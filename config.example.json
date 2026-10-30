@@ -15,7 +15,7 @@
   "model_name": "DSV4.1-1017",
   "model": "",
   "ds4_command": [
-    "engines/ds4-mac/ds4-server",
+    "engines/ds4/ds4-server",
     "--model",
     "{model}",
     "--cuda",

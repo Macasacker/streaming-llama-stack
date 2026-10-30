@@ -34,10 +34,8 @@ if [ "$target" = webui ] || [ "$target" = all ]; then
 fi
 
 if [ "$target" = ds4 ] || [ "$target" = all ]; then
-    # CUDA decode engine. The packed FP4 decode kernels live in engines/ds4-win and are
-    # not yet ported to Linux, so this builds engines/ds4-mac against the canonical
-    # ggml-mxfp4 layout file.
-    make -C "$root/engines/ds4-mac" cuda CUDA_ARCH="sm_${cuda_arch%a}"
+    # CUDA decode engine: Linux, io_uring batch reads, packed FP4 and Q4_K kernels.
+    make -C "$root/engines/ds4" cuda CUDA_ARCH="sm_${cuda_arch%a}"
 fi
 
 if [ "$target" = llama ] || [ "$target" = all ]; then

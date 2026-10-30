@@ -82,17 +82,15 @@ class EnvironmentContractTests(unittest.TestCase):
         self.assertEqual(env['HF_HUB_OFFLINE'], '1')
         self.assertTrue(env['TMP'].startswith(cfg['runtime_root']))
         self.assertAlmostEqual(float(env['MEM_GUARD_MAX_PROC_GB']) * 1e9, 1 << 30)
-        # Windows private commitment includes GPU backing; it is separate
-        # from the physical RSS cap enforced by the outer guardian.
-        self.assertEqual(apply({}, cfg, 'ds4-win')['DS4_HOST_MEMORY_BUDGET_MB'], '45056')
+        # The host RSS cap is separate from the engine's own device-backing
+        # allowance; the launcher supplies the admitted budget for the ds4 scope.
+        self.assertEqual(apply({}, cfg, 'ds4')['DS4_HOST_MEMORY_BUDGET_MB'], '45056')
 
     def test_environment_cannot_override_guard_gpu_or_memory_limits(self):
         from slstack.config import load
         cfg = load(overrides={'gpu_uuid': 'GPU-test', 'host_budget_gib': 1, 'min_available_gib': 4})
         for scope, var, value in [('rtx-llama', 'CUDA_VISIBLE_DEVICES', 'GPU-other'),
-                                  ('mac-ds4', 'DS4_NATIVE_SESSION_HOST_BYTES', str(2 << 30)),
-                                  ('mac-ds4', 'DS4_NATIVE_SESSION_HOST_FLOOR_BYTES', str(1 << 30)),
-                                  ('ds4-win', 'DS4_HOST_MEMORY_BUDGET_MB', '65536'),
+                                  ('ds4', 'DS4_HOST_MEMORY_BUDGET_MB', '65536'),
                                   ('image', 'MEM_GUARD_DISABLE', '1')]:
             with self.subTest(var=var), self.assertRaises(ValueError):
                 apply({}, {**cfg, 'env_overrides': {var: value}}, scope)
@@ -102,7 +100,7 @@ class EnvironmentContractTests(unittest.TestCase):
         cfg = {'env_overrides': {'DS4_CACHE_AFFINITY_BIAS': '0.35'}}
         for args in [['engine', '--cache-affinity-bias', '0', '--cpu'],
                      ['engine', '--cache-affinity-bias=0', '--cpu']]:
-            self.assertEqual(argv_overrides(args, cfg, 'ds4-win'), ['engine', '--cpu'])
+            self.assertEqual(argv_overrides(args, cfg, 'ds4'), ['engine', '--cpu'])
 
 
     def test_test_fault_is_documented_and_only_explicit(self):

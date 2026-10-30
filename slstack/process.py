@@ -31,7 +31,7 @@ class OwnedProcess:
         self.stop_path = self.prefix.with_suffix('.stop')
         self.receipt = self.prefix.with_suffix('.receipt.json')
         self.log = self.prefix.with_suffix('.log')
-        scope = scope or ('ds4-win' if name == 'ds4-server' else name if name in ('image', 'video') else 'studio')
+        scope = scope or ('ds4' if name == 'ds4-server' else name if name in ('image', 'video') else 'studio')
         from .envvars import argv_overrides
         command = argv_overrides(command, cfg, scope)
         # Secret values never reach the spec file; the guard gets them through its own environment.
@@ -43,10 +43,10 @@ class OwnedProcess:
         spec = {'command': command, 'cwd': str(cwd), 'env': public_env, 'secret_env': sorted(secrets),
                 'runtime_root': cfg['runtime_root'], 'gpu_uuid':cfg.get('gpu_uuid'),
                 'host_budget_gib': cfg['host_budget_gib'], 'min_available_gib': cfg['min_available_gib'],
-                'paging_telemetry': bool(cfg.get('paging_telemetry') or gpu or scope in ('ds4-win', 'ds4-mac', 'rtx-producer', 'mlx-serve', 'image', 'video'))
+                'paging_telemetry': bool(cfg.get('paging_telemetry') or gpu or scope in ('ds4', 'rtx-producer', 'image', 'video'))
                                     if telemetry is None else telemetry,
                 'job_commit_gib': commit_budget_gib(cfg), 'timeout_s': None if unbounded else (timeout or cfg['request_timeout_s']),   # DS4COMBO2: a server has no lifetime cap
-                'runtime_min_free_gib': cfg.get('runtime_min_free_gib',0.5) if scope in ('ds4-win','ds4-mac','rtx-producer','mlx-serve') else 0,
+                'runtime_min_free_gib': cfg.get('runtime_min_free_gib',0.5) if scope in ('ds4','rtx-producer') else 0,
                 'owner_pid': os.getpid(), 'owner_created': psutil.Process().create_time(),
                 'stop': str(self.stop_path), 'receipt': str(self.receipt), 'log': str(self.log)}
         self.cooperative_stop=bool(name in ('router','single-engine') and cfg.get('serving','single_engine')=='single_engine')

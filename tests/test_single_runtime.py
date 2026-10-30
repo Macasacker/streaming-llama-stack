@@ -18,7 +18,7 @@ BASE = dict(gpu_uuid='GPU-1', gpu_idle_max_mib=1024, hold_file=str(FIXTURE / 'gp
             context=262144, model=str(FIXTURE / 'models/x.gguf'), model_name='DSV4.1-1017', producer_host_budget_gib=6.25,
             producer_profile='ultra', producer_sha256='a' * 64, producer_source_revision='r',
             llama_producer=str(FIXTURE / 'scratch/bin/llamadecode-r.exe'), runtime_root=str(FIXTURE / 'scratch/runs'),
-            producer_library_directories=[str(FIXTURE / 'scratch/engines/ds4-win'), str(FIXTURE / 'cuda/bin')],
+            producer_library_directories=[str(FIXTURE / 'scratch/engines/ds4'), str(FIXTURE / 'cuda/bin')],
             cache_affinity_spread_file=str(FIXTURE / 's.txt'), model_receipt=str(FIXTURE / 'scratch/m.json'), ds4_command=['native.exe'],
             env_overrides={'CUDA_CACHE_DISABLE': '1'}, host='127.0.0.1', port=18748)
 INSTALLED = FIXTURE / 'installed/0123abcd'

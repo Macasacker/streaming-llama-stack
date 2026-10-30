@@ -1,4 +1,4 @@
-"""GPU gate: the single-engine serving path end to end (no HTTP, no native ds4-win).
+"""GPU gate: the single-engine serving path end to end (no HTTP, no separate native server).
 
 Turn 1 renders the case in process, launches the ULTRA producer on it, greedy-decodes
 to EOS and checks the case's expected substring. Turn 2 appends the assistant reply

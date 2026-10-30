@@ -47,7 +47,7 @@ def check(cfg, *, verify_journal=True):
     supported = 'error' not in counters and ('pages_output' in counters or 'vm_stat' in counters or 'swap_out_bytes' in counters)
     record('paging_counter_support', supported, 'OS paging counters are included in engine/GPU guard receipts; system activity is not per-process attribution', required=False)
     record('core_kv_residency', False, 'Live VRAM/wired/pinned residency and pagefile/expert-miss I/O reconciliation remain unqualified', required=False)
-    for name in ('ds4-win', 'streaming-llama', 'ds4-mac'):
+    for name in ('ds4', 'streaming-llama'):
         directory = ROOT / 'engines' / name
         record('source:' + name, (directory / 'PROVENANCE.md').is_file(), 'Clean vendored source; see PROVENANCE.md')
     for key in ('model', 'image_model', 'video_model', 'comfyui_models'):

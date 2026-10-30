@@ -26,7 +26,7 @@ class CalibrationPresetTests(unittest.TestCase):
 
     def selected(self, cfg=None):
         with patch('slstack.envvars.rows', return_value=[self.row]):
-            return apply({}, cfg or self.cfg, 'ds4-win')
+            return apply({}, cfg or self.cfg, 'ds4')
 
     def test_matching_model_selects_packaged_numeric_calibration(self):
         self.assertEqual(self.selected()['DS4_CACHE_AFFINITY_SPREAD_FILE'],

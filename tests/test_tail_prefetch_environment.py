@@ -15,7 +15,7 @@ class TailPrefetchEnvironmentTests(unittest.TestCase):
             self.assertEqual(env['LLAMADECODE_CONE_TAIL_PREFETCH'], '0')
             self.assertEqual(env['LLAMADECODE_GRAPH_MATERIALIZE_PLAN'], '1')
             self.assertEqual(apply({}, {'env_overrides': {'LLAMADECODE_CONE_TAIL_PREFETCH': '1'}}, 'rtx-llama')['LLAMADECODE_CONE_TAIL_PREFETCH'], '1')
-            self.assertNotIn('LLAMADECODE_CONE_TAIL_PREFETCH', apply({}, {}, 'mac-ds4'))
+            self.assertNotIn('LLAMADECODE_CONE_TAIL_PREFETCH', apply({}, {}, 'ds4'))
             with self.assertRaises(ValueError):
                 apply({}, {'env_overrides': {'LLAMADECODE_CONE_TAIL_PREFETCH': '2'}}, 'rtx-llama')
 

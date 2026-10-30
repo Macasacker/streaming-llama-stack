@@ -92,7 +92,7 @@ def main():
     start.add_argument('--video-mode', choices=['streaming', 'resident'])
     start.add_argument('--lora', action='append')
     start.add_argument('--serving', choices=['single_engine', 'native'],
-                       help='Single-RTX serving: single_engine (default; ULTRA producer prefill + ds4 decode in one process) or native (ds4-win server)')
+                       help='Single-RTX serving: single_engine (default; ULTRA producer prefill + ds4 decode in one process) or native (ds4-server)')
     guarded = sub.add_parser('guarded')
     guarded.add_argument('--cwd', default=str(ROOT))
     guarded.add_argument('argv', nargs=argparse.REMAINDER)

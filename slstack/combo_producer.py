@@ -596,7 +596,7 @@ class ComboProducer:
 
     def quality(self,value):
         """LLAMADECODE B5: the live quality-speed setting (0 = max quality, 1.36125 = max speed) for the
-        in-process ds4 decode; same scale as ds4-win /v1/quality-speed. Applies from the next decode."""
+        in-process ds4 decode; same scale as the native server's /v1/quality-speed. Applies from the next decode."""
         return self.process.request(self.command('quality_speed',value=float(value)))
 
     def generation(self, settings):

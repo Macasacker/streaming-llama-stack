@@ -1,89 +1,77 @@
-"""Check retained backend build inputs without loading a model or a GPU library."""
-from pathlib import Path
-import ast
+"""Audit the retained Linux engine sources: provenance, licences, and file completeness.
+
+The fork ships two engines. This script checks that each one carries its provenance record and
+that the source inputs a build needs are present in the checkout. It does not build anything and
+does not establish that a model runs - see docs/linux-port-plan.md for the gates that do.
+"""
 import hashlib
 import json
 import subprocess
-import sys
-import tomllib
-
-ROOT=Path(__file__).resolve().parents[1]
-sys.path.insert(0,str(ROOT))
-from slstack.backends import BACKENDS
+from pathlib import Path
 
 
-def audit(root=ROOT):
-    components={
-        'ds4':['engines/ds4-mac/ds4.c','engines/ds4-mac/ds4_metal.m','engines/ds4-mac/Makefile'],
-        'llama':['engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/CMakeLists.txt',
-                 'engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp',
-                 'engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/tail_tokens.cpp',
-                 'engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/tail_tokens.h'],
-        'llama-upstream':['engines/upstream-decode-receiver/CMakeLists.txt','engines/upstream-decode-receiver/wir-disabled.cpp',
-                          'engines/upstream-decode-receiver/PROVENANCE.json'],
-        'mlx':['engines/mlx-receiver/mlx_token_stream_server.py','engines/mlx-receiver/kv_handoff.py',
-               'engines/mlx-receiver/kv_converter.py','engines/mlx-receiver/mtp_openai_shim.py',
-               'engines/mlx-receiver/glm52_mtp.py','engines/mlx-receiver/glm52_mtp_drafter.py',
-               'slstack/mlx_setup.py','locks/mac-mlx-py312.txt','vendor/mac-mlx/PROVENANCE.json'],
-        'mference':['engines/mference/Package.swift','engines/mference/Package.resolved',
-                    'engines/mference/LICENSE','engines/mference/LICENSE-APACHE',
-                    'engines/mference/Sources/MferenceServer/Command/main.swift'],
-        'mlx-serve':['engines/mlx-serve/build.zig','engines/mlx-serve/build.zig.zon',
-                     'engines/mlx-serve/scripts/build-mlx.sh','engines/mlx-serve/scripts/fetch-llama.sh'],
-        'omlx':['vendor/studio/studio/backend_argv.py'],
-        'ds4-peer':['vendor/studio/studio/peer_launch.py','engines/ds4-peer/ds4_peer.c',
-                    'engines/ds4-peer/ds4_peer.h','engines/ds4-peer/Makefile','engines/ds4-peer/ds4_metal.m'],
-    }
-    rows=[]
-    for name,spec in BACKENDS.items():
-        missing=[p for p in components[spec.setup] if not (root/p).is_file()]
-        rows.append(dict(backend=name,transport=spec.transport,source_inputs_present=not missing,missing=missing,
-                         qualification='Source audit only; does not establish native build, model compatibility or GPU output.'))
-    native=root/'vendor/mac-mlx/mlx_vlm/custom_kernels/glm_moe_dsa/csrc'
-    required=['CMakeLists.txt','bindings.cpp','dsa_indexer.cpp','dsa_indexer.h','exact_block_attention.cpp',
-              'fused_moe.cpp','sparse_mla.cpp','sparse_mla.h','kernels/quantized_glm.h',
-              'kernels/steel_attention_block_token.h','kernels/steel_dsa_indexer_score.h','kernels/steel_sparse_mla.h',
-              'mlx/backend/metal/kernels/steel/attn/params.h']
-    native_missing=[p for p in required if not (native/p).is_file()]
-    manifest=json.loads((root/'vendor/mac-mlx/PROVENANCE.json').read_text())
-    hashes=[]
-    for row in manifest['files']:
-        file=root/'vendor/mac-mlx'/row['path']
-        if not file.is_file() or hashlib.sha256(file.read_bytes().replace(b'\r\n',b'\n')).hexdigest()!=row['export_sha256']:hashes.append(row['path'])
-    peer_manifest=json.loads((root/'engines/ds4-peer/PROVENANCE.json').read_text())
-    peer_hashes=[]
-    for row in peer_manifest['files']:
-        file=root/'engines/ds4-peer'/row['path']
-        if not file.is_file() or hashlib.sha256(file.read_bytes().replace(b'\r\n',b'\n')).hexdigest()!=row['export_sha256']:peer_hashes.append(row['path'])
-    mference_manifest=json.loads((root/'engines/mference/PROVENANCE.json').read_text())
-    mference_hashes=[]
-    for row in mference_manifest['files']:
-        file=root/'engines/mference'/row['path']
-        if not file.is_file() or hashlib.sha256(file.read_bytes().replace(b'\r\n',b'\n')).hexdigest()!=row['export_sha256']:mference_hashes.append(row['path'])
-    untracked=[]
-    if (root/'.git').exists():
-        tracked=set(subprocess.check_output(['git','-C',str(root),'ls-files','--cached','-z']).decode().split('\0'))
-        for directory,records in (('vendor/mac-mlx',manifest['files']),('engines/ds4-peer',peer_manifest['files']),('engines/mference',mference_manifest['files'])):
-            untracked.extend(directory+'/'+r['path'] for r in records if directory+'/'+r['path'] not in tracked)
-    # Resolve local receiver imports against the retained implementation modules.
-    receiver=root/'engines/mlx-receiver';modules={p.stem for p in receiver.glob('*.py')}
-    needed={'kv_handoff','kv_converter','glm52_mtp','glm52_mtp_drafter','kimi_vision','mlx_adapters',
-            'mtp_adaptive_depth','prompt_cache_store','swi_reasoning'}
-    missing_modules=sorted(needed-modules)
-    for p in receiver.glob('*.py'):ast.parse(p.read_text(encoding='utf-8'))
-    package=tomllib.loads((root/'vendor/mac-mlx/pyproject.toml').read_text())
-    globs=package['tool']['setuptools']['package-data'].get('mlx_vlm.custom_kernels.glm_moe_dsa',[])
-    packaged={p.relative_to(native.parent).as_posix() for pattern in globs for p in native.parent.glob(pattern) if p.is_file()}
-    unpackaged=['csrc/'+p for p in required if 'csrc/'+p not in packaged]
-    return dict(backends=rows,mlx_native_missing=native_missing,mlx_unpacked_build_inputs=unpackaged,
-                mlx_source_files=len(manifest['files']),mlx_hash_mismatches=hashes,receiver_missing_modules=missing_modules,
-                peer_hash_mismatches=peer_hashes,
-                mference_hash_mismatches=mference_hashes,untracked_retained_files=untracked,
-                all_retained_components_complete=not(native_missing or unpackaged or hashes or peer_hashes or mference_hashes or untracked or missing_modules or any(row['missing'] for row in rows)),
-                external_requirements={'mlx-serve':'Initialize the pinned source and stage its MLX/MLX-C, libllama, Jinja and webp build dependencies.',
-                                       'omlx':'An isolated pinned oMLX installation with compiled native kernels is required; an argv builder alone is not an installed engine.'})
+def normalized(path):
+    return hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
 
 
-if __name__=='__main__':
-    result=audit();print(json.dumps(result,indent=2))
+ENGINES = {
+    'ds4': {
+        'provenance': 'engines/ds4/PROVENANCE.md',
+        'notices': ['engines/ds4/THIRD_PARTY_NOTICES.md'],
+        'inputs': ['engines/ds4/Makefile', 'engines/ds4/ds4.c', 'engines/ds4/ds4_cuda.cu',
+                   'engines/ds4/ds4_batch_io.cpp', 'engines/ds4/ds4_batch_io.h',
+                   'engines/ds4/ds4_host_memory.c', 'engines/ds4/ds4_host_memory.h',
+                   'engines/ds4/ds4_engram_iouring.c', 'engines/ds4/ds4_server.c',
+                   'engines/ds4/cuda/mmq/mmq.cuh', 'engines/ds4/cuda/mmq/ds4_repack.cu'],
+    },
+    'streaming-llama': {
+        'provenance': 'engines/streaming-llama/PROVENANCE.md',
+        'inputs': ['engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu',
+                   'engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp'],
+    },
+}
+
+
+def manifest_hashes(root, engine):
+    """Verify any checked-in PROVENANCE.json manifest for an engine directory."""
+    manifest_path = root / 'engines' / engine / 'PROVENANCE.json'
+    if not manifest_path.is_file():
+        return []
+    mismatches = []
+    for row in json.loads(manifest_path.read_text(encoding='utf-8'))['files']:
+        file = root / 'engines' / engine / row['path']
+        if not file.is_file() or normalized(file) != row['export_sha256']:
+            mismatches.append(row['path'])
+    return mismatches
+
+
+def audit(root=None):
+    root = Path(root or Path(__file__).resolve().parents[1])
+    rows = []
+    for name, spec in ENGINES.items():
+        missing = [p for p in [spec['provenance'], *spec.get('notices', []), *spec['inputs']]
+                   if not (root / p).is_file()]
+        rows.append(dict(engine=name, source_inputs_present=not missing, missing=missing,
+                         qualification='Source audit only; does not establish a native build, '
+                                       'model compatibility, or GPU output.'))
+    hashes = {name: manifest_hashes(root, name) for name in ENGINES}
+    untracked = []
+    if (root / '.git').exists():
+        tracked = set(subprocess.check_output(['git', '-C', str(root), 'ls-files', '--cached', '-z'])
+                      .decode().split('\0'))
+        for name, spec in ENGINES.items():
+            untracked.extend(p for p in [spec['provenance'], *spec.get('notices', []), *spec['inputs']]
+                             if p not in tracked)
+    complete = not (any(row['missing'] for row in rows) or any(hashes.values()) or untracked)
+    return dict(engines=rows, manifest_hash_mismatches=hashes, untracked_retained_files=untracked,
+                all_retained_components_complete=complete,
+                external_requirements={'ds4': 'CUDA 13.4 with nvcc for sm_120, liburing; '
+                                              'GPUDirect Storage is not required (io_uring batch reads).',
+                                       'streaming-llama': 'CUDA 13.4, a C++ toolchain, and OpenSSL; '
+                                                          'the producer needs a qualified GGUF on disk to run.'})
+
+
+if __name__ == '__main__':
+    result = audit()
+    print(json.dumps(result, indent=2))
     raise SystemExit(not result['all_retained_components_complete'])

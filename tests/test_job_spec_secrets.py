@@ -36,14 +36,14 @@ class JobSpecSecretTests(unittest.TestCase):
         self.assertNotIn(SECRET, json.dumps(cfg))
 
     def run_job(self, paging):
-        # The token is a ds4-win scoped setting; ds4-win jobs use the shared paging guard.
+        # The token is a ds4-scoped setting; ds4 jobs use the shared paging guard.
         with tempfile.TemporaryDirectory() as root:
             cfg = load(None)
             cfg.update(runtime_root=root, host_budget_gib=1, min_available_gib=1, request_timeout_s=60,
                        paging_telemetry=paging, _control_token=SECRET,
                        env_overrides={'DS4_SERVER_AUTH_TOKEN': SECRET})
             stdin = json.dumps({'cfg': redact_cfg(cfg)}) + '\n'
-            proc = OwnedProcess(cfg, [sys.executable, '-c', CHILD], 'secret-test', stdin=stdin, scope='ds4-win')
+            proc = OwnedProcess(cfg, [sys.executable, '-c', CHILD], 'secret-test', stdin=stdin, scope='ds4')
             proc.wait()
             written = [p for p in Path(root, 'jobs').iterdir() if p.is_file()]
             log = proc.log.read_text(errors='replace')

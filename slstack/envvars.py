@@ -18,7 +18,7 @@ HOST_VARIABLES = {'PATH', 'HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'SYS
                   'WINDIR', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TERM', 'COMSPEC', 'PATHEXT',
                   'USERNAME', 'LOGNAME', 'USER', 'SHELL', 'PWD', 'OLDPWD', 'CUDA_PATH',
                   'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE', 'NO_COLOR', 'FORCE_COLOR'}
-SCOPE_ALIASES = {'ds4-mac': 'mac-ds4', 'rtx-producer': 'rtx-llama'}
+SCOPE_ALIASES = {'rtx-producer': 'rtx-llama'}
 
 
 @lru_cache(maxsize=16)
@@ -104,7 +104,7 @@ def apply(env, cfg, scope):
         applicable = scope in row['scopes']
         value = overrides.get(var) if applicable else None
         if value is None and applicable:
-            value = cfg.get('ds4_env', {}).get(var) if scope == 'ds4-win' else None
+            value = cfg.get('ds4_env', {}).get(var) if scope == 'ds4' else None
             if value is None:
                 value = row.get('defaults_by_scope', {}).get(scope)
                 if row.get('model_signature') and not matches_model_signature(cfg, row['model_signature']):
@@ -189,7 +189,7 @@ def restore_secrets(spec):
 def argv_overrides(command, cfg, scope):
     """A table flag beats a conflicting engine argument in a user's config."""
     scope = SCOPE_ALIASES.get(scope, scope)
-    selected = {**(cfg.get('ds4_env', {}) if scope == 'ds4-win' else {}), **cfg.get('env_overrides', {})}
+    selected = {**(cfg.get('ds4_env', {}) if scope == 'ds4' else {}), **cfg.get('env_overrides', {})}
     conflicts = {row['argv_flag'] for row in rows() if scope in row['scopes'] and row.get('argv_flag') and row['var'] in selected}
     result = []
     index = 0

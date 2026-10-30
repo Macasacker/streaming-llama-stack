@@ -206,7 +206,7 @@ class Native:
                   (' vram=%d host=%d'%built if built else ''),flush=True)
             if self.restore_source!='none':env_values['DS4_COMBO_EXPERT_RESTORE_FILE']=restore_file
         self.cfg.setdefault('env_overrides',{}).update(env_values)
-        env=environment(self.cfg,'ds4-win')
+        env=environment(self.cfg,'ds4')
         parts=cfg.get('ds_read_parts',8)
         if type(parts) is not int or not 1<=parts<=64:raise ValueError('Explicit native split reads must be in1..64')
         env['DS4_DS_READ_PARTS']=str(parts)

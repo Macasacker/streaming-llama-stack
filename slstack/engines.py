@@ -77,7 +77,7 @@ class Engines:
 
     def single_engine(self):
         # Default single-RTX endpoint: combo_proxy serving_mode=single_engine (ULTRA producer
-        # prefill + in-process ds4 decode). --serving native keeps the ds4-win server.
+        # prefill + in-process ds4 decode). --serving native keeps the ds4-server binary.
         return not self.cfg.get('mac') and self.cfg.get('serving', 'single_engine') == 'single_engine'
 
     def combo_enabled(self):
@@ -319,9 +319,9 @@ class Engines:
         self.cfg.setdefault('env_overrides', {})['DS4_SERVER_AUTH_TOKEN'] = token
         # combo_proxy's own guardian owns the server and producer and checks each request's
         # GPU window; each producer takes the GPU hold. The outer job is the CPU-idle server's
-        # tree budget only (ds4-win scope for the native token), so no 19-minute engine deadline.
+        # tree budget only (ds4 scope for the native token), so no 19-minute engine deadline.
         self.llm = OwnedProcess(self.cfg, [sys.executable, '-B', '-m', 'slstack.combo_proxy', '--config', str(config)],
-                                'single-engine', scope='ds4-win', telemetry=False,
+                                'single-engine', scope='ds4', telemetry=False,
                                 cwd=Path(__file__).resolve().parents[1], timeout=86400)
         window = Window(readiness_seconds(self.cfg))   # no-progress window (owner rule), as above
         while not window.expired():

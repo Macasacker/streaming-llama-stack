@@ -1,7 +1,7 @@
-"""DeepSeek generated-message parser: a Python port of ds4-win's exact logic.
+"""DeepSeek generated-message parser: a Python port of the engine's exact logic.
 
 The parser is C, so this is a line-for-line port, not the process.
-Provenance: engines/ds4-win/ds4_server.c at stack revision b5907f2 (fork base
+Provenance: the Windows ds4 engine's ds4_server.c at stack revision b5907f2 (fork base
 058ae09159a1, merge e1e45374ddc3): find_any_tool_start/end, trim_tool_separator_ws,
 find_tool_structural_text, dsml_unescape_text, dsml_attr, tool_call_json_args_add,
 dsml_parse_leaf_param_json, dsml_parse_nested_params_object, split_reasoning_content,

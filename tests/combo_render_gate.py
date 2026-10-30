@@ -1,6 +1,6 @@
-"""GPU gate: native ds4-win render vs the in-process renderer, byte-identical token ids.
+"""GPU gate: native ds4 render vs the in-process renderer, byte-identical token ids.
 
-Starts ONE native ds4-win (the qualified cfg's ds4_command, combo mode) and asks it
+Starts ONE native ds4 (the qualified cfg's ds4_command, combo mode) and asks it
 to render each request body (Native.render, the /decode/render control op on a
 fresh native, i.e. canonical ids); renders the same bodies with slstack.ds4_render;
 asserts identical id lists. No decode, no producer.

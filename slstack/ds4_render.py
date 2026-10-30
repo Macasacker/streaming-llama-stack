@@ -1,6 +1,6 @@
-"""In-process DeepSeek-V4.1 chat render + tokenizer: a Python port of ds4-win's.
+"""In-process DeepSeek-V4.1 chat render + tokenizer: a Python port of the engine's.
 
-Provenance (exact logic port, no process): engines/ds4-win at stack revision
+Provenance (exact logic port, no process): the Windows ds4 engine this fork ports from, at stack revision
 b5907f2 (fork base 058ae09159a1, merge e1e45374ddc3):
   ds4_server.c  parse_chat_request / parse_messages / parse_openai_content(_object)
                 json_content / parse_tool_calls_value / parse_function_call
@@ -354,7 +354,7 @@ def _number(value):
 
 
 def parse_stop(value):
-    """ds4-win parse_stop: a string or an array whose string members are the stop
+    """Engine parse_stop: a string or an array whose string members are the stop
     sequences (other members skipped); any other value is ignored; empty strings dropped."""
     if isinstance(value, str):values = [value]
     elif isinstance(value, list):values = [v for v in value if isinstance(v, str)]

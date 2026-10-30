@@ -26,7 +26,7 @@ class QualityRequestTransportTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         source_path = os.environ.get('SLSTACK_SERVER_SOURCE')
         if not source_path:
-            source_path = next(p for p in (root / 'ds4_server.c', root / 'engines/ds4-win/ds4_server.c') if p.is_file())
+            source_path = next(p for p in (root / 'ds4_server.c', root / 'engines/ds4/ds4_server.c') if p.is_file())
         source = Path(source_path).read_text(encoding='utf-8')
         fields = re.search(r'bool quality_speed_set;\s*float quality_speed;\s*bool quality_per_phase;\s*float quality_phases\[(?:\d+|DS4_QUALITY_PHASE_COUNT)\];', source)
         setting = re.search(r'typedef struct \{bool per_phase;float value,phases\[(?:4|DS4_QUALITY_PHASE_COUNT)\];\} quality_setting;', source)

@@ -90,13 +90,13 @@ class Exports(unittest.TestCase):
             cfg['decode'].update(backend='llama-server',binary=__import__('sys').executable)
             self.assertTrue(inspect(cfg)['ready'])
 
-    def test_native_sources_resources_and_licenses_survive_export(self):
-        spec=importlib.util.spec_from_file_location('backend_audit',ROOT/'scripts/audit_backend_sources.py')
+    def test_linux_engine_sources_and_provenance_survive_export(self):
+        spec=importlib.util.spec_from_file_location('engine_audit',ROOT/'scripts/audit_backend_sources.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         result=module.audit()
-        self.assertEqual(len(result['backends']),len(BACKENDS))
+        self.assertEqual([row['engine'] for row in result['engines']],['ds4','streaming-llama'])
         self.assertTrue(result['all_retained_components_complete'],result)
-        self.assertEqual(result['mlx_unpacked_build_inputs'],[])
-        self.assertTrue((ROOT/'vendor/mac-mlx/mlx_vlm/models/mimo_v2/_arch_v26.LICENSE').is_file())
+        self.assertTrue((ROOT/'engines/ds4/PROVENANCE.md').is_file())
+        self.assertTrue((ROOT/'engines/ds4/THIRD_PARTY_NOTICES.md').is_file())
 
 if __name__=='__main__':unittest.main()

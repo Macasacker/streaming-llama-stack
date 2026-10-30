@@ -17,7 +17,7 @@ class Dsv41RecipeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_native_startup_accepts_lora_before_help_without_loading_weights(self):
-        binary = ROOT / 'engines/ds4-win/ds4-server.exe'
+        binary = ROOT / 'engines/ds4/ds4-server'
         self.assertTrue(binary.is_file(), 'Build the native test binary first')
         result = subprocess.run([str(binary), '--lora', 'TEST-not-loaded.safetensors', '--help'],
                                 capture_output=True, text=True, encoding='utf-8', errors='replace',

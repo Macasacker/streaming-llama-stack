@@ -42,7 +42,7 @@ class DeepSeekPretokenizerTests(unittest.TestCase):
         self.assertFalse(steps[3]['use_regex'])
         reference = Sequence([Split(Regex(s['pattern']['Regex']), 'isolated') for s in steps[:3]])
         root = Path(__file__).resolve().parents[1]
-        engine = root / 'engines/ds4-mac'
+        engine = root / 'engines/ds4'
         source = (engine / 'ds4.c').read_text(encoding='utf-8')
         fragment = source[source.index('#include "ds4_deepseek_unicode.inc"'):source.index('\nstatic int vocab_lookup', source.index('#include "ds4_deepseek_unicode.inc"'))]
         helpers = '\n'.join(c_function(source, name) for name in ['utf8_len_from_first_byte', 'ascii_alpha', 'ascii_newline', 'joyai_ascii_punct_symbol', 'utf8_is_cjk_hira_kata', 'utf8_peek_one'])

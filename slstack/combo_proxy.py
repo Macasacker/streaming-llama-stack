@@ -1,4 +1,4 @@
-"""Normal native-server HTTP surface, relaying the real ds4-win stream.
+"""Normal native-server HTTP surface, relaying the real native engine stream.
 
 CPU-only while idle. Every chat owns a separately bounded shared GPU lease;
 the existing independent guardian watches the whole server/model process tree.

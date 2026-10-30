@@ -28,13 +28,13 @@ def main():
     cfg = load(args.config)
     cfg.setdefault('env_overrides', {}).update({key[4:]: value for key, value in vars(args).items()
                                                if key.startswith('env_') and value is not None})
-    binary = path('engines/ds4-win/ds4-server.exe')
+    binary = path('engines/ds4/ds4-server')
     # Include a conflicting configured engine argument. The table flag must
     # win. A missing relative model stops the CPU control before inference.
     command = [sys.executable, '-B', '-c', CHILD, str(binary), '--cpu', '--ctx', '64',
                '--cache-affinity-bias', '0', '--model', 'slstack-env-proof-no-model.gguf']
     assert not path('slstack-env-proof-no-model.gguf').exists()
-    proc = OwnedProcess(cfg, command, 'native-env-proof', scope='ds4-win', timeout=20)
+    proc = OwnedProcess(cfg, command, 'native-env-proof', scope='ds4', timeout=20)
     try:
         proc.wait()
     except RuntimeError:

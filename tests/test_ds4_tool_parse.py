@@ -1,4 +1,4 @@
-"""ds4-win DeepSeek tool-call parser port (slstack.ds4_tool_parse) on sample outputs."""
+"""DeepSeek tool-call parser port (slstack.ds4_tool_parse) on sample outputs."""
 import json
 import sys
 import unittest
