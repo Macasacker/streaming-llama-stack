@@ -154,11 +154,12 @@ Write a shell twin of `build.ps1`. Drop `LLAMA_DSV41_DSTORAGE_INCLUDE_DIR` and `
 
 ### Decode engine
 
-Two choices.
-
-Use ds4-mac's CUDA build on Linux with the canonical `ggml-mxfp4` file that has no layout flag. That works today, but only ds4-win accepts `flashinfer-sm120-mxfp8-mxfp4-v1`, at `engines/ds4-win/ds4.c:3066` and `cuda/mmq/ds4_mmq_fp4_packed.cuh`. So you lose the packed tensor-core layout and its decode speed.
-
-Port ds4-win into a Linux ds4 engine to keep the packed decode kernels and turn `ds4-decode.dll` into a `.so` loaded beside the producer. That is 747 Win32 references.
+The fork's base is `engines/ds4-win`, renamed `engines/ds4`, with `engines/ds4-mac` deleted. Both
+engines fail to build on Linux today, and `cuda/mmq/` differs between them only in `mmq.cuh`
+(18 lines), so the packed FP4 and Q4K-half kernels move as files rather than through a merge.
+`ds4-decode.dll` becomes `ds4-decode.so`, loaded with `dlopen`, and the 322 non-Metal Win32
+references become POSIX: `ds4_win32.h` is a Windows-only shim that compiles away on Linux, and
+`ds4_dstorage.cpp` has an io_uring twin at `engines/ds4/ds4_batch_io.cpp`.
 
 ### Two-machine mode
 

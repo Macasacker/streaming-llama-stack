@@ -110,27 +110,90 @@ asserts `producer_prefill_sweep_tokens == 49152` and gets `'auto'`. It fails on 
 
 ## Phase 1: one CUDA engine
 
-1. Create `engines/ds4` from `engines/ds4-mac`, keeping the non-Darwin Makefile branch.
-2. Delete the Metal and Objective-C sources: 28 files in `engines/ds4-mac/metal`, `ds4_metal.m`,
-   `ds4_metal*.inc`, the Accelerate and ImageIO link lines, and the Darwin branch of the Makefile.
-   `engines/ds4-mac` has 6,091 Apple/Metal references.
-3. Delete `rocm/`, `cuda-spark`, `cuda-generic`, `strix-halo`, `rocm` Makefile targets and the
-   gfx1151 flags unless ROCm stays.
-4. Merge the ds4-win kernel list above into `engines/ds4/cuda/mmq` and add them to `MMQ_OBJS`.
-5. Port the V4.1 decode kernel bodies from `engines/ds4-win/ds4_cuda.cu` into
-   `engines/ds4/ds4_cuda.cu`. Diff first; the files are 46k and 33k lines and diverge.
-6. Teach `engines/ds4/ds4.c` to accept `deepseek41.expert_layout = flashinfer-sm120-mxfp8-mxfp4-v1`.
-   Only `engines/ds4-win/ds4.c:3066` accepts it today.
-7. Add an external decode library target so the producer loads decode kernels beside it,
-   replacing `ds4-decode.dll`.
-8. Delete `engines/ds4-win` and `engines/ds4-peer`. Carry their provenance notes from
-   `engines/ds4-win/PROVENANCE.md` and `engines/ds4-peer` into `engines/ds4/PROVENANCE.md` and
-   `NOTICE`, since the kernels came from NovaStar and IngeniousIdiocy.
+### Decision taken on which engine is the base (2026-10-30, evidence)
+
+Both engines fail to build on Linux today, so neither is a drop-in.
+
+- `make -C engines/ds4-mac cuda CUDA_ARCH=sm_120` fails in `ds4.c`. `ds4.c` calls six `ds4_gpu_*`
+  functions whose declarations sit inside `#ifdef __APPLE__` in `ds4_gpu.h` (the block at 158-277):
+  `ds4_gpu_dsv41_matmul_q8_0_bf16_rows` (`ds4.c:41397`), `ds4_gpu_dsv41_indexer_topk_tensor`
+  (`:42079`), `ds4_gpu_tp_flag_fold_request` (`:42272`), `ds4_gpu_add_tensor_tp_flag` (`:42505`),
+  `ds4_gpu_pq_probs` (`:89469`), `ds4_gpu_pq_cand` (`:89471`). GCC 14 makes the implicit
+  declaration an error, so the Mac engine's Linux CUDA branch has never been compiled.
+- `make -C engines/ds4-win cuda CUDA_ARCH=sm_120` compiles every C/C++ TU and fails only in
+  `ds4_cuda.cu`: 12 errors, all identifiers defined inside the `#if defined(_WIN32)` block that
+  runs 5933-6711 but used outside it (`g_ds_decode_bandwidth` at 8623/8631/8644/8657/11455,
+  `g_prefill_pipeline` at 8696, `ds4_ds_batch_inflight` at 11423, `g_ds_prefetch_*` at
+  11457-11496, `cuda_ds_prefetch_reset` at 11494) plus one "transfer of control bypasses
+  initialization" at 27845.
+- `cuda/mmq/` is near-identical between the two engines: only `mmq.cuh` differs, by 18 lines.
+  The Windows copy adds a K2304 row-stride guard so a partial K row never loads the next
+  expert's codes or scales (`mmq.cuh:973-986`). So the packed FP4 and Q4K-half kernels move as
+  files; there is no 46k-line merge.
+
+Base is therefore `engines/ds4-win`, renamed `engines/ds4`, and `engines/ds4-mac` is deleted in
+the same pass. That keeps option 3's end state - exactly one engine - without the kernel merge,
+keeps `flashinfer-sm120-mxfp8-mxfp4-v1` acceptance (`ds4.c:3066`) and the packed decode kernels,
+and drops 4,114 Apple/Metal references instead of 6,091. Steps 4, 5 and 6 below are superseded.
+
+### Chunks
+
+1.1 Skeleton and build rules. Done: `engines/ds4/` copied from `engines/ds4-win` (154 files,
+    no `.o`), Metal/ROCm/Win32 files deleted (`metal/`, `rocm/`, `ds4_metal.m`, `ds4_rocm*`,
+    `linenoise_win32.c`, `ds4_distributed_win32.c`, `ds4_tp_win32.c`, `ds4_win32.h/.c`,
+    `ds4_dstorage.h/.cpp`, `ds4_engram_ioring.cpp`, `ds4_combo_launcher.c`), Makefile rewritten
+    Linux-only (`cuda`, `cuda-generic`, `cpu`, `cuda-decode`, `test`, `clean`; no Darwin branch,
+    no spark/strix/rocm/metal targets). CUDA is at `/opt/cuda` on this box, so `CUDA_LDLIBS`
+    gained `-L$(CUDA_HOME)/lib` as well as `lib64`.
+
+1.2 Host-memory admission. Done: `ds4_host_memory.h/.c`, the Linux twin of the Windows guard.
+    MemAvailable for the physical reserve, VmRSS/VmPeak for process private, cgroup v2
+    `memory.max`/`memory.current` for system commit, `DS4_HOST_MEMORY_BUDGET_MB` override, a
+    250 ms watchdog that requests the graceful abort, and the same owner rule: never force-kill
+    while VRAM may be held. Compiles clean.
+
+1.3 io_uring transport. Done: `ds4_batch_io.h/.cpp` implements the whole `ds4_ds_*` API the
+    CUDA path calls outside any platform guard - init from fd with `fstat` identity and re-init on
+    an fd swap, 8-slot demand FIFO, span splitting into parts, device arena with a host mirror
+    plus a `cudaEvent` recorded after the upload (the Linux stand-in for the D3D12 fence),
+    prefill waves, one background batch, byte counters, slow-batch lines, layer trace, and the
+    QD1-versus-batched self-test against `pread`. Compiles clean; not yet run against a model.
+    Reads are buffered - the engine opens the model `O_RDONLY`. An `O_DIRECT` variant with
+    4 KiB-aligned offsets and buffers is separate follow-up work.
+
+1.4 Call-site substitution. Done for the host-memory and transport surface: `ds4.c`,
+    `ds4_cuda.cu`, `ds4_cli.c`, `ds4_server.c`, `ds4_bench.c`, `ds4_agent.c`, `ds4_help.c`,
+    `ds4_peer.c`, `ds4_web.c`, `ds4_engram.c`, `cuda/mmq/ds4_ggml_stubs.cu`,
+    `cuda/mmq/ds4_repack.cu`. `ds4_win32_host_memory_*` became `ds4_host_memory_*`, admission
+    guards that were Windows-only now run on Linux, `ExitProcess(72)` became `_exit(72)`,
+    `ds4_dstorage.h` became `ds4_batch_io.h`, the Windows-only `DS41_ALLOC` host-slab branch was
+    dropped (Linux keeps the managed GPU tensor), and the MMQ pool fixture is enabled on Linux.
+
+1.5 Engram io_uring reader. Written but not wired: `ds4_engram_iouring.c` exports
+    `ds4_engram_ioring_read_rows(fd, base, rows, n, out, why, why_n)` at QD64 over 264-byte rows.
+    Needs a Makefile rule, and `ds4_engram.c` still gates its ioring call sites on
+    `#if defined(_WIN32)` (around lines 257 and 346) - change to `__linux__`.
+
+1.6 Decode library. `make cuda-decode CUDA_ARCH=sm_120` builds `ds4-decode.so`, the dlopen twin
+    of `ds4-decode.dll`. Not yet compiled; needs `DS4_EXTERNAL_DECODE` and the `ds4x_*` entry
+    points in `ds4_decode_adapter.inc`, and the producer's loader path in
+    `engines/streaming-llama` must use `dlopen`/`dlsym` instead of `LoadLibrary`/`GetProcAddress`.
+
+1.7 First CUDA build. `make -C engines/ds4 cuda CUDA_ARCH=sm_120`. Expect the `ds4_cuda.cu`
+    Windows-block identifier errors above to be the main work: decide per site whether the Linux
+    io_uring prefetch replaces it or the branch is dead.
+
+1.8 Delete `engines/ds4-mac` and `engines/ds4-peer`, carry provenance from
+    `engines/ds4-win/PROVENANCE.md` and `engines/ds4-win/THIRD_PARTY_NOTICES.md` into
+    `engines/ds4/PROVENANCE.md` and `NOTICE`, rename the `ds4-win` scope key to `ds4` in
+    `slstack/envvars.py`, `process.py`, `combo_native.py`, `general_engine.py`, `engines.py`,
+    `check.py` and the presets, then regenerate `docs/VARIABLES.md`.
 
 Gate: `make -C engines/ds4 cuda CUDA_ARCH=sm_120` builds `ds4`, `ds4-server`, `ds4-bench`,
-`ds4-eval`, `ds4-agent`, and `make -C engines/ds4 test-mxfp4-cuda` passes.
-Note `ds4-server` needs `$(PAIRED_OBJS)` and `$(PAIRED_GGML)` on its link line; the Linux rules
-at `engines/ds4-mac/Makefile:753-758` omit them and linking fails with undefined `ds4_chain_*`.
+`ds4-eval`, `ds4-agent`, and `make -C engines/ds4 cuda-decode CUDA_ARCH=sm_120` builds
+`ds4-decode.so`. `make test-mxfp4-cuda` cannot run: `tests/test_mxfp4_cuda.cu` is not in the
+published tree (the engine `tests/` directory holds only 8 files), so that target now says
+skipped rather than failing on a missing source.
 
 ## Phase 2: engine host layer
 
@@ -292,14 +355,37 @@ Costs that could exceed expectations:
 - Losing decode for Kimi, GLM, MiniMax and Step. That is a feature removal, not a port, so settle
   decision 2 first.
 
+## Machine facts checked on this box (2026-10-30)
+
+Arch Linux, kernel 7.2.11-arch1-1, RTX 5090, driver 615.78, CUDA 13.4 at `/opt/cuda` (not
+`/usr/local/cuda`), nvcc 13.4 with `sm_120`/`sm_121`, cmake 4.4.5, ninja 1.13.2,
+`/usr/include/liburing.h` present, Python 3.14.8, ext4 on one NVMe with 793 GB free, 30 GB RAM.
+`nvidia-fs` is not installed, so GDS is unavailable; io_uring is the route.
+
+Two things limit what a gate can prove here:
+
+- The GPU is occupied by another process (`strata`, 29.3 GiB of 32 GiB VRAM) and RAM is at
+  22 GiB used, ~7.8 GiB available. Compile gates run; anything that allocates VRAM or mlocks
+  large buffers will contend with it.
+- No DeepSeek V4 weights exist locally. Phase 3 and Phase 8 gates cannot run until a qualified
+  GGUF is present.
+
 ## How to resume this plan
 
 ```sh
 cd streaming-llama-stack
 git log --oneline -1
+git status --short                 # Phase 1 chunks 1.1-1.5 land here
 grep -rn "_WIN32\|windows.h\|Win32\|DStorage\|IoRing\|msvcrt\|WinDLL" engines slstack vendor scripts examples tests | wc -l
 grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack vendor scripts examples docs tests | wc -l
 python3 -B scripts/release_check.py
 ```
 
-At Phase 0 the Windows count is about 940 and the Apple/MLX count is about 12,300.
+Counts: Phase 0 about 940 Windows references and about 12,300 Apple/MLX references. After chunks
+1.1-1.4 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and
+4,109 Apple/Metal references. `python3 -B scripts/release_check.py` still reports only the
+pre-existing `docs/VARIABLES.md:0: regenerate` finding.
+
+`.githooks` is wired through `core.hooksPath`, so `pre-commit` runs `release_check.py` and will
+refuse a commit while the VARIABLES finding stands. Either regenerate the table first or commit
+the work-in-progress chunks with `--no-verify` and say so in the commit message.
