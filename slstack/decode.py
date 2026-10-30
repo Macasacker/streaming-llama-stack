@@ -11,7 +11,7 @@ from .journal import atomic_json
 
 
 def settings(cfg, model=None, selected=None):
-    result=dict(cfg.get('decode') or (cfg.get('general') or {}).get('mac') or {})
+    result=dict(cfg.get('decode') or {})
     if model:result['model_path']=model
     if selected:result['backend']=selected
     if not result.get('model_path'):raise ValueError('Set decode.model_path in the local config or pass --model')
@@ -20,12 +20,11 @@ def settings(cfg, model=None, selected=None):
 
 
 def scope_for(name):
-    if name in ('mlx-receiver','mlx-lm','mlx-vlm','mtp-shim','omlx'):return 'mac-mlx'
-    return {'mlx-serve':'mlx-serve','mference':'mac-mference','ds4':'ds4-mac','ds4-peer':'ds4-mac'}.get(name,'mac-llama')
+    return {'ds4':'ds4'}.get(name,'studio')
 
 
 def inspect(cfg, model=None, selected=None):
-    local=settings(cfg,model,selected);spec=backend(local.get('backend','mlx-receiver'))
+    local=settings(cfg,model,selected);spec=backend(local.get('backend','ds4'))
     missing=[]
     try:argv=commands(local,runtime=cfg['runtime_root'],write_settings=False)
     except (OSError,ValueError) as exc:argv=[];missing.append(str(exc))
@@ -33,7 +32,7 @@ def inspect(cfg, model=None, selected=None):
     for command in argv:
         if not Path(command[0]).is_file() and not shutil.which(command[0]):missing.append('Missing backend executable: '+command[0])
     managed=(Path(cfg['runtime_root'])/'state/backends'/(spec.name+'.json')).is_file()
-    managed=managed or (spec.setup=='mlx' and (Path(cfg['runtime_root'])/'decode-venv/slstack-source.json').is_file())
+    managed=managed
     if managed:
         from .backend_setup import check as installed
         if not installed(cfg,spec.name).get('ready'):missing.append('Backend installation is unverified or changed; run setup-backend --backend '+spec.name)
@@ -41,14 +40,11 @@ def inspect(cfg, model=None, selected=None):
 
 
 def run(cfg, *, model=None, selected=None, check=False):
-    local=settings(cfg,model,selected);spec=backend(local.get('backend','mlx-receiver'))
+    local=settings(cfg,model,selected);spec=backend(local.get('backend','ds4'))
     result=inspect(cfg,model,selected)
     if check:return result
     if not result['ready']:raise ValueError('; '.join(result['missing']))
     launch={**cfg,'decode':local}
-    if sys.platform=='darwin':
-        from .mac import budget
-        launch=budget(launch,400)
     effective=Path(cfg['runtime_root'])/'decode-effective.local.json'
     atomic_json(effective,launch)
     from .process import OwnedProcess
@@ -64,7 +60,7 @@ def run(cfg, *, model=None, selected=None, check=False):
 
 def serve(cfg):
     """All children share one outer guardian and one admitted host budget."""
-    local=settings(cfg);spec=backend(local.get('backend','mlx-receiver'))
+    local=settings(cfg);spec=backend(local.get('backend','ds4'))
     env=environment(cfg,scope_for(spec.name));children=[]
     try:
         for command in commands(local,runtime=cfg['runtime_root']):

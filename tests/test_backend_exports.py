@@ -9,7 +9,6 @@ from unittest.mock import patch
 from slstack.config import ROOT
 from slstack.backends import BACKENDS,command,commands
 from slstack.native_broker import vendor
-from slstack.general_templates import minja_template,template_file
 
 vendor()
 from studio.general_launch import stream_arch_id,canonical_streaming_rtx,streaming_prefill_env
@@ -44,31 +43,7 @@ class Exports(unittest.TestCase):
         self.assertEqual(env['LLAMA_MLA_SPARSE'],'1')
         self.assertEqual(env['LLAMA_DSA_SCORE_CUBLAS'],'1')
 
-    def test_model_template_preserves_control_tokens_and_numbers(self):
-        original='[gMASK]<sop>{{ m.content.0.output }} {{ m.tool_calls.0.function.name }} 0.95'
-        expected='[gMASK]<sop>{{ m.content[0].output }} {{ m.tool_calls[0].function.name }} 0.95'
-        self.assertEqual(minja_template(original),expected)
-        with tempfile.TemporaryDirectory() as temp:
-            path=template_file(temp,metadata={'tokenizer.chat_template':original})
-            self.assertEqual(Path(path).read_text(),expected)
-            self.assertEqual(template_file(temp,metadata={'tokenizer.chat_template':original}),path)
-            self.assertIsNone(template_file(temp,metadata={'tokenizer.chat_template':'{{ messages }}'}))
 
-    def test_glm_launch_uses_model_metadata_instead_of_kimi_defaults(self):
-        from slstack.general_engine import launch_spec
-        def string(s):
-            b=s.encode();return struct.pack('<Q',len(b))+b
-        fields=[('general.architecture',8,string('glm-dsa')),('glm-dsa.block_count',4,struct.pack('<I',79)),
-                ('glm-dsa.nextn_predict_layers',4,struct.pack('<I',1)),
-                ('tokenizer.chat_template',8,string('[gMASK]<sop>{{ m.content.0.output }}'))]
-        with tempfile.TemporaryDirectory() as temp:
-            model=Path(temp)/'model.gguf'
-            model.write_bytes(b'GGUF'+struct.pack('<IQQ',3,0,len(fields))+b''.join(string(k)+struct.pack('<I',kind)+value for k,kind,value in fields))
-            cfg=dict(runtime_root=temp,model=str(model),host='127.0.0.1',general=dict(mac=dict(host='127.0.0.1',backend='mlx-receiver')))
-            argv,env,_=launch_spec(cfg)
-            self.assertIn('glm-dsa',argv)
-            self.assertEqual(argv[argv.index('--decode-remote-layers')+1],'78')
-            self.assertEqual(Path(argv[argv.index('--chat-template-file')+1]).read_text(),'[gMASK]<sop>{{ m.content[0].output }}')
 
     def test_omlx_never_imports_global_settings(self):
         from studio.backend_argv import omlx_write_settings
@@ -77,16 +52,19 @@ class Exports(unittest.TestCase):
                 target=omlx_write_settings(temp,262144)
             self.assertEqual(json.loads(Path(target).read_text())['sampling']['max_context_window_policy'],262144)
 
-    def test_decode_preflight_checks_paths_and_isolates_omlx(self):
+    def test_decode_preflight_checks_paths_for_the_linux_backends(self):
         from slstack.decode import inspect,settings
         with tempfile.TemporaryDirectory() as temp:
             model=Path(temp)/'model';model.mkdir()
-            cfg=dict(runtime_root=temp,decode=dict(backend='omlx',model_path=str(model)))
+            cfg=dict(runtime_root=temp,decode=dict(backend='ds4',model_path=str(model)))
             result=inspect(cfg)
-            self.assertFalse(result['ready'])
-            self.assertIn('omlx-venv',result['missing'][0])
-            self.assertEqual(settings(cfg,selected='mlx-vlm')['backend'],'mlx-vlm')
+            self.assertEqual(result['backend'],'ds4')
+            cfg['decode']['binary']=str(Path(temp)/'not-built-yet')
+            self.assertFalse(inspect(cfg)['ready'])
+            self.assertTrue(any('not-built-yet' in item for item in inspect(cfg)['missing']))
+            self.assertEqual(settings(cfg,selected='llama-server')['backend'],'llama-server')
             with self.assertRaises(ValueError):settings(dict(runtime_root=temp))
+            with self.assertRaises(ValueError):settings(dict(runtime_root=temp,model=str(model),selected='mlx-receiver'))
             cfg['decode'].update(backend='llama-server',binary=__import__('sys').executable)
             self.assertTrue(inspect(cfg)['ready'])
 

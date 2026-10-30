@@ -197,11 +197,7 @@ class Engines:
 
     def _ready(self):
         if self.cfg.get('mac'):
-            if self.remote is None:
-                from .pairing import Pair
-                self.remote = Pair(self.cfg, self.status)
-            self.remote.start()
-            return
+            raise ValueError('Two-machine pairing was deleted with macOS')
         if self.llm and self.llm.proc.poll() is None:
             return
         self.close()

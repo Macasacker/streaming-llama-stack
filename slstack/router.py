@@ -45,9 +45,9 @@ def media_request(kind, body, cfg):
 class Stack:
     def __init__(self, cfg, engines=None):
         self.cfg = cfg
-        if engines is None and cfg.get('general'):
-            from .general_engine import GeneralEngines
-            engines=GeneralEngines(cfg)
+        if cfg.get('general'):
+            raise ValueError('The Mac-paired general engine was deleted with macOS; '
+                             'this fork serves DeepSeek V4.x on the Linux ds4 engine')
         self.engines = engines or Engines(cfg)
         from .models import Models
         self.models = getattr(self.engines, 'models', None) or Models(cfg)

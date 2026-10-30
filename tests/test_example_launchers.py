@@ -17,15 +17,6 @@ launcher=importlib.util.module_from_spec(spec);spec.loader.exec_module(launcher)
 
 
 class Launchers(unittest.TestCase):
-    def test_paired_ultra_presets_default_exact_and_approximation_is_explicit(self):
-        from argparse import Namespace
-        for name in ('dsv41-ultra','dsv41-ultra-yoco','dsv41-ultra-cone','dsv41-ultra-cone-fp4'):
-            args=Namespace(single=None,preset=name,machine='rtx',approximate_yoco=False)
-            cfg,command=launcher.prepare(args,{'yoco_keep':140})
-            self.assertEqual((command,cfg['yoco_keep']),('rtx',2541))
-            args.approximate_yoco=True
-            cfg,_=launcher.prepare(args,{})
-            self.assertEqual(cfg['yoco_keep'],140)
 
     def test_all_single_machine_dry_runs_are_read_only(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -58,21 +49,5 @@ class Launchers(unittest.TestCase):
             cfg=json.loads(run.stdout)['config']
             self.assertEqual((cfg['producer_profile'],cfg['yoco_keep']),('ultra',2541))
             self.assertEqual(cfg['env_overrides'].get('LLAMADECODE_SINGLEPASS_VRAM'),'1')
-
-    def test_every_dual_recipe_refuses_unresolved_settings_before_start(self):
-        with tempfile.TemporaryDirectory() as folder:
-            local=Path(folder)/'empty.local.json';local.write_text('{}')
-            for recipe in sorted((ROOT/'examples/dual-machine').glob('*/preset.json')):
-                for machine in ('mac','rtx'):
-                    with self.subTest(preset=recipe.parent.name,machine=machine):
-                        args=['--preset',recipe.parent.name,'--machine',machine,'--config',str(local)]
-                        with patch.object(launcher.subprocess,'call',side_effect=AssertionError('must not start')):
-                            with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit) as exc:
-                                launcher.main(args)
-                            self.assertEqual(exc.exception.code,2)
-                            out=io.StringIO()
-                            with contextlib.redirect_stdout(out):self.assertEqual(launcher.main(args+['--dry-run']),0)
-                            self.assertTrue(json.loads(out.getvalue())['missing_local_settings'])
-
 
 if __name__=='__main__':unittest.main()

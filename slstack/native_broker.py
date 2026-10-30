@@ -185,15 +185,12 @@ class OwnedProducer:
             self.vision=[]
             self.vision_leases=set()
             def stage_vision(images,base):
-                from .paired_vision import materialize
-                descriptor=materialize(directory/'vision',images,previous=self.vision,base=base)
-                rows=json.loads(descriptor.read_text())
-                for row in rows:
-                    if row['file'] not in self.vision_leases:
-                        self.stack.enter_context(native.read_lease(Path(row['file'])))
-                        self.vision_leases.add(row['file'])
-                self.stack.enter_context(native.read_lease(descriptor))
-                self.vision=[{k:v for k,v in row.items() if k!='data'} for row in images]
+                # The Mac receiver owned vision encoding (SLVP projection). It is gone, so image
+                # spans are not delivered through this broker path; single-engine serving stages
+                # images through slstack.vision instead.
+                raise ValueError('Vision spans are not supported on this broker path in the '
+                                 'Linux-only fork; use single-engine serving, which stages images '
+                                 'through slstack.vision')
                 return str(descriptor)
             if request.get('vision'):
                 args['--vision-spans-file']=stage_vision(request['vision'],0)

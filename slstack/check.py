@@ -32,16 +32,8 @@ def check(cfg, *, verify_journal=True):
     except MemoryError as exc:
         record('host_memory', False, exc)
     if cfg.get('general'):
-        from .backends import backend
-        general=cfg['general'];spec=backend(general.get('mac',{}).get('backend','mlx-receiver'))
-        record('decode_backend',True,spec.name+' / '+spec.transport)
-        if general.get('mode','streaming') in ('streaming','peer'):
-            from .general_engine import launch_spec
-            argv,env,url=launch_spec(cfg)
-            record('general_producer',Path(argv[0]).is_file(),argv[0])
-            record('model',path(cfg['model']).is_file(),'Existing RTX GGUF (first shard for split models)')
-        else:record('remote_endpoint',bool(general.get('endpoint')),'OpenAI endpoint configured')
-        return rows
+        raise ValueError('The Mac-paired general engine was deleted with macOS; '
+                         'this fork serves DeepSeek V4.x on the Linux ds4 engine')
     from .memory_counters import diagnostic_snapshot as snapshot
     counters = snapshot()
     supported = 'error' not in counters and ('pages_output' in counters or 'vm_stat' in counters or 'swap_out_bytes' in counters)

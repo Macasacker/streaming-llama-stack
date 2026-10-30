@@ -26,12 +26,6 @@ class YocoTests(unittest.TestCase):
         self.assertEqual(load(overrides=dict(gpu_uuid='GPU-test'))['yoco_keep'],2541)
         self.assertEqual(load(overrides=dict(gpu_uuid='GPU-test',yoco_keep=0))['yoco_keep'],0)
 
-    def test_config_accepts_explicit_mac_route_and_refuses_unpaired_native(self):
-        from slstack.config import load
-        cfg=load(overrides=dict(gpu_uuid='GPU-test',mac='http://example.test:8180',yoco_keep=140,serving='native'))
-        self.assertEqual(cfg['yoco_keep'],140)
-        with self.assertRaisesRegex(ValueError,'explicitly paired'):
-            load(overrides=dict(gpu_uuid='GPU-test',yoco_keep=140,serving='native'))
 
     def test_config_rejects_malformed_keep_before_launch(self):
         from slstack.config import load
@@ -66,17 +60,6 @@ class YocoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'0, 140 or 2541'):
                 yoco_keep(dict(yoco_keep=keep,serving_mode='single_engine'))
 
-    def test_dependency_cone_has_distinct_local_and_negotiated_remote_identity(self):
-        from slstack.combo_producer import prefill_arguments
-        from slstack.config import load
-        cfg=load(overrides=dict(gpu_uuid='GPU-test',yoco_keep=2541,context=999424,ctx_cache_precision='bf16',ctx_cache_growable=True))
-        self.assertEqual(yoco_keep(cfg),2541)
-        args,_=prefill_arguments(cfg,4096,20*(1<<30))
-        self.assertEqual(args['--yoco-keep'],'2541')
-        remote,_=prefill_arguments(cfg,4096,20*(1<<30),export_state=True)
-        self.assertEqual(remote['--yoco-remote-state-version'],'2')
-        paired=load(overrides=dict(gpu_uuid='GPU-test',mac='http://example.test:8180'))
-        self.assertEqual(paired['yoco_keep'],2541)
 
     def test_wrappers_default_exact_and_allow_approximate_webui(self):
         for preset in ('262k', '1m'):

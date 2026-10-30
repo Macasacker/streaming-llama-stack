@@ -4,10 +4,12 @@ The work plan lives in [docs/linux-port-plan.md](docs/linux-port-plan.md). Scope
 only: Windows, macOS, Metal, MLX and the non-CUDA ggml backends all get deleted.
 
 Where the port stands: Phase 0 deletions are committed, and `engines/ds4` is a Linux CUDA engine
-built from `engines/ds4-win` that compiles and links on this box (`sm_120`, CUDA 13.4 at
+built from the Windows engine that compiles and links on this box (`sm_120`, CUDA 13.4 at
 `/opt/cuda`, batched reads over io_uring instead of DirectStorage, `/proc` + cgroup memory
-admission instead of Windows job-object limits). It has never run against model weights — there
-are none on this machine — so it is a compile gate, not a performance result.
+admission instead of Windows job-object limits). `engines/` now holds only `ds4` and
+`streaming-llama`; the Windows, macOS, MLX and peer engine trees are deleted, and the launcher has
+one environment scope (`ds4`). It has never run against model weights — there are none on this
+machine — so the engine is a compile gate, not a performance result.
 
 Repo: https://github.com/fronteagle739/streaming-llama-stack
 Reviewed: 2026-10-30, via `gh` plus a local clone at `/tmp/sl-stack`

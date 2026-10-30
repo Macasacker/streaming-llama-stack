@@ -1,2 +1,0 @@
-class LanguageModel:
-    pass

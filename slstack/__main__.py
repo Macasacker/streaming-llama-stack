@@ -16,10 +16,6 @@ def main():
     parser.add_argument('--runtime-min-free-gib', type=float, help='Runtime available physical RAM floor (default 0.5 GiB; 0 disables it)')
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('check')
-    mlx_setup = sub.add_parser('setup-mlx', help='Install the retained MLX-VLM fork and native GLM kernels')
-    mlx_setup.add_argument('--check', action='store_true')
-    mlx_setup.add_argument('--no-native-glm', action='store_true')
-    mlx_setup.add_argument('--wheelhouse', help='Use a local wheel directory without accessing a package index')
     from .backends import BACKENDS
     backend_setup = sub.add_parser('setup-backend', help='Install a pinned decoder and its build dependencies')
     backend_setup.add_argument('--backend', choices=[*BACKENDS,'all'], required=True)
@@ -42,20 +38,6 @@ def main():
     sub.add_parser('serve-internal', help=argparse.SUPPRESS)
     sub.add_parser('mac-internal', help=argparse.SUPPRESS)
     sub.add_parser('broker-internal', help=argparse.SUPPRESS)
-    pair = sub.add_parser('pair')
-    pair.add_argument('--mac', required=True)
-    pair.add_argument('--pair-token')
-    pair.add_argument('--model')
-    for name in ('mac', 'mac-setup'):
-        child = sub.add_parser(name)
-        child.add_argument('--model')
-        child.add_argument('--pair-token', help='Optional shared token for either-machine-first startup')
-        child.add_argument('--mtp-model')
-        child.add_argument('--backend', choices=['ds4', 'mlx-serve'], default=None)
-        child.add_argument('--port', dest='mac_port', type=int)
-        child.add_argument('--engine-port', dest='mac_engine_port', type=int)
-        child.add_argument('--zig')
-        child.add_argument('--check', action='store_true')
     train = sub.add_parser('train_lora')
     train.add_argument('--data-folder', required=True)
     train.add_argument('--settings', required=True)
@@ -136,11 +118,6 @@ def main():
         from .decode import serve
         serve(cfg)
         return 0
-    if args.command == 'setup-mlx':
-        from .mlx_setup import setup
-        result = setup(cfg, check=args.check, native_glm=not args.no_native_glm, wheelhouse=args.wheelhouse)
-        print(json.dumps(result, indent=2))
-        return 0 if result['ready'] else 1
     if args.command == 'install':
         from .install import install
         result = install(cfg, image=args.image, video=args.video, all_engines=args.all,
@@ -149,50 +126,9 @@ def main():
         return 0 if (all(row['ready'] for row in result['engines'])
                      and result.get('build', {}).get('ready', True)
                      and result.get('model_receipt', {}).get('ready', True)) else 1
-    if args.command in ('mac', 'mac-setup'):
-        from .mac import setup, budget
-        from .process import OwnedProcess
-        from .journal import atomic_json
-        backend = cfg.get('backend') or 'ds4'
-        build = setup(cfg, backend, check=args.check, zig=cfg.get('zig'))
-        print(json.dumps(build), flush=True)
-        if args.command == 'mac-setup' or args.check:
-            return 0 if build['ready'] else 1
-        if args.host_budget_gib is not None:
-            cfg['mac_host_budget_gib'] = args.host_budget_gib
-        launch = budget(cfg, 400 if backend == 'ds4' else 128)
-        launch['mac_build'] = build
-        launch['backend'] = backend
-        effective = Path(cfg['runtime_root']) / 'mac-effective.local.json'
-        atomic_json(effective, launch)
-        proc = OwnedProcess(launch, [sys.executable, '-B', '-m', 'slstack', '--config', str(effective), 'mac-internal'],
-                            'mac-receiver', timeout=86400)
-        try:
-            from .mac import wait_for_receiver
-            wait_for_receiver(launch, proc)
-            proc.wait()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            if proc.proc.poll() is None:
-                proc.stop()
-        return 0
-    if args.command == 'mac-internal':
-        from .mac import serve
-        serve(cfg, cfg['backend'], cfg['mac_build'])
-        return 0
     if args.command == 'broker-internal':
         from .native_broker import serve
         serve(cfg)
-        return 0
-    if args.command == 'pair':
-        from .pairing import Pair
-        peer = Pair(cfg)
-        try:
-            peer.start()
-            print('Pairing and native state qualification passed', flush=True)
-        finally:
-            peer.close()
         return 0
     if args.command == 'guarded':
         # Build/install subprocesses do not use model state. In particular, do

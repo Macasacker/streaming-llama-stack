@@ -14,7 +14,7 @@ def ds4_server_argv(model_path: str, *, port: int, ctx: int, binary: str=DEFAULT
         raise ValueError('DS4 ssd_streaming (--ssd-streaming) is incompatible with ds4_mtp_model (--mtp-model); ds4-server refuses the combination')
     workdir = str(chdir or '').strip()
     if not workdir:
-        raise ValueError('DS4 chdir is required so metal/*.metal can be resolved')
+        raise ValueError('DS4 chdir is required so the engine can resolve its build directory')
     exact_host = str(bind_address or '127.0.0.1').strip()
     try:
         parsed_host = ipaddress.ip_address(exact_host)
@@ -22,7 +22,7 @@ def ds4_server_argv(model_path: str, *, port: int, ctx: int, binary: str=DEFAULT
         raise ValueError('DS4 bind_address must be an exact IPv4 literal') from exc
     if parsed_host.version != 4 or parsed_host.is_unspecified:
         raise ValueError('DS4 bind_address must be an exact non-wildcard IPv4 address')
-    argv = [str(binary or DEFAULT_MAC_DS4_SERVER), '--chdir', workdir, '--metal', '-m', str(model_path), '--host', exact_host, '--port', str(int(port)), '--ctx', str(int(ctx))]
+    argv = [str(binary or DEFAULT_MAC_DS4_SERVER), '--chdir', workdir, '--cuda', '-m', str(model_path), '--host', exact_host, '--port', str(int(port)), '--ctx', str(int(ctx))]
     if ssd_streaming:
         argv.append('--ssd-streaming')
     if ssd_streaming_cache_experts is not None:

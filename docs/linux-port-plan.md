@@ -376,19 +376,39 @@ Nothing measured transfers. Re-run against the hash-pinned fixtures and write ne
 
 Each chunk is sized to fit one working session and ends with a gate. Tick them in this file.
 
-1.9 Settle the open decisions. Two-machine mode cannot survive: the decode half was the macOS
-   receiver, and macOS is deleted. So decision 1 resolves to (b), single machine only. That means
-   deleting `slstack/mac.py`, `pairing.py`, `native_broker.py`, the `combo_*` handoff paths,
-   `examples/dual-machine/*`, and the `ds4-peer` engine and backend profile. Decision 2: restrict
-   the supported list to DeepSeek V4.x on ds4 CUDA; Kimi/GLM/MiniMax/Step lose their MLX decode.
-   Decision 3: ROCm stays deleted - no AMD hardware here.
+1.10a Delete the engine trees. Done (`3d36bd6`): `engines/ds4-win`, `engines/ds4-mac`,
+    `engines/ds4-peer`, `engines/mlx-receiver`, `engines/mlx-serve`, `engines/mference` and
+    `engines/upstream-decode-receiver` are gone, `.gitmodules` deleted with the mlx-serve
+    gitlink, and `engines/ds4/PROVENANCE.md` rewritten for the Linux engine. 1.04M lines removed.
 
-1.10 Delete `engines/ds4-win`, `engines/ds4-mac`, `engines/ds4-peer` and every path that points at
-    them: `slstack/check.py:50`, `slstack/process.py:34,46,49`, `slstack/envvars.py:21,107,192`,
-    `slstack/combo_native.py:209`, `slstack/backends.py:25,134-139`, `slstack/__main__.py:95`,
-    `build.sh`, `slstack/install.py`, `config.example.json`. Rename the scope key `ds4-win` to
-    `ds4`. Regenerate `docs/VARIABLES.md` with `python -B -m slstack.envdocs`.
-    Gate: `python3 -B scripts/release_check.py` exits 0, and the 34-test Python suite passes.
+1.10b One scope, Linux paths. Done (`6dc410f`): the scope key `ds4-win` is now `ds4` in
+    `envvars.py`, `process.py`, `engines.py`, `combo_native.py`, `check.py` and the tests;
+    `SCOPE_ALIASES` lost `ds4-mac -> mac-ds4`; `build.sh` builds `engines/ds4`;
+    `config.example.json` points at `engines/ds4/ds4-server`. `envvars.json` went 3335 -> 2233
+    rows (Metal, ROCm, peer, MLX and Mac-toolchain variables no longer read anywhere in
+    `engines/` or `vendor/`), plus one new row for `DS4_DISABLE_HOST_MEMORY_WATCHDOG`.
+    `docs/VARIABLES.md` regenerated, `scripts/audit_backend_sources.py` rewritten for the two
+    Linux engines.
+
+    Surprise worth remembering: dropping a row is safe only when nothing reads the variable. The
+    first pass keyed on the `engines/`+`vendor/` scan alone and deleted rows the launcher still
+    owns through `slstack/` (the scan does not cover `slstack/`). Those rows came back.
+
+1.10c Delete the Mac Python surface. Open: `slstack/mac.py`, `pairing.py`, `paired_generation.py`,
+    `model_compatibility.py`, `native_relay.py`, `mac_relay.py`, `mlx_setup.py`,
+    `mlx_serve_setup.py`, `omlx_setup.py`, the Mac profiles in `slstack/backends.py`
+    (`mlx-receiver`, `ds4-peer`, `mlx-serve`, `omlx`, `mlx-lm`, `mlx-vlm`, `mtp-shim`,
+    `mference`) and their aliases, the Mac build paths in `slstack/backend_setup.py`, the peer
+    mode in `slstack/general_engine.py`, `vendor/mac-mlx`, `locks/mac-*.txt`,
+    `examples/dual-machine/*`, and the Mac CLI commands in `slstack/__main__.py` (`mac`,
+    `mac-setup`, `pair`, `mac-internal`, `broker-internal`, `setup-mlx`, `decode` for Mac
+    backends). Gate: the Python suite stays at or below the baseline above and
+    `python3 -B scripts/release_check.py` stays at 0 findings.
+
+1.9 Settle the open decisions. Resolved by chunk 1.10a: two-machine mode cannot survive, because
+    the decode half was the macOS receiver and macOS is deleted. Decision 1 is (b), single machine
+    only. Decision 2: the supported list is DeepSeek V4.x on ds4 CUDA; Kimi, GLM, MiniMax and Step
+    lose their MLX decode. Decision 3: ROCm stays deleted, there is no AMD hardware here.
 
 2.1 Remaining Win32 host code in the engine: `ds4.c` (~50 refs), `ds4_cuda.cu` (34 guards),
     `ds4_cli.c`, `ds4_server.c`, `ds4_agent.c` (drive-letter path handling), `ds4_web.c`,
@@ -471,10 +491,22 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts: Phase 0 about 940 Windows references and about 12,300 Apple/MLX references. After chunks
-1.1-1.7 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and
-4,109 Apple/Metal references. `python3 -B scripts/release_check.py` still reports only the
-pre-existing `docs/VARIABLES.md:0: regenerate` finding.
+Counts: Phase 0 about 940 Windows references and about 12,300 Apple/MLX references. After chunk
+1.7 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and 4,109
+Apple/Metal references. After chunks 1.10a and 1.10b the Mac engine trees, MLX vendor trees and
+their environment rows are gone; `engines/` holds only `ds4` and `streaming-llama`. Re-count
+before trusting any of these numbers.
+
+`python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
+in chunk 1.10b.
+
+Python suite: `timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p
+'test_*.py'` runs 677 tests with 5 failures and 6 errors. The fork baseline was 8 failures and 6
+errors, so nothing regressed. The survivors are Linux gaps, not Mac leftovers: Windows-only guard
+and producer paths (`test_combo_process`, `test_shared_guard_adapter`, `test_single_liveness`,
+`test_journal_recovery_flags`), the missing `cosmos_windows` vendor module
+(`test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco`), and GPU/video gates that need a
+model on disk (`test_h3_video_delivery`, `test_yoco_transfer`). Chunk 5.1 and 8.1 own them.
 
 Build a CUDA engine with `make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4` (~4 min). `make cpu`
 builds the same binary names as CPU variants, so rebuild CUDA afterwards if you need the CUDA
