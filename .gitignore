@@ -15,17 +15,23 @@ runtime/
 !engines/mference/Sources/MferenceApp/Core/State/
 !engines/mference/Sources/MferenceApp/Core/State/**
 *.local.*
-*.exe
-*.dll
-*.obj
-*.lib
-*.pdb
-*.exp
-*.ilk
+*.o
+*.so
 *.metallib
 *.air
-*.winmd
 engines/ds4-mac/.paired-samplers/
+# Engine binaries built by build.sh.
+engines/ds4-mac/ds4
+engines/ds4-mac/ds4-server
+engines/ds4-mac/ds4-bench
+engines/ds4-mac/ds4-eval
+engines/ds4-mac/ds4-agent
+engines/ds4-win/ds4
+engines/ds4-win/ds4-server
+engines/ds4-win/ds4-bench
+engines/ds4-win/ds4-eval
+engines/ds4-win/ds4-agent
+engines/ds4-win/ds4-decode.so
 
 # Additional outputs of the reproducible web UI build.
 /engines/streaming-llama/prefill_llama.cpp/tools/server/public/index.html

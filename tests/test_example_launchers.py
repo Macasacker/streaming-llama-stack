@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -26,38 +27,37 @@ class Launchers(unittest.TestCase):
             cfg,_=launcher.prepare(args,{})
             self.assertEqual(cfg['yoco_keep'],140)
 
-    @unittest.skipUnless(shutil.which('powershell'),'PowerShell is needed to execute Windows examples')
-    def test_all_single_machine_scripts_are_read_only_dry_runs(self):
+    def test_all_single_machine_dry_runs_are_read_only(self):
         with tempfile.TemporaryDirectory() as folder:
             runtime=Path(folder)/'must-not-be-created'
             local=Path(folder)/'test.local.json'
             local.write_text(json.dumps(dict(model='model.gguf',runtime_root=str(runtime),webui=True,
                                             producer_profile='accurate',yoco_keep=140,api_key='example-placeholder')))
-            for file in sorted((ROOT/'examples/single-machine').glob('*.ps1')):
-                with self.subTest(script=file.name):
-                    run=subprocess.run(['powershell','-NoProfile','-File',str(file),'-Config',str(local),'-DryRun'],
-                                       capture_output=True,text=True,timeout=30)
-                    self.assertEqual(run.returncode,0,run.stderr)
-                    result=json.loads(run.stdout);cfg=result['config']
-                    profile=file.stem.removeprefix('dsv41-').removesuffix('-webui')
-                    cone=profile in ('ultra-cone','ultra-yoco')
-                    self.assertEqual(cfg['producer_profile'],'ultra' if cone else profile)
-                    self.assertEqual(cfg['yoco_keep'],2541 if cone else 0)
-                    self.assertEqual(cfg['env_overrides']['LLAMADECODE_APPEND_DECODE_MAX'],'0')
-                    self.assertEqual(cfg['webui'],file.stem.endswith('-webui'))
-                    self.assertNotIn('example-placeholder',run.stdout)
-                    self.assertFalse(runtime.exists())
+            for profile in ('accurate','fast','ultra','ultra-cone','ultra-yoco'):
+                for context in ('262k','1m'):
+                    with self.subTest(profile=profile,context=context):
+                        run=subprocess.run([sys.executable,'-B',str(ROOT/'examples/run_preset.py'),
+                                            '--single',profile,'--context',context,'--config',str(local),'--dry-run','--webui'],
+                                           capture_output=True,text=True,timeout=30,cwd=ROOT)
+                        self.assertEqual(run.returncode,0,run.stderr)
+                        result=json.loads(run.stdout);cfg=result['config']
+                        self.assertEqual(cfg['producer_profile'],'ultra' if profile in ('ultra-cone','ultra-yoco') else profile)
+                        self.assertEqual(cfg['yoco_keep'],{'ultra-cone':2541,'ultra-yoco':140}.get(profile,0))
+                        self.assertEqual(cfg['env_overrides']['LLAMADECODE_APPEND_DECODE_MAX'],'0')
+                        self.assertEqual(cfg['webui'],True)
+                        self.assertNotIn('example-placeholder',run.stdout)
+                        self.assertFalse(runtime.exists())
 
-    @unittest.skipUnless(shutil.which('powershell'),'PowerShell is needed to execute Windows examples')
-    def test_legacy_yoco_launchers_require_explicit_approximation(self):
+    def test_single_machine_ultra_cone_dry_run_keeps_the_exact_cone(self):
         with tempfile.TemporaryDirectory() as folder:
             local=Path(folder)/'test.local.json';local.write_text('{}')
-            for file in sorted((ROOT/'examples/single-machine').glob('*ultra-yoco*.ps1')):
-                run=subprocess.run(['powershell','-NoProfile','-File',str(file),'-Config',str(local),
-                                    '-ApproximateYoco','-Context','1m','-DryRun'],capture_output=True,text=True,timeout=30)
-                self.assertEqual(run.returncode,0,run.stderr)
-                cfg=json.loads(run.stdout)['config']
-                self.assertEqual((cfg['producer_profile'],cfg['yoco_keep']),('ultra',140))
+            run=subprocess.run([sys.executable,'-B',str(ROOT/'examples/run_preset.py'),
+                                '--single','ultra-cone','--context','1m','--config',str(local),'--dry-run'],
+                               capture_output=True,text=True,timeout=30,cwd=ROOT)
+            self.assertEqual(run.returncode,0,run.stderr)
+            cfg=json.loads(run.stdout)['config']
+            self.assertEqual((cfg['producer_profile'],cfg['yoco_keep']),('ultra',2541))
+            self.assertEqual(cfg['env_overrides'].get('LLAMADECODE_SINGLEPASS_VRAM'),'1')
 
     def test_every_dual_recipe_refuses_unresolved_settings_before_start(self):
         with tempfile.TemporaryDirectory() as folder:

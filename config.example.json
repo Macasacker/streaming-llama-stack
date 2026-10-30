@@ -15,7 +15,7 @@
   "model_name": "DSV4.1-1017",
   "model": "",
   "ds4_command": [
-    "engines/ds4-win/ds4-server.exe",
+    "engines/ds4-mac/ds4-server",
     "--model",
     "{model}",
     "--cuda",
@@ -46,7 +46,7 @@
   "studio_python": "",
   "studio_root": "vendor/studio",
   "streaming_root": "vendor/engines",
-  "llama_producer": "build/llama/bin/llama-dsv41-prefill.exe",
+  "llama_producer": "build/llama/bin/llama-dsv41-prefill",
   "long_prompt": false,
   "lora": [],
   "enable_bash": false,

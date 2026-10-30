@@ -89,9 +89,9 @@ class ReleaseCheckTests(unittest.TestCase):
         script = 'config = ' + repr('C' + ':/' + 'Users/sample/model.gguf')
         (root / 'code.py').write_text(script)
         (root / 'examples').mkdir()
-        (root / 'examples/launch.ps1').write_text(script)
+        (root / 'examples/launch.sh').write_text(script)
         (root / 'examples/README.md').write_text(script)
-        paths = b'code.py\0examples/launch.ps1\0examples/README.md\0'
+        paths = b'code.py\0examples/launch.sh\0examples/README.md\0'
         with patch('scripts.release_check.subprocess.check_output', return_value=paths):
             self.assertEqual(scan(root), [('code.py', 1, 'machine path'), ('examples\\README.md' if os.name == 'nt' else 'examples/README.md', 1, 'machine path')])
 

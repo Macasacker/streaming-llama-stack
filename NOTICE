@@ -21,5 +21,4 @@ https://github.com/ddalcu/mlx-serve/commit/6991ba3ad3d356891d43211dec941cc6f9ff6
 MIT and third-party Apache-2.0/NOTICE; see submodule notices.
 
 Changes to native engines provide streaming, session transport, controls, adapters and resource guards; see their PROVENANCE.md files.
-DirectStorage: Microsoft redistributable terms; retain SDK notices. SDK binaries must be installed separately.
 Other embedded libraries retain their individual source licences and attribution.

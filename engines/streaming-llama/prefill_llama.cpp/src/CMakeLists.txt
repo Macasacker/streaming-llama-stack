@@ -212,30 +212,17 @@ if (BUILD_SHARED_LIBS)
     target_compile_definitions(llama PUBLIC  LLAMA_SHARED)
 endif()
 
-# DirectStorage support for weight fetcher (Windows only, optional)
-# Enables WF_MODE_DSTORAGE in llama-weight-fetcher.cpp (NVMe → GPU via D3D12)
-set(DS_SDK_DIR "${PROJECT_SOURCE_DIR}/external/directstorage")
-if (WIN32 AND EXISTS "${DS_SDK_DIR}/native/include/dstorage.h")
-    message(STATUS "llama: DirectStorage SDK found — enabling WF_MODE_DSTORAGE in weight fetcher")
-    target_include_directories(llama PRIVATE "${DS_SDK_DIR}/native/include")
-    target_link_libraries(llama PRIVATE
-        "${DS_SDK_DIR}/native/lib/x64/dstorage.lib"
-        ole32
-        d3d12
-        dxgi)
-    target_compile_definitions(llama PRIVATE LLAMA_DIRECTSTORAGE)
-    # CUDA interop for D3D12-CUDA buffer sharing (needed for WF_HAS_DSTORAGE)
-    if (GGML_CUDA)
-        find_package(CUDAToolkit QUIET)
-        if (CUDAToolkit_FOUND)
-            target_include_directories(llama PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
-            target_link_libraries(llama PRIVATE CUDA::cudart)
-            message(STATUS "llama: CUDA + DirectStorage interop enabled (WF_HAS_DSTORAGE)")
-        endif()
+# Weight fetcher transports: GPUDirect Storage (cuFile) when the GDS driver is present,
+# io_uring or threaded pread otherwise. There is no DirectStorage path on Linux.
+if (GGML_CUDA)
+    find_package(CUDAToolkit QUIET)
+    if (CUDAToolkit_FOUND)
+        target_include_directories(llama PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+        target_link_libraries(llama PRIVATE CUDA::cudart)
     endif()
 endif()
 
 # Static consumers must resolve weight-fetcher symbols in this library.
-if(WIN32 AND NOT BUILD_SHARED_LIBS)
+if (NOT BUILD_SHARED_LIBS)
     target_compile_definitions(llama PUBLIC WF_STATIC)
 endif()

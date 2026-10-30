@@ -36,7 +36,7 @@ def main():
     decoder.add_argument('--check', action='store_true')
     sub.add_parser('decode-internal', help=argparse.SUPPRESS)
     installer = sub.add_parser('install')
-    for option in ('image', 'video', 'all', 'check', 'sdk'):
+    for option in ('image', 'video', 'all', 'check'):
         installer.add_argument('--' + option, action='store_true')
     sub.add_parser('mcp')
     sub.add_parser('serve-internal', help=argparse.SUPPRESS)
@@ -144,9 +144,9 @@ def main():
     if args.command == 'install':
         from .install import install
         result = install(cfg, image=args.image, video=args.video, all_engines=args.all,
-                         check=args.check, sdk_only=args.sdk)
+                         check=args.check)
         print(json.dumps(result, indent=2))
-        return 0 if (result['sdk']['ready'] and all(row['ready'] for row in result['engines'])
+        return 0 if (all(row['ready'] for row in result['engines'])
                      and result.get('build', {}).get('ready', True)
                      and result.get('model_receipt', {}).get('ready', True)) else 1
     if args.command in ('mac', 'mac-setup'):

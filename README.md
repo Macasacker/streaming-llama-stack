@@ -1,8 +1,8 @@
 # Streaming Llama Stack
 
 Run frontier-size mixture-of-experts models on one desktop GPU. The stack streams
-the weights from NVMe straight into an RTX 5090 with DirectStorage, so a 483 GiB
-model runs on a machine with 32 GB of VRAM and 32 GB of system RAM. Add a
+the weights from NVMe straight into an RTX 5090 with GPUDirect Storage or io_uring,
+so a 483 GiB model runs on a machine with 32 GB of VRAM and 32 GB of system RAM. Add a
 512 GB Mac Studio and the RTX does the long prefill while the Mac decodes.
 
 It ships a llama.cpp fork with streaming prefill, the ds4 decode kernels for
@@ -19,6 +19,11 @@ previous build. Earlier README figures (for example 5,240 tok/s) were measured o
 100,000 *identical* tokens. That file needs about 1,200 Engram rows per table, against
 1.66M on real text, so it hid about 37 s of Engram and spill cost at 200K. Those
 figures are retired.
+
+These figures were measured on the upstream Windows build. The Linux fork in this
+repository has not re-measured them; the streaming producer needs the Linux weight
+provider first, and every number then needs re-qualification against the same
+hash-pinned fixtures. See [linux-port.md](linux-port.md).
 
 ### Single machine: RTX 5090
 
@@ -108,7 +113,7 @@ negotiates at 5 Gb/s, not 10.
 
 ### Presets and scripts (fastest defaults)
 
-- RTX single machine: `examples/single-machine/dsv41-ultra-cone.ps1 -Context 1m`
+- RTX single machine: `python -B examples/run_preset.py --single ultra-cone --context 1m --config my.local.json`
   (packed FP4 file in your config; Max quality or Max speed is the live quality-speed
   control).
 - Mac single machine: `slstack mac` with the Mac decode FP4 file and its DSpark support
@@ -135,13 +140,13 @@ Other models on the same streaming engine and RTX 5090:
 
 The host-RAM tier stays **off by default** (`LLAMADECODE_HOST_CACHE_MB=0`). Round 4
 (2026-10-30) moved its data movement off the critical path: the VRAM-to-RAM copy-in
-runs on its own stream with one event, the DirectStorage batch is submitted first and
+runs on its own stream with one event, the storage batch is submitted first and
 RAM hits upload on a separate H2D stream while it reads, and Max-speed routing prices
 a RAM expert at half a miss (`LLAMADECODE_RAM_ROUTE_COST=0.5`). On this 32 GB box the
-tier is a small gain only at FP4 Max quality and still a loss elsewhere: Windows refuses
-to CUDA-register the locked tier in-process, so each hit is copied through pinned
-staging (about 1 ms of CPU per expert), and a 6.6 GB tier holds 351 experts, removing
-only 6% of misses.
+tier is a small gain only at FP4 Max quality and still a loss elsewhere: the measured
+build could not CUDA-register the locked tier in-process, so each hit is copied through
+pinned staging (about 1 ms of CPU per expert), and a 6.6 GB tier holds 351 experts,
+removing only 6% of misses.
 
 Packed FP4 unless marked Q4, 899 warm steps, VRAM headroom 128 + 64 MiB, 6.6 GB tier:
 
@@ -176,7 +181,7 @@ CUDA-registered; that is untested and listed in the
 **Streaming prefill.** Prefill reads each layer's weights once per pass and runs
 the whole prompt chunk through that layer before moving on. The cost of reading
 the weights is shared by every token in the pass. A complete DeepSeek V4.1 Q4
-pass reads 315.8 GB; Engram rows are gathered separately. DirectStorage reads the
+pass reads 315.8 GB; Engram rows are gathered separately. The storage layer reads the
 next layer while the GPU computes the current one. DeepSeek V4.1 uses
 49,152-token passes, with optional RAM-admitted chunk grouping.
 [Routed reads, the exact replay cone and byte accounting](docs/MULTICHUNK_PREFILL.md).
@@ -216,19 +221,20 @@ one DeepSeek V4.1-specific part.
 
 | Mode | Hardware needed |
 |---|---|
-| Single RTX | Windows RTX 50-series desktop, 32 GB VRAM, 32 GB system RAM and fast DirectStorage NVMe; measured on an RTX 5090. |
+| Single RTX | Linux RTX 50-series desktop, 32 GB VRAM, 32 GB system RAM and fast NVMe; measured on an RTX 5090. |
 | RTX + Mac | The same RTX machine plus an Apple Silicon Mac with enough unified memory for the model; measured on an M3 Ultra with 512 GB. |
-| RTX + large-RAM box | The same RTX machine plus a Windows/Linux RAM-rich decode host sized for the whole GGUF and session; **untested example**, receiver gap documented [here](examples/dual-machine/dsv41-large-ram-untested/README.md). |
+| RTX + large-RAM box | The same RTX machine plus a RAM-rich Linux decode host sized for the whole GGUF and session; **untested example**, receiver gap documented [here](examples/dual-machine/dsv41-large-ram-untested/README.md). |
 
 ## Requirements
 
 - **GPU:** RTX 50-series (compute capability 12.0). Measured on an RTX 5090, 32 GB.
-- **Storage:** fast local NVMe with DirectStorage. Measured on a NVMe RAID-0 at
-  about 25 GB/s. Storage speed sets prefill and cold decode speed.
+- **Storage:** fast local NVMe. Measured on a NVMe RAID-0 at about 25 GB/s. Storage
+  speed sets prefill and cold decode speed. GPUDirect Storage needs the `nvidia-fs`
+  driver and XFS or EXT4 in ordered mode; io_uring works without it.
 - **System RAM:** 32 GB. The engine needs its 9.25 GiB budget plus a 512 MiB
   desktop reserve free, and stops cleanly if RAM drops below 0.5 GiB free.
-- **Build tools:** Windows, Python 3.12, Visual Studio C++ Build Tools, CMake, Ninja,
-  CUDA 13.2 and Node.js 24.
+- **Build tools:** Linux, Python 3.12, a C++ toolchain, CMake, Ninja, CUDA 13.2 or
+  newer with `sm_120a`, liburing, and Node.js 24.
 - **Optional Mac:** M3 Ultra with 512 GB, on the same network, with the same model file.
 
 ## Any-GGUF single engine
@@ -262,15 +268,15 @@ Status: this native safetensors path has not yet been run end to end and qualifi
 
 | File | Purpose | Runs on | Preset or script | Command (after the plan step below) |
 |---|---|---|---|---|
-| **RTX packed FP4** | RTX prefill (single machine and the prefill side of two machines) and RTX single-machine decode | Windows RTX 5090 | `examples/single-machine/dsv41-ultra-cone.ps1`; `rtx.model` of `examples/dual-machine/dsv41-ultra-cone-fp4/preset.json` | `--expert-format native-fp4 --expert-layout flashinfer-sm120-mxfp8-mxfp4-v1 --dense-format q8` |
+| **RTX packed FP4** | RTX prefill (single machine and the prefill side of two machines) and RTX single-machine decode | Linux RTX 5090 | `python -B examples/run_preset.py --single ultra-cone`; `rtx.model` of `examples/dual-machine/dsv41-ultra-cone-fp4/preset.json` | `--expert-format native-fp4 --expert-layout flashinfer-sm120-mxfp8-mxfp4-v1 --dense-format q8` |
 | **Mac decode FP4** | Mac decode with ds4: Mac single machine and the decode side of two machines | Mac Studio M3 Ultra | `slstack mac --model …`; `mac.model` of `dsv41-ultra-cone-fp4/preset.json` and `dsv41-ultra-cone/preset.json` | `--expert-format native-fp4 --expert-layout ggml-mxfp4 --dense-format q8` |
 | **DSpark drafter** | Speculative drafts for Mac decode | Mac Studio M3 Ultra | `mac.mtp_model` in the paired presets; the DSpark support model for `slstack mac` | `--component dspark` (Q4_K experts, Q8_0 attention/shared/projections; no `--expert-format`/`--expert-layout`) |
-| **Q4** | The Q4_K/Q8_0 alternative on the RTX | Windows RTX 5090 (also loads on the Mac) | `scripts/start-dsv41-single-262k.ps1` / `-1m.ps1` with the Q4 path in your config; `rtx.model` of `dsv41-ultra-cone/preset.json` | `--expert-format q4` (the default) |
+| **Q4** | The Q4_K/Q8_0 alternative on the RTX | Linux RTX 5090 (also loads on the Mac) | `scripts/start-dsv41-single-262k.sh` / `-1m.sh` with the Q4 path in your config; `rtx.model` of `dsv41-ultra-cone/preset.json` | `--expert-format q4` (the default) |
 
 Rule of thumb: **MXFP4 experts with the layout flag = RTX; MXFP4 experts with no flag
 = Mac; Q4_K experts = Q4.** You can check a file without reading its payload:
 
-```powershell
+```sh
 python -B -c "import sys; sys.path.insert(0,'.'); from slstack.gguf_header import read_header, TYPE_NAMES; h=read_header(sys.argv[1]); m=h['metadata']; t=[x for x in h['tensors'] if x['name'].endswith('_exps.weight')][0]; print('experts', TYPE_NAMES.get(t['type']), '| layout', m.get('deepseek41.expert_layout', 'none = ggml-mxfp4 if MXFP4'))" <file.gguf>
 ```
 
@@ -337,11 +343,11 @@ Conversion is CPU-only.
 
 ## Quickstart
 
-```powershell
+```sh
 git clone --recurse-submodules https://github.com/fronteagle739/streaming-llama-stack.git
 cd streaming-llama-stack
-./slstack.ps1 install --all
-./slstack.ps1 install --all --check
+./bin/slstack install --all
+./bin/slstack install --all --check
 ```
 
 Create `my.local.json` from [config.example.json](config.example.json) with your
@@ -357,21 +363,21 @@ model path and GPU UUID. `*.local.*` files are ignored by Git.
 }
 ```
 
-```powershell
-./slstack.ps1 --config my.local.json check
-powershell -File scripts/start-dsv41-single-262k.ps1 -WebUI
+```sh
+./bin/slstack --config my.local.json check
+scripts/start-dsv41-single-262k.sh --webui
 ```
 
 Open the printed URL (default `http://127.0.0.1:8088`). The same port serves
 `/v1/chat/completions`, `/v1/models`, `/health` and `/mcp`. The first check hashes
 the model once. The first chat loads the engine.
 
-Other presets (run one at a time; stop with the same script and `-Stop`):
+Other presets (run one at a time; stop with the same script and `--stop`):
 
-```powershell
-powershell -File scripts/start-dsv41-single-1m.ps1 -WebUI # 1M context, exact cone
-powershell -File scripts/start-dsv41-single-262k-ultra-yoco.ps1 -ApproximateYoco -WebUI
-powershell -File scripts/start-dsv41-single-1m-ultra-yoco.ps1 -ApproximateYoco -WebUI
+```sh
+scripts/start-dsv41-single-1m.sh --webui               # 1M context, exact cone
+scripts/start-dsv41-single-262k-ultra-yoco.sh --webui  # 262K, approximate YOCO keep 140
+scripts/start-dsv41-single-1m-ultra-yoco.sh --webui    # 1M, approximate YOCO keep 140
 ```
 
 Each script accepts `-Config`, `-Model`, `-DryRun` and `-Stop`.
@@ -403,10 +409,10 @@ Install on both. On the Mac:
 ./bin/slstack mac --model '<model_dir>/<deepseek-v4.1-flash>.gguf' --host-budget-gib 400 --min-available-gib 0.5
 ```
 
-It prints an endpoint, a pairing token and the Windows command:
+It prints an endpoint, a pairing token and the RTX command:
 
-```powershell
-./slstack.ps1 rtx --config my.local.json --mac <mac-endpoint> --pair-token <printed-token> --webui
+```sh
+./bin/slstack rtx --config my.local.json --mac <mac-endpoint> --pair-token <printed-token> --webui
 ```
 
 The current exact-cone WebUI proof processes **105,054 tokens** in a
@@ -417,7 +423,7 @@ Use the [ULTRA exact-cone paired preset](examples/dual-machine/dsv41-ultra-cone/
 with the [example launchers](examples/dual-machine/README.md).
 [Cone state protocol](docs/CONE_STATE.md).
 
-For a Windows/Linux second machine with enough RAM to hold the model, see the
+For a RAM-rich Linux second machine with enough memory to hold the model, see the
 [large-RAM ds4-win untested example](examples/dual-machine/dsv41-large-ram-untested/README.md).
 It documents the missing mode3/YOCO CPU receiver; its launcher only previews the
 configuration.
@@ -439,8 +445,10 @@ configuration.
 
 ## Limitations
 
-- Windows kernels target compute capability 12.0 (RTX 50-series).
-- The RTX path is Windows-only today because it uses DirectStorage.
+- CUDA kernels target compute capability 12.0 (RTX 50-series).
+- The streaming producer needs the Linux weight provider: the V4.1 physical provider,
+  the Engram extent reader and the locked-RAM carry are not ported yet. See
+  [linux-port.md](linux-port.md).
 - The single-engine DeepSeek V4.1 path accepts the [supported GGUF layouts](docs/DSV41_GGUF.md); split files require assembly first.
 - The faster dial settings cost quality. Max speed introduced syntax errors in C++
   tests; use Max quality or Balanced for code.
@@ -479,7 +487,7 @@ own licences; see [NOTICE](NOTICE).
   [IngeniousIdiocy's V4.1 backend](https://github.com/IngeniousIdiocy/ds4-v41-m3ultra)
   for the native kernels.
 - [mlx-serve](https://github.com/ddalcu/mlx-serve) for the optional MLX service.
-- [Microsoft DirectStorage](https://github.com/microsoft/DirectStorage) for
-  storage-to-GPU transfers.
+- [NVIDIA GPUDirect Storage](https://github.com/NVIDIA/gds-nvidia-fs) for
+  storage-to-GPU transfers, and Linux io_uring for the read path.
 
 <sub>Useful to you? [Ko-fi](https://ko-fi.com/FrontEagle).</sub>

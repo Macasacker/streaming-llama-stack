@@ -140,9 +140,9 @@ static uint32_t metal_graph_cuda_tp_output_tiers_for_head(
     return n;
 }
 
-#ifndef DS4_NO_GPU
+/* ds4_gpu.h also carries the DS4_GPU_V41_* group masks used by
+ * ds4_upstream_controls.inc, which is included unconditionally below. */
 #include "ds4_gpu.h"
-#endif
 
 /* Every public engine/session entry point that reaches Metal runs inside an autorelease pool, popped on
  * every return path (see ds4_gpu_autorelease_push in ds4_gpu.h). Nested scopes are fine. */

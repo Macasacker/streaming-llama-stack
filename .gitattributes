@@ -1,12 +1,12 @@
 docs/evidence/** -text
-# Preserve pinned upstream bytes for the FlashInfer source manifest on Windows.
+# Preserve pinned upstream bytes for the FlashInfer source manifest.
 engines/streaming-llama/flashinfer-sm120/source/** -text
 engines/streaming-llama/flashinfer-sm120/dense-source/** -text
 # Performance evidence digests bind exact bytes, including recorded newlines.
 examples/dual-machine/dsv41-ultra-cone/proof/performance/** -text
 examples/dual-machine/dsv41-ultra-cone/proof/PERFORMANCE.md -text
 examples/**/*.sh text eol=lf
-# LF webui sources keep the tracked built index.html.gz reproducible on Windows.
+# LF webui sources keep the tracked built index.html.gz reproducible.
 engines/streaming-llama/prefill_llama.cpp/tools/server/webui/**/*.svelte text eol=lf
 engines/streaming-llama/prefill_llama.cpp/tools/server/webui/**/*.svx text eol=lf
 engines/streaming-llama/prefill_llama.cpp/tools/server/webui/**/*.ts text eol=lf

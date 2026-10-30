@@ -143,10 +143,9 @@ class LaunchConfigTests(unittest.TestCase):
             self.assertEqual(json.loads(target.read_text(encoding='utf-8')), printed['start_config'])
             self.assertEqual(printed['resolved']['single_engine']['context'], 999424)
 
-    @unittest.skipUnless(os.name == 'nt' and shutil.which('powershell'), 'Windows PowerShell launcher')
-    def test_powershell_dry_run_starts_nothing(self):
-        result = subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-                                 str(ROOT / 'scripts' / 'start-dsv41-single-262k.ps1'), '-DryRun', '-WebUI', '-Model', 'M.gguf'],
+    def test_shell_dry_run_starts_nothing(self):
+        result = subprocess.run(['sh', str(ROOT / 'scripts' / 'start-dsv41-single-262k.sh'),
+                                 '--dry-run', '--webui', '--model', 'M.gguf'],
                                 capture_output=True, text=True, timeout=120, cwd=ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('bootstrap.py', result.stdout)
@@ -154,7 +153,7 @@ class LaunchConfigTests(unittest.TestCase):
         self.assertIn('Router / web UI: http://127.0.0.1:', result.stdout)
         written = json.loads((ROOT / 'runtime' / 'dsv41-single-262k-ultra-cone.local.json').read_text(encoding='utf-8'))
         self.assertEqual(written['ctx_cache_precision'], 'f32')
-        self.assertEqual(written['yoco_keep'],2541)
+        self.assertEqual(written['yoco_keep'], 2541)
 
 
 class KeptKeyTests(unittest.TestCase):

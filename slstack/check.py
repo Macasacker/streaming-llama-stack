@@ -58,17 +58,12 @@ def check(cfg, *, verify_journal=True):
         record('model_receipt', receipt['ready'], receipt.get('receipt') or receipt.get('error'))
     command = cfg['ds4_command']
     record('ds4_executable', bool(command) and (path(command[0]).is_file() or shutil.which(command[0])), command[0] if command else 'missing')
-    if os.name == 'nt' and command and 'ds4' in Path(command[0]).name.lower():
-        directory = path(command[0]).parent
-        missing = [name for name in ('dstorage.dll', 'dstoragecore.dll') if not (directory / name).is_file()]
-        record('directstorage_runtime', not missing,
-               'Required beside the native executable: ' + ', '.join(missing) if missing else 'Both DirectStorage runtime DLLs are beside the native executable')
     record('llama_producer', path(cfg['llama_producer']).is_file(), cfg['llama_producer'], required=cfg['long_prompt'])
     if cfg['webui']:
         public = path(cfg['webui_root'])
         record('webui', (public / 'index.html').is_file() or (public / 'index.html.gz').is_file(), public)
     record('live_bias', True, 'Delivered authenticated native control; model-bound calibration required at runtime', required=False)
-    record('long_prompt', not cfg['long_prompt'], 'Windows target-only import/export/rewind parity gate is not implemented')
+    record('long_prompt', not cfg['long_prompt'], 'Target-only import/export/rewind parity gate is not implemented')
     record('llm_lora', len(cfg['lora']) <= 1, 'Native DSV4.1 dense output adapter; exact base binding, VRAM fusion and journal')
     if verify_journal:
         try:

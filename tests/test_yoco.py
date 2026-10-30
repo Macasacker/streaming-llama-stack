@@ -78,17 +78,17 @@ class YocoTests(unittest.TestCase):
         paired=load(overrides=dict(gpu_uuid='GPU-test',mac='http://example.test:8180'))
         self.assertEqual(paired['yoco_keep'],2541)
 
-    @unittest.skipUnless(shutil.which('powershell'),'Windows PowerShell launcher')
     def test_wrappers_default_exact_and_allow_approximate_webui(self):
-        for preset in ('262k','1m'):
-            for approximate in (False,True):
-                args=['powershell','-NoProfile','-File',str(ROOT/f'scripts/start-dsv41-single-{preset}-ultra-yoco.ps1'),
-                      '-DryRun','-WebUI']+(['-ApproximateYoco'] if approximate else [])
-                run=subprocess.run(args,capture_output=True,text=True,timeout=30,cwd=ROOT)
-                self.assertEqual(run.returncode,0,run.stderr)
-                data,_=json.JSONDecoder().raw_decode(run.stdout.lstrip())
-                self.assertEqual(data['resolved']['producer_flags']['--yoco-keep'],'140' if approximate else '2541')
-                self.assertIn('start --webui',run.stdout)
+        for preset in ('262k', '1m'):
+            for approximate in (False, True):
+                script = (f'start-dsv41-single-{preset}-ultra-yoco.sh' if approximate
+                          else f'start-dsv41-single-{preset}.sh')
+                run = subprocess.run(['sh', str(ROOT / 'scripts' / script), '--dry-run', '--webui'],
+                                     capture_output=True, text=True, timeout=30, cwd=ROOT)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                data, _ = json.JSONDecoder().raw_decode(run.stdout.lstrip())
+                self.assertEqual(data['resolved']['producer_flags']['--yoco-keep'], '140' if approximate else '2541')
+                self.assertIn('start --webui', run.stdout)
 
     def test_long_live_append_and_edit_reprefill(self):
         from test_combo_single import Harness, ids

@@ -293,14 +293,9 @@ configure_file(cmake/llama.pc.in
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/llama.pc"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-# Thin DLL export over the same static native units used by the producer.
-if(WIN32 AND GGML_CUDA AND NOT BUILD_SHARED_LIBS)
-    add_library(slstack-weight-fetcher SHARED tools/slstack-weight-fetcher.cpp tools/slstack-weight-fetcher.def)
+# Thin shared-library export over the same static native units used by the producer.
+if(GGML_CUDA AND NOT BUILD_SHARED_LIBS)
+    add_library(slstack-weight-fetcher SHARED tools/slstack-weight-fetcher.cpp)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(slstack-weight-fetcher PRIVATE llama ggml-cuda CUDA::cudart)
-    add_custom_command(TARGET slstack-weight-fetcher POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${PROJECT_SOURCE_DIR}/external/directstorage/native/bin/x64/dstorage.dll"
-            "${PROJECT_SOURCE_DIR}/external/directstorage/native/bin/x64/dstoragecore.dll"
-            "$<TARGET_FILE_DIR:slstack-weight-fetcher>")
 endif()

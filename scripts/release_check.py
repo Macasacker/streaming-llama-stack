@@ -114,7 +114,7 @@ def scan_blob(relative, raw, compiled, forbidden, images):
     if '.local.' in rel.name or rel.name.endswith('.local.json'):
         return findings + [(str(rel), 0, 'local configuration must be untracked')]
     attribution = rel.name in {'LICENSE', 'AUTHORS', 'NOTICE', 'NOTICES.txt'} or 'licenses' in rel.parts
-    if rel.suffix.lower() in {'.exe', '.dll', '.pdb', '.gguf', '.safetensors', '.pt', '.bin', '.npy', '.npz'}:
+    if rel.suffix.lower() in {'.so', '.o', '.gguf', '.safetensors', '.pt', '.bin', '.npy', '.npz'}:
         return findings + [(str(rel), 0, 'binary/weight artifact')]
     try:
         if rel.suffix == '.gz':
@@ -139,7 +139,7 @@ def scan_blob(relative, raw, compiled, forbidden, images):
         for name, pattern in candidates.items():
             if relative.replace('\\', '/') == 'scripts/release_check.py' and line.strip().startswith(repr(name) + ':'):
                 if name != 'credential':continue
-            example = (rel.parts[0] == 'examples' or '.example.' in rel.name) and rel.suffix in {'.py', '.ps1', '.sh', '.json', '.cmd', '.bat'}
+            example = (rel.parts[0] == 'examples' or '.example.' in rel.name) and rel.suffix in {'.py', '.sh', '.json'}
             if name == 'machine path' and example:
                 continue
             if pattern.search(line):
