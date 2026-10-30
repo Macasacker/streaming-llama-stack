@@ -26,6 +26,21 @@ cmake 4.4.5, ninja 1.13.2, `/usr/include/liburing.h` present, Python 3.14.8
 
 ## Decision taken
 
+Three options were on the table for `engines/ds4-win`.
+
+1. Delete it and use `engines/ds4-mac` CUDA on Linux. Cheapest, but you lose the packed FP4
+   decode kernels, `ds4_mmq_fp4_packed.cuh` and `ds4_q4k_half.cu`, which only ds4-win has.
+   Rejected: the packed layout is what the RTX decode speed comes from.
+2. Strip its Win32 files and rename it `ds4-linux`. Keeps packed FP4 decode, costs 333
+   references, and leaves two near-duplicate engines whose `ds4.c` diverges by 17k lines.
+   Rejected: three copies of the same engine is the maintenance problem this fork already
+   has, and a third copy does not fix it.
+3. Move its extra kernels into ds4-mac's CUDA build, then delete ds4-win. Chosen. One engine
+   with packed FP4, and it also clears the config scope strings that currently say `ds4-win`.
+
+Option 3 costs more up front than option 2 because ds4-mac's and ds4-win's CUDA sources
+already diverge. That is the Phase 1 risk noted at the end of this file.
+
 Merge `engines/ds4-win`'s extra CUDA kernels into the ds4-mac CUDA build, then delete
 `engines/ds4-win`. Files that must survive:
 
