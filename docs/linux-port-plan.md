@@ -394,21 +394,32 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     first pass keyed on the `engines/`+`vendor/` scan alone and deleted rows the launcher still
     owns through `slstack/` (the scan does not cover `slstack/`). Those rows came back.
 
-1.10c Delete the Mac Python surface. Open: `slstack/mac.py`, `pairing.py`, `paired_generation.py`,
-    `model_compatibility.py`, `native_relay.py`, `mac_relay.py`, `mlx_setup.py`,
-    `mlx_serve_setup.py`, `omlx_setup.py`, the Mac profiles in `slstack/backends.py`
-    (`mlx-receiver`, `ds4-peer`, `mlx-serve`, `omlx`, `mlx-lm`, `mlx-vlm`, `mtp-shim`,
-    `mference`) and their aliases, the Mac build paths in `slstack/backend_setup.py`, the peer
-    mode in `slstack/general_engine.py`, `vendor/mac-mlx`, `locks/mac-*.txt`,
-    `examples/dual-machine/*`, and the Mac CLI commands in `slstack/__main__.py` (`mac`,
-    `mac-setup`, `pair`, `mac-internal`, `broker-internal`, `setup-mlx`, `decode` for Mac
-    backends). Gate: the Python suite stays at or below the baseline above and
-    `python3 -B scripts/release_check.py` stays at 0 findings.
+1.10c Delete the Mac Python surface. Done (`4abb73f`). Two-machine mode cannot survive in a
+    Linux-only fork, so decision 1 resolves to single machine only. Deleted `slstack/{mac,
+    pairing,paired_generation,paired_vision,model_compatibility,native_relay,mlx_setup,
+    mlx_serve_setup,omlx_setup,general_engine,general_templates}.py`,
+    `vendor/studio/studio/{peer_launch,mlx_model_presets}.py`, `vendor/mac-mlx`,
+    `locks/mac-*.txt`, `presets/dsv41-mac.json`, `examples/dual-machine`,
+    `examples/macdecode-r3`, and 14 Mac/paired test files. `backends.py` is now `ds4` and
+    `llama-server`; `studio/mac_argv.py` emits `--cuda`; `backend_setup.py` builds
+    `engines/ds4` with `make cuda` (arch probed from `nvidia-smi --query-gpu=compute_cap`,
+    `sm_120a` fallback) and `llama-server` with `GGML_CUDA=ON`. `examples/run_preset.py` takes
+    `--single` and `--setup` only.
 
-1.9 Settle the open decisions. Resolved by chunk 1.10a: two-machine mode cannot survive, because
-    the decode half was the macOS receiver and macOS is deleted. Decision 1 is (b), single machine
-    only. Decision 2: the supported list is DeepSeek V4.x on ds4 CUDA; Kimi, GLM, MiniMax and Step
-    lose their MLX decode. Decision 3: ROCm stays deleted, there is no AMD hardware here.
+    Two deliberate behaviour changes, both raise instead of degrading silently: a `mac` config
+    setting is refused (`slstack/config.py`), and image spans through the native broker raise
+    (`native_broker.stage_vision`) because SLVP projection was the Mac receiver's job -
+    single-engine serving stages images through `slstack/vision.py`.
+
+1.10d Dead Mac and Windows branches in the launcher. Open: unreachable `cfg.get('mac')` branches
+    at `slstack/engines.py:81,199,340` and `slstack/router.py:64-65,137-138,168,313,324`, the
+    `os.name == 'nt'` branch at `slstack/engines.py:85`, Mac-local token counts in
+    `combo_crossover.py`, and the `mac=` hold-ledger semantics in `lease.py`. Gate: the Python
+    suite stays at or below 6 failures / 5 errors.
+
+1.9 Settled by chunk 1.10c. Decision 1 is (b), single machine only. Decision 2: the supported
+    list is DeepSeek V4.x on ds4 CUDA; Kimi, GLM, MiniMax and Step lose their MLX decode, and
+    `general` mode now raises. Decision 3: ROCm stays deleted, there is no AMD hardware here.
 
 2.1 Remaining Win32 host code in the engine: `ds4.c` (~50 refs), `ds4_cuda.cu` (34 guards),
     `ds4_cli.c`, `ds4_server.c`, `ds4_agent.c` (drive-letter path handling), `ds4_web.c`,
@@ -493,9 +504,10 @@ python3 -B scripts/release_check.py
 
 Counts: Phase 0 about 940 Windows references and about 12,300 Apple/MLX references. After chunk
 1.7 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and 4,109
-Apple/Metal references. After chunks 1.10a and 1.10b the Mac engine trees, MLX vendor trees and
-their environment rows are gone; `engines/` holds only `ds4` and `streaming-llama`. Re-count
-before trusting any of these numbers.
+Apple/Metal references. After chunks 1.10a, 1.10b and 1.10c: 495 Apple/MLX references outside
+`engines/ds4` (mostly `engines/streaming-llama` and vendored Studio), 281 Windows references
+outside `engines/ds4`, `engines/` holds only `ds4` and `streaming-llama`, and the working tree is
+about 518 MB with a 55 MB `.git`. Re-count before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.
