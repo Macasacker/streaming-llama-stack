@@ -1,5 +1,8 @@
 # streaming-llama-stack: repo review and Linux port notes
 
+The work plan lives in [docs/linux-port-plan.md](docs/linux-port-plan.md). Phase 0 is
+committed; Phases 1 through 7 are open.
+
 Repo: https://github.com/fronteagle739/streaming-llama-stack
 Reviewed: 2026-10-30, via `gh` plus a local clone at `/tmp/sl-stack`
 MIT, single author "Front Eagle", created 2026-10-25, last pushed 2026-10-30.

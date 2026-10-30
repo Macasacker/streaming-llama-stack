@@ -448,7 +448,7 @@ configuration.
 - CUDA kernels target compute capability 12.0 (RTX 50-series).
 - The streaming producer needs the Linux weight provider: the V4.1 physical provider,
   the Engram extent reader and the locked-RAM carry are not ported yet. See
-  [linux-port.md](linux-port.md).
+  [docs/linux-port-plan.md](docs/linux-port-plan.md).
 - The single-engine DeepSeek V4.1 path accepts the [supported GGUF layouts](docs/DSV41_GGUF.md); split files require assembly first.
 - The faster dial settings cost quality. Max speed introduced syntax errors in C++
   tests; use Max quality or Balanced for code.
