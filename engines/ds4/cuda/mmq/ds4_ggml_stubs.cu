@@ -24,9 +24,8 @@
 #include <mutex>
 #include <vector>
 
-#if defined(_WIN32)
+#include <unistd.h>
 #include "../../ds4_host_memory.h"
-#endif
 
 // ----------------------------------------------------------------------------
 // Device info singleton.

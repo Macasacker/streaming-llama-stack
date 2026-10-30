@@ -10,7 +10,7 @@ CFLAGS ?= -O3 -ffast-math $(DEBUG_FLAGS) $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c
 	-D_GNU_SOURCE -fno-finite-math-only
 QUALITY_CFLAGS ?= -O3 $(DEBUG_FLAGS) $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c11
 
-LDLIBS ?= -lm -pthread
+LDLIBS ?= -lm -pthread -luring
 DS4_TEST_MODEL ?= ds4flash.gguf
 DS4_TEST_MTP ?= gguf/DeepSeek-V4-Flash-MTP-Q4K-Q8_0-F32.gguf
 DS4_DSPARK_MODEL ?= $(DS4_TEST_MODEL)
@@ -28,7 +28,7 @@ endif
 endif
 NVCCFLAGS ?= -O3 -g -lineinfo --use_fast_math $(NVCC_ARCH_FLAGS) \
 	-Xcompiler $(NATIVE_CPU_FLAG) -Xcompiler -pthread
-CUDA_LDLIBS ?= -lm -Xcompiler -pthread -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart -lcublas -lcuda
+CUDA_LDLIBS ?= -lm -Xcompiler -pthread -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart -lcublas -lcuda -luring
 DS4_LINK ?= $(NVCC) $(NVCCFLAGS)
 DS4_LINK_LIBS ?= $(CUDA_LDLIBS)
 
@@ -39,9 +39,9 @@ MMQ_OBJS := cuda/mmq/ds4_ggml_stubs.o cuda/mmq/ds4_mmq.o cuda/mmq/ds4_mmq_d2r.o 
 	cuda/mmq/ds4_q4k_half.o
 HOST_IO_OBJS = ds4_batch_io.o ds4_host_memory.o
 CORE_OBJS = ds4.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_cuda.o ds4_layer_pack.o ds4_engram.o \
-	ds4_engram_iouring.o $(HOST_IO_OBJS) $(MMQ_OBJS)
+	ds4_engram_iouring.o ds4_image.o ds4_prompt_prefix.o $(HOST_IO_OBJS) $(MMQ_OBJS)
 CPU_CORE_OBJS = ds4_cpu.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o ds4_engram.o \
-	ds4_host_memory_cpu.o
+	ds4_engram_iouring.o ds4_image.o ds4_prompt_prefix.o ds4_host_memory_cpu.o
 PIC_FLAGS := -fPIC
 
 .PHONY: all help clean test cpu cuda cuda-generic cuda-decode cuda-regression \
@@ -83,7 +83,7 @@ ds4-server: ds4_server.o ds4_peer.o ds4_help.o ds4_kvstore.o rax.o ds4_gpu_args.
 ds4-bench: ds4_bench.o ds4_help.o ds4_gpu_args.o $(CORE_OBJS)
 	$(DS4_LINK) -o $@ $^ $(DS4_LINK_LIBS)
 
-ds4-eval: ds4_eval.o ds4_help.o $(CORE_OBJS)
+ds4-eval: ds4_eval.o ds4_eval_cases.o ds4_help.o $(CORE_OBJS)
 	$(DS4_LINK) -o $@ $^ $(DS4_LINK_LIBS)
 
 ds4-agent: ds4_agent.o ds4_help.o ds4_web.o ds4_kvstore.o linenoise.o ds4_gpu_args.o $(CORE_OBJS)
@@ -111,7 +111,7 @@ cpu: ds4_cli_cpu.o ds4_server_cpu.o ds4_bench_cpu.o ds4_eval_cpu.o ds4_agent_cpu
 	$(CC) $(CFLAGS) -o ds4 ds4_cli_cpu.o ds4_help.o linenoise.o ds4_gpu_args_cpu.o $(CPU_CORE_OBJS) $(LDLIBS)
 	$(CC) $(CFLAGS) -o ds4-server ds4_server_cpu.o ds4_peer.o ds4_help.o ds4_kvstore.o rax.o ds4_gpu_args_cpu.o $(CPU_CORE_OBJS) $(LDLIBS)
 	$(CC) $(CFLAGS) -o ds4-bench ds4_bench_cpu.o ds4_help.o ds4_gpu_args_cpu.o $(CPU_CORE_OBJS) $(LDLIBS)
-	$(CC) $(CFLAGS) -o ds4-eval ds4_eval_cpu.o ds4_help.o $(CPU_CORE_OBJS) $(LDLIBS)
+	$(CC) $(CFLAGS) -o ds4-eval ds4_eval_cpu.o ds4_eval_cases.o ds4_help.o $(CPU_CORE_OBJS) $(LDLIBS)
 	$(CC) $(CFLAGS) -o ds4-agent ds4_agent_cpu.o ds4_help.o ds4_web.o ds4_kvstore.o linenoise.o ds4_gpu_args_cpu.o $(CPU_CORE_OBJS) $(LDLIBS)
 
 cuda-regression: tests/cuda_long_context_smoke

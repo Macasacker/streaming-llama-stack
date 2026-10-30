@@ -5918,7 +5918,7 @@ static uint32_t cuda_stream_host_expert_cache_lru_slot(
     return slot;
 }
 
-#if defined(_WIN32)
+
 /* ---- Batched expert prefetch -------------------------------------------------------------------
  *
  * The router picks every expert for a layer at once, so all of that layer's disk reads are known
@@ -6029,7 +6029,7 @@ static const void                             *g_ds_hot_prefetch_map    = NULL;
 static uint32_t                                g_ds_hot_prefetch_last_layer = 0;
 static uint64_t                                g_ds_hot_prefetch_used   = 0;
 static size_t                                  g_ds_hot_prefetch_spans  = 0;
-#if defined(_WIN32)
+
 /* Decode-side frequency-tier lookahead. Each in-flight wave owns one
  * immutable arena region until every layer in that wave has copied its
  * selected weights into compact compute buffers. */
@@ -6309,7 +6309,7 @@ static void cuda_ds_hash_pipeline_stats_dump(void) {
                 batch_ms > 0.0 ? 100.0 * wait_ms / batch_ms : 0.0);
     }
 }
-#endif
+
 
 /* Optional next-layer RAM -> VRAM promotion.  It occupies a disjoint tail of
  * the DirectStorage GPU arena, so pinned-H2D and SSD->GPU can run together
@@ -6690,13 +6690,6 @@ static int cuda_ds_prefetch_snapshot_span(
     }
     return 1;
 }
-#else
-static int cuda_ds_prefetch_copy_expert_to_device(
-        char *, char *, char *, const void *,
-        uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, int = 0) {
-    return 0;
-}
-#endif  /* _WIN32 */
 
 static int cuda_model_read_to_host(
         char *dst,
@@ -12514,7 +12507,7 @@ extern "C" void ds4_gpu_stream_expert_prefetch_token_end(void) {
 }
 #endif
 
-#if defined(_WIN32)
+
 static uint64_t cuda_prefill_pipeline_align(uint64_t value) {
     return (value + 255ull) & ~255ull;
 }
@@ -13546,7 +13539,7 @@ extern "C" int ds4_gpu_prefill_pipeline_finish(void) {
 extern "C" void ds4_gpu_prefill_pipeline_release(void) {
     cuda_prefill_pipeline_release();
 }
-#endif
+
 
 static int cuda_stream_selected_cache_begin_compact_load(
         const void    *model_map,
@@ -27820,6 +27813,7 @@ extern "C" int ds4_gpu_attention_decode_heads_tensor(
     }
     int ok = 0;
     const float *sinks = NULL;
+    int logical_tier = 0;   /* set after the checks below, so no goto jumps past its init */
     dim3 grid(1, 1, 1);
     if (!heads || !q || !raw_kv || !model_map || n_raw == 0 || raw_cap < n_raw ||
         raw_start >= raw_cap || (n_comp != 0 && !comp_kv) || (use_mask && !comp_mask) ||
@@ -27832,7 +27826,7 @@ extern "C" int ds4_gpu_attention_decode_heads_tensor(
         (use_mask && comp_mask->bytes < (uint64_t)n_comp * sizeof(float))) {
         goto done;
     }
-    const int logical_tier = ds4_tensor_device_idx(heads);
+    logical_tier = ds4_tensor_device_idx(heads);
     sinks = (const float *)cuda_resolve_weight_ptr(
             model_map, sinks_offset, (uint64_t)n_head * sizeof(float), logical_tier, "attn_sinks");
     if (!sinks) goto done;

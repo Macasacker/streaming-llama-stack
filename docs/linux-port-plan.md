@@ -179,21 +179,54 @@ and drops 4,114 Apple/Metal references instead of 6,091. Steps 4, 5 and 6 below 
     points in `ds4_decode_adapter.inc`, and the producer's loader path in
     `engines/streaming-llama` must use `dlopen`/`dlsym` instead of `LoadLibrary`/`GetProcAddress`.
 
-1.7 First CUDA build. `make -C engines/ds4 cuda CUDA_ARCH=sm_120`. Expect the `ds4_cuda.cu`
-    Windows-block identifier errors above to be the main work: decide per site whether the Linux
-    io_uring prefetch replaces it or the branch is dead.
+1.7 First CUDA build. Done. `make -C engines/ds4 cuda CUDA_ARCH=sm_120` builds `ds4`,
+    `ds4-server`, `ds4-bench`, `ds4-eval`, `ds4-agent` (56-58 MB each) and `make cpu` builds the
+    CPU variants. `./ds4 --help` runs.
 
-1.8 Delete `engines/ds4-mac` and `engines/ds4-peer`, carry provenance from
-    `engines/ds4-win/PROVENANCE.md` and `engines/ds4-win/THIRD_PARTY_NOTICES.md` into
+    What the build needed:
+    - `ds4_cuda.cu` had three platform guards that gated platform-neutral code, not Windows code.
+      Removed the guard at 5921 (its `#endif /* _WIN32 */` at 6699 plus an orphan `#else` branch
+      holding `cuda_ds_prefetch_copy_expert_to_device` stubs), the nested guard at 6032..6312, and
+      the guard at 12510..13542 that held `ds4_gpu_prefill_pipeline_begin/layer_done/wait_layer/
+      finish/release`. Their internals call only the `ds4_ds_*` transport API, so the io_uring
+      transport is what they now run on. Scan of those blocks found no Win32 or D3D calls.
+    - One C++ error: `goto done` jumped over `const int logical_tier` initialization at
+      `ds4_cuda.cu:27829`. Declared `int logical_tier = 0` above the checks and assigned after.
+      Be careful editing near it: the same variable name appears in ~40 other functions, and a
+      plain string replace hits the wrong one (26804 in `ds4_gpu_attention_noncausal_raw_batch_heads_tensor`).
+    - `cuda/mmq/ds4_ggml_stubs.cu` needed `<unistd.h>` and the host-memory header unguarded.
+    - Link additions: `-luring`, `ds4_image.o`, `ds4_prompt_prefix.o`, `ds4_engram.o`,
+      `ds4_engram_iouring.o`, and `ds4_eval_cases.c/.h` copied from `engines/ds4-mac` (the
+      Windows engine never had them, but `ds4_eval.c` needs `eval_hard_cases`).
+
+1.6 Decode library. Open: `make cuda-decode CUDA_ARCH=sm_120` builds `ds4-decode.so`. Not yet
+    compiled. Needs `DS4_EXTERNAL_DECODE` and the `ds4x_*` entry points from
+    `ds4_decode_adapter.inc`, and the producer's loader in `engines/streaming-llama` must use
+    `dlopen`/`dlsym` instead of `LoadLibrary`/`GetProcAddress`.
+
+1.8 Delete the old engines. Open: delete `engines/ds4-mac` and `engines/ds4-peer`, carry
+    provenance from `engines/ds4-win/PROVENANCE.md` and `THIRD_PARTY_NOTICES.md` into
     `engines/ds4/PROVENANCE.md` and `NOTICE`, rename the `ds4-win` scope key to `ds4` in
     `slstack/envvars.py`, `process.py`, `combo_native.py`, `general_engine.py`, `engines.py`,
     `check.py` and the presets, then regenerate `docs/VARIABLES.md`.
 
-Gate: `make -C engines/ds4 cuda CUDA_ARCH=sm_120` builds `ds4`, `ds4-server`, `ds4-bench`,
-`ds4-eval`, `ds4-agent`, and `make -C engines/ds4 cuda-decode CUDA_ARCH=sm_120` builds
-`ds4-decode.so`. `make test-mxfp4-cuda` cannot run: `tests/test_mxfp4_cuda.cu` is not in the
-published tree (the engine `tests/` directory holds only 8 files), so that target now says
-skipped rather than failing on a missing source.
+Gate for chunk 1.7, met: `make -C engines/ds4 cuda CUDA_ARCH=sm_120` builds `ds4`, `ds4-server`,
+`ds4-bench`, `ds4-eval`, `ds4-agent`. `make -C engines/ds4 cpu` builds the CPU variants.
+`make test-mxfp4-cuda` cannot run: `tests/test_mxfp4_cuda.cu` is not in the published tree (the
+engine `tests/` directory holds only 8 files), so that target says skipped instead of failing on a
+missing source.
+
+Known gaps carried forward, not hidden:
+
+- The io_uring transport is correct-by-construction but unmeasured. No model file exists on this
+  box, so `ds4_ds_selftest` and the decode pipeline have never run against real weights.
+- Reads are buffered. `O_DIRECT` with 4 KiB-aligned offsets and buffers is a separate chunk.
+- `ds4_cuda.cu` still has 34 `#if defined(_WIN32)` guards and `ds4.c` has Windows host code left;
+  they compile away on Linux. Phase 2 deletes them, and the Phase 2 grep gate cannot pass until
+  then.
+- `./ds4 --help` still advertises `--metal`. Help text and CLI backend names are Phase 2 work.
+- `engines/ds4-win`, `engines/ds4-mac` and `engines/ds4-peer` still exist until chunk 1.8 lands,
+  so the fork temporarily has four engines.
 
 ## Phase 2: engine host layer
 
@@ -382,9 +415,13 @@ python3 -B scripts/release_check.py
 ```
 
 Counts: Phase 0 about 940 Windows references and about 12,300 Apple/MLX references. After chunks
-1.1-1.4 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and
+1.1-1.7 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and
 4,109 Apple/Metal references. `python3 -B scripts/release_check.py` still reports only the
 pre-existing `docs/VARIABLES.md:0: regenerate` finding.
+
+Build a CUDA engine with `make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4` (~4 min). `make cpu`
+builds the same binary names as CPU variants, so rebuild CUDA afterwards if you need the CUDA
+binaries.
 
 `.githooks` is wired through `core.hooksPath`, so `pre-commit` runs `release_check.py` and will
 refuse a commit while the VARIABLES finding stands. Either regenerate the table first or commit
