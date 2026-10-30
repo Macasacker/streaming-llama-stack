@@ -92,7 +92,7 @@ ds4-agent: ds4_agent.o ds4_help.o ds4_web.o ds4_kvstore.o linenoise.o ds4_gpu_ar
 # The producer loads this beside itself instead of ds4-decode.dll: it binds the
 # ds4x_* entry points in ds4_decode_adapter.inc with dlopen.
 ds4-decode.so: ds4.o ds4_cuda.o ds4_lora.o ds4_image.o $(MMQ_OBJS) $(HOST_IO_OBJS) ds4_layer_pack.o ds4_ssd.o ds4_distributed.o ds4_tp.o
-	$(NVCC) $(NVCCFLAGS) $(PIC_FLAGS) -shared -o $@ $^ $(CUDA_LDLIBS)
+	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC -shared -o $@ $^ $(CUDA_LDLIBS)
 
 cuda-decode:
 	@if [ -z "$(strip $(CUDA_ARCH))" ]; then \

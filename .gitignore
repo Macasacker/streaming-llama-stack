@@ -27,6 +27,10 @@ engines/ds4/ds4-bench
 engines/ds4/ds4-eval
 engines/ds4/ds4-agent
 engines/ds4/ds4-decode.so
+engines/ds4/tests/*
+!engines/ds4/tests/*.c
+!engines/ds4/tests/*.cpp
+!engines/ds4/tests/*.sh
 engines/ds4-mac/ds4
 engines/ds4-mac/ds4-server
 engines/ds4-mac/ds4-bench
