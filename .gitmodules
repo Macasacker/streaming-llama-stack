@@ -1,3 +1,0 @@
-[submodule "engines/mlx-serve"]
-	path = engines/mlx-serve
-	url = https://github.com/ddalcu/mlx-serve.git

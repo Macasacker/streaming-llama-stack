@@ -1,8 +1,13 @@
 # streaming-llama-stack: repo review and Linux port notes
 
 The work plan lives in [docs/linux-port-plan.md](docs/linux-port-plan.md). Scope is Linux
-only: Windows, macOS, Metal, MLX and the non-CUDA ggml backends all get deleted. Phase 0 is
-committed; Phases 1 through 8 are open.
+only: Windows, macOS, Metal, MLX and the non-CUDA ggml backends all get deleted.
+
+Where the port stands: Phase 0 deletions are committed, and `engines/ds4` is a Linux CUDA engine
+built from `engines/ds4-win` that compiles and links on this box (`sm_120`, CUDA 13.4 at
+`/opt/cuda`, batched reads over io_uring instead of DirectStorage, `/proc` + cgroup memory
+admission instead of Windows job-object limits). It has never run against model weights — there
+are none on this machine — so it is a compile gate, not a performance result.
 
 Repo: https://github.com/fronteagle739/streaming-llama-stack
 Reviewed: 2026-10-30, via `gh` plus a local clone at `/tmp/sl-stack`

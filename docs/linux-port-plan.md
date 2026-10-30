@@ -120,12 +120,12 @@ Both engines fail to build on Linux today, so neither is a drop-in.
   (`:42079`), `ds4_gpu_tp_flag_fold_request` (`:42272`), `ds4_gpu_add_tensor_tp_flag` (`:42505`),
   `ds4_gpu_pq_probs` (`:89469`), `ds4_gpu_pq_cand` (`:89471`). GCC 14 makes the implicit
   declaration an error, so the Mac engine's Linux CUDA branch has never been compiled.
-- `make -C engines/ds4-win cuda CUDA_ARCH=sm_120` compiles every C/C++ TU and fails only in
+- `make -C engines/ds4-win cuda CUDA_ARCH=sm_120` compiled every C/C++ TU and failed only in
   `ds4_cuda.cu`: 12 errors, all identifiers defined inside the `#if defined(_WIN32)` block that
-  runs 5933-6711 but used outside it (`g_ds_decode_bandwidth` at 8623/8631/8644/8657/11455,
-  `g_prefill_pipeline` at 8696, `ds4_ds_batch_inflight` at 11423, `g_ds_prefetch_*` at
-  11457-11496, `cuda_ds_prefetch_reset` at 11494) plus one "transfer of control bypasses
-  initialization" at 27845.
+  ran 5933-6711 but used outside it (`g_ds_decode_bandwidth`, `g_prefill_pipeline`,
+  `ds4_ds_batch_inflight`, `g_ds_prefetch_*`, `cuda_ds_prefetch_reset`) plus one "transfer of
+  control bypasses initialization". Chunk 1.7 resolved this: those blocks are platform-neutral
+  code that only calls the `ds4_ds_*` transport API, so the guard came off rather than the code.
 - `cuda/mmq/` is near-identical between the two engines: only `mmq.cuh` differs, by 18 lines.
   The Windows copy adds a K2304 row-stride guard so a partial K row never loads the next
   expert's codes or scales (`mmq.cuh:973-986`). So the packed FP4 and Q4K-half kernels move as
@@ -372,7 +372,64 @@ Nothing measured transfers. Re-run against the hash-pinned fixtures and write ne
 4. Paired run only if two-machine mode stays, KL within mean 0.1 and max 0.5 nats.
 5. Update `docs/PERFORMANCE.md` and the README tables only from these receipts.
 
-## Sequencing and risk
+### Chunk backlog, in the order worth doing
+
+Each chunk is sized to fit one working session and ends with a gate. Tick them in this file.
+
+1.9 Settle the open decisions. Two-machine mode cannot survive: the decode half was the macOS
+   receiver, and macOS is deleted. So decision 1 resolves to (b), single machine only. That means
+   deleting `slstack/mac.py`, `pairing.py`, `native_broker.py`, the `combo_*` handoff paths,
+   `examples/dual-machine/*`, and the `ds4-peer` engine and backend profile. Decision 2: restrict
+   the supported list to DeepSeek V4.x on ds4 CUDA; Kimi/GLM/MiniMax/Step lose their MLX decode.
+   Decision 3: ROCm stays deleted - no AMD hardware here.
+
+1.10 Delete `engines/ds4-win`, `engines/ds4-mac`, `engines/ds4-peer` and every path that points at
+    them: `slstack/check.py:50`, `slstack/process.py:34,46,49`, `slstack/envvars.py:21,107,192`,
+    `slstack/combo_native.py:209`, `slstack/backends.py:25,134-139`, `slstack/__main__.py:95`,
+    `build.sh`, `slstack/install.py`, `config.example.json`. Rename the scope key `ds4-win` to
+    `ds4`. Regenerate `docs/VARIABLES.md` with `python -B -m slstack.envdocs`.
+    Gate: `python3 -B scripts/release_check.py` exits 0, and the 34-test Python suite passes.
+
+2.1 Remaining Win32 host code in the engine: `ds4.c` (~50 refs), `ds4_cuda.cu` (34 guards),
+    `ds4_cli.c`, `ds4_server.c`, `ds4_agent.c` (drive-letter path handling), `ds4_web.c`,
+    `ds4_ssd.c`, `ds4_kvstore.c`, `ds4.h`, `ds4_gpu.h`, `ds4_peer.c` (deleted with 1.9),
+    `ds4_combo_api.inc` (Windows-only; delete). Gate: `grep -rn "_WIN32\|windows.h\|Win32\|DStorage\|IoRing" engines/ds4` returns nothing.
+
+2.2 Apple/Metal dead code in the engine (4,109 refs, most inside `#ifdef __APPLE__` blocks in
+    `ds4.c`, `ds4_gpu.h`, `ds4_tp.c`, `ds4_image.c`, `ds4_web.c`, `ds4_cli.c`, `ds4_help.c`).
+    Gate: `grep -rn "__APPLE__\|TARGET_OS\|Metal\|metal" engines/ds4` returns nothing, and
+    `make cuda CUDA_ARCH=sm_120` still builds.
+
+3.1 Streaming producer on Linux. `engines/streaming-llama/prefill_llama.cpp`: implement
+    `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`, delete
+    `llama-wf-gpu-ring.inl` and the DStorage interop and the `--ds-gpu-ring-slots` option, port
+    `llama-dsv41-engram-prefetch.cpp` (108 Win32 refs), replace the provider lease and the two
+    throws in `llama-dsv41-weights.cpp` (`:923`, `:1000`), replace `llama-dsv41-locked-ram.h` and
+    the carry lease, replace BCrypt SHA-256 with OpenSSL EVP in `tools/dsv41-prefill/main.cpp` and
+    `src/boundary-capture.cpp`, drop DXGI/Windows includes in the producer, `mtmd` and `server`.
+    Gate: the producer links and passes `--check-native-profiles`. A 262K prefill needs weights.
+
+3.2 Producer decode library wiring: `dlopen`/`dlsym` for `ds4-decode.so` in place of
+    `LoadLibraryW`/`GetProcAddress`, and `make cuda-decode` producing it.
+
+4.1 ggml backend prune: keep CUDA + CPU; delete Vulkan, SYCL, Hexagon, KleidiAI, RPC, AMX, Metal
+    in `ggml-bench`, and the corresponding options in `ggml/CMakeLists.txt`.
+
+5.1 Python orchestrator: `guard.py` Job Object -> cgroup v2 scope via `systemd-run --scope`,
+    `single_runtime.py` PRODUCER_FILES, `memory_counters.py` psutil path, `lease.py` msvcrt branch,
+    `journal.py` rename-race handling, `working_set.py`/`shared_guard.py`, `combo_ram.py:86`,
+    `lora.py` drive letters, `generation.py` msvcrt branch.
+    Gate: `./bin/slstack --config <file> check` runs on Linux and the Python suite passes.
+
+6.1 Vendor and engine bloat: `vendor/mac-mlx`, `engines/mlx-receiver`, `engines/mlx-serve`,
+    `engines/mference`, the MLX lock files, `patches/mlx-core-ring-listeners.*`.
+
+7.1 Docs, examples, presets, tests: delete the Mac/paired halves, regenerate `docs/VARIABLES.md`,
+    relabel inherited Windows/macOS measurements.
+
+8.1 Qualification. Needs a qualified GGUF on disk: 262K exact-cone runs, 200K real-text fixture
+    with password recall and logits SHA-256, Engram extent reads against the pread baseline, then
+    rewrite `docs/PERFORMANCE.md` and the README tables from those receipts only.
 
 Phases 1, 2, 3 make the inference path work. Phases 4, 5, 6, 7 are the bloat reduction and can
 run in any order after that. Phase 8 last.
