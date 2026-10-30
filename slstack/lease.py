@@ -61,22 +61,16 @@ def recover_runtime_leases(runtime_root, task='DS4STACK'):
             for identity in recover_leases(location, task)]
 
 
-def active_holds(text, *, mac=None):
+def active_holds(text):
     """Unreleased ledger holds, parsed by the vendored Studio priority_holds.
 
-    mac=False: RTX holds only; mac=True: MAC holds only. The default (None) is the
-    RTX admission view: RTX holds plus MAC KIT11* holds, which also block the RTX.
+    The RTX resource is the only one this fork coordinates on: the Mac receiver was
+    deleted with macOS, so no MAC hold line can appear in the ledger.
     """
     from .native_broker import vendor
     vendor()
     from studio.job_guard import priority_holds
-    if mac:
-        return priority_holds(text, ('*',), resource='MAC')
-    rtx = priority_holds(text, ('*',), resource='RTX')
-    if mac is False:
-        return rtx
-    return rtx + [line for line in priority_holds(text, ('*',), resource='MAC')
-                  if re.match(r'^MAC ACTIVE:\s+KIT11[A-Z0-9]*\s', line)]
+    return priority_holds(text, ('*',), resource='RTX')
 
 
 def reservation_admission(lines, budget_gib, floor_gib, *, available=None, owned_rss=None):
@@ -134,9 +128,9 @@ def hold_admission(lines, *, budget_gib=0, floor_gib=2, available=None):
 
 class HoldWatcher:
     """Fail closed on a new foreign hold; unchanged ledgers cost one stat call."""
-    def __init__(self, path, identity, *, mac=False, task='DS4STACK'):
+    def __init__(self, path, identity, *, task='DS4STACK'):
         self.path, self.identity = Path(path), identity
-        self.mac, self.task = mac, task
+        self.task = task
         self.stamp = None
         self.blocking = None
         self.foreign = []
@@ -148,13 +142,13 @@ class HoldWatcher:
             if stat.st_size > 16 * 1024**2:
                 raise RuntimeError('Shared hold ledger exceeds its observation budget')
             blocking = []
-            for line in active_holds(read_hold_text(self.path), mac=bool(self.mac)):
-                match = re.match(r'^(?:MAC |RTX )?ACTIVE:\s+(\S+)\s+(\S+)', line.strip())
+            for line in active_holds(read_hold_text(self.path)):
+                match = re.match(r'^ACTIVE:\s+(\S+)\s+(\S+)', line.strip())
                 if not match or (match[1], match[2].rstrip(';')) != (self.task, self.identity):
                     blocking.append(line)
             self.foreign = blocking
             self.stamp = stamp
-        self.blocking = '\n'.join(self.foreign if self.mac else hold_admission(self.foreign)) or None
+        self.blocking = '\n'.join(hold_admission(self.foreign)) or None
         return self.blocking
 
 

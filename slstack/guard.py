@@ -158,8 +158,7 @@ def _supervise_plain(spec):
     admit(budget, spec['min_available_gib'])
     from .lease import HoldWatcher
     watch = spec.get('hold_watch')
-    watcher = HoldWatcher(watch['path'], watch['identity'], mac=watch.get('mac', False),
-                          task=watch.get('task', 'DS4STACK')) if watch else None
+    watcher = HoldWatcher(watch['path'], watch['identity'], task=watch.get('task', 'DS4STACK')) if watch else None
     if watcher and watcher.reason():
         raise RuntimeError('Yielding before process creation to shared hold: ' + watcher.reason())
     flags = subprocess.CREATE_NO_WINDOW | 4 if os.name == 'nt' else 0  # suspended until Job admission
@@ -272,8 +271,7 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
     admit(budget, spec['min_available_gib'])
     from .lease import HoldWatcher
     watch = spec.get('hold_watch')
-    watcher = HoldWatcher(watch['path'], watch['identity'], mac=watch.get('mac', False),
-                          task=watch.get('task', 'DS4STACK')) if watch else None
+    watcher = HoldWatcher(watch['path'], watch['identity'], task=watch.get('task', 'DS4STACK')) if watch else None
     if watcher and watcher.reason():
         raise RuntimeError('Yielding before process creation to shared hold: ' + watcher.reason())
     flags = subprocess.CREATE_NO_WINDOW | 4 if os.name == 'nt' else 0  # suspended until Job admission

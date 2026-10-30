@@ -78,11 +78,11 @@ class Engines:
     def single_engine(self):
         # Default single-RTX endpoint: combo_proxy serving_mode=single_engine (ULTRA producer
         # prefill + in-process ds4 decode). --serving native keeps the ds4-server binary.
-        return not self.cfg.get('mac') and self.cfg.get('serving', 'single_engine') == 'single_engine'
+        return self.cfg.get('serving', 'single_engine') == 'single_engine'
 
     def combo_enabled(self):
         # Single-RTX native engine: graceful shutdown and media swaps use the native session boundary.
-        return not self.cfg.get('mac') and not self.cfg['lora'] and os.name == 'nt' and not self.single_engine()
+        return not self.cfg['lora'] and not self.single_engine()
 
     def single(self, operation):
         return http_json(self.cfg['ds4_url'] + '/v1/stack/' + operation, {}, timeout=None,
@@ -196,8 +196,6 @@ class Engines:
             raise
 
     def _ready(self):
-        if self.cfg.get('mac'):
-            raise ValueError('Two-machine pairing was deleted with macOS')
         if self.llm and self.llm.proc.poll() is None:
             return
         self.close()
@@ -208,7 +206,7 @@ class Engines:
                 print('Recovered stale LoRA journal: ' + json.dumps(reports), flush=True)
             self.journal_checked = True
         if self.cfg['long_prompt'] and not self.single_engine():
-            raise RuntimeError('ULTRA handoff requires the Windows target-only adapter and parity gate')
+            raise RuntimeError('Long-prompt ULTRA handoff was deleted with macOS; serve with serving=single_engine')
         if not self.cfg['model'] or not path(self.cfg['model']).exists():
             raise ValueError('Configure an existing ds4 model path')
         address = urlsplit(self.cfg['ds4_url'])
@@ -337,14 +335,6 @@ class Engines:
                            % (window.idle(), window.elapsed()))
 
     def quality(self, value=None):
-        if self.cfg.get('mac'):
-            from .generation import Store
-            store=Store(self.cfg)
-            row=store.bias(value) if value is not None else store.get()
-            return {'supported': True, 'phases_supported': True,'settings':row,
-                    'per_phase':row['per_phase'],'phases':{p:v['bias'] for p,v in row['phases'].items()},
-                    'value': {p:v['bias'] for p,v in row['phases'].items()} if row['per_phase'] else row['value'],
-                    'scope':'session','applies':'next request'}
         # Control must remain available while another thread is decoding.
         # Cold start still shares the normal lifecycle lock with media/model swaps.
         if not self.llm or self.llm.proc.poll() is not None:
@@ -371,7 +361,7 @@ class Engines:
             yield from self.remote.events(body)
             return
         if not self.single_engine():
-            raise ValueError('Streaming requires the paired Mac receiver or the single engine')
+            raise ValueError('Streaming requires serving=single_engine')
         # The single engine streams its own SSE: content deltas, 1 Hz prefill_progress chunks
         # and timings on the finish chunk. Its independent progress guard owns liveness.
         from .streaming import events

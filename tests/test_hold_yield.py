@@ -28,19 +28,18 @@ class HoldYieldTests(unittest.TestCase):
             file.unlink()
         self.directory.rmdir()
 
-    def test_rtx_and_mac_namespaces_and_release(self):
-        rtx, mac = HoldWatcher(self.hold, 'own'), HoldWatcher(self.hold, 'own', mac=True)
-        self.assertIsNone(rtx.reason())
+    def test_rtx_namespace_and_release(self):
+        watcher = HoldWatcher(self.hold, 'own')
+        self.assertIsNone(watcher.reason())
+        # A Mac receiver was deleted with macOS, so a MAC hold line is not an RTX hold.
         self.hold.write_text('ACTIVE: DS4STACK own; test\nMAC ACTIVE: KIT11 mac; priority\n', encoding='utf-8')
-        self.assertIsNone(rtx.reason())
-        self.assertIn('KIT11', mac.reason())
+        self.assertIsNone(watcher.reason())
         with self.hold.open('a', encoding='utf-8') as out:
             out.write('ACTIVE: DS4COMBO rtx; priority\n')
-        self.assertIn('DS4COMBO', rtx.reason())
+        self.assertIn('DS4COMBO', watcher.reason())
         with self.hold.open('a', encoding='utf-8') as out:
             out.write('RELEASED: DS4COMBO rtx; done\nMAC RELEASED: KIT11 mac; done\n')
-        self.assertIsNone(rtx.reason())
-        self.assertIsNone(mac.reason())
+        self.assertIsNone(watcher.reason())
 
     def test_real_owned_child_stops_on_kit11_hold(self):
         ready = self.directory / 'ready'

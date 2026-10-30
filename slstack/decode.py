@@ -78,6 +78,6 @@ def serve(cfg):
         for owner in owners:
             proof=owner.stop()
             if not proof['confirmed']:
-                error=RuntimeError('Mac decoder cleanup unconfirmed; ownership retained')
+                error=RuntimeError('Decoder cleanup unconfirmed; ownership retained')
                 error.owned_cleanup_uncertain=True
                 raise error

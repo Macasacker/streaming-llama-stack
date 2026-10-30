@@ -1,6 +1,6 @@
 # Handoff: Linux-only port of streaming-llama-stack
 
-Working dir: `/home/mac/workspace/local-llm-playground/streaming-llama-stack`, branch `linux-only`.
+Working dir: this checkout (`streaming-llama-stack`), branch `linux-only`.
 Durable plan: `docs/linux-port-plan.md` (chunk backlog near the end). Repo review: `linux-port.md`.
 Runnable commands for the user: `docs/linux-port-commands.md`.
 
@@ -34,7 +34,7 @@ vendor module, and GPU/video gates that need a model on disk.
 interrupted, so the undefined symbols are still unknown. Reproduce with:
 
 ```bash
-cd /home/mac/workspace/local-llm-playground/streaming-llama-stack/engines/ds4
+cd engines/ds4
 timeout 900 make -B ds4-decode.so CUDA_ARCH=sm_120 > /tmp/decode-build.log 2>&1
 grep "undefined reference" /tmp/decode-build.log | sed 's/.*undefined reference to //' | sort | uniq -c | sort -rn
 ```

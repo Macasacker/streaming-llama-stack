@@ -114,16 +114,13 @@ def render(table):
             '`{host_budget_mb}`, `{physical_floor_bytes}` (admission) and `{runtime_floor_bytes}` (runtime). `{host_budget_gib}` and '
             '`{min_available_gib}` use GiB. User overrides are literal strings, including JSON and braces.', '',
             'Hardware commands use the pinned shared ownership/paging guard. Model operations wait while progress advances; only stalled work expires. '
-            'It enforces the physical budget/floor and a separate Windows device-backing commit allowance. '
-            'Windows owned-page observations are bounded and incremental; Darwin disk-only process attribution is unavailable. '
-            'Zero observed pages does not establish exhaustive zero pagefile I/O. Resource leases remain held if owned cleanup cannot be confirmed.', '',
+            'It enforces the physical budget and floor. Linux attribution reads /proc and cgroup v2; paging is measured as swap output. '
+            'Zero observed pages does not establish exhaustive zero swap I/O. Resource leases remain held if owned cleanup cannot be confirmed.', '',
             'Examples (edit paths in the config first):', '', '```text',
             'slstack rtx --config config.json --llama-dsv41-topk-radix 1',
             'slstack rtx --config config.json --ds4-cuda-streaming-expert-cache-reserve-gb 2',
-            'slstack mac --config config.json --ds4-metal-disable-v41-layer-prefill 1',
             'slstack rtx --config config.json --mem-guard-min-free-gb 4', '```', '',
-            'The core-eviction flag must remain 0 and the wired Metal flag must remain 1. '
-            'Requests to disable these residency requirements fail before an engine starts.', '',
+            'Expert residency requirements are enforced by the engine. Requests to disable them fail before an engine starts.', '',
             '## Advanced source inventory', '',
             'Variables without a launcher flag retain their built-in default. The literal read and immediate '
             'consumer are recorded below, including conditional and wrapper defaults. '

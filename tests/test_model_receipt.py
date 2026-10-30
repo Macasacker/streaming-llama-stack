@@ -58,8 +58,7 @@ class ModelReceiptTests(unittest.TestCase):
         with mock.patch.object(native_broker, 'sha256', side_effect=AssertionError('rehashed')):
             self.assertEqual(model_receipt(receipt_config(self.cfg)), self.target)
 
-    def test_not_applicable_on_the_paired_mac_or_native_path(self):
-        self.assertIsNone(check_module.verify_model_receipt({**self.cfg, 'mac': 'http://mac:1'}))
+    def test_not_applicable_on_the_native_path(self):
         self.assertIsNone(check_module.verify_model_receipt({**self.cfg, 'serving': 'native'}))
         self.assertFalse(self.target.exists())
 

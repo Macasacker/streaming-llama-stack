@@ -132,13 +132,13 @@ class SingleEngineStreamTests(unittest.TestCase):
         self.assertEqual(rows[1]['prefill_progress'], PROGRESS)
         self.assertEqual(rows[-1]['choices'][0]['finish_reason'], 'stop')
 
-    def test_native_serving_still_refuses_unpaired_streaming(self):
+    def test_native_serving_refuses_streaming(self):
         engines = Engines.__new__(Engines)
-        engines.cfg = {**self.cfg, 'serving': 'native', 'mac': None}
+        engines.cfg = {**self.cfg, 'serving': 'native'}
         engines.remote = None
         engines.select = lambda model: None
         engines.ready = lambda: None
-        with self.assertRaisesRegex(ValueError, 'paired Mac receiver or the single engine'):
+        with self.assertRaisesRegex(ValueError, 'Streaming requires serving=single_engine'):
             list(engines.chat_events({'messages': []}))
 
 

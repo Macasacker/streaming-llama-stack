@@ -1,8 +1,8 @@
 # Linux port commands
 
 Commands for this machine: Arch Linux, RTX 5090 (32 GiB), CUDA 13.4 at `/opt/cuda`,
-`nvcc 13.4`, `liburing` headers present, Python 3.14.8. Repo:
-`/home/mac/workspace/local-llm-playground/streaming-llama-stack`, branch `linux-only`.
+`nvcc 13.4`, `liburing` headers present, Python 3.14.8. Repo: this checkout, branch `linux-only`.
+Every command below is run from the repository root unless it says otherwise.
 
 Two realities that shape every run:
 
@@ -17,8 +17,6 @@ Two realities that shape every run:
 ## Builds
 
 ```bash
-cd /home/mac/workspace/local-llm-playground/streaming-llama-stack
-
 # CUDA engine, ~4 minutes. Builds ds4, ds4-server, ds4-bench, ds4-eval, ds4-agent.
 make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4
 
@@ -33,8 +31,6 @@ error is not yet diagnosed. See `HANDOFF.md`.
 ## Gates that pass today
 
 ```bash
-cd /home/mac/workspace/local-llm-playground/streaming-llama-stack
-
 python3 -B scripts/release_check.py          # Release check: 0 findings
 timeout 300 env PYTHONPATH=.:tests python3 -m unittest \
   test_release_check test_dsv41_single_launch test_example_launchers   # 32 tests, OK
@@ -82,7 +78,7 @@ dd if=/dev/urandom of=/tmp/io-bench.bin bs=1M count=64
 # Free VRAM first.
 pkill -f 'Strata/build/strata' ; nvidia-smi --query-gpu=memory.free --format=csv,noheader
 
-cd /home/mac/workspace/local-llm-playground/streaming-llama-stack/engines/ds4
+cd engines/ds4
 
 # Metadata and tensor validation, no inference, no VRAM beyond context init.
 ./ds4 --inspect --model /path/to/supported.gguf --cuda

@@ -36,7 +36,6 @@ def main():
         installer.add_argument('--' + option, action='store_true')
     sub.add_parser('mcp')
     sub.add_parser('serve-internal', help=argparse.SUPPRESS)
-    sub.add_parser('mac-internal', help=argparse.SUPPRESS)
     sub.add_parser('broker-internal', help=argparse.SUPPRESS)
     train = sub.add_parser('train_lora')
     train.add_argument('--data-folder', required=True)
@@ -66,8 +65,6 @@ def main():
     start.add_argument('--image-arch')
     start.add_argument('--video-arch')
     start.add_argument('--comfyui-models')
-    start.add_argument('--mac', help='Native Mac receiver endpoint')
-    start.add_argument('--pair-token', help='Token printed by the Mac; stored in the private runtime')
     start.add_argument('--mode', choices=['accurate', 'fast', 'ultra', 'hyper'], dest='native_tier',
                        help='RTX prefill arithmetic profile (default: accurate)')
     start.add_argument('--image-mode', choices=['streaming', 'resident'])
@@ -87,14 +84,11 @@ def main():
     args = parser.parse_args()
     config_keys = {'host_budget_gib', 'min_available_gib', 'runtime_min_free_gib', 'model', 'webui', 'image_model', 'video_model',
                    'image_arch', 'video_arch', 'comfyui_models', 'image_mode', 'video_mode',
-                   'mtp_model', 'mac_port', 'mac_engine_port', 'backend', 'zig', 'models', 'resident', 'native_tier',
-                   'mac', 'pair_token'}
+                   'mtp_model', 'backend', 'zig', 'models', 'resident', 'native_tier'}
     if args.command in ('start', 'rtx'):
         config_keys.update({'lora', 'serving'})
     overrides = {k: v for k, v in vars(args).items() if k in config_keys and v is not None}
     cfg = load(args.config, overrides)
-    if args.command == 'rtx' and cfg.get('mac') and args.webui is None:
-        cfg['webui'] = True
     cfg.setdefault('env_overrides', {}).update({k[4:]: v for k, v in vars(args).items()
                                               if k.startswith('env_') and v is not None})
     if args.command == 'decode':

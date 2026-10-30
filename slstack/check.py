@@ -11,7 +11,8 @@ from .journal import Journal
 def verify_model_receipt(cfg):
     """Single-engine serving: hash the model once here (install/check/start), with progress on
     the console, so the first prompt finds the receipt cached. None when not applicable."""
-    if cfg.get('general') or cfg.get('mac') or cfg.get('serving', 'single_engine') != 'single_engine' or not cfg.get('model')             or not path(cfg['model']).is_file():
+    if (cfg.get('serving', 'single_engine') != 'single_engine' or not cfg.get('model')
+            or not path(cfg['model']).is_file()):
         return None
     from .native_broker import model_receipt
     from .single_runtime import receipt_config

@@ -13,13 +13,6 @@ from slstack.lease import active_holds, reservation_admission
 
 @unittest.skipUnless(os.name=='nt','Windows Job qualification')
 class GuardTest(unittest.TestCase):
-    def test_kit11_mac_hold_also_blocks_and_cannot_retire_its_rtx_hold(self):
-        rtx='ACTIVE: KIT11 same; RTX'
-        mac='MAC ACTIVE: KIT11 same; Mac'
-        self.assertEqual(active_holds(rtx+'\n'+mac),[rtx,mac])
-        self.assertEqual(active_holds(rtx+'\n'+mac+'\nMAC RELEASED: KIT11 same; Mac'),[rtx])
-        self.assertEqual(active_holds('MAC ACTIVE: OTHER ignored; Mac'),[])
-        self.assertEqual(active_holds('MAC ACTIVE: KIT11FIX build; Mac'),['MAC ACTIVE: KIT11FIX build; Mac'])
     def test_exact_cpu_reservation_and_outstanding_budget(self):
         line='ACTIVE: KIT11FIX Windows native plugin build; host budget 3 GiB; physical RAM reserve 6 GiB; no GPU or Studio restart requested.'
         self.assertFalse(reservation_admission([line],9.25,2,available=int(20.25*2**30))[0])

@@ -166,7 +166,7 @@ def stack_config(cfg):
 
 def preset(cfg, installed):
     installed = Path(installed)
-    return dict(name=cfg.get('preset_name', PRESET_NAME), mode='local', mac={}, include_previous_reasoning=True, tool_call_format='native',
+    return dict(name=cfg.get('preset_name', PRESET_NAME), mode='local', include_previous_reasoning=True, tool_call_format='native',
         rtx=dict(backend='ds4', model='deepseek-reasoner', model_path=cfg['model'], ctx=cfg['context'],
             ds4_binary=str(installed / 'ds4-server.exe'), ds4_chdir=str(installed), ds4_ssd_streaming='1',
             ds4_cache_affinity_bias=0, ds4_cache_affinity_spread_file=str(installed / 'qualification/affinity-spreads.txt'),

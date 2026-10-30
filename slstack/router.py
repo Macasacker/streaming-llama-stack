@@ -56,16 +56,6 @@ class Stack:
         from .generation import Store
         self.generation = Store(cfg)
 
-    def route_metadata(self,row):
-        general=self.cfg.get('general')
-        if general:
-            from .backends import backend
-            remote=general.get('mode','streaming')=='remote'
-            spec=backend((general.get('mac') or {}).get('backend','mlx-serve' if remote else 'mlx-receiver'))
-            row.update(route='mac-http' if remote else 'rtx-prefill-mac-decode',
-                       decode_backend=spec.name,transport=spec.transport,ultra_handoff=False)
-        return row
-
     def prepare_chat(self, body, *, stream=False, references=None):
         if not isinstance(body.get('messages'), list) or not body['messages']:
             raise ValueError('messages must be a nonempty array')
@@ -134,11 +124,10 @@ class Stack:
                     for artifact in item.get('data', []):
                         content += '\n\n' + f'![Generated media]({artifact["url"]})'
                 message['content'] = content
-                paired = bool(self.cfg.get('mac'))
-                result['slstack'] = self.route_metadata({'route': 'rtx-prefill-mac-decode' if paired else
-                                      ('single-engine' if getattr(self.engines, 'single_engine', lambda: False)() else 'ds4-native'), 'tool_media': media,
-                                      'buffered_stream': True,
-                                      'ultra_handoff': paired and self.cfg.get('native_tier') == 'ultra'})
+                result['slstack'] = {'route': 'single-engine' if getattr(self.engines, 'single_engine', lambda: False)() else 'ds4-native',
+                                    'tool_media': media,
+                                    'buffered_stream': True,
+                                    'ultra_handoff': False}
                 return result
             names = [call['function']['name'] for call in calls]
             if not all(name in stack_names for name in names):
@@ -165,8 +154,8 @@ class Stack:
                    'choices':[{'index':0,'delta':delta,'finish_reason':finish}]}
             if finish:
                 row.update(metadata)
-                row['slstack'] = self.route_metadata({'route':'rtx-prefill-mac-decode' if self.cfg.get('mac') else 'single-engine','tool_media':media,
-                                   'buffered_stream':False,'ultra_handoff':self.cfg.get('native_tier')=='ultra'})
+                row['slstack'] = {'route': 'single-engine', 'tool_media': media,
+                                 'buffered_stream': False, 'ultra_handoff': False}
             return row
         def progress_chunk(progress):
             # The web UI draws its prompt-processing bar from llama-server's prompt_progress.
@@ -309,8 +298,8 @@ def handler(stack):
                                        'media_progress': progress.snapshot() if progress else None},
                                  extra={'Cache-Control':'no-store'})
             if route == '/slstack/generation':
-                return self.send(200, dict(stack.generation.state(), supported=not bool(stack.cfg.get('general')),
-                    applies='next request' if stack.cfg.get('mac') else 'next token boundary'))
+                return self.send(200, dict(stack.generation.state(), supported=True,
+                    applies='next token boundary'))
             if route == '/slstack/settings':
                 return self.send(200,stack.preferences.state())
             if route == '/slstack/browse':
@@ -319,11 +308,7 @@ def handler(stack):
                 except (OSError,ValueError) as exc:return self.send(400,{'error':{'message':str(exc)}})
             if route == '/props':
                 command = stack.cfg['ds4_command']
-                if stack.cfg.get('general'):
-                    n_ctx=stack.engines.context_size()
-                elif stack.cfg.get('mac'):
-                    n_ctx = 1000001
-                elif getattr(stack.engines, 'single_engine', lambda: False)():
+                if getattr(stack.engines, 'single_engine', lambda: False)():
                     from .single_runtime import context
                     n_ctx = context(stack.cfg)
                 else:
@@ -344,11 +329,9 @@ def handler(stack):
                 return self.send(200, (ROOT / 'slstack' / 'media.js').read_bytes(), 'text/javascript; charset=utf-8',
                                  {'Cache-Control':'no-store'})
             if route == '/slstack-generation.js' and stack.cfg['webui']:
-                # General backends use the stock UI's OpenAI sampler fields.
-                # The native toolbar interceptor removes those fields in favor
-                # of its live control file, which general decoders do not read.
+                # The native toolbar interceptor drives the live control file; the stock UI's
+                # OpenAI sampler fields are not read by this engine.
                 script=(ROOT/'slstack/generation.js').read_bytes()
-                if stack.cfg.get('general'):script=b'window.slstackNativeGeneration=false;\n'+script
                 return self.send(200, script, 'text/javascript; charset=utf-8',
                                  {'Cache-Control': 'no-store'})
             if route == '/slstack-settings.js' and stack.cfg['webui']:
@@ -419,9 +402,8 @@ def handler(stack):
                 if route == '/slstack/settings':
                     return self.send(200,stack.preferences.update(body))
                 if route == '/slstack/generation':
-                    if stack.cfg.get('general'):raise ValueError('Use the WebUI or OpenAI request sampler settings for this backend')
                     return self.send(200, dict(settings=stack.generation.update(body), supported=True,
-                        scope='session', applies='next request' if stack.cfg.get('mac') else 'next token boundary'))
+                        scope='session', applies='next token boundary'))
                 if route == '/v1/stack/shutdown':
                     # Loopback-only router; the launcher asks for a graceful stop before any forced one.
                     threading.Thread(target=server_ref[0].shutdown, daemon=True).start()
@@ -442,7 +424,7 @@ def handler(stack):
                     return self.send(200, {'success': True})
                 if route == '/v1/chat/completions':
                     with stack.engines.lock:
-                        if body.get('stream') and (stack.cfg.get('mac') or getattr(stack.engines, 'single_engine', lambda: False)()):
+                        if body.get('stream') and getattr(stack.engines, 'single_engine', lambda: False)():
                             from .streaming import send
                             return send(self,stack.chat_events(body))
                         result = stack.chat(body)
