@@ -1,7 +1,8 @@
 # streaming-llama-stack: repo review and Linux port notes
 
-The work plan lives in [docs/linux-port-plan.md](docs/linux-port-plan.md). Phase 0 is
-committed; Phases 1 through 7 are open.
+The work plan lives in [docs/linux-port-plan.md](docs/linux-port-plan.md). Scope is Linux
+only: Windows, macOS, Metal, MLX and the non-CUDA ggml backends all get deleted. Phase 0 is
+committed; Phases 1 through 8 are open.
 
 Repo: https://github.com/fronteagle739/streaming-llama-stack
 Reviewed: 2026-10-30, via `gh` plus a local clone at `/tmp/sl-stack`
