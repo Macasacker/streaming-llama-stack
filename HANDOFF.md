@@ -6,9 +6,16 @@ Runnable commands for the user: `docs/linux-port-commands.md`.
 
 ## What the next session is for
 
-Chunks 1.6 and 2.1 are committed. Take chunk 2.2 (Apple/Metal dead code inside `engines/ds4`,
-4,100 refs, 3,959 of them in `ds4.c`). Everything verified so far is a compile or host-code gate;
-nothing is a performance result, because no model weights are on disk.
+Chunks 1.6, 2.1 and the Apple half of 2.2 are committed. Chunk 2.2 is **not** finished, and the
+rest of it needs a decision from the owner rather than a mechanical pass: `engines/ds4` still
+holds about 3,700 Metal references, and they are live CUDA code, not dead Mac branches - the graph
+helpers are named `metal_graph_*`, the decode layer phases `METAL_DECODE_LAYER_*`, and roughly 200
+environment variables are `DS4_METAL_*` while doing CUDA work. Renaming the identifiers is safe and
+mechanical; renaming the env vars is a user-facing contract change (they are documented in
+`docs/VARIABLES.md` and named in `docs/macdecode-r6/r6-controls.json` and `docs/MACDECODE_ROUND6.md`).
+Pick one: rename to `DS4_*` and update the consumers, keep the names and narrow the chunk 2.2 gate
+to code identifiers, or accept both spellings for a while. Everything verified so far is a compile
+or host-code gate; nothing is a performance result, because no model weights are on disk.
 
 ## State
 
@@ -18,11 +25,24 @@ Commits, oldest first: `58ff877` (chunk 1: `engines/ds4` from the Windows engine
 `bc439fe` (plan update), `5c32214` (handoff + command notes + nvcc shared-link fix),
 `ebc5ba4` (1.10d: dead Mac/Windows branches in the launcher), `90b8605` (1.6: the decode library
 builds and is gated without a GPU or a model file), `8c2ac02` (plan and handoff for 1.6),
-`171319a` (2.1: Win32 host code deleted from `engines/ds4`).
+`171319a` (2.1: Win32 host code deleted from `engines/ds4`), `b7c5906` (plan and handoff for 2.1),
+`7cc2ca3` (2.2a: Apple conditional branches deleted), `3a49385` (2.1 follow-up: the claims about
+what the deleted Windows paths leave behind).
 
 `python3 -B scripts/release_check.py` reports 0 findings, so commits need no `--no-verify`.
 Python suite: **584 tests, 5-6 failures, 5 errors** (fork baseline 585 tests, 6 failures, 6
 errors). Two process tests vary run to run, so compare the failing names rather than the count.
+
+## What chunk 2.2a landed (`7cc2ca3`)
+
+3,475 more lines of engine source deleted with the same mechanical rule, applied to
+`__APPLE__`/`TARGET_OS`/`__MACH__`. ds4.c carried the Mac graph layer behind `#if defined(__APPLE__)`,
+so the Metal implementations went and the CUDA ones stayed. Three guards needed hand work because
+a later branch was the live one: the n-gram read advisory (`#ifdef __APPLE__ / #elif
+defined(POSIX_FADV_RANDOM)`), `ds4_gpu.h`'s `ds4_gpu_device_is_spark()` behind
+`#elif !defined(__APPLE__)`, and two `#if defined(_WIN32) / #elif defined(__linux__)` pairs in
+`ds4_agent.c`. 77 conditions in ds4.c kept their guard and lost only the Apple operand, because
+they still test `DS4_NO_GPU` or `DS4_ROCM_BUILD`.
 
 ## What chunk 2.1 landed
 
@@ -123,10 +143,12 @@ extensions>` returns nothing and `make cuda` still builds), then 3.1 (Linux prod
 Chunk 2.1 landed: every conditional whose expression named Win32 now compiles to what Linux already
 compiled, 4,088 lines of engine source deleted, and `engines/ds4` is clean of the gate tokens
 except the two vendored files (`external/nlohmann/json.hpp`, `linenoise.c`), which were left alone
-on purpose. Four capabilities the Windows branches used to implement now refuse instead of
-silently succeeding: combo handoff, expert-cache restore and snapshot, background affinity
-promotion, output LoRA. `ds4_web.c` gained the opposite: its `#else` branch is a real POSIX
-browser-tool implementation, now unconditional.
+on purpose. Four capabilities the Windows branches used to implement are gone: combo handoff,
+background affinity promotion and output LoRA now refuse with a message naming the build, while
+expert-cache restore and snapshot are inert - nothing on Linux calls
+`ds4_expert_cache_restore_prepare`/`ds4_expert_cache_snapshot_write`, so the two
+`DS4_COMBO_EXPERT_*_FILE` variables `slstack` sets for a combo run do nothing. `ds4_web.c` gained
+the opposite: its `#else` branch is a real POSIX browser-tool implementation, now unconditional.
 
 Chunk 1.6's producer side is NOT wired here: nothing in `engines/streaming-llama` loads
 `ds4-decode.so` today - `grep -rn ds4x_ engines/streaming-llama` finds only

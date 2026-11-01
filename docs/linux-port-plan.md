@@ -235,18 +235,23 @@ Known gaps carried forward, not hidden:
 - The io_uring transport is correct-by-construction but unmeasured. No model file exists on this
   box, so `ds4_ds_selftest` and the decode pipeline have never run against real weights.
 - Reads are buffered. `O_DIRECT` with 4 KiB-aligned offsets and buffers is a separate chunk.
-- The engine refuses four things on Linux, because their only implementation was Windows-only
-  and chunk 2.1 deleted it: the two-process combo handoff, expert-cache restore and snapshot at
-  relaunch, background affinity promotion, and output LoRA. Each prints a refusal naming the
-  build rather than failing silently. Porting any of them is new work, not a port - decide which
-  are wanted before Phase 5 rewrites `combo_ram.py`.
+- What Linux does not implement, because the only implementation was Windows-only and chunk 2.1
+  deleted it: the two-process combo handoff, expert-cache restore and snapshot at relaunch,
+  background affinity promotion, and output LoRA. Combo, background promotion and output LoRA
+  refuse, with a message naming the build (`DS4_COMBO_ENABLED=1` now fails startup with a reason
+  instead of an empty one). Expert-cache restore and snapshot are inert rather than refusing:
+  `ds4_expert_cache_restore_prepare` and `ds4_expert_cache_snapshot_write` have no caller on
+  Linux, so `DS4_COMBO_EXPERT_RESTORE_FILE` and `DS4_COMBO_EXPERT_SNAPSHOT_FILE`, which
+  `slstack/combo_native.py` and `slstack/engines.py` set for a combo run, do nothing until the
+  combo path exists. Porting any of them is new work, not a port - decide which are wanted before
+  Phase 5 rewrites `combo_ram.py`.
 - `--ds-read-parts` is parsed but refused on Linux; `DS4_DS_READ_PARTS` is the only way to set the
   transport's span count. Making the flag call `ds4_ds_configure_read_parts` before the transport is
   initialised is a small, separate change.
 - `./ds4 --help` still advertises `--metal`, `--backend metal`, `--metal-graph-test`,
-  `--ssd-streaming-full-layers` (GLM Metal) and `--expert-profile` (Metal-only). Help text and CLI
-  backend names are chunk 2.2 work: `engines/ds4` holds 4,100 Apple/Metal references, 3,959 of
-  them in `ds4.c`.
+  `--ssd-streaming-full-layers` (GLM Metal) and `--expert-profile` (Metal-only). Those belong to
+  chunk 2.2b with the identifier rename, not to 2.2a: the words name options the Linux binary
+  parses today.
 - `engines/ds4-win`, `engines/ds4-mac` and `engines/ds4-peer` are deleted (chunk 1.8 settled by
   1.10a); `engines/` holds `ds4` and `streaming-llama` only.
 
@@ -457,10 +462,12 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     upstream `linenoise.c` feature comment.
 
     What went with the Windows branches: the two-process combo handoff (`ds4_combo_api.inc` keeps
-    only its refusal stubs; `ds4_native_checkpoint.h`, the BCrypt checkpoint hasher, is deleted),
-    asynchronous expert-cache restore and snapshot (`ds4_expert_restore_async.cuh`, now stubs), and
-    background affinity promotion (`ds4_cache_affinity_background.cuh`, stubs). Each refuses with a
-    message naming the build; none reports success. `ds4_web.c` is the opposite case - the whole
+    only its refusal stubs; `ds4_native_checkpoint.h`, the BCrypt hasher, is deleted with the last
+    thing that included it, as is `tests/combo_native_parity.c`, the Windows-only fixture that
+    included it too), asynchronous expert-cache restore and snapshot (`ds4_expert_restore_async.cuh`,
+    now stubs), and background affinity promotion (`ds4_cache_affinity_background.cuh`, stubs).
+    Combo and background promotion refuse with a message naming the build; restore and snapshot are
+    inert because nothing on Linux calls them. `ds4_web.c` is the opposite case - the whole
     file was a Windows guard whose `#else` branch is a real POSIX implementation, so that 1,456-line
     browser-tool implementation is now unconditional and live.
 
@@ -482,10 +489,29 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `docs/VARIABLES.md` were regenerated: no variable name was added or removed, only source line
     numbers and the snippets of read sites that were inside the deleted branches.
 
-2.2 Apple/Metal dead code in the engine (4,109 refs, most inside `#ifdef __APPLE__` blocks in
-    `ds4.c`, `ds4_gpu.h`, `ds4_tp.c`, `ds4_image.c`, `ds4_web.c`, `ds4_cli.c`, `ds4_help.c`).
-    Gate: `grep -rn "__APPLE__\|TARGET_OS\|Metal\|metal" engines/ds4` returns nothing, and
-    `make cuda CUDA_ARCH=sm_120` still builds.
+2.2a Apple conditional branches in the engine. Done (`7cc2ca3`). Every conditional mentioning
+    `__APPLE__`, `TARGET_OS` or `__MACH__` now compiles to what Linux already compiled: 3,475 lines
+    gone, including the Mac graph layer that ds4.c carried whole behind `#if defined(__APPLE__)`.
+    Three guards needed hand work because their live branch was an `#elif` (the n-gram read
+    advisory, `ds4_gpu_device_is_spark()`, two `_WIN32`/`__linux__` pairs in `ds4_agent.c`), and 77
+    conditions kept their guard after losing only the Apple operand, since they still test
+    `DS4_NO_GPU` or `DS4_ROCM_BUILD`. The only `__APPLE__` left in `engines/ds4` is one inside the
+    vendored `external/nlohmann/json.hpp`.
+
+2.2b Metal naming in live CUDA code. Open, and it needs a decision rather than a pass. The
+    remaining 3,704 references are not dead Mac code: 516 distinct `metal_*` identifiers (the graph
+    helpers, e.g. `metal_graph_attn_cur`), 237 distinct `METAL_*` constants (decode layer phases),
+    and 215 distinct `DS4_METAL_*` environment variables, all doing CUDA work in ds4.c.
+    Renaming the identifiers is mechanical and safe. Renaming the environment variables is a
+    contract change: they are documented in `docs/VARIABLES.md` and named in
+    `docs/macdecode-r6/r6-controls.json` and `docs/MACDECODE_ROUND6.md`, so any launcher or saved
+    control file using them stops working silently. Choose one: (a) rename to `DS4_*` and update
+    the consumers and the table in the same commit, (b) keep the variable names and narrow the
+    chunk 2.2 gate to code identifiers, or (c) read both spellings for one release and drop the old
+    name in chunk 7.1.
+    Gate for the identifier half: `grep -rn "\bmetal_\|\bMETAL_" engines/ds4` over source
+    extensions returns nothing, `make cuda CUDA_ARCH=sm_120` still builds, and the host gates
+    still pass.
 
 3.1 Streaming producer on Linux. `engines/streaming-llama/prefill_llama.cpp`: implement
     `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`, delete
@@ -558,10 +584,10 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunk 2.1 with the commands above: 752 Windows references across
-`engines slstack vendor scripts examples tests docs README.md`, of which 3 are first-party
-`engines/ds4` hits and all three are vendored files; 7,978 Apple/MLX references repo-wide, 4,100 of
-them inside `engines/ds4`. Re-count before trusting any of these numbers.
+Counts, re-counted after chunk 2.2a with the commands above: 7,600 Apple/MLX references repo-wide,
+3,704 of them inside `engines/ds4` - all Metal naming now, with no Apple conditional left there
+except one inside the vendored json.hpp. Windows references: 752 repo-wide, 3 first-party
+`engines/ds4` hits, all three vendored files. Re-count before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.
