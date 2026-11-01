@@ -6,16 +6,13 @@ Runnable commands for the user: `docs/linux-port-commands.md`.
 
 ## What the next session is for
 
-Chunks 1.6, 2.1 and the Apple half of 2.2 are committed. Chunk 2.2 is **not** finished, and the
-rest of it needs a decision from the owner rather than a mechanical pass: `engines/ds4` still
-holds about 3,700 Metal references, and they are live CUDA code, not dead Mac branches - the graph
-helpers are named `metal_graph_*`, the decode layer phases `METAL_DECODE_LAYER_*`, and roughly 200
-environment variables are `DS4_METAL_*` while doing CUDA work. Renaming the identifiers is safe and
-mechanical; renaming the env vars is a user-facing contract change (they are documented in
-`docs/VARIABLES.md` and named in `docs/macdecode-r6/r6-controls.json` and `docs/MACDECODE_ROUND6.md`).
-Pick one: rename to `DS4_*` and update the consumers, keep the names and narrow the chunk 2.2 gate
-to code identifiers, or accept both spellings for a while. Everything verified so far is a compile
-or host-code gate; nothing is a performance result, because no model weights are on disk.
+Chunks 1.6, 2.1 and the Apple half of 2.2 are committed. Chunk 2.2b is open and already decided -
+the owner chose to keep the `DS4_METAL_*` environment variable names and narrow the gate to code
+identifiers - but none of it has been done. What remains is a rename of the 516 `metal_*`
+identifiers and 237 `METAL_*` constants in `engines/ds4`, plus the `--metal`, `--backend metal`,
+`--metal-graph-test` CLI surface in `ds4_help.c` and the parsers, while the 215 `DS4_METAL_*`
+variables keep their names exactly as documented. Everything verified so far is a compile or
+host-code gate; nothing is a performance result, because no model weights are on disk.
 
 ## State
 
@@ -135,9 +132,9 @@ variable name set is unchanged.
 
 ## Next chunks, in order
 
-From `docs/linux-port-plan.md`: 2.2 (Apple/Metal inside `engines/ds4`, 4,100 refs left, 3,959 of
-them in `ds4.c`; gate `grep -rn "__APPLE__\|TARGET_OS\|Metal\|metal" engines/ds4 --include=<source
-extensions>` returns nothing and `make cuda` still builds), then 3.1 (Linux producer), 3.2 (producer
+From `docs/linux-port-plan.md`: 2.2b (rename the `metal_*` identifiers, the `METAL_*` constants
+and the `--metal` CLI surface inside `engines/ds4`; the `DS4_METAL_*` environment variables keep
+their names by owner decision), then 3.1 (Linux producer), 3.2 (producer
 `dlopen` of `ds4-decode.so`), 4.1, 5.1, 6.1, 7.1, 8.1.
 
 Chunk 2.1 landed: every conditional whose expression named Win32 now compiles to what Linux already

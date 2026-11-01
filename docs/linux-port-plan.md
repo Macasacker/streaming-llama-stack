@@ -498,20 +498,18 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `DS4_NO_GPU` or `DS4_ROCM_BUILD`. The only `__APPLE__` left in `engines/ds4` is one inside the
     vendored `external/nlohmann/json.hpp`.
 
-2.2b Metal naming in live CUDA code. Open, and it needs a decision rather than a pass. The
-    remaining 3,704 references are not dead Mac code: 516 distinct `metal_*` identifiers (the graph
-    helpers, e.g. `metal_graph_attn_cur`), 237 distinct `METAL_*` constants (decode layer phases),
-    and 215 distinct `DS4_METAL_*` environment variables, all doing CUDA work in ds4.c.
-    Renaming the identifiers is mechanical and safe. Renaming the environment variables is a
-    contract change: they are documented in `docs/VARIABLES.md` and named in
-    `docs/macdecode-r6/r6-controls.json` and `docs/MACDECODE_ROUND6.md`, so any launcher or saved
-    control file using them stops working silently. Choose one: (a) rename to `DS4_*` and update
-    the consumers and the table in the same commit, (b) keep the variable names and narrow the
-    chunk 2.2 gate to code identifiers, or (c) read both spellings for one release and drop the old
-    name in chunk 7.1.
-    Gate for the identifier half: `grep -rn "\bmetal_\|\bMETAL_" engines/ds4` over source
-    extensions returns nothing, `make cuda CUDA_ARCH=sm_120` still builds, and the host gates
-    still pass.
+2.2b Metal naming in live CUDA code. Open, decided: option (b). `engines/ds4` holds 516 distinct
+    `metal_*` identifiers (the graph helpers, e.g. `metal_graph_attn_cur`), 237 distinct `METAL_*`
+    constants (decode layer phases) and 215 distinct `DS4_METAL_*` environment variables, all doing
+    CUDA work in `ds4.c`. Only the first two are in scope: the variables keep their names, because
+    they are documented in `docs/VARIABLES.md` and named in `docs/macdecode-r6/r6-controls.json`
+    and `docs/MACDECODE_ROUND6.md`, and a silent rename would leave a saved control file setting
+    nothing. The chunk 2.2 gate is therefore narrowed to code identifiers:
+    `grep -rn "\bmetal_\|\bMETAL_" engines/ds4` over the source extensions returns nothing, the
+    `--metal`, `--backend metal` and `--metal-graph-test` CLI surface in `ds4_help.c` and the
+    parsers goes with them, and `make cuda CUDA_ARCH=sm_120` still builds with the host gates
+    passing. What stays named is then deliberate: 215 environment variables carrying the Metal
+    prefix while doing CUDA work, and chunk 7.1 relabels the docs that mention them.
 
 3.1 Streaming producer on Linux. `engines/streaming-llama/prefill_llama.cpp`: implement
     `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`, delete
