@@ -11,16 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <unistd.h>
-#endif
-#ifdef __APPLE__
-#include <dispatch/dispatch.h>
-#elif !defined(_WIN32)
 #include <pthread.h>
-#endif
 
 bool ds4_engram_layout_valid(const ds4_engram_layout *l) {
     if (!l || !l->token_map || !l->vocab_size ||
@@ -131,11 +123,7 @@ static bool read_row(int fd, uint64_t offset, uint8_t row[DS4_ENGRAM_ROW_BYTES])
     size_t done = 0;
     while (done < DS4_ENGRAM_ROW_BYTES) {
         ssize_t n = pread(fd, row + done, DS4_ENGRAM_ROW_BYTES - done,
-#if defined(_WIN32)
-                          (int64_t)(offset + done));
-#else
                           (off_t)(offset + done));
-#endif
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0) {
             if (n == 0) errno = EIO;
@@ -154,7 +142,7 @@ static float e4m3(uint8_t byte) {
 }
 
 /* One raw GGUF I8 row (256 E4M3 codes + 8 E8M0 scales) to BF16-rounded F32.
- * Both readers (pread and IoRing) decode through here, so their output is the
+ * Both readers (pread and io_uring) decode through here, so their output is the
  * same bytes for the same raw row. */
 static bool decode_row(const uint8_t raw[DS4_ENGRAM_ROW_BYTES], float *out) {
     for (int j = 0; j < DS4_ENGRAM_DIM; j++) {
@@ -255,7 +243,7 @@ static void *read_batch_thread(void *context) {
 #endif
 
 #if defined(__linux__)
-/* ds4_engram_iouring.c: the Linux io_uring twin of streaming-llama's Engram IoRing reader. */
+/* ds4_engram_iouring.c: the io_uring Engram row reader. */
 bool ds4_engram_ioring_read_rows(int fd, uint64_t base, const uint32_t *rows, size_t n,
                                  uint8_t *out, char *why, size_t why_n);
 
@@ -268,7 +256,7 @@ static bool engram_ioring_enabled(void) {
     return enabled != 0;
 }
 
-/* Sorted requests: read each distinct row once through the IoRing, at most
+/* Sorted requests: read each distinct row once through the ring, at most
  * 1024 distinct rows (270 KiB) at a time, then decode it into the first
  * request's output and copy it to that row's duplicates, as the pread path does. */
 static bool read_sorted_ioring(const ds4_engram_table *t, const engram_request *request,

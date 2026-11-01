@@ -1,52 +1,5 @@
 #include "ds4_web.h"
 
-#if defined(_WIN32)
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-struct ds4_web {
-    int unused;
-};
-
-static char *web_stub_error(char *err, size_t err_len) {
-    const char *msg =
-        "browser web tools are not available in the native Windows ds4-agent build yet";
-    if (err && err_len) snprintf(err, err_len, "%s", msg);
-    char *out = (char *)malloc(strlen(msg) + 2);
-    if (!out) {
-        if (err && err_len) snprintf(err, err_len, "out of memory");
-        return NULL;
-    }
-    sprintf(out, "%s\n", msg);
-    return out;
-}
-
-ds4_web *ds4_web_create(const ds4_web_config *cfg) {
-    (void)cfg;
-    return (ds4_web *)calloc(1, sizeof(ds4_web));
-}
-
-void ds4_web_free(ds4_web *web) {
-    free(web);
-}
-
-char *ds4_web_google_search(ds4_web *web, const char *query,
-                            char *err, size_t err_len) {
-    (void)web;
-    (void)query;
-    return web_stub_error(err, err_len);
-}
-
-char *ds4_web_visit_page(ds4_web *web, const char *url,
-                         char *err, size_t err_len) {
-    (void)web;
-    (void)url;
-    return web_stub_error(err, err_len);
-}
-
-#else
 
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -1501,4 +1454,3 @@ char *ds4_web_visit_page(ds4_web *web, const char *url,
     return web_run_page_js(web, url, web_extract_page_js, true, err, err_len);
 }
 
-#endif /* _WIN32 */

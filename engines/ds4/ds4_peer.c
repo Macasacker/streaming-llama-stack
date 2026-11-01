@@ -8,9 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -18,7 +15,6 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
-#endif
 
 #ifndef MSG_NOSIGNAL
 #define MSG_NOSIGNAL 0
@@ -1080,11 +1076,7 @@ static int peer_refuse(int fd, const char *reason, char *err, size_t errlen) {
 
 static bool peer_file_rewind(FILE *file) {
     if (!file) return false;
-#if defined(_WIN32)
-    return _fseeki64(file, 0, SEEK_SET) == 0;
-#else
     return fseeko(file, 0, SEEK_SET) == 0;
-#endif
 }
 
 static void peer_payload_source_release(ds4_peer_payload_source *source) {
@@ -2488,11 +2480,7 @@ void ds4_peer_listener_stop(ds4_peer_listener *listener) {
      * connection needs shutdown to wake a blocking control-frame read; the
      * listening socket remains owned by its thread until join has completed. */
     if (active_fd >= 0) {
-#if defined(_WIN32)
-        (void)shutdown(active_fd, SD_BOTH);
-#else
         (void)shutdown(active_fd, SHUT_RDWR);
-#endif
     }
     (void)pthread_join(listener->thread, NULL);
     if (listener->fd >= 0) close(listener->fd);

@@ -2,7 +2,7 @@
  *
  * Why: the pread path issues one 264-byte read per row, one at a time, across ~3M rows per sweep.
  * Random 264-byte reads at queue depth 1 are latency-bound, not bandwidth-bound. io_uring keeps a
- * batch of rows in flight, which is the Linux analogue of the Windows IoRing reader, and the same
+ * batch of rows in flight, and the same
  * raw bytes land in the same output buffer so decode_row() output is identical either way.
  *
  * Rows are 264 bytes, so this is buffered I/O: O_DIRECT needs 4 KiB alignment and cannot express a

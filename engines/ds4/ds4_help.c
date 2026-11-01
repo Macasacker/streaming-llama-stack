@@ -3,11 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <unistd.h>
-#endif
 
 typedef struct {
     const char *off;
@@ -174,9 +170,9 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
     }
     opt(fp, c, "-t, --threads N", "CPU helper threads for host-side/reference work.");
     opt(fp, c, "--power N", "GPU duty-cycle target, 1..100. Default: 100");
-    opt(fp, c, "--ssd-streaming", "Metal/CUDA/ROCm: opt in to SSD-backed model streaming instead of full residency.");
+    opt(fp, c, "--ssd-streaming", "CUDA: opt in to SSD-backed model streaming instead of full residency.");
     opt(fp, c, "--ssd-streaming-cold", "SSD streaming: skip default popularity-based expert-cache preload.");
-    opt(fp, c, "--ds-read-parts N", "Windows CUDA DirectStorage: 0/1=off, 2..64 parts, default8. DS4_DS_READ_PARTS overrides this option.");
+    opt(fp, c, "--ds-read-parts N", "Not accepted: the io_uring transport reads 2..64 parts per span, DS4_DS_READ_PARTS selects it.");
     opt(fp, c, "--cache-affinity-bias FLOAT", "Selection-only nonresident penalty, 0=off (0..3). Trades accuracy for speed; DS4_CACHE_AFFINITY_BIAS.");
     opt(fp, c, "--cache-affinity-mode MODE", "spread (per-layer, default) or flat; decode only.");
     opt(fp, c, "--cache-affinity-adaptive", "Experimental, default off: previous-final-logit top2 margin controls bias; existing warm-up/ramp. DS4_CACHE_AFFINITY_ADAPTIVE=0|1.");
@@ -274,14 +270,6 @@ static void print_distributed(FILE *fp, const help_colors *c) {
     fputc('\n', fp);
     title(fp, c, "Tensor Parallelism");
     fputc('\n', fp);
-#if defined(_WIN32)
-    /* [merge 2026-08-16] ds4_tp.c is POSIX-only (netdb.h, sys/uio.h, netinet/*), so the Windows build
-     * links ds4_tp_win32.c, whose 42 entry points all fail loudly. Every flag below therefore
-     * hard-errors here. Say so in the help rather than advertising options that cannot work -
-     * documenting a flag the binary rejects is its own small lie. */
-    para(fp, c, "NOT AVAILABLE IN THIS BUILD. Tensor parallelism needs the POSIX transport layer, which the Windows build does not provide; the flags below are documented for the Linux/macOS builds and will fail with a clear error here.");
-    fputc('\n', fp);
-#endif
     para(fp, c, "Tensor parallelism uses the same coordinator/worker addresses as distributed mode, but always runs one 50/50 worker. Add --tensor-parallel, omit --layers, start the worker, then start the coordinator.");
     fputc('\n', fp);
     opt(fp, c, "--tensor-parallel", "Switch --role/--listen/--coordinator to two-machine tensor parallelism.");

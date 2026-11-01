@@ -14,9 +14,6 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <dirent.h>
 #include <fnmatch.h>
 #include <poll.h>
@@ -26,11 +23,8 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#endif
 #include <signal.h>
-#if !defined(_WIN32)
 #include <spawn.h>
-#endif
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -39,7 +33,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
-#if !defined(_WIN32)
 #include <unistd.h>
 #ifdef __APPLE__
 #include <copyfile.h>
@@ -48,7 +41,6 @@
 #endif
 
 extern char **environ;
-#endif
 
 /* This is intentionally not in linenoise.h, but it is part of the existing
  * multiplexed editor implementation.  The agent uses it only to restore text
@@ -7060,16 +7052,8 @@ static char *agent_tool_list(const agent_tool_call *call) {
  */
 
 static bool agent_same_file_version(const struct stat *a, const struct stat *b) {
-#if defined(_WIN32)
-    struct timespec am = {.tv_sec = a->st_mtime}, bm = {.tv_sec = b->st_mtime};
-    struct timespec ac = {.tv_sec = a->st_ctime}, bc = {.tv_sec = b->st_ctime};
-#elif defined(__APPLE__)
-    struct timespec am = a->st_mtimespec, bm = b->st_mtimespec;
-    struct timespec ac = a->st_ctimespec, bc = b->st_ctimespec;
-#else
     struct timespec am = a->st_mtim, bm = b->st_mtim;
     struct timespec ac = a->st_ctim, bc = b->st_ctim;
-#endif
     return a->st_dev == b->st_dev && a->st_ino == b->st_ino &&
            a->st_size == b->st_size && a->st_nlink == b->st_nlink &&
            am.tv_sec == bm.tv_sec && am.tv_nsec == bm.tv_nsec &&
@@ -7119,9 +7103,6 @@ static int agent_replace_file(const char *path, const char *data, size_t len,
                               char *err, size_t errlen) {
     char target[PATH_MAX], temp[PATH_MAX] = "";
     struct stat before, after;
-#ifdef _WIN32
-    BY_HANDLE_FILE_INFORMATION win_before = {0};
-#endif
     int src = -1, fd = -1, rc = -1;
     bool exists = lstat(path, &before) == 0;
     if (!exists && errno != ENOENT) goto failed;
@@ -7129,13 +7110,6 @@ static int agent_replace_file(const char *path, const char *data, size_t len,
         if (!realpath(path, target)) goto failed;
         src = open(target, O_RDWR | O_NONBLOCK | O_NOFOLLOW);
         if (src < 0 || fstat(src, &before) != 0) goto failed;
-#ifdef _WIN32
-        if (!GetFileInformationByHandle((HANDLE)_get_osfhandle(src), &win_before)) goto failed;
-        if (win_before.nNumberOfLinks != 1) {
-            snprintf(err, errlen, "refusing to replace hard-linked file: %s", path);
-            goto done;
-        }
-#endif
         if (!S_ISREG(before.st_mode) || before.st_nlink != 1) {
             snprintf(err, errlen, "refusing to replace non-regular or hard-linked file: %s", path);
             goto done;
@@ -7183,10 +7157,8 @@ static int agent_replace_file(const char *path, const char *data, size_t len,
         pos += (size_t)n;
     }
     if (exists) {
-#if !defined(_WIN32)
         if (fchown(fd, before.st_uid, before.st_gid) != 0) goto failed;
         if (fchmod(fd, before.st_mode & 07777) != 0) goto failed;
-#endif /* ReplaceFile below preserves Windows security and file metadata. */
 #ifdef __APPLE__
         if (fcopyfile(src, fd, NULL, COPYFILE_ACL | COPYFILE_XATTR) != 0) goto failed;
 #elif defined(__linux__)
@@ -7201,44 +7173,11 @@ static int agent_replace_file(const char *path, const char *data, size_t len,
         if (!realpath(path, resolved) || strcmp(resolved, target) ||
             stat(target, &after) != 0 || !agent_same_file_version(&before, &after))
             goto changed;
-#ifdef _WIN32
-        /* Compare the handle identity and precise write timestamp as the CRT
-         * stat structure only exposes second-resolution timestamps. */
-        BY_HANDLE_FILE_INFORMATION win_after = {0};
-        HANDLE check = CreateFileA(target, FILE_READ_ATTRIBUTES,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
-                OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, NULL);
-        if (check == INVALID_HANDLE_VALUE) goto changed;
-        BOOL checked = GetFileInformationByHandle(check, &win_after);
-        CloseHandle(check);
-        if (!checked || (win_after.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
-            win_before.dwVolumeSerialNumber != win_after.dwVolumeSerialNumber ||
-            win_before.nFileIndexHigh != win_after.nFileIndexHigh ||
-            win_before.nFileIndexLow != win_after.nFileIndexLow ||
-            win_before.nFileSizeHigh != win_after.nFileSizeHigh ||
-            win_before.nFileSizeLow != win_after.nFileSizeLow ||
-            win_before.nNumberOfLinks != win_after.nNumberOfLinks ||
-            CompareFileTime(&win_before.ftLastWriteTime, &win_after.ftLastWriteTime) != 0)
-            goto changed;
-        if (!ReplaceFileA(target, temp, NULL, 0, NULL, NULL)) {
-            errno = EACCES;
-            goto failed;
-        }
-#else
         if (rename(temp, target) != 0) goto failed;
-#endif
     } else {
-#ifdef _WIN32
-        /* Move without REPLACE_EXISTING preserves the concurrent-create check. */
-        if (!MoveFileExA(temp, target, MOVEFILE_WRITE_THROUGH)) {
-            errno = EEXIST;
-            goto failed;
-        }
-#else
         /* Unlike rename, link will not overwrite a concurrently created file. */
         if (link(temp, target) != 0) goto failed;
         unlink(temp);
-#endif
     }
     temp[0] = 0;
     rc = 0;
@@ -8998,33 +8937,6 @@ static void *agent_bash_monitor(void *arg) {
  * can exhaust memory before the child gets to exec, even with copy-on-write. */
 static int agent_bash_spawn(pid_t *pid, int tmpfd, const int pipefd[2],
                             const char *cmd) {
-#if defined(_WIN32)
-    /* Preserve the Windows fork/exec wrapper behavior from b12b8ab. The
-     * platform reports ENOSYS for fork; propagate that explicit error rather
-     * than claiming a command launched. POSIX uses the new spawn path below. */
-    pid_t child = fork();
-    if (child < 0) return errno;
-    if (child == 0) {
-        setpgid(0, 0);
-        close(tmpfd);
-        int null_fd = open("/dev/null", O_RDONLY);
-        if (null_fd >= 0) {
-            if (dup2(null_fd, STDIN_FILENO) < 0) close(STDIN_FILENO);
-            if (null_fd != STDIN_FILENO) close(null_fd);
-        } else {
-            close(STDIN_FILENO);
-        }
-        close(pipefd[0]);
-        dup2(pipefd[1], STDOUT_FILENO);
-        dup2(pipefd[1], STDERR_FILENO);
-        close(pipefd[1]);
-        execl("/bin/sh", "sh", "-c", cmd ? cmd : "", (char *)NULL);
-        _exit(127);
-    }
-    *pid = child;
-    setpgid(child, child);
-    return 0;
-#else
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t actions;
     int rc = posix_spawnattr_init(&attr);
@@ -9049,7 +8961,6 @@ static int agent_bash_spawn(pid_t *pid, int tmpfd, const int pipefd[2],
     posix_spawn_file_actions_destroy(&actions);
     posix_spawnattr_destroy(&attr);
     return rc;
-#endif
 }
 
 /* Spawn a shell command into its own process group so bash_stop/timeout can
@@ -9071,7 +8982,6 @@ static agent_bash_job *agent_bash_start(agent_worker *w, const char *cmd,
         return NULL;
     }
     int rc = 0;
-#if !defined(_WIN32)
     /* Keep the source for both dup2 actions out of the standard fd range,
      * including when the agent itself was started with closed descriptors. */
     if (pipefd[1] <= STDERR_FILENO) {
@@ -9082,7 +8992,6 @@ static agent_bash_job *agent_bash_start(agent_worker *w, const char *cmd,
     if (!rc && (fcntl(tmpfd, F_SETFD, FD_CLOEXEC) < 0 ||
                 fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) < 0 ||
                 fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) < 0)) rc = errno;
-#endif
     pid_t pid;
     if (!rc) rc = agent_bash_spawn(&pid, tmpfd, pipefd, cmd);
     if (rc) {
@@ -11322,21 +11231,6 @@ static bool worker_check_raw_mode_restore(agent_worker *w) {
 
 static void drain_wake_fd(int fd) {
     char buf[128];
-#if defined(_WIN32)
-    intptr_t osfh = _get_osfhandle(fd);
-    if (osfh != -1) {
-        HANDLE h = (HANDLE)osfh;
-        for (;;) {
-            DWORD avail = 0;
-            if (!PeekNamedPipe(h, NULL, 0, NULL, &avail, NULL) || avail == 0)
-                break;
-            unsigned int chunk = avail < sizeof(buf) ? avail : (unsigned int)sizeof(buf);
-            int n = read(fd, buf, chunk);
-            if (n <= 0) break;
-        }
-        return;
-    }
-#endif
     for (;;) {
         ssize_t n = read(fd, buf, sizeof(buf));
         if (n > 0) continue;
@@ -13135,126 +13029,11 @@ static int run_agent_non_interactive(ds4_engine *engine, agent_config *cfg) {
     return rc;
 }
 
-#if defined(_WIN32)
-static int agent_win32_consume_worker(agent_worker *worker, agent_status *status_out) {
-    char *out = NULL;
-    size_t out_len = 0;
-    agent_status st = {0};
-    worker_consume(worker, &out, &out_len, &st);
-    if (out && out_len) {
-        write_all(STDOUT_FILENO, out, out_len);
-        fflush(stdout);
-    }
-    free(out);
-    if (worker_take_queued_user_drain_request(worker))
-        worker_answer_queued_user_drain(worker, NULL);
-    if (status_out) *status_out = st;
-    if (st.state == AGENT_WORKER_ERROR) {
-        fprintf(stderr, "ds4-agent: %s\n",
-                st.error[0] ? st.error : "worker error");
-        return -1;
-    }
-    return 0;
-}
-
-static int agent_win32_wait_worker(agent_worker *worker, bool until_idle) {
-    for (;;) {
-        struct pollfd pfd = {.fd = worker->wake_fd[0], .events = POLLIN};
-        (void)poll(&pfd, 1, 100);
-        if (pfd.revents & POLLIN) drain_wake_fd(worker->wake_fd[0]);
-
-        agent_status st = {0};
-        if (agent_win32_consume_worker(worker, &st) != 0) return -1;
-        if (!worker_is_initialized(worker, NULL)) continue;
-        if (!until_idle || worker_is_idle(worker)) return 0;
-    }
-}
-
-static char *agent_win32_read_line(const char *prompt) {
-    if (prompt) {
-        fputs(prompt, stdout);
-        fflush(stdout);
-    }
-    agent_input_buf line = {0};
-    char buf[4096];
-    for (;;) {
-        if (!fgets(buf, sizeof(buf), stdin)) {
-            agent_input_buf_free(&line);
-            return NULL;
-        }
-        agent_input_buf_append(&line, buf, strlen(buf));
-        size_t n = line.len;
-        if (n && line.ptr[n - 1] == '\n') break;
-        if (feof(stdin)) break;
-    }
-    while (line.len && (line.ptr[line.len - 1] == '\n' ||
-                        line.ptr[line.len - 1] == '\r'))
-        line.ptr[--line.len] = '\0';
-    return agent_input_buf_take(&line);
-}
-
-static int run_agent_win32_basic(ds4_engine *engine, agent_config *cfg) {
-    agent_worker worker;
-    if (agent_worker_init(&worker, engine, cfg) != 0) return 1;
-
-    printf("DwarfStar Agent for Windows basic console mode.\n");
-    printf("Type /exit or /quit to leave. Browser and shell job tools are limited in this build.\n\n");
-    fflush(stdout);
-
-    int rc = 0;
-    if (agent_win32_wait_worker(&worker, false) != 0) {
-        rc = 1;
-        goto done;
-    }
-
-    char *pending = cfg->gen.prompt && cfg->gen.prompt[0] ?
-        xstrdup(cfg->gen.prompt) : NULL;
-    for (;;) {
-        char *line = pending ? pending : agent_win32_read_line("ds4-agent> ");
-        pending = NULL;
-        if (!line) break;
-        if (!strcmp(line, "/exit") || !strcmp(line, "/quit") ||
-            !strcmp(line, "/q")) {
-            free(line);
-            break;
-        }
-        if (!strcmp(line, "/help")) {
-            puts("Windows basic console commands: /help, /exit, /quit.");
-            free(line);
-            continue;
-        }
-        if (!line[0]) {
-            free(line);
-            continue;
-        }
-
-        agent_echo_user_prompt(line);
-        if (!worker_submit(&worker, line)) {
-            fprintf(stderr, "ds4-agent: worker is busy; prompt was not submitted\n");
-            free(line);
-            continue;
-        }
-        free(line);
-
-        if (agent_win32_wait_worker(&worker, true) != 0) {
-            rc = 1;
-            break;
-        }
-    }
-
-done:
-    agent_worker_free(&worker);
-    return rc;
-}
-#endif
 
 /* Main UI loop.  poll() multiplexes stdin with the worker wake pipe; all
  * terminal writes go through editor_write_async() so linenoise, status footer,
  * model output, and tool output never race each other. */
 static int run_agent(ds4_engine *engine, agent_config *cfg) {
-#if defined(_WIN32)
-    return run_agent_win32_basic(engine, cfg);
-#endif
     agent_worker worker;
     if (agent_worker_init(&worker, engine, cfg) != 0) return 1;
 
@@ -13731,9 +13510,6 @@ static int run_agent(ds4_engine *engine, agent_config *cfg) {
 
 #ifndef DS4_AGENT_TEST_NO_MAIN
 int main(int argc, char **argv) {
-#if defined(_WIN32)
-    ds4_host_memory_enable_utf8_console();
-#endif
     agent_config cfg = parse_options(argc, argv);
     if (cfg.chdir_path) {
         struct stat st;

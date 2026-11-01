@@ -8,7 +8,7 @@
  *
  * At each MoE layer the router picks top-k experts simultaneously, so every miss for that layer is
  * known before any read is issued. They should go out as ONE batch. io_uring with IORING_OP_READ
- * and a registered fd is the Linux analogue of the Windows IoRing/DirectStorage queue: submissions
+ * and a registered fd is an io_uring submission queue: submissions
  * are queued in userspace, the kernel issues them concurrently, and completions are drained from a
  * CQ ring without a syscall per read.
  *
@@ -17,7 +17,7 @@
  * Demand batches go into host destinations. The optional GPU proof gate keeps a host staging mirror
  * of the device arena: reads land in the mirror, one cudaMemcpyAsync per request moves it into the
  * device arena on a dedicated upload stream, and a cudaEvent recorded after the copy is what the
- * compute stream waits on. That is the same ordering the D3D12 fence gave: the host never blocks
+ * compute stream waits on. That ordering is why the host never blocks
  * compute queueing on the upload.
  *
  * NO SILENT FALLBACK: every entry point reports failure explicitly. Callers must decide loudly.

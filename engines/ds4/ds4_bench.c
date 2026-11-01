@@ -24,9 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#endif
 
 /* CUDA builds resolve these weak symbols through libcudart; other builds
  * remain independent of CUDA headers and libraries. */
@@ -690,9 +687,6 @@ static void close_engine(ds4_engine *engine, ds4_tp *tp) {
 }
 
 int main(int argc, char **argv) {
-#if defined(_WIN32)
-    ds4_host_memory_enable_utf8_console();
-#endif
     bench_config cfg = parse_options(argc, argv);
     g_bench_start_sec = bench_now_sec();
     bench_logf("run start backend=%s model=%s prompt=%s chat_prompt=%s ctx_start=%d ctx_max=%d ctx_alloc=%d step_incr=%d step_mul=%.4g gen_tokens=%d prefill_chunk=%u ssd_streaming=%s",

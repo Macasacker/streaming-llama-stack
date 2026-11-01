@@ -3,7 +3,7 @@
  * Compiled by the host C++ compiler, not nvcc: liburing has no reason to be parsed by nvcc, and
  * this file only needs cuda_runtime_api.h for the device arena and the upload copies.
  *
- * The Windows original used DirectStorage queues plus a D3D12 fence imported into CUDA. The Linux
+ * The engine this came from used a proprietary storage queue plus a device fence imported into CUDA.
  * analogue is io_uring for the reads and a cudaEvent recorded after the upload copy for ordering:
  * same contract, same loud failures, no silent fallback.
  */

@@ -4,11 +4,7 @@
 #include "../ds4_server.c"
 int main(void) {
     test_quality_speed_request_validation();
-#ifdef _WIN32
-    _putenv_s("DS4_SERVER_AUTH_TOKEN", "TEST-quality-secret");
-#else
     setenv("DS4_SERVER_AUTH_TOKEN", "TEST-quality-secret", 1);
-#endif
     const char *ok="POST /v1/quality-speed HTTP/1.1\r\nAuthorization: Bearer TEST-quality-secret\r\n\r\n";
     const char *bad="Authorization: Bearer wrong\r\n\r\n";
     const char *duplicate="Authorization: Bearer TEST-quality-secret\r\nAuthorization: Bearer TEST-quality-secret\r\n\r\n";

@@ -29,12 +29,8 @@
  * needs -- ds4_win32.h defines mmap/munmap (-> ds4_win32_mmap/_munmap) plus PROT_READ, MAP_SHARED,
  * MAP_PRIVATE and MAP_FAILED, and it is __cplusplus-guarded with extern "C", so it is safe to include
  * from this .cu. Same guard pattern as ds4_ssd.c and ds4_bench.c use. */
-#if defined(_WIN32)
-#include "../../ds4_host_memory.h"
-#else
 #include <sys/mman.h>
 #include <unistd.h>
-#endif
 
 static double repack_now_sec(void) {
     struct timespec ts;
@@ -76,14 +72,10 @@ bool ds4_repack_map_file(const char *log_prefix, const char *path, ds4_repack_fi
         return false;
     }
     m.size = (uint64_t)st.st_size;
-    /* [merge 2026-08-16] st_blksize is POSIX; Windows `struct _stat64` has no such member.
-     * Guarding rather than shimming is behaviour-preserving here: direct_align feeds ONLY the
-     * O_DIRECT path below, which is `#if defined(__linux__) && defined(O_DIRECT)`, and the one other
-     * consumer (line ~319) additionally requires `m.direct_fd >= 0`. On Windows direct_fd is never
-     * opened, so direct_align is dead. */
-#if !defined(_WIN32)
+    /* st_blksize is POSIX: direct_align feeds only the O_DIRECT path below, which is
+     * `#if defined(__linux__) && defined(O_DIRECT)`, and the other consumer (line ~319)
+     * additionally requires `m.direct_fd >= 0`. */
     if (st.st_blksize > 1) m.direct_align = (uint64_t)st.st_blksize;
-#endif
 #if defined(__linux__) && defined(O_DIRECT)
     if (getenv("DS4_CUDA_NO_DIRECT_IO") == nullptr) {
         char proc_path[64];

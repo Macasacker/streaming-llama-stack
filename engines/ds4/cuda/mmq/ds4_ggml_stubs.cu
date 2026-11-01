@@ -194,9 +194,6 @@ static void ds4_pool_trace(const char *phase, int device, cudaStream_t stream,
         (unsigned long long)stats[2], (unsigned long long)stats[3],
         status[0], status[1], status[2], status[3]);
     fflush(stderr);
-#if defined(_WIN32)
-    ds4_host_memory_snapshot(phase);
-#endif
 }
 #endif
 
@@ -306,27 +303,15 @@ struct ds4_naive_pool : public ggml_cuda_pool {
 } // anonymous namespace
 
 /* Default-off model-free test boundary. A trusted fixture must explicitly
- * enable it and establish the source-enforced <=4 GiB Windows private cap
+ * enable it and establish the source-enforced <=4 GiB private cap
  * before these helpers initialize CUDA or allocate real MMQ scratch. */
 static bool ds4_pool_fixture_enabled() {
-#if defined(_WIN32) && !defined(GGML_USE_HIP)
-    const char *value = getenv("DS4_MMQ_POOL_TEST");
-    return value && value[0] == '1' && value[1] == '\0';
-#else
     return false;
-#endif
 }
 
 extern "C" void *ds4_mmq_pool_test_create(int device) {
     if (!ds4_pool_fixture_enabled() || device < 0) return nullptr;
-#if defined(_WIN32) && !defined(GGML_USE_HIP)
-    ds4_host_memory_status status;
-    if (!ds4_host_memory_begin() || !ds4_host_memory_read(&status) ||
-        status.process_limit_bytes > (UINT64_C(4) << 30)) return nullptr;
-    return new ds4_naive_pool(device);
-#else
     return nullptr;
-#endif
 }
 
 extern "C" void *ds4_mmq_pool_test_alloc(void *pool, size_t bytes, void *stream, size_t *actual) {

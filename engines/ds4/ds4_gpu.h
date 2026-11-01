@@ -539,18 +539,6 @@ typedef struct ds4_gpu_prefill_layer_plan {
 /* Reset only the prompt-local eviction heuristic.  The resident SSD expert
  * cache itself is intentionally kept warm across sessions. */
 void ds4_gpu_stream_expert_cache_reset_route_hotness(void);
-#if defined(_WIN32) && !defined(DS4_NO_GPU) && !defined(DS4_ROCM_BUILD)
-/* Refresh the existing host rank map from the always-maintained CUDA route
- * counter when its configured token interval is due. Returns nonzero only
- * after every layer has accumulated the configured minimum selection mass. */
-int ds4_gpu_stream_expert_cache_refresh_live_route_ranks(
-        uint32_t *ranks,
-        uint32_t  rank_stride,
-        uint32_t  current_layer,
-        uint32_t  n_layers,
-        uint32_t  n_experts,
-        uint32_t  selections_per_token);
-#endif
 /* Runtime record of which experts a workload ACTUALLY selects, per layer, tagged with the streaming
  * tier each was assigned. The two-bound design deliberately EXCLUDES the statically-hottest K experts
  * from the cache so they are always prefetched; this is what tells you whether that static ranking
@@ -570,23 +558,6 @@ int ds4_gpu_stream_expert_cache_begin_selected_load(
         const ds4_gpu_stream_expert_table *table,
         const int32_t                     *selected_ids,
         uint32_t                           n_selected);
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-/* Capture every routing-independent tier-1 layer once and submit arena-sized
- * multi-layer waves. DS4_CUDA_DECODE_PIPELINE_DEPTH bounds concurrent waves;
- * 0 selects the legacy token-wide batch for A/B. A wave remains immutable
- * until all of its layers consume their selected bytes. */
-int ds4_gpu_stream_expert_prefetch_token_begin(
-        const ds4_gpu_stream_expert_table *tables,
-        uint32_t                           n_tables,
-        const int32_t                     *exact_selected,
-        uint32_t                           exact_stride,
-        uint64_t                           token_index);
-void ds4_gpu_stream_expert_prefetch_token_end(void);
-/* Promote up to DS4_CUDA_RAM_PREFETCH_K host-resident candidates for this
- * layer into a reserved GPU-arena tail on a non-blocking CUDA copy stream. */
-int ds4_gpu_stream_host_expert_prefetch_layer(
-        const ds4_gpu_stream_expert_table *table);
-#endif
 int ds4_gpu_glm_stream_expert_cache_begin_selected_load_tensor(
         const ds4_gpu_stream_expert_table *table,
         const ds4_gpu_tensor              *selected,

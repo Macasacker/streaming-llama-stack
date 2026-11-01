@@ -1,8 +1,7 @@
 /* Model-free gate for the io_uring transport in ds4_batch_io.cpp.
  *
- * The transport is what the SSD-streaming expert path reads through, and until now its only call
- * site sat inside a `#if defined(_WIN32)` block in ds4_cuda.cu, so nothing on Linux ever exercised
- * it. This harness drives it against a throwaway file: no GPU, no GGUF, no VRAM. It is the only
+ * The transport is what the SSD-streaming expert path reads through. Its call sites were guarded
+ * as platform-specific in ds4_cuda.cu, so nothing on Linux ever exercised it. This harness drives it against a throwaway file: no GPU, no GGUF, no VRAM. It is the only
  * correctness gate for the read path that can run while another process holds the GPU.
  *
  * The core check is the engine's own ds4_ds_selftest(): read a span twice, once at queue depth 1

@@ -615,12 +615,6 @@ int ds4_session_eval(ds4_session *s, int token, char *err, size_t errlen);
  * while holding its inference mutex at request completion because an MSYS
  * SIGTERM does not run the native process's atexit handlers. */
 void ds4_forward_fn_accounting_dump(void);
-#ifdef _WIN32
-/* Emit the default-on cumulative DirectStorage counters.  The server calls
- * this beside the decode accounting dump at request completion; the CLI also
- * retains the DirectStorage transport's atexit registration. */
-void ds4_ds_stats_dump(void);
-#endif
 
 typedef struct {
     ds4_session *session;

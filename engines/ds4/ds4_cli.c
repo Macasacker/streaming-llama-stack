@@ -5,9 +5,6 @@
 #include "ds4_help.h"
 #include "ds4_prompt_prefix.h"
 #include "linenoise.h"
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-#include "ds4_gpu.h"
-#endif
 
 /* ds4 CLI.
  *
@@ -29,11 +26,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <unistd.h>
-#endif
 
 static bool cli_env_flag_enabled(const char *name, bool defval) {
     const char *v = getenv(name);
@@ -740,9 +733,6 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
     /* Route-hotness virtual cache, dumped wherever generation actually ENDS. There are several
      * timing-print sites for the same format string and which one runs depends on the path; putting
      * the dump at only one of them produced a run that printed its rate and no report. */
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_gpu_stream_expert_cache_dump_route_hotness("generation-end");
-#endif
 
     ds4_session_free(session);
     return 0;
@@ -1802,9 +1792,6 @@ static int run_chat_turn(ds4_engine *engine, cli_config *cfg, repl_chat *chat,
     /* Route-hotness virtual cache, dumped wherever generation actually ENDS. There are several
      * timing-print sites for the same format string and which one runs depends on the path; putting
      * the dump at only one of them produced a run that printed its rate and no report. */
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_gpu_stream_expert_cache_dump_route_hotness("generation-end");
-#endif
     return 0;
 }
 
@@ -2440,9 +2427,6 @@ static cli_config parse_options(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-#if defined(_WIN32)
-    ds4_host_memory_enable_utf8_console();
-#endif
     cli_config cfg = parse_options(argc, argv);
     if (cfg.gen.dump_tokens) {
         if (cfg.gen.prefix.count != 0) {

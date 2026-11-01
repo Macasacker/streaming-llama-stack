@@ -4,8 +4,8 @@
  * Per layer: the router ids, weights and FFN input come back in one D2H (the
  * same single sync the id read already cost). RAM-resident experts chosen for
  * the CPU are handed to a persistent AVX-512 pool and computed in place from
- * the locked tier, while this thread runs the expert hook (DirectStorage
- * misses, uploads) and queues the GPU experts. The packed launcher joins the
+ * the locked tier, while this thread runs the expert hook (storage misses,
+ * uploads) and queues the GPU experts. The packed launcher joins the
  * CPU lane just before the down projection: it waits only if the CPU job is
  * still running, uploads each CPU expert's per-row sums, and the down kernel
  * adds them in slot order (the GPU's own summation order). No per-expert

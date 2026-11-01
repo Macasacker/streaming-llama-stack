@@ -1,5 +1,5 @@
 #include "ds4.h"
-static bool ds4_combo_active; /* Explicit Windows target-only session only. */
+static bool ds4_combo_active; /* Never true: combo handoff has no Linux implementation. */
 #include "ds4_tool_text.h"
 #include "ds4_distributed.h"
 #include "ds4_gpu_args.h"
@@ -23,9 +23,6 @@ static bool ds4_combo_active; /* Explicit Windows target-only session only. */
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <netinet/in.h>
@@ -35,7 +32,6 @@ static bool ds4_combo_active; /* Explicit Windows target-only session only. */
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
-#endif
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -70,22 +66,6 @@ static void stop_signal_handler(int sig) {
     }
 }
 
-#if defined(_WIN32) && defined(SIGBREAK)
-/* Ctrl-Break (the owner's no-force-kill escalation step, sent by the DS4COMBO
- * harness and Studio): request the same orderly stop as SIGINT, but never _exit,
- * however many arrive, so a process that may hold VRAM/DirectStorage always leaves
- * through its normal teardown. The CRT resets the disposition before each call. */
-static void break_signal_handler(int sig) {
-    (void)sig;
-    signal(SIGBREAK, break_signal_handler);
-    g_stop_requested = 1;
-    if (g_listen_fd >= 0) {
-        int fd = (int)g_listen_fd;
-        g_listen_fd = -1;
-        close(fd);
-    }
-}
-#endif
 
 typedef struct {
     char *ptr;
@@ -99,20 +79,12 @@ static void die(const char *msg) {
 }
 
 static void *xmalloc(size_t n) {
-#if defined(_WIN32)
-    if (n >= 1048576u && !ds4_host_memory_check(n, "server malloc"))
-        die("host-memory admission refused server malloc");
-#endif
     void *p = malloc(n ? n : 1);
     if (!p) die("out of memory");
     return p;
 }
 
 static void *xrealloc(void *p, size_t n) {
-#if defined(_WIN32)
-    if (n >= 1048576u && !ds4_host_memory_check(n, "server realloc"))
-        die("host-memory admission refused server realloc");
-#endif
     p = realloc(p, n ? n : 1);
     if (!p) die("out of memory");
     return p;
@@ -126,26 +98,6 @@ static char *xstrdup(const char *s) {
 }
 
 static bool random_bytes(void *dst, size_t len) {
-#if defined(_WIN32)
-    typedef BOOLEAN (APIENTRY *rtl_gen_random_fn)(PVOID, ULONG);
-    HMODULE advapi = LoadLibraryA("advapi32.dll");
-    if (!advapi) return false;
-    rtl_gen_random_fn rtl_gen_random =
-        (rtl_gen_random_fn)GetProcAddress(advapi, "SystemFunction036");
-    bool ok = false;
-    if (rtl_gen_random) {
-        unsigned char *p = dst;
-        while (len) {
-            ULONG chunk = len > 0xffffffffu ? 0xffffffffu : (ULONG)len;
-            if (!rtl_gen_random(p, chunk)) break;
-            p += chunk;
-            len -= chunk;
-        }
-        ok = len == 0;
-    }
-    FreeLibrary(advapi);
-    return ok;
-#else
     unsigned char *p = dst;
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd < 0) return false;
@@ -161,7 +113,6 @@ static bool random_bytes(void *dst, size_t len) {
     }
     close(fd);
     return true;
-#endif
 }
 
 static char *xstrndup(const char *s, size_t n) {
@@ -15783,9 +15734,6 @@ decode_again:
         pthread_mutex_lock(&s->inference_mu);
 #ifndef DS4_NO_GPU
         ds4_forward_fn_accounting_dump();
-#ifdef _WIN32
-        ds4_ds_stats_dump();
-#endif
 #endif
         pthread_mutex_unlock(&s->inference_mu);
     }
@@ -16389,9 +16337,6 @@ static void wait_for_job_or_disconnect(server *s, job *j) {
 
 #include "ds4_training_api.h"
 #include "ds4_combo_api.inc"
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-void ds4_ds_shutdown(void);
-#endif
 static double now_sec_for_combo_shutdown(void) {
     struct timespec ts; timespec_get(&ts, TIME_UTC);
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
@@ -16838,11 +16783,7 @@ static void apply_prefill_mode(const char *mode) {
                             "refusing to start\n", mode, set[i][0], set[i][1], set[i][0], now);
             exit(2);
         }
-#if defined(_WIN32)
-        if (_putenv_s(set[i][0], set[i][1]) != 0) {
-#else
         if (setenv(set[i][0], set[i][1], 1) != 0) {
-#endif
             fprintf(stderr, "ds4-server: --prefill-mode %s cannot set %s\n", mode, set[i][0]);
             exit(2);
         }
@@ -17321,9 +17262,6 @@ static void server_request_decode_stop(server *s) {
 }
 
 int main(int argc, char **argv) {
-#if defined(_WIN32)
-    ds4_host_memory_enable_utf8_console();
-#endif
     signal(SIGPIPE, SIG_IGN);
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -17331,9 +17269,6 @@ int main(int argc, char **argv) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
-#if defined(_WIN32) && defined(SIGBREAK)
-    signal(SIGBREAK, break_signal_handler);
-#endif
 
     server_config cfg = parse_options(argc, argv);
     if (cfg.chdir_path && chdir(cfg.chdir_path) != 0) {
@@ -17695,8 +17630,8 @@ int main(int argc, char **argv) {
 
     while (!g_stop_requested) {
         /* A bounded readiness wait lets authenticated owned shutdown drain
-         * cleanly on Windows, where closing a listener in another thread may
-         * leave its blocking accept asleep. */
+         * cleanly: closing a listener in another thread can leave its blocking
+         * accept asleep. */
         struct pollfd listener = {.fd = lfd, .events = POLLIN};
         const int ready = poll(&listener, 1, 100);
         if (g_stop_requested) break;
@@ -17773,9 +17708,6 @@ int main(int argc, char **argv) {
         const double t0 = now_sec_for_combo_shutdown();
         server_close_resources(&s);
         const double t1 = now_sec_for_combo_shutdown();
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-        if (graceful) ds4_ds_shutdown();
-#endif
         if (graceful) {
             const double t2 = now_sec_for_combo_shutdown();
             fprintf(stderr, "DS4COMBO_NATIVE_GRACEFUL_SHUTDOWN_COMPLETE engine_ms=%.1f ds_ms=%.1f engine_and_ds_ms=%.1f ds_shutdown=1\n",

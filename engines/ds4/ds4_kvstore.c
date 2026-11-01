@@ -16,12 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <dirent.h>
 #include <unistd.h>
-#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>

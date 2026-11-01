@@ -20,9 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(_WIN32)
 #include <sys/types.h>
-#endif
 
 #define TEST_CONTEXT_DEFAULT 512
 #define TEST_DECODE_STEPS 16
@@ -58,11 +56,7 @@ static void failf(const char *label, const char *detail) {
 }
 
 static bool file_seek(FILE *fp, uint64_t offset) {
-#if defined(_WIN32)
-    return _fseeki64(fp, (int64_t)offset, SEEK_SET) == 0;
-#else
     return fseeko(fp, (off_t)offset, SEEK_SET) == 0;
-#endif
 }
 
 static void put_u32_le(uint8_t out[4], uint32_t value) {
@@ -80,11 +74,7 @@ static uint32_t get_u32_le(const uint8_t in[4]) {
 }
 
 static int set_env_value(const char *name, const char *value) {
-#if defined(_WIN32)
-    return _putenv_s(name, value ? value : "") == 0 ? 0 : 1;
-#else
     return value ? setenv(name, value, 1) : unsetenv(name);
-#endif
 }
 
 static int select_cache_format(const payload_format_case *format) {

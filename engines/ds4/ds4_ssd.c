@@ -6,12 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
-#include "ds4_host_memory.h"
-#else
 #include <sys/mman.h>
 #include <unistd.h>
-#endif
 
 #ifndef MAP_ANONYMOUS
 #define MAP_ANONYMOUS MAP_ANON

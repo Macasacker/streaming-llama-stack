@@ -30,11 +30,9 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
-#if !defined(_WIN32)
 #include <strings.h>
 #include <sys/file.h>
 #include <sys/mman.h>
-#endif
 #include <sys/stat.h>
 #if defined(__APPLE__)
 #include <dispatch/dispatch.h>
@@ -42,9 +40,7 @@
 #endif
 #include <stdarg.h>
 #include <time.h>
-#if !defined(_WIN32)
 #include <unistd.h>
-#endif
 
 #include "ds4.h"
 #include "ds4_native_session.h"
@@ -5435,16 +5431,6 @@ static bool ds4_streaming_prefill_headroom_bytes(
         return false;
     }
     uint64_t reserve_experts = DS4_N_EXPERT;
-#if defined(_WIN32) && !defined(DS4_NO_GPU) && !defined(DS4_ROCM_BUILD)
-    /* V4.1 scalar rows stage only top-k experts: reserve two selected windows.
-     * The V4.1 layer sweep's full-layer loader is not added to the plan: it
-     * borrows the VRAM expert tier's memory for the sweep
-     * (ds4_gpu_stream_prefill_borrow), so its one or two layers are charged
-     * against that tier and the fixed-plan decode tier is unchanged. */
-    if (DS4_MODEL_VARIANT == DS4_VARIANT_FLASH41) {
-        reserve_experts = DS4_N_EXPERT_USED;
-    }
-#endif
     const uint64_t layer_bytes = per_expert_bytes * reserve_experts;
     if (reserve_layers != 0 &&
         layer_bytes > UINT64_MAX / (uint64_t)reserve_layers) return false;
@@ -5454,23 +5440,7 @@ static bool ds4_streaming_prefill_headroom_bytes(
 }
 
 static bool cuda_stream_mixed_precision_experts_enabled(void) {
-#if defined(_WIN32) && !defined(DS4_NO_GPU) && \
-    !defined(DS4_ROCM_BUILD) && !defined(__APPLE__)
-    static int cached = -1;
-    if (cached < 0) {
-        const char *env = getenv("DS4_CUDA_STREAM_MIXED_PRECISION_EXPERTS");
-        cached = env && strcmp(env, "1") == 0;
-        if (cached) {
-            fprintf(stderr,
-                    "ds4: CUDA mixed-precision expert DirectStorage path enabled by "
-                    "DS4_CUDA_STREAM_MIXED_PRECISION_EXPERTS=1 "
-                    "[DS4_MIXED_EXPERT_DS_V1]\n");
-        }
-    }
-    return cached != 0;
-#else
     return false;
-#endif
 }
 
 /*
@@ -5583,11 +5553,6 @@ static bool ds4_prefill_edge_vram_enabled(void) {
 
 void ds4_streaming_set_phase_decode(int decode) {
     g_cuda_stream_phase_decode = decode ? 1 : 0;
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_gpu_stream_expert_cache_set_phase_decode(
-            g_cuda_stream_phase_decode,
-            ds4_prefill_edge_vram_enabled() ? 1 : 0);
-#endif
 }
 static uint32_t g_cuda_stream_prefetch_k;
 static uint32_t g_cuda_stream_cache_m;
@@ -5845,30 +5810,6 @@ static void cuda_stream_route_ranking_entry(
 
 static const uint32_t *cuda_stream_cache_policy_ranks_for_layer(
         uint32_t layer) {
-#if defined(_WIN32) && !defined(DS4_ROCM_BUILD)
-    if (cuda_stream_live_cache_policy_enabled()) {
-        static bool live_ranks_initialized;
-        if (g_ds4_shape.variant != DS4_VARIANT_FLASH ||
-            layer >= DS4_MAX_LAYER) {
-            return NULL;
-        }
-        if (!live_ranks_initialized) {
-            memset(g_cuda_stream_route_ranks, 0xff,
-                   sizeof(g_cuda_stream_route_ranks));
-            live_ranks_initialized = true;
-        }
-        if (!ds4_gpu_stream_expert_cache_refresh_live_route_ranks(
-                    &g_cuda_stream_route_ranks[0][0],
-                    DS4_MAX_EXPERT,
-                    layer,
-                    DS4_N_LAYER,
-                    DS4_N_EXPERT,
-                    DS4_N_EXPERT_USED)) {
-            return NULL;
-        }
-        return g_cuda_stream_route_ranks[layer];
-    }
-#endif
     if (!cuda_stream_learned_cache_policy_enabled() ||
         g_ds4_shape.variant != DS4_VARIANT_FLASH ||
         layer >= DS4_MAX_LAYER) {
@@ -15172,11 +15113,7 @@ static uint32_t ds4_prefill_cap_for_prompt(int prompt_len,
              * workspace shortfall.  Gate-off retains the measured 16128 default
              * byte-for-byte for the same-binary control. */
             cap = DS4_MODEL_VARIANT == DS4_VARIANT_FLASH ?
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-                      (ds4_prefill_edge_vram_enabled() ? 28928u : 16128u) :
-#else
                       16128u :
-#endif
                   (DS4_MODEL_VARIANT == DS4_VARIANT_PRO ? 8192u : 4096u);
         }
     }
@@ -18041,11 +17978,7 @@ static uint64_t metal_graph_indexer_scores_persistent_values(uint64_t comp_cap) 
  * external format.  This is a storage optimization rather than a model
  * quantization format change.
  */
-#if defined(__APPLE__) || defined(_WIN32)
-#define DS4_GPU_ATTN_COMP_CACHE_DEFAULT_FORMAT DS4_GPU_COMP_KV_FORMAT_F16
-#else
 #define DS4_GPU_ATTN_COMP_CACHE_DEFAULT_FORMAT DS4_GPU_COMP_KV_FORMAT_F32
-#endif
 
 /* Upstream carried a plain per-platform DS4_GPU_ATTN_COMP_CACHE_F16 flag; this
  * port generalized it into the 3-way DS4_GPU_ATTN_COMP_CACHE_DEFAULT_FORMAT
@@ -18055,11 +17988,7 @@ static uint64_t metal_graph_indexer_scores_persistent_values(uint64_t comp_cap) 
 #define DS4_GPU_ATTN_COMP_CACHE_F16 \
     (DS4_GPU_ATTN_COMP_CACHE_DEFAULT_FORMAT == DS4_GPU_COMP_KV_FORMAT_F16)
 
-#if defined(_WIN32)
-#define DS4_GPU_GLM_COMPACT_CACHE_F16 DS4_GPU_ATTN_COMP_CACHE_F16
-#else
 #define DS4_GPU_GLM_COMPACT_CACHE_F16 1
-#endif
 
 /* =========================================================================
  * Metal Release Graph State.
@@ -22279,11 +22208,7 @@ static bool metal_graph_stream_pread_range(
         const size_t want = rem > (uint64_t)chunk ? chunk : (size_t)rem;
         ssize_t nread;
         do {
-#if defined(_WIN32)
-            nread = pread(model->fd, buf, want, (int64_t)pos);
-#else
             nread = pread(model->fd, buf, want, (off_t)pos);
-#endif
         } while (nread < 0 && errno == EINTR);
         if (nread <= 0) {
             ok = false;
@@ -25791,23 +25716,6 @@ static bool metal_graph_encode_decode_layer_phase(
     const uint64_t gate_expert_bytes = expert_mid_dim * gate_row_bytes;
     const uint64_t down_row_bytes = routed_expert_row_bytes(layer->ffn_down_exps);
     const uint64_t down_expert_bytes = routed_out_dim * down_row_bytes;
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    /* Start the RAM-hot promotion before this layer's attention and router.
-     * The non-blocking copy stream can overlap the prior queued layer plus the
-     * current attention path; selected loading later consumes only matching
-     * candidates and DirectStorage fetches the disjoint remainder. */
-    if (phase == METAL_DECODE_LAYER_FULL && g->ssd_streaming) {
-        const ds4_gpu_stream_expert_table ram_prefetch_table =
-            graph_stream_expert_table_make(model,
-                                           layer,
-                                           il,
-                                           gate_expert_bytes,
-                                           down_expert_bytes);
-        if (!ds4_gpu_stream_host_expert_prefetch_layer(&ram_prefetch_table)) {
-            return false;
-        }
-    }
-#endif
     const bool compressed = ds4_layer_compress_ratio(il) != 0;
     const float freq_base = layer_rope_freq_base(il);
     const float freq_scale = layer_rope_freq_scale(il);
@@ -35512,9 +35420,6 @@ static bool metal_graph_eval_token_raw_swa_streaming(
 
     ds4_gpu_decode_profile_snapshot decode_profile_before = {0};
     ds4_gpu_decode_profile_get(&decode_profile_before);
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_ds_stats_set_token(pos);
-#endif
 
     const bool profile =
         glm_graph_env_present("DS4_ROCM_GRAPH_TOKEN_PROFILE",
@@ -35534,72 +35439,6 @@ static bool metal_graph_eval_token_raw_swa_streaming(
     const bool batch_static_decode =
         static_decode_map && metal_graph_stream_decode_layer_batch_enabled(g);
     bool ok = true;
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    /* Submit all routing-independent work before mapping, embedding, attention
-     * or router work. Besides the experimental frequency tier, layers 0..2
-     * have exact tid2eid selections at token start. Exact hash prefetch remains
-     * default-ON, but the cached OFF control is required to measure and tune the
-     * VRAM -> RAM -> SSD hierarchy without any prefetch confound. Never call
-     * getenv in the token/expert hot path after this one-time initialization. */
-    cuda_stream_expert_tiers_init();
-    static int hash_prefetch_initialized = 0;
-    static int hash_prefetch_enabled = 1;
-    if (!hash_prefetch_initialized) {
-        const char *env = getenv("DS4_CUDA_HASH_PREFETCH");
-        hash_prefetch_enabled = !(env && strcmp(env, "0") == 0);
-        hash_prefetch_initialized = 1;
-        if (!hash_prefetch_enabled) {
-            fprintf(stderr,
-                    "ds4: CUDA exact hash expert prefetch disabled by DS4_CUDA_HASH_PREFETCH=0\n");
-        }
-    }
-    if (g->ssd_streaming &&
-        (g_cuda_stream_prefetch_k != 0 || hash_prefetch_enabled)) {
-        ds4_gpu_stream_expert_table prefetch_tables[DS4_MAX_LAYER];
-        int32_t exact_selected[DS4_MAX_LAYER * DS4_MAX_EXPERT_USED];
-        memset(exact_selected, 0xff, sizeof(exact_selected));
-        uint32_t n_prefetch_tables = 0;
-        for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
-            const ds4_layer_weights *layer = &weights->layer[il];
-            if (!metal_graph_decode_cuda_selected_slots_expected(g, layer)) continue;
-            const uint64_t gate_row_bytes = routed_expert_row_bytes(layer->ffn_gate_exps);
-            const uint64_t down_row_bytes = routed_expert_row_bytes(layer->ffn_down_exps);
-            if (gate_row_bytes == 0 || down_row_bytes == 0 ||
-                layer->ffn_gate_exps->dim[1] > UINT64_MAX / gate_row_bytes ||
-                layer->ffn_down_exps->dim[1] > UINT64_MAX / down_row_bytes) {
-                fprintf(stderr,
-                        "ds4: CUDA token hot prefetch expert size overflow at layer %u\n",
-                        il);
-                ok = false;
-                break;
-            }
-            const uint32_t table_index = n_prefetch_tables++;
-            prefetch_tables[table_index] =
-                graph_stream_expert_table_make(
-                    model,
-                    layer,
-                    il,
-                    layer->ffn_gate_exps->dim[1] * gate_row_bytes,
-                    layer->ffn_down_exps->dim[1] * down_row_bytes);
-            if (hash_prefetch_enabled && layer->ffn_gate_tid2eid) {
-                int selected[DS4_MAX_EXPERT_USED];
-                layer_hash_selected_experts(selected, model, layer, token);
-                for (uint32_t si = 0; si < DS4_N_EXPERT_USED; si++) {
-                    exact_selected[(size_t)table_index * DS4_MAX_EXPERT_USED + si] =
-                        (int32_t)selected[si];
-                }
-            }
-        }
-        if (ok && n_prefetch_tables != 0) {
-            ok = ds4_gpu_stream_expert_prefetch_token_begin(
-                    prefetch_tables,
-                    n_prefetch_tables,
-                    hash_prefetch_enabled ? exact_selected : NULL,
-                    DS4_MAX_EXPERT_USED,
-                    pos) != 0;
-        }
-    }
-#endif
     if (static_decode_map) {
         if (!static_map_state_cache || !g->streaming_static_decode_map_current) {
             ok = metal_graph_stream_map_decode_static_all(model, weights);
@@ -35642,9 +35481,6 @@ static bool metal_graph_eval_token_raw_swa_streaming(
                 ok = metal_graph_dspark_capture_decode_layer(g, il);
             }
         }
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-        ds4_gpu_stream_expert_prefetch_token_end();
-#endif
         if (ok && logits) {
             ok = metal_graph_encode_output_head(g, model, weights, weights->output->dim[1]);
         }
@@ -35729,9 +35565,6 @@ static bool metal_graph_eval_token_raw_swa_streaming(
             execute_s += tl_done - tl_encoded;
         }
     }
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_gpu_stream_expert_prefetch_token_end();
-#endif
 
     if (ok && logits && !static_decode_map) ok = metal_graph_stream_map_output(model, weights);
     const double t_head0 = profile ? now_sec() : 0.0;
@@ -42928,8 +42761,8 @@ typedef struct {
     } engram_carry;
     ds4_engram_table table[2];
     /* CPU prefetch writers must not touch managed memory concurrently with
-     * kernels on Windows' basic Unified Memory model. This host-only slab is
-     * uploaded after its reader publishes each complete range. */
+     * kernels. This host-only slab is uploaded after its reader publishes each
+     * complete range. */
     float *engram_prefetch_host;
     float rows[2][DS4_ENGRAM_COLS * DS4_ENGRAM_DIM];
     ds4_gpu_tensor *window[40];
@@ -43587,13 +43420,6 @@ static bool ds41_matmul_rows(ds4_gpu_tensor *out, const ds4_model *m,
 static bool ds41_output_projection_rows(ds41_gpu_graph *g, ds4_gpu_tensor *out,
                                         const ds4_model *m, const ds4_weights *w,
                                         const ds4_gpu_tensor *in, uint32_t rows, bool exact) {
-#if defined(_WIN32) && defined(DS4_HAS_DEEPSEEK41_GPU)
-    if (m->lora_output) {
-        if (g->tp_logits_half) return false;
-        return ds4_gpu_matmul_resident_f16_tensor(out, m->lora_output,
-            w->output->dim[0], w->output->dim[1], in, rows) != 0;
-    }
-#endif
     ds4_tensor head = *w->output;
     if (g->tp_logits_half) {
         uint64_t row_bytes;
@@ -45921,39 +45747,23 @@ static bool ds41_decoder_prepare(ds41_gpu_graph *g, const ds4_model *m,
 
 
 
-/* Publish completed Engram rows before readers observe ready/done. Windows
- * interlocked operations provide full barriers (stronger than acquire/release)
- * and preserve the separate one-byte bool and four-byte row-count storage. */
+/* Publish completed Engram rows before readers observe ready/done. The atomics
+ * below keep the separate one-byte bool and four-byte row-count storage, with
+ * release on the publish and acquire on the read. */
 static bool ds41_atomic_bool_load(const bool *value) {
-#ifdef _WIN32
-    return _InterlockedCompareExchange8((volatile CHAR *)value, 0, 0) != 0;
-#else
     return __atomic_load_n(value, __ATOMIC_ACQUIRE);
-#endif
 }
 
 static void ds41_atomic_bool_store(bool *value, bool next) {
-#ifdef _WIN32
-    (void)_InterlockedExchange8((volatile CHAR *)value, next ? 1 : 0);
-#else
     __atomic_store_n(value, next, __ATOMIC_RELEASE);
-#endif
 }
 
 static uint32_t ds41_atomic_u32_load(const uint32_t *value) {
-#ifdef _WIN32
-    return (uint32_t)InterlockedCompareExchange((volatile LONG *)value, 0, 0);
-#else
     return __atomic_load_n(value, __ATOMIC_ACQUIRE);
-#endif
 }
 
 static void ds41_atomic_u32_store(uint32_t *value, uint32_t next) {
-#ifdef _WIN32
-    (void)InterlockedExchange((volatile LONG *)value, (LONG)next);
-#else
     __atomic_store_n(value, next, __ATOMIC_RELEASE);
-#endif
 }
 
 static void *ds41_engram_prefetch_read(void *arg) {
@@ -46194,16 +46004,7 @@ static bool ds41_graph_prefill_sweep(ds41_gpu_graph *g, const ds4_model *m,
                     routed_expert_row_bytes(w->layer[il].ffn_gate_exps) * DS4_N_FF_EXP,
                     routed_expert_row_bytes(w->layer[il].ffn_down_exps) * DS4_N_EMBD);
                 ds4_gpu_stream_expert_table next = {0};
-#if defined(_WIN32)
-                /* The Windows DirectStorage next-layer read loads every expert of the
-                 * next layer: worth it for the encoder layers (0-19), which run every
-                 * row, not for the decoder suffix (20+), whose shrinking tail touches
-                 * only part of a layer. A plain (non-deferred) sweep has encoder_only
-                 * false yet still runs layers 0-19 on all rows, so test the layer. */
-                const bool more = il + 1u < 20u;
-#else
                 const bool more = il + 1u < (encoder_only ? 20u : DS4_N_LAYER);
-#endif
                 if (more) next = graph_stream_expert_table_make(m, &w->layer[il + 1u], il + 1u,
                     routed_expert_row_bytes(w->layer[il + 1u].ffn_gate_exps) * DS4_N_FF_EXP,
                     routed_expert_row_bytes(w->layer[il + 1u].ffn_down_exps) * DS4_N_EMBD);
@@ -49712,10 +49513,6 @@ static uint64_t glm_graph_host_memory_bytes(void) {
     size_t len = sizeof(mem);
     if (sysctlbyname("hw.memsize", &mem, &len, NULL, 0) != 0) return 0;
     return mem;
-#elif defined(_WIN32)
-    MEMORYSTATUSEX mem = {0};
-    mem.dwLength = sizeof(mem);
-    return GlobalMemoryStatusEx(&mem) ? (uint64_t)mem.ullTotalPhys : 0;
 #else
     return 0;
 #endif
@@ -62127,11 +61924,7 @@ static bool qwen4_ngram_row(const ds4_model *m, uint32_t row, float *out) {
     const uint64_t offset = t->abs_offset + (uint64_t)row * bytes;
     uint32_t done = 0;
     while (done < bytes) {
-#ifdef _WIN32
-        ssize_t n = pread(m->ngram_fd, raw + done, bytes - done, (int64_t)(offset + done));
-#else
         ssize_t n = pread(m->ngram_fd, raw + done, bytes - done, (off_t)(offset + done));
-#endif
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0 || (size_t)n > bytes - done) {
             if (!n) errno = EIO;
@@ -64201,9 +63994,6 @@ static int generate_metal_graph_raw_swa(
     /* Switch the expert tiers on for decode. See the comment on
      * g_cuda_stream_phase_decode - tiers cost prefill 30% and buy it nothing, because prefill streams
      * sequentially and cannot spend per-token residency. */
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    if (ok) ds4_streaming_set_phase_decode(1);
-#endif
 
     /* EAGER STATIC DECODE MAP.  MEASURED 2026-08-18: the FIRST decode token costs 5.5-7.8 s - 65-96x a
      * normal token, reproduced in 5 of 5 profiled runs, and 20-26% of the entire decode wall of a
@@ -64407,9 +64197,6 @@ static int generate_metal_graph_raw_swa(
      * therefore never emitted the report at all: the string was in the binary and the instrument had
      * no output. Same completing check as everywhere else in this file - a marker proves the patch
      * shipped, only the output proves it runs. */
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_gpu_stream_expert_cache_dump_route_hotness("generation-end");
-#endif
 
     /* Per-quarter decode rate. See the QUARTER RATES note at t_quarter: a single average cannot say
      * whether a run reached steady state, and comparing runs of DIFFERENT lengths confounds warming
@@ -65089,11 +64876,7 @@ static void ds4_release_instance_lock(void) {
  * stale accidental second run is more dangerous than a normal CLI error. */
 static void ds4_acquire_instance_lock(void) {
     const char *path = getenv("DS4_LOCK_FILE");
-#if defined(_WIN32)
-    if (!path || !path[0]) path = ".\\ds4.lock";
-#else
     if (!path || !path[0]) path = "/tmp/ds4.lock";
-#endif
 
     const int fd = open(path, O_RDWR | O_CREAT, 0600);
     if (fd < 0) {
@@ -67874,11 +67657,7 @@ static int ds4_session_stage_payload_impl(ds4_session *s,
         return 1;
     }
 
-#if defined(_WIN32)
-    char tmpl[] = ".\\ds4-session-payload.XXXXXX";
-#else
     char tmpl[] = "/tmp/ds4-session-payload.XXXXXX";
-#endif
     int fd = mkstemp(tmpl);
     if (fd < 0) {
         payload_set_err(err, errlen, "failed to create staged session payload");
@@ -69307,50 +69086,18 @@ int ds4_session_save_snapshot(ds4_session *s, ds4_session_snapshot *snap, char *
         snap->cap = capacity;
     }
 
-#if defined(_WIN32)
-    FILE *fp = tmpfile();
-#else
     FILE *fp = fmemopen(snap->ptr, (size_t)capacity, "wb");
-#endif
     if (!fp) {
         payload_set_err(err, errlen, "failed to open memory stream for session snapshot");
         return 1;
     }
     const int rc = ds4_session_save_payload(s, fp, err, errlen);
-#if defined(_WIN32)
-    uint64_t written = 0;
-    if (rc == 0) {
-        if (fflush(fp) != 0) {
-            payload_set_err(err, errlen, "failed to flush memory session snapshot");
-            fclose(fp);
-            return 1;
-        }
-        const int64_t pos = ftello(fp);
-        if (pos < 0 || (uint64_t)pos > bytes) {
-            payload_set_err(err, errlen, "failed to measure memory session snapshot");
-            fclose(fp);
-            return 1;
-        }
-        written = (uint64_t)pos;
-        rewind(fp);
-        if (written != 0 &&
-            fread(snap->ptr, 1, (size_t)written, fp) != (size_t)written) {
-            payload_set_err(err, errlen, "failed to copy memory session snapshot");
-            fclose(fp);
-            return 1;
-        }
-    }
-#endif
     if (fclose(fp) != 0 && rc == 0) {
         payload_set_err(err, errlen, "failed to finalize memory session snapshot");
         return 1;
     }
     if (rc != 0) return 1;
-#if defined(_WIN32)
-    snap->len = written;
-#else
     snap->len = bytes;
-#endif
     return 0;
 }
 
@@ -69368,24 +69115,11 @@ int ds4_session_load_snapshot(ds4_session *s, const ds4_session_snapshot *snap, 
         return 1;
     }
 
-#if defined(_WIN32)
-    FILE *fp = tmpfile();
-#else
     FILE *fp = fmemopen((void *)snap->ptr, (size_t)snap->len, "rb");
-#endif
     if (!fp) {
         payload_set_err(err, errlen, "failed to open memory stream for session snapshot restore");
         return 1;
     }
-#if defined(_WIN32)
-    if (fwrite(snap->ptr, 1, (size_t)snap->len, fp) != (size_t)snap->len ||
-        fflush(fp) != 0) {
-        payload_set_err(err, errlen, "failed to stage memory session snapshot restore");
-        fclose(fp);
-        return 1;
-    }
-    rewind(fp);
-#endif
     const int rc = ds4_session_load_payload(s, fp, snap->len, err, errlen);
     if (fclose(fp) != 0 && rc == 0) {
         payload_set_err(err, errlen, "failed to close memory session snapshot");
@@ -76372,22 +76106,10 @@ static int ds4_engine_open_internal(ds4_engine **out,
 #if defined(DS4_ROCM_BUILD) || defined(DS4_NO_GPU)
     if (affinity > 0.0f) { fprintf(stderr, "ds4: cache affinity requires CUDA\n"); *out = NULL; return 1; }
 #endif
-#if defined(_WIN32) && !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
-    if(opt->backend==DS4_BACKEND_CUDA && opt->ssd_streaming) {
-        if(!ds4_ds_configure_read_parts(opt->ds_read_parts_set?opt->ds_read_parts:8u)) {
-            fprintf(stderr,"ds4: invalid DirectStorage startup controls; refusing engine open\n");
-            *out=NULL;return 1;
-        }
-    } else if(opt->ds_read_parts_set) {
-        fprintf(stderr,"ds4: --ds-read-parts requires Windows CUDA SSD streaming\n");
-        *out=NULL;return 1;
-    }
-#else
     if(opt->ds_read_parts_set) {
-        fprintf(stderr,"ds4: --ds-read-parts requires Windows CUDA DirectStorage\n");
+        fprintf(stderr,"ds4: --ds-read-parts is not accepted here; set DS4_DS_READ_PARTS for the io_uring transport\n");
         *out=NULL;return 1;
     }
-#endif
     pthread_mutex_lock(&g_quality_mu);
     memset(&g_quality, 0, sizeof(g_quality));
     g_quality.adaptive = g_cache_affinity_adaptive;
@@ -76557,13 +76279,6 @@ static int ds4_engine_open_internal(ds4_engine **out,
     e->share_session_prefill_workspace = opt->share_session_prefill_workspace;
     e->request_sized_prefill_workspace =
         opt->request_sized_prefill_workspace;
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    /* Establish the gated prefill phase before model/session setup can seed a
-     * resident cache.  Session sync repeats this at every later turn. */
-    if (ds4_prefill_edge_vram_enabled()) {
-        ds4_streaming_set_phase_decode(0);
-    }
-#endif
     ds4_acquire_instance_lock();
 
     if (opt->simulate_used_memory_bytes != 0 &&
@@ -77936,36 +77651,8 @@ static int ds4_engine_open_internal(ds4_engine **out,
 #endif
 
     if (opt->lora_path && opt->lora_path[0]) {
-#if defined(_WIN32) && defined(DS4_HAS_DEEPSEEK41_GPU)
-        if (e->backend != DS4_BACKEND_CUDA || DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK41 ||
-            opt->cuda_tensor_parallel || opt->tp.role != DS4_TP_NONE ||
-            opt->distributed.role != DS4_DISTRIBUTED_NONE || load_slice ||
-            !e->weights.output || e->weights.output->type != DS4_TENSOR_Q8_0) {
-            fprintf(stderr, "ds4: LoRA requires single-CUDA DSV4.1 with a Q8_0 dense output head\n");
-            ds4_engine_close(e); *out = NULL; return 1;
-        }
-        ds4_output_lora adapter = {0}; char error[256] = {0};
-        if (!ds4_output_lora_read(opt->lora_path, opt->lora_base_sha256,
-                DS4_N_EMBD, DS4_N_VOCAB, &adapter, error, sizeof(error))) {
-            fprintf(stderr, "ds4: LoRA refused: %s\n", error);
-            ds4_engine_close(e); *out = NULL; return 1;
-        }
-        e->model.lora_output = ds4_gpu_tensor_alloc((uint64_t)DS4_N_EMBD * DS4_N_VOCAB * 2);
-        const float scale = (opt->lora_scale_set ? opt->lora_scale : 1.0f) * adapter.alpha / adapter.rank;
-        const bool fused = e->model.lora_output && ds4_gpu_fuse_output_q8_lora(
-            e->model.lora_output, e->model.map, e->model.size,
-            e->weights.output->abs_offset, DS4_N_EMBD, DS4_N_VOCAB,
-            adapter.a, adapter.b, adapter.rank, scale);
-        ds4_output_lora_free(&adapter);
-        if (!fused) {
-            fprintf(stderr, "ds4: LoRA VRAM fusion failed\n");
-            ds4_engine_close(e); *out = NULL; return 1;
-        }
-        fprintf(stderr, "ds4: LoRA attached: target=output.weight fusion=once-in-VRAM base_read_only=1\n");
-#else
-        fprintf(stderr, "ds4: output LoRA requires the Windows CUDA build\n");
+        fprintf(stderr, "ds4: output LoRA is not implemented in this build\n");
         ds4_engine_close(e); *out = NULL; return 1;
-#endif
     }
     if (!opt->inspect_only) {
         ds4_engine_print_startup_memory(e, opt->context_size);
@@ -79817,11 +79504,6 @@ void ds4_session_set_cancel(ds4_session *s, ds4_session_cancel_fn fn, void *ud) 
 }
 
 static bool ds4_session_cancelled(ds4_session *s) {
-#if defined(_WIN32)
-    /* A host-memory breach requested the graceful abort (never a self-kill while
-     * VRAM/DirectStorage may be held): fail the current request and refuse new ones. */
-    if (ds4_host_memory_graceful_abort_requested()) return true;
-#endif
     return s && s->cancel && s->cancel(s->cancel_ud);
 }
 
@@ -81534,12 +81216,6 @@ int ds4_session_prepare_prefill(ds4_session *s, int request_tokens,
     (void)errlen;
     return 0;
 #else
-#if defined(_WIN32)
-    if (!ds4_session_is_cpu(s) && !ds4_session_is_glm(s) &&
-        !ds4_session_is_ds41(s) && !ds4_session_is_qwen4(s)) {
-        ds4_streaming_set_phase_decode(0);
-    }
-#endif
     return ds4_session_prepare_prefill_internal(
             s, request_tokens, true, err, errlen);
 #endif
@@ -81591,84 +81267,9 @@ int ds4_session_sync(ds4_session *s, const ds4_tokens *prompt, char *err, size_t
      * function IS the prefill for the session/server path, and decode follows it via
      * ds4_session_eval().  The Studio presets drive ds4-server, so they were on the wrong side of
      * this until now. */
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    ds4_streaming_set_phase_decode(0);
-#ifdef DS4_HAS_DEEPSEEK41_GPU
-    if (!ds4_session_is_cpu(s) && ds4_session_is_ds41(s) &&
-        s->engine->ssd_streaming && ds4_prefill_edge_vram_enabled() &&
-        ds4_gpu_stream_expert_cache_configured_count() != s->engine->ssd_streaming_cache_experts) {
-        ds4_gpu_set_streaming_expert_cache_budget(s->engine->ssd_streaming_cache_experts);
-    }
-    /* Size the context VRAM to this request's prompt: grow before prefill,
-     * or shrink for a new conversation / shorter prompt. */
-    if (!ds4_session_is_cpu(s) && ds4_session_is_ds41(s) && prompt && prompt->len > 0 &&
-        !ds41_ctx_resize(&s->ds41_graph, (uint32_t)prompt->len, true)) {
-        if (err && errlen) snprintf(err, errlen,
-            "context VRAM could not grow to %d tokens (see DS4COMBO_CTX_RESIZE_FAILED)", prompt->len);
-        return 1;
-    }
-    if (!ds4_session_is_cpu(s) && ds4_session_is_ds41(s) &&
-        !ds41_graph_ensure_prefill_workspace(&s->ds41_graph)) {
-        if (err && errlen) snprintf(err, errlen, "failed to restore V4.1 prefill workspace");
-        return 1;
-    }
-#endif
-    if (!ds4_session_is_cpu(s) && !ds4_session_is_glm(s) &&
-        !ds4_session_is_ds41(s) && !ds4_session_is_qwen4(s) &&
-        ((s->engine->request_sized_prefill_workspace &&
-          ds4_session_prepare_prefill_internal(
-                  s, prompt ? prompt->len : 0, false, err, errlen) != 0) ||
-         (!s->engine->request_sized_prefill_workspace &&
-          ds4_prefill_edge_vram_enabled() &&
-          !metal_graph_ensure_prefill_workspace(
-                  &s->graph, &s->engine->weights)))) {
-        if (err && errlen) {
-            if (!err[0]) {
-                snprintf(err, errlen,
-                         "failed to allocate a prefill workspace after cache eviction");
-            }
-        }
-        return 1;
-    }
-    if (!ds4_session_is_cpu(s) && !ds4_session_is_glm(s) &&
-            !ds4_session_is_ds41(s) && !ds4_session_is_qwen4(s)) {
-        s->prefill_cap = s->graph.prefill_cap;
-    }
-#endif
     int rc = s && s->engine && s->engine->tp.active && prompt && prompt->len > 0 ?
         ds4_session_sync_lockstep(s, prompt, err, errlen) :
         ds4_session_sync_internal(s, prompt, err, errlen);
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-    if (rc == 0) {
-        if (!ds4_session_is_cpu(s) && !ds4_session_is_glm(s) &&
-            !ds4_session_is_ds41(s) && !ds4_session_is_qwen4(s)) {
-            metal_graph_release_prefill_workspace_for_decode(&s->graph, NULL);
-        }
-#ifdef DS4_HAS_DEEPSEEK41_GPU
-        else if (!ds4_session_is_cpu(s) && ds4_session_is_ds41(s)) {
-            metal_graph_release_prefill_workspace_for_decode(NULL, &s->ds41_graph);
-            if (s->engine->ssd_streaming && ds4_prefill_edge_vram_enabled() &&
-                s->engine->ssd_streaming_requested_cache_bytes != 0) {
-                /* Restore the user's ceiling after prefill. The existing CUDA
-                 * phase edge samples free VRAM below and clamps every class;
-                 * startup's full-graph fit must not pin decode to that smaller
-                 * count after its workspace has gone away. */
-                uint64_t per_expert_bytes = 0;
-                const uint32_t requested = ds4_streaming_cache_experts_for_byte_budget(
-                    &s->engine->weights, s->engine->ssd_streaming_requested_cache_bytes,
-                    &per_expert_bytes);
-                const uint32_t current = ds4_gpu_stream_expert_cache_configured_count();
-                if (requested > current) {
-                    ds4_gpu_set_streaming_expert_cache_budget(requested);
-                    fprintf(stderr, "ds4: CUDA V4.1 decode expert ceiling restored %u -> %u; "
-                                    "existing physical edge clamp applies\n", current, requested);
-                }
-            }
-        }
-#endif
-        ds4_streaming_set_phase_decode(1);
-    }
-#endif
 #ifndef DS4_NO_GPU
     if (rc == 0) glm_debug_dump_prefill_logits(s->logits);
     if (rc == 0) {
@@ -84217,323 +83818,18 @@ static int ds4_session_eval_probe_tp(ds4_session *s, int token, bool probe_mtp,
  * because every request's prefill edge (DS4_CUDA_PREFILL_EDGE_VRAM) evicts the VRAM cache, so
  * anything loaded earlier would be discarded. A list that cannot be restored in full is an
  * error, never a partial restore. */
-#if defined(_WIN32) && !defined(DS4_NO_GPU)
-typedef struct {
-    uint32_t n;
-    uint32_t *layer, *expert;
-    uint64_t *gate, *down;
-} ds4_expert_list;
-static struct {
-    bool pending;
-    uint64_t model_size;
-    ds4_expert_list v, h;
-} g_expert_restore;
-
-static void ds4_expert_list_free(ds4_expert_list *l) {
-    free(l->layer); free(l->expert); free(l->gate); free(l->down);
-    memset(l, 0, sizeof(*l));
-}
-static bool ds4_expert_list_reserve(ds4_expert_list *l, uint32_t n) {
-    const size_t c = n ? n : 1;
-    l->layer = calloc(c, sizeof(uint32_t)); l->expert = calloc(c, sizeof(uint32_t));
-    l->gate = calloc(c, sizeof(uint64_t)); l->down = calloc(c, sizeof(uint64_t));
-    return l->layer && l->expert && l->gate && l->down;
-}
-
 int ds4_expert_cache_restore_prepare(const char *path, char *err, size_t errlen) {
-    ds4_expert_list_free(&g_expert_restore.v); ds4_expert_list_free(&g_expert_restore.h);
-    g_expert_restore.pending = false;
-    if (!path || !path[0]) return 0;
-    FILE *fp = fopen(path, "rb");
-    if (!fp) { snprintf(err, errlen, "expert restore list %s unreadable: %s", path, strerror(errno)); return 1; }
-    char line[256]; unsigned long long model_size = 0; unsigned nv = 0, nh = 0;
-    if (!fgets(line, sizeof(line), fp) ||
-        sscanf(line, "# ds4-expert-cache-snapshot v1 model_size=%llu %*s vram=%u host=%u",
-               &model_size, &nv, &nh) != 3 ||
-        nv > (unsigned)(DS4_N_LAYER * DS4_N_EXPERT) || nh > (unsigned)(DS4_N_LAYER * DS4_N_EXPERT)) {
-        fclose(fp); snprintf(err, errlen, "expert restore list %s has no valid v1 header", path); return 1;
-    }
-    if (!ds4_expert_list_reserve(&g_expert_restore.v, nv) ||
-        !ds4_expert_list_reserve(&g_expert_restore.h, nh)) {
-        fclose(fp); snprintf(err, errlen, "expert restore list allocation failed"); return 1;
-    }
-    unsigned long long lineno = 1;
-    while (fgets(line, sizeof(line), fp)) {
-        lineno++;
-        char kind = 0; unsigned layer = 0, expert = 0; unsigned long long gate = 0, down = 0;
-        if (sscanf(line, " %c %u %u %llu %llu", &kind, &layer, &expert, &gate, &down) != 5 ||
-            (kind != 'v' && kind != 'h') || layer >= DS4_N_LAYER || expert >= DS4_N_EXPERT ||
-            !gate || !down) {
-            fclose(fp); snprintf(err, errlen, "expert restore list %s line %llu invalid", path, lineno); return 1;
-        }
-        ds4_expert_list *l = kind == 'v' ? &g_expert_restore.v : &g_expert_restore.h;
-        const uint32_t cap = kind == 'v' ? nv : nh;
-        if (l->n >= cap) {
-            fclose(fp); snprintf(err, errlen, "expert restore list %s exceeds its header count", path); return 1;
-        }
-        l->layer[l->n] = layer; l->expert[l->n] = expert; l->gate[l->n] = gate; l->down[l->n] = down; l->n++;
-    }
-    fclose(fp);
-    if (g_expert_restore.v.n != nv || g_expert_restore.h.n != nh) {
-        snprintf(err, errlen, "expert restore list %s truncated (vram %u/%u host %u/%u)", path,
-                 g_expert_restore.v.n, nv, g_expert_restore.h.n, nh);
-        return 1;
-    }
-    g_expert_restore.model_size = model_size;
-    g_expert_restore.pending = nv + nh != 0;
-    fprintf(stderr, "DS4COMBO_EXPERT_RESTORE_PENDING vram=%u host=%u file=%s\n", nv, nh, path);
-    return 0;
-}
-
-static bool ds4_expert_snapshot_take(int host, ds4_expert_list *l) {
-    memset(l, 0, sizeof(*l));
-    const uint32_t n = ds4_gpu_stream_expert_cache_snapshot(host, NULL, NULL, NULL, NULL, 0);
-    if (!ds4_expert_list_reserve(l, n)) return false;
-    l->n = ds4_gpu_stream_expert_cache_snapshot(host, l->layer, l->expert, l->gate, l->down, n);
-    return l->n == n;
-}
-
-/* Writes the resident set, or the still-unapplied inherited set when this process has not
- * decoded yet (its live cache would otherwise read as cold). */
-int ds4_expert_cache_snapshot_write(ds4_session *s, const char *path, uint32_t *vram_out,
-                                    uint32_t *host_out, int *inherited_out, char *err, size_t errlen) {
-    if (!s || !s->engine || !path || !path[0]) { snprintf(err, errlen, "expert snapshot target missing"); return 1; }
-    /* An async restore still in progress completes first, so the live list includes it. */
-    if (!ds4_gpu_expert_restore_async_drain("snapshot")) {
-        char why[200] = {0}; (void)ds4_gpu_expert_restore_async_state(why, sizeof(why));
-        snprintf(err, errlen, "expert cache restore failed: %s", why); return 1;
-    }
-    const bool inherited = g_expert_restore.pending;
-    ds4_expert_list v = {0}, h = {0};
-    if (!inherited && (!ds4_expert_snapshot_take(0, &v) || !ds4_expert_snapshot_take(1, &h))) {
-        ds4_expert_list_free(&v); ds4_expert_list_free(&h);
-        snprintf(err, errlen, "expert snapshot enumeration failed"); return 1;
-    }
-    const ds4_expert_list *pv = inherited ? &g_expert_restore.v : &v;
-    const ds4_expert_list *ph = inherited ? &g_expert_restore.h : &h;
-    char tmp[1100]; snprintf(tmp, sizeof(tmp), "%s.tmp", path);
-    FILE *fp = fopen(tmp, "wb"); int rc = 1;
-    if (fp) {
-        bool ok = fprintf(fp, "# ds4-expert-cache-snapshot v1 model_size=%llu source=%s vram=%u host=%u\n",
-                          (unsigned long long)s->engine->model.size, inherited ? "inherited" : "live",
-                          pv->n, ph->n) > 0;
-        for (uint32_t i = 0; ok && i < ph->n; i++)
-            ok = fprintf(fp, "h %u %u %llu %llu\n", ph->layer[i], ph->expert[i],
-                         (unsigned long long)ph->gate[i], (unsigned long long)ph->down[i]) > 0;
-        for (uint32_t i = 0; ok && i < pv->n; i++)
-            ok = fprintf(fp, "v %u %u %llu %llu\n", pv->layer[i], pv->expert[i],
-                         (unsigned long long)pv->gate[i], (unsigned long long)pv->down[i]) > 0;
-        if (fclose(fp) != 0) ok = false;
-        if (ok && MoveFileExA(tmp, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) rc = 0;
-    }
-    if (rc) snprintf(err, errlen, "expert snapshot write to %s failed", path);
-    else {
-        if (vram_out) *vram_out = pv->n;
-        if (host_out) *host_out = ph->n;
-        if (inherited_out) *inherited_out = inherited;
-        fprintf(stderr, "DS4COMBO_EXPERT_SNAPSHOT vram=%u host=%u source=%s file=%s\n",
-                pv->n, ph->n, inherited ? "inherited" : "live", path);
-        /* Hotlist pre-seed: this process's routed-lookup counts per expert, with both tier
-         * capacities, so the owner can rank experts for the next decoder. Best effort. */
-        const uint32_t nf = inherited ? 0 : ds4_gpu_stream_expert_frequency(NULL, NULL, NULL, NULL, NULL, 0);
-        if (nf) {
-            uint32_t *fl = calloc(nf, sizeof(uint32_t)), *fe = calloc(nf, sizeof(uint32_t)), *fc = calloc(nf, sizeof(uint32_t));
-            uint64_t *fg = calloc(nf, sizeof(uint64_t)), *fd = calloc(nf, sizeof(uint64_t));
-            char fpath[1100], ftmp[1110]; snprintf(fpath, sizeof(fpath), "%s.freq", path); snprintf(ftmp, sizeof(ftmp), "%s.tmp", fpath);
-            FILE *ff = (fl && fe && fc && fg && fd) ? fopen(ftmp, "wb") : NULL;
-            if (ff) {
-                const uint32_t got = ds4_gpu_stream_expert_frequency(fl, fe, fc, fg, fd, nf);
-                bool ok = fprintf(ff, "# ds4-expert-frequency v1 model_size=%llu vram_configured=%u host_configured=%u experts=%u\n",
-                                  (unsigned long long)s->engine->model.size, ds4_gpu_stream_expert_cache_configured_count(),
-                                  (got && nf) ? ds4_gpu_stream_host_expert_cache_capacity_for(fg[0], fd[0]) : 0u, got < nf ? got : nf) > 0;
-                for (uint32_t i = 0; ok && i < got && i < nf; i++)
-                    ok = fprintf(ff, "f %u %u %u %llu %llu\n", fl[i], fe[i], fc[i],
-                                 (unsigned long long)fg[i], (unsigned long long)fd[i]) > 0;
-                if (fclose(ff) != 0) ok = false;
-                if (ok && MoveFileExA(ftmp, fpath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-                    fprintf(stderr, "DS4COMBO_EXPERT_FREQUENCY experts=%u file=%s\n", got < nf ? got : nf, fpath);
-            }
-            free(fl); free(fe); free(fc); free(fg); free(fd);
-        }
-    }
-    ds4_expert_list_free(&v); ds4_expert_list_free(&h);
-    return rc;
-}
-
-static bool ds4_expert_restore_seed_kind(ds4_session *s, int host, const ds4_expert_list *l,
-                                         char *err, size_t errlen) {
-    const ds4_model *model = &s->engine->model;
-    const ds4_weights *weights = &s->engine->weights;
-    int32_t ids[DS4_MAX_EXPERT]; uint32_t prio[DS4_MAX_EXPERT];
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
-        uint32_t n = 0; uint64_t gate = 0, down = 0;
-        for (uint32_t i = 0; i < l->n; i++) {
-            if (l->layer[i] != il) continue;
-            if (n && (l->gate[i] != gate || l->down[i] != down)) {
-                snprintf(err, errlen, "expert restore layer %u mixes expert sizes", il); return false;
-            }
-            gate = l->gate[i]; down = l->down[i];
-            if (n >= DS4_MAX_EXPERT) { snprintf(err, errlen, "expert restore layer %u overfull", il); return false; }
-            ids[n] = (int32_t)l->expert[i]; prio[n] = i + 1u; n++;  /* newer = higher priority */
-        }
-        if (!n) continue;
-        const ds4_layer_weights *layer = &weights->layer[il];
-        if (!layer->ffn_gate_exps || !layer->ffn_down_exps) {
-            snprintf(err, errlen, "expert restore layer %u has no routed experts", il); return false;
-        }
-        const ds4_gpu_stream_expert_table table =
-            graph_stream_expert_table_make(model, layer, il, gate, down);
-        /* The per-layer seed sizes a missing cache to THIS layer's count, and each larger layer then
-         * reallocates it (measured: 12/301 resident). Allocate the full configured cache first. */
-        if (!host && ds4_gpu_stream_expert_cache_prepare_full(gate, down) < n) {
-            snprintf(err, errlen, "expert restore VRAM cache unavailable at layer %u", il); return false;
-        }
-        const int ok = host ? ds4_gpu_stream_host_expert_cache_seed_experts(&table, ids, n)
-                            : ds4_gpu_stream_expert_cache_seed_experts(&table, ids, prio, n);
-        if (!ok) { snprintf(err, errlen, "expert restore seed failed at layer %u", il); return false; }
-    }
-    return true;
-}
-
-/* Async counterpart of ds4_expert_restore_seed_kind: same per-layer checks, queues instead of seeding. */
-static bool ds4_expert_restore_queue_kind(ds4_session *s, int host, const ds4_expert_list *l,
-                                          char *err, size_t errlen) {
-    const ds4_model *model = &s->engine->model;
-    const ds4_weights *weights = &s->engine->weights;
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
-        uint32_t n = 0; uint64_t gate = 0, down = 0;
-        for (uint32_t i = 0; i < l->n; i++) {
-            if (l->layer[i] != il) continue;
-            if (n && (l->gate[i] != gate || l->down[i] != down)) {
-                snprintf(err, errlen, "expert restore layer %u mixes expert sizes", il); return false;
-            }
-            gate = l->gate[i]; down = l->down[i];
-            if (n >= DS4_MAX_EXPERT) { snprintf(err, errlen, "expert restore layer %u overfull", il); return false; }
-            n++;
-        }
-        if (!n) continue;
-        const ds4_layer_weights *layer = &weights->layer[il];
-        if (!layer->ffn_gate_exps || !layer->ffn_down_exps) {
-            snprintf(err, errlen, "expert restore layer %u has no routed experts", il); return false;
-        }
-        const ds4_gpu_stream_expert_table table =
-            graph_stream_expert_table_make(model, layer, il, gate, down);
-        for (uint32_t i = 0; i < l->n; i++) {
-            if (l->layer[i] != il) continue;
-            if (!ds4_gpu_expert_restore_async_add(&table, l->expert[i], host, i + 1u)) {  /* newer = higher priority */
-                snprintf(err, errlen, "expert restore queue failed at layer %u", il); return false;
-            }
-        }
-    }
-    return true;
-}
-
-static int ds4_session_expert_restore_apply(ds4_session *s, char *err, size_t errlen) {
-    if (!g_expert_restore.pending) {
-        /* An async restore that failed after token 1 fails the next request loudly. */
-        char why[200] = {0};
-        if (ds4_gpu_expert_restore_async_state(why, sizeof(why)) < 0) {
-            snprintf(err, errlen, "expert cache restore failed: %s", why);
-            return 1;
-        }
-        return 0;
-    }
-    g_expert_restore.pending = false;  /* one shot: a failure fails this request loudly */
-    const double t0 = now_sec();
-    char why[256] = {0};
-    const ds4_expert_list *v = &g_expert_restore.v, *h = &g_expert_restore.h;
-    if (!s || !s->engine || !s->engine->ssd_streaming)
-        snprintf(why, sizeof(why), "decoder is not SSD-streaming");
-    else if (g_expert_restore.model_size != s->engine->model.size)
-        snprintf(why, sizeof(why), "list is for another model");
-    if (!why[0] && !g_cuda_stream_phase_decode) ds4_streaming_set_phase_decode(1);
-#if defined(DS4_HAS_DEEPSEEK41_GPU) && defined(DS41_CTX_GROW_CUDA)
-    /* The VRAM tier is sized to this conversation's context; a list saved
-     * at another context length keeps its newest (hottest) entries. */
-    ds4_expert_list vclip = *v;
-    if (!why[0] && g_ds41_ctxgrow.streaming && v->n > ds4_gpu_stream_expert_cache_tier_count()) {
-        const uint32_t tier = ds4_gpu_stream_expert_cache_tier_count(), skip = v->n - tier;
-        fprintf(stderr, "DS4COMBO_EXPERT_RESTORE_CLIPPED vram=%u kept=%u reason=context-sized VRAM tier\n",
-                v->n, tier);
-        vclip.n = tier;
-        vclip.layer += skip; vclip.expert += skip; vclip.gate += skip; vclip.down += skip;
-        v = &vclip;
-    }
-#endif
-    if (!why[0] && v->n > ds4_gpu_stream_expert_cache_configured_count())
-        snprintf(why, sizeof(why), "VRAM cache budget %u < %u listed experts",
-                 ds4_gpu_stream_expert_cache_configured_count(), v->n);
-    const uint32_t host_cap = h->n ? ds4_gpu_stream_host_expert_cache_capacity_for(h->gate[0], h->down[0]) : 0;
-    if (!why[0] && h->n > host_cap)
-        snprintf(why, sizeof(why), "RAM cache budget %u < %u listed experts", host_cap, h->n);
-    uint32_t cleared = 0;
-    /* VRAM first, host second: the host tier is inclusive, and seeding VRAM stages
-     * every expert through it, LRU-evicting whatever the host list put there first.
-     * Clear the prefill-era VRAM slots only when there is a VRAM list to seed in
-     * their place, and only after outstanding work on them has finished. */
-    /* DS4COMBO_RESTORE_ASYNC (default 1): issue the restore on the background DirectStorage
-     * queue and return; decode step 0 fetches on demand meanwhile. */
-    const char *async_env = getenv("DS4COMBO_RESTORE_ASYNC");
-    bool async = !async_env || strcmp(async_env, "0") != 0;
-    if (!why[0] && async) {
-        char unavailable[128] = {0};
-        if (!ds4_gpu_expert_restore_async_available(unavailable, sizeof(unavailable))) {
-            fprintf(stderr, "DS4COMBO_RESTORE_ASYNC_UNAVAILABLE reason=%s; running the synchronous restore\n", unavailable);
-            async = false;
-        }
-    }
-    if (!why[0] && v->n) {
-        if (!ds4_gpu_synchronize()) snprintf(why, sizeof(why), "GPU synchronize before slot clear failed");
-        else cleared = ds4_gpu_stream_expert_cache_clear_slots();
-    }
-    if (!why[0] && async) {
-        ds4_gpu_expert_restore_async_reset();
-        if (ds4_expert_restore_queue_kind(s, 0, v, why, sizeof(why)) &&
-            ds4_expert_restore_queue_kind(s, 1, h, why, sizeof(why)) &&
-            ds4_gpu_expert_restore_async_start(cleared, why, sizeof(why))) {
-            ds4_t1_mark("restore_issued");
-            return 0;
-        }
-        if (!why[0]) snprintf(why, sizeof(why), "async restore start failed");
-        ds4_gpu_expert_restore_async_reset();
-    }
-    if (!why[0]) ds4_t1_mark("restore_issued");
-    if (!why[0]) (void)ds4_expert_restore_seed_kind(s, 0, v, why, sizeof(why));
-    if (!why[0]) (void)ds4_expert_restore_seed_kind(s, 1, h, why, sizeof(why));
-    if (!why[0] && !ds4_gpu_synchronize()) snprintf(why, sizeof(why), "GPU synchronize failed");
-    if (!why[0]) {
-        const uint32_t mh = ds4_gpu_stream_expert_cache_apply_order(1, h->layer, h->expert, h->gate, h->down, h->n);
-        const uint32_t mv = ds4_gpu_stream_expert_cache_apply_order(0, v->layer, v->expert, v->gate, v->down, v->n);
-        if (mh || mv)
-            snprintf(why, sizeof(why), "only %u/%u VRAM and %u/%u RAM experts resident after seed",
-                     v->n - mv, v->n, h->n - mh, h->n);
-    }
-    const double seconds = now_sec() - t0;
-    if (why[0]) {
-        fprintf(stderr, "DS4COMBO_EXPERT_RESTORE_FAILED vram=%u host=%u seconds=%.3f async=%d reason=%s\n",
-                v->n, h->n, seconds, async ? 1 : 0, why);
-        snprintf(err, errlen, "expert cache restore failed: %s", why);
-        return 1;
-    }
-    fprintf(stderr, "DS4COMBO_EXPERT_RESTORE experts=%u vram=%u host=%u seconds=%.3f cleared_prefill_slots=%u async=0\n",
-            v->n + h->n, v->n, h->n, seconds, cleared);
-    ds4_t1_mark("restore_complete");
-    return 0;
-}
-#else
-int ds4_expert_cache_restore_prepare(const char *path, char *err, size_t errlen) {
-    if (path && path[0]) { snprintf(err, errlen, "expert restore requires Windows CUDA"); return 1; }
+    if (path && path[0]) { snprintf(err, errlen, "expert cache restore is not implemented in this build"); return 1; }
     return 0;
 }
 int ds4_expert_cache_snapshot_write(ds4_session *s, const char *path, uint32_t *v, uint32_t *h,
                                     int *inh, char *err, size_t errlen) {
     (void)s; (void)path; (void)v; (void)h; (void)inh;
-    snprintf(err, errlen, "expert snapshot requires Windows CUDA"); return 1;
+    snprintf(err, errlen, "expert cache snapshot is not implemented in this build"); return 1;
 }
 static int ds4_session_expert_restore_apply(ds4_session *s, char *err, size_t errlen) {
     (void)s; (void)err; (void)errlen; return 0;
 }
-#endif
 
 int ds4_session_eval(ds4_session *s, int token, char *err, size_t errlen) {
     if (ds4_session_expert_restore_apply(s, err, errlen)) return 1;
@@ -91300,25 +90596,6 @@ static int ds41_session_spec(ds4_session *s, int first_token, int max_tokens, in
     const bool draftable = P1 >= 1u && d->mh_rows && P1 - 1u >= d->mh_pos0 &&
         P1 - 1u < d->mh_pos0 + d->mh_rows && P1 + B < g->ctx && max_tokens > 1 && accepted_cap > 1;
     bool fetch_cost_admit=true;
-#if defined(_WIN32) && !defined(DS4_ROCM_BUILD)
-    if(draftable && g->streaming && getenv("DS4_CUDA_DSPARK_COST_GATE") &&
-       !strcmp(getenv("DS4_CUDA_DSPARK_COST_GATE"),"1")) {
-        const ds4_spec_fetch_input input={d->verify_bytes,d->verify_bytes,d->verify_read_s,
-            d->propose_s,d->verify_other_s,d->plain_rate,d->useful_tokens};
-        ds4_spec_fetch_decision decision;
-        if(!ds4_spec_fetch_decide(&input,&decision)) {
-            payload_set_err(err,errlen,"DSpark fetch policy received invalid cost evidence");return -1;
-        }
-        fetch_cost_admit=decision.admit;
-        if(decision.priced) {
-            d->cost_checks++;d->cost_skips+=!decision.admit;
-            if(getenv("DS4_DSPARK_SPEC_LOG"))fprintf(stderr,
-                "ds4: DSpark cost-gate position=%u predicted_fetch_bytes=%.0f expected_ms=%.3f plain_ms=%.3f admit=%d\n",
-                P1,decision.predicted_miss_bytes,decision.expected_seconds*1000,decision.plain_seconds*1000,decision.admit);
-        } else if(decision.observe_serial && getenv("DS4_DSPARK_SPEC_LOG"))
-            fprintf(stderr,"ds4: DSpark cost-gate position=%u observing initial serial step\n",P1);
-    }
-#endif
     const bool proposed = draftable && fetch_cost_admit && (public_controller ?
         !d->fault.disabled && ds41_adapt_admit(&d->admission) :
         (!d->skip_left || ds41_draft_adapt_off()));
@@ -91403,25 +90680,9 @@ static int ds41_session_spec(ds4_session *s, int first_token, int max_tokens, in
     const ds4_engram_history history = g->history;
     uint64_t fetch_before=0;double read_before=0;
     ds4_gpu_decode_profile_snapshot fetch_profile_before={0},fetch_profile_after={0};
-#if defined(_WIN32) && !defined(DS4_ROCM_BUILD)
-    if(g->streaming) {ds4_ds_get_byte_counters(&fetch_before,&read_before,NULL);ds4_gpu_decode_profile_get(&fetch_profile_before);}
-#endif
     const double tv = now_sec();
     bool ok = ds41_draft_verify(g, &e->model, &e->weights, toks, k + 1u, rows);
     if (stats) s->dspark_stats.verify_ms += (now_sec() - tv) * 1000.0;
-#if defined(_WIN32) && !defined(DS4_ROCM_BUILD)
-    if(g->streaming && ok) {
-        uint64_t after=0;double read_after=0;ds4_ds_get_byte_counters(&after,&read_after,NULL);
-        ds4_gpu_decode_profile_get(&fetch_profile_after);
-        d->verify_bytes=(double)(after-fetch_before);d->verify_read_s=(read_after-read_before)/1000.0;
-        d->verify_other_s=fmax(0.0,now_sec()-tv-d->verify_read_s);d->propose_s=propose_s;
-        if(getenv("DS4_DSPARK_SPEC_LOG")) fprintf(stderr,
-            "ds4: DSpark verify-fetch position=%u rows=%u bytes=%llu experts=%llu read_ms=%.3f wall_ms=%.3f\n",
-            P1,k+1u,(unsigned long long)(after-fetch_before),
-            (unsigned long long)(fetch_profile_after.cache_misses-fetch_profile_before.cache_misses),
-            read_after-read_before,(now_sec()-tv)*1000.0);
-    }
-#endif
     if (!ok) {
         free(rows);
         s->checkpoint_valid = false;

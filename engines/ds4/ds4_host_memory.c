@@ -1,13 +1,13 @@
 /* Host-memory admission for the Linux CUDA engine.
  *
- * This is the Linux twin of the Windows host guard. Same rules, different source:
+ * Same rules as the engine this fork came from, read from Linux sources:
  *   physical reserve   -> MemAvailable from /proc/meminfo
  *   process private    -> VmRSS / VmPeak from /proc/self/status
  *   system commit      -> cgroup v2 memory.current and memory.max when the process
  *                         is inside a scoped cgroup, else MemTotal + SwapTotal
  *   process cap        -> the same derived ceiling, overridable with DS4_HOST_MEMORY_BUDGET_MB
  *
- * Owner rule, unchanged from Windows: never force-kill this process while it may hold
+ * Owner rule: never force-kill this process while it may hold
  * VRAM. A breach after the first GPU allocation requests a graceful abort instead, so
  * the current request fails and new ones are refused while the process stays up.
  */
