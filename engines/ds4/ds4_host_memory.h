@@ -38,6 +38,10 @@ uint64_t ds4_host_memory_peak(void);
  * allocation a breach requests a graceful abort instead of an exit. */
 void ds4_host_memory_request_graceful_abort(const char *why);
 bool ds4_host_memory_graceful_abort_requested(void);
+/* Flags that GPU resources are live, so a budget breach aborts the request instead
+ * of force-killing the process. No caller in this build yet: the engine reaches the
+ * same state through its own first-allocation path, and the Linux producer (chunk
+ * 3.1) is the intended caller. */
 void ds4_host_memory_mark_gpu_resources_live(void);
 bool ds4_host_memory_gpu_resources_live(void);
 /* Optional reclaim hint for a mapped file view; the mapping survives. */

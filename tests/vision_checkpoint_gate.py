@@ -42,11 +42,11 @@ def main():
             dict(role='user',content=[dict(type='image_url',image_url=dict(url=uri)),dict(type='text',text='What is the dominant color of this image? Answer with only the color name.')])])
         two=turn(engine,following);result['after_image']=two
         logs=list((Path(cfg['runtime_root'])/'vision').glob('*.log'));text='\n'.join(p.read_text(errors='replace') for p in logs)
-        result['directstorage_gpu_fetch']='backend=directstorage destination=gpu' in text
+        result['gpu_vision_fetch']='backend=io_uring destination=gpu' in text
         result['encoder_weights_released']='encoder_weights_released=1' in text
         result['resumed_prefix']=two['metrics'].get('prefix_source')=='checkpoint' and two['metrics'].get('reused_prefix_tokens',0)>0
         result['pixel_check']='red' in (two['content'] or '').lower()
-        result['status']='PASS' if all(result[k] for k in ('directstorage_gpu_fetch','encoder_weights_released','resumed_prefix','pixel_check')) else 'FAIL'
+        result['status']='PASS' if all(result[k] for k in ('gpu_vision_fetch','encoder_weights_released','resumed_prefix','pixel_check')) else 'FAIL'
     except BaseException as exc:result.update(status='FAIL',error=repr(exc));raise
     finally:
         engine.close();Path(args.out).write_text(json.dumps(result,indent=2,default=str),encoding='utf-8')

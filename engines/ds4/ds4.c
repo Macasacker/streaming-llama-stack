@@ -5179,8 +5179,9 @@ static bool cuda_stream_mixed_precision_experts_enabled(void) {
  * Mixed-precision ("boosted") GGUFs upcast a few layers' routed experts to a
  * bigger quant (e.g. Q4_K among IQ2 layers). A layer is "uniform" iff its
  * per-expert bytes match the dominant slab class. The CUDA cache has a second
- * size class, but the mixed-precision DirectStorage gate remains opt-in until
- * same-binary correctness and performance measurements prove the path.
+ * size class, but the mixed-precision streaming gate is closed in this build:
+ * cuda_stream_mixed_precision_experts_enabled() is a constant false, so no layer
+ * may mix slab classes, until same-binary measurements prove the path.
  */
 static DS4_MAYBE_UNUSED bool weights_streaming_layer_experts_uniform(
         const ds4_weights *w,

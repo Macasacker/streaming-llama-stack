@@ -5988,7 +5988,7 @@ struct cuda_ds_decode_bandwidth_state {
     void begin(uint64_t token_index) {
         if (active) {
             fprintf(stderr,
-                    "ds4: decode DirectStorage bandwidth token %llu was not retired "
+                    "ds4: decode transport bandwidth token %llu was not retired "
                     "before token %llu began (issued=%llu completed=%llu)\n",
                     (unsigned long long)token,
                     (unsigned long long)token_index,
@@ -6421,15 +6421,15 @@ static int cuda_ds_prefetch_copy_expert_to_device(
     if (!cuda_ok(cuda_decode_profile_arena_memcpy(
                             gate_dst, arena + gate->arena_off,
                             (size_t)gate_bytes, kind),
-                 "DirectStorage GPU gate expert placement") ||
+                 "transport GPU gate expert placement") ||
         !cuda_ok(cuda_decode_profile_arena_memcpy(
                             up_dst, arena + up->arena_off,
                             (size_t)gate_bytes, kind),
-                 "DirectStorage GPU up expert placement") ||
+                 "transport GPU up expert placement") ||
         !cuda_ok(cuda_decode_profile_arena_memcpy(
                             down_dst, arena + down->arena_off,
                             (size_t)down_bytes, kind),
-                 "DirectStorage GPU down expert placement")) {
+                 "transport GPU down expert placement")) {
         return -1;
     }
     g_ds_prefetch_hits += 3;
@@ -10019,6 +10019,8 @@ static int cuda_route_hotlist_output_cmp(const void *a, const void *b) {
     return 0;
 }
 
+/* Re-ranks the live route hotlist into `ranks`. No caller in this build: its only caller was
+ * the deleted platform branch, and the Linux producer (chunk 3.1) is the intended caller. */
 extern "C" int ds4_gpu_stream_expert_cache_refresh_live_route_ranks(
         uint32_t *ranks,
         uint32_t  rank_stride,
@@ -36833,8 +36835,8 @@ static int cuda_ds_fence_enabled(void) {
     if (v < 0) {
         const char *e = getenv("DS4COMBO_V41_DS_FENCE");
         v = e && e[0] && strcmp(e, "0") != 0 ? 1 : 0;
-        if (v) fprintf(stderr, "DS4COMBO_V41_DS_FENCE on: layer expert waves wait on the transport "
-                               "wave event before their arena copies\n");
+        if (v) fprintf(stderr, "DS4COMBO_V41_DS_FENCE on: no effect in this build, the borrowed "
+                               "layer DS upload path is a stub and every load takes the staged reader\n");
     }
     return v;
 }

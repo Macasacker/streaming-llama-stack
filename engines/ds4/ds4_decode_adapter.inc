@@ -107,9 +107,9 @@ DS4X_EXPORT int ds4x_vision_file(const char *model_path, const char *vision_path
     }
     if(ok){
         ds4_gpu_external_decode_mode(1);e->metal_ready=true;e->vision_map_ready=true;
-        fprintf(stderr,"LLAMADECODE_VISION_FETCH backend=directstorage destination=gpu bytes=%llu milliseconds=%.3f host_weight_staging=0\n",(unsigned long long)fetched,fetch_ms);
+        fprintf(stderr,"LLAMADECODE_VISION_FETCH backend=io_uring destination=gpu bytes=%llu milliseconds=%.3f host_weight_staging=0\n",(unsigned long long)fetched,fetch_ms);
         ok=ds4_engine_vision_encode_file(e,image_path,&embedding,error,cap);
-    }else ds4x_set_error(error,cap,"DirectStorage GPU vision fetch failed; host-copy fallback refused");
+    }else ds4x_set_error(error,cap,"GPU vision fetch failed; host-copy fallback refused");
     if(ok)ok=ds4_prompt_append_vision(e,&tokens,&span,&embedding,error,cap);
     FILE *out=NULL;
     if(ok){

@@ -728,10 +728,6 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
             steady_toks,
             half_ts,
             half_toks);
-    /* Route-hotness virtual cache, dumped wherever generation actually ENDS. There are several
-     * timing-print sites for the same format string and which one runs depends on the path; putting
-     * the dump at only one of them produced a run that printed its rate and no report. */
-
     ds4_session_free(session);
     return 0;
 }
@@ -1787,9 +1783,6 @@ static int run_chat_turn(ds4_engine *engine, cli_config *cfg, repl_chat *chat,
             first_tok_ms,
             steady_ts,
             steady_toks);
-    /* Route-hotness virtual cache, dumped wherever generation actually ENDS. There are several
-     * timing-print sites for the same format string and which one runs depends on the path; putting
-     * the dump at only one of them produced a run that printed its rate and no report. */
     return 0;
 }
 

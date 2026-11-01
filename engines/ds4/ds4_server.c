@@ -15726,10 +15726,9 @@ decode_again:
                        now_sec() - t0);
         }
     }
-    /* Git Bash/MSYS terminates this native server without running CRT atexit
-     * handlers.  Dump the cumulative decode and DirectStorage accounting at
-     * the request boundary while the same mutex used by evaluation excludes
-     * concurrent updates. */
+    /* A supervisor can kill this server without running atexit handlers, so dump the
+     * cumulative forward-function accounting at the request boundary, under the mutex
+     * evaluation already serialises on. */
     if (completion > 0) {
         pthread_mutex_lock(&s->inference_mu);
 #ifndef DS4_NO_GPU
@@ -17690,8 +17689,10 @@ int main(int argc, char **argv) {
     while (s.clients > 0) pthread_cond_wait(&s.clients_cv, &s.mu);
     pthread_mutex_unlock(&s.mu);
 
-    /* A combo graceful shutdown has already exported its state to the owner;
-     * it must not also write the KV disk cache on the way out. */
+    /* A combo graceful shutdown has already exported its state to the owner, so it must
+     * not also write the KV disk cache on the way out. ds4_combo_shutdown_requested is
+     * only ever set by the combo path, which this build does not implement: the flag stays
+     * false and the cache is always written here. */
     for (int i = 0; !ds4_combo_shutdown_requested && s.kv.enabled && !s.peer_decode_enabled && i < s.slot_count; i++) {
         server_slot *slot = &s.slots[i];
         const ds4_tokens *tokens = ds4_session_tokens(slot->session);

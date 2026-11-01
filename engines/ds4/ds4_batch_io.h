@@ -99,6 +99,9 @@ uint32_t ds4_ds_batch_capacity(void);
 
 /* Cheap phase/token context for transport bandwidth and slow-batch reporting.
  * set_batch_layer snapshots it onto the next split or synchronous batch. */
+/* Marks which phase the transport accounting should attribute reads to. No caller
+ * in this build yet: the CUDA engine sets its phase internally, and the Linux
+ * producer (chunk 3.1) is the intended caller. */
 void ds4_ds_stats_set_phase(int decode);
 void ds4_ds_stats_set_token(uint64_t token_index);
 void ds4_ds_stats_set_batch_layer(uint32_t first_layer, uint32_t last_layer);
