@@ -29,7 +29,7 @@
 #include "ds4_tp.h"
 #include "ds4_gpu.h"
 
-#if (defined(__APPLE__) || defined(__linux__)) && defined(__has_include)
+#if (defined(__linux__)) && defined(__has_include)
 #if __has_include(<infiniband/verbs.h>)
 #include <infiniband/verbs.h>
 #include <dlfcn.h>
@@ -348,20 +348,7 @@ static int tp_tcp_exchange_io(ds4_tp *tp, ds4_tp_gate_header *header,
 static int tp_tcp_exchange(ds4_tp *tp, ds4_tp_gate_header *header,
                            ds4_tp_gate_header *peer_header,
                            const void *out, void *in, size_t bytes) {
-#ifdef __APPLE__
-    /* Darwin sendmsg can block despite MSG_DONTWAIT. The data socket has
-     * one exchange owner; restore its mode before blocking header I/O. */
-    const int flags = fcntl(tp->data_fd, F_GETFL);
-    if (flags < 0) return 0;
-    const bool changed = !(flags & O_NONBLOCK);
-    if (changed && fcntl(tp->data_fd, F_SETFL, flags | O_NONBLOCK) < 0) return 0;
-#endif
     const int ok = tp_tcp_exchange_io(tp, header, peer_header, out, in, bytes);
-#ifdef __APPLE__
-    const int saved_errno = errno;
-    if (changed && fcntl(tp->data_fd, F_SETFL, flags) < 0) return 0;
-    errno = saved_errno;
-#endif
     return ok;
 }
 
@@ -613,7 +600,7 @@ int ds4_tp_validate_engine_options(
         return 1;
     }
     bool supported_backend = opt->backend == DS4_BACKEND_METAL;
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
+#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
     supported_backend |= opt->backend == DS4_BACKEND_CUDA;
 #endif
     if (!supported_backend) {
@@ -726,12 +713,7 @@ static int tp_gate_mask_fits(
 
 static int tp_rdma_load_api(ds4_tp_verbs_api *api) {
     if (api->handle) return 1;
-#ifdef __APPLE__
-    void *h = dlopen("/usr/lib/librdma.dylib", RTLD_NOW | RTLD_LOCAL);
-    if (!h) h = dlopen("librdma.dylib", RTLD_NOW | RTLD_LOCAL);
-#else
     void *h = dlopen("libibverbs.so.1", RTLD_NOW | RTLD_LOCAL);
-#endif
     if (!h) return 0;
 #define TP_SYM(field, name) \
     do { \
@@ -814,11 +796,7 @@ static int tp_rdma_linux_gid(ds4_tp *tp, struct ibv_context *ctx,
 #endif
 
 static enum ibv_qp_type tp_rdma_qp_type(void) {
-#ifdef __APPLE__
-    return IBV_QPT_UC;
-#else
     return IBV_QPT_RC;
-#endif
 }
 
 static int tp_rdma_open(ds4_tp *tp, char *err, size_t errlen) {

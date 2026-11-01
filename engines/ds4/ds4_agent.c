@@ -34,11 +34,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#ifdef __APPLE__
-#include <copyfile.h>
-#elif defined(__linux__)
 #include <sys/xattr.h>
-#endif
 
 extern char **environ;
 
@@ -685,8 +681,6 @@ static ds4_backend parse_backend(const char *s) {
 static ds4_backend default_backend(void) {
 #ifdef DS4_NO_GPU
     return DS4_BACKEND_CPU;
-#elif defined(__APPLE__)
-    return DS4_BACKEND_METAL;
 #else
     return DS4_BACKEND_CUDA;
 #endif
@@ -7159,11 +7153,7 @@ static int agent_replace_file(const char *path, const char *data, size_t len,
     if (exists) {
         if (fchown(fd, before.st_uid, before.st_gid) != 0) goto failed;
         if (fchmod(fd, before.st_mode & 07777) != 0) goto failed;
-#ifdef __APPLE__
-        if (fcopyfile(src, fd, NULL, COPYFILE_ACL | COPYFILE_XATTR) != 0) goto failed;
-#elif defined(__linux__)
         if (agent_copy_file_xattrs(src, fd) != 0) goto failed;
-#endif
     }
     if (fsync(fd) != 0) goto failed;
     if (close(fd) != 0) { fd = -1; goto failed; }

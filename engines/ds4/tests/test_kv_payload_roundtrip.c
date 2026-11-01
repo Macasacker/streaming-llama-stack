@@ -554,11 +554,7 @@ static int run_format_case(const payload_format_case *format, int context,
             (double)ram_cache_bytes / 1073741824.0);
     ds4_engine_options options = {
         .model_path = model_path,
-#if defined(__APPLE__)
-        .backend = DS4_BACKEND_METAL,
-#else
         .backend = DS4_BACKEND_CUDA,
-#endif
         .n_threads = 1,
         .context_size = context,
         .ssd_streaming = true,

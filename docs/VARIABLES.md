@@ -967,16 +967,16 @@ A/B switch: set to restore the old 2048-row rounding of CUDA SSD V4.1 layer swee
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45570`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44005`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * longer than the carry still split on the 2048 grid. */
         if (g->streaming && remaining <= g->carry_cap && !ds41_short_sweep_off() &&
             !getenv("DS4COMBO_V41_DISABLE_ONE_SWEEP")) return remaining;
-#endif
         return count - count % 2048u;
     }
     const uint32_t tail_cap = g->prefill_cap < 2048u ? g->prefill_cap : 2048u;
+    return remaining < tail_cap ? remaining : tail_cap;
 ```
 
 ### DS4COMBO_V41_DS_FENCE
@@ -1027,7 +1027,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-attribution.h
         ggml_backend_tensor_get(tensor,row.data(),uint64_t(p-first)*words*4,words*4);
 ```
 
-Source: `engines/ds4/ds4.c:44657`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43202`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_dump_on(void) {
@@ -1039,7 +1039,7 @@ static bool ds41_dump_on(void) {
             if (!list || !list[0]) list = "0,128,275,549";
 ```
 
-Source: `engines/ds4/ds4.c:44816`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43356`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->tp_world == 1 && !g->streaming && !g->quality && !g->imatrix && !g->image_count &&
@@ -1069,7 +1069,7 @@ inline std::vector<uint32_t> llama_dsv41_attribution_positions() {
         char *end=nullptr;const unsigned long long n=std::strtoull(text,&end,10);
 ```
 
-Source: `engines/ds4/ds4.c:44660`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43205`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_ds41_dump_state = -1;
@@ -1273,7 +1273,7 @@ DS4_ALLOW_MTP_STREAMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76879`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74932`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * Default behaviour is unchanged; this only allows the combination to be TESTED. */
@@ -1291,7 +1291,7 @@ DS4_ATTN_COMP_CACHE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19614`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19337`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t metal_graph_attn_comp_cache_default_format(void) {
@@ -1309,7 +1309,7 @@ DS4_BATCHED_FFN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16752`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16479`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ffn_batch = 128;
@@ -1327,7 +1327,7 @@ DS4_BATCHED_ROPE_MAX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16252`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:15979`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -1345,7 +1345,7 @@ DS4_BENCH_CUDA_PROFILE_PREFILL: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:921`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:917`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #if defined(DS4_BENCH_HAVE_CUDA_PROFILER)
@@ -1363,7 +1363,7 @@ DS4_BENCH_CUDA_PROFILE_RANGE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:1015`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:1011`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int cuda_profile_tokens = 0;
@@ -1381,7 +1381,7 @@ DS4_BENCH_DISABLE_SNAPSHOT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:962`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:958`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool need_snapshot =
@@ -1399,7 +1399,7 @@ DS4_BENCH_FORCE_SNAPSHOT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:970`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:966`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const uint64_t payload_bytes = kvcache_bytes;
@@ -1417,7 +1417,7 @@ DS4_BENCH_SNAPSHOT_MAX_BYTES: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:136`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:134`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -1435,7 +1435,7 @@ DS4_BENCH_SPEC_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:1056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:1052`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     toks, (int)(sizeof(toks) / sizeof(toks[0])),
@@ -1453,7 +1453,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76073`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74128`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -1471,7 +1471,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE_MAX: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76082`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float bounds[2]={opt->cache_affinity_adaptive_min_set?opt->cache_affinity_adaptive_min:0.0f,
@@ -1489,7 +1489,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE_MIN: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76082`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float bounds[2]={opt->cache_affinity_adaptive_min_set?opt->cache_affinity_adaptive_min:0.0f,
@@ -1507,7 +1507,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE_TRACE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81542`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_quality.applied = mean;
@@ -1516,7 +1516,7 @@ Source: `engines/ds4/ds4.c:83606`. Unset read: NULL from getenv; the literal con
             fprintf(stderr,"ds4: adaptive-affinity position=%d gap=%.6g mean=%.6g min=%.6g max=%.6g\n",
                 s->checkpoint.len,margin,mean,g_cache_affinity_adaptive_min,g_cache_affinity_adaptive_max);
     }
-#endif
+#ifdef DS4_HAS_DEEPSEEK41_GPU
 ```
 
 ### DS4_CACHE_AFFINITY_BIAS
@@ -1525,7 +1525,7 @@ CUDA expert-cache routing bias,0..1.36125.0 preserves baseline selection; live c
 
 Scope: ds4. Class: preset.
 
-Source: `engines/ds4/ds4.c:76063`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74118`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                      const ds4_gpu_config *gpu_cfg) {
@@ -1543,7 +1543,7 @@ Record unbiased per-layer routing spreads and write their calibration when the e
 
 Scope: ds4, rtx-llama. Class: runtime.
 
-Source: `engines/ds4/ds4.c:76126`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74181`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -1555,7 +1555,7 @@ Source: `engines/ds4/ds4.c:76126`. Unset read: NULL from getenv; the literal con
     const char *warm_env=getenv("DS4_CACHE_AFFINITY_WARMUP_TOKENS"), *ramp_env=getenv("DS4_CACHE_AFFINITY_RAMP_TOKENS"), *cap_env=getenv("DS4_CACHE_AFFINITY_PROMOTION_CAP");
 ```
 
-Source: `engines/ds4/ds4_decode_adapter.inc:285`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_decode_adapter.inc:283`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!g_ds4x.open || !isfinite(mean) || mean < 0.0f || mean > 1.36125f) return 0;
@@ -1573,7 +1573,7 @@ DS4_CACHE_AFFINITY_MODE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76120`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74175`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     pthread_mutex_unlock(&g_quality_mu);
@@ -1591,13 +1591,13 @@ DS4_CACHE_AFFINITY_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76145`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74200`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool router_confidence=opt->cache_affinity_router_confidence_set ?
         opt->cache_affinity_router_confidence : confidence_env && !strcmp(confidence_env,"1");
     g_cache_affinity_observe = (calibrate && *calibrate) || getenv("DS4_CACHE_AFFINITY_PROFILE");
-#if !defined(DS4_NO_GPU) && !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
+#if !defined(DS4_NO_GPU) && !defined(DS4_ROCM_BUILD)
     if (opt->backend==DS4_BACKEND_CUDA &&
         !ds4_gpu_cache_affinity_configure(affinity,warmup,ramp,spread,calibrate,!strcmp(mode,"flat"),promotion?cap:0u,router_confidence?1:0)) {
         *out=NULL;return 1;
@@ -1621,7 +1621,7 @@ DS4_CACHE_AFFINITY_PROMOTION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76136`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74191`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         fprintf(stderr,"ds4: invalid cache affinity token/rate limit\n");*out=NULL;return 1;
@@ -1639,7 +1639,7 @@ DS4_CACHE_AFFINITY_PROMOTION_CAP: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74185`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;
@@ -1669,7 +1669,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-sess
         handoff.bind_ms=ms(t0);
 ```
 
-Source: `engines/ds4/ds4.c:76130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74185`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;
@@ -1687,7 +1687,7 @@ DS4_CACHE_AFFINITY_ROUTER_CONFIDENCE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76138`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74193`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char *promotion_env=getenv("DS4_CACHE_AFFINITY_PROMOTION");
@@ -1705,7 +1705,7 @@ Per-model routing calibration. The packaged 1017 default contains40 numeric spre
 
 Scope: ds4. Class: runtime-preset.
 
-Source: `engines/ds4/ds4.c:76125`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74180`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         fprintf(stderr,"ds4: cache affinity mode must be spread or flat\n"); *out=NULL;return 1;
@@ -1735,7 +1735,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-sess
         handoff.bind_ms=ms(t0);
 ```
 
-Source: `engines/ds4/ds4.c:76130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74185`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;
@@ -1760,21 +1760,9 @@ Source: `engines/ds4/ds4_web.c:965`. Unset read: NULL from getenv; the literal c
 static char *web_chrome_executable(void) {
     const char *env = getenv("DS4_CHROME");
     if (env && env[0]) return web_xstrdup(env);
-#ifdef __APPLE__
-    if (access("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", X_OK) == 0)
-        return web_xstrdup("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
-```
-
-Source: `engines/ds4/ds4_web.c:1015`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#ifdef __APPLE__
-static const char *web_macos_chrome_app_name(void) {
-    if (getenv("DS4_CHROME")) return NULL;
-    if (access("/Applications/Google Chrome.app", F_OK) == 0)
-        return "Google Chrome";
-    if (access("/Applications/Chromium.app", F_OK) == 0)
-        return "Chromium";
+    const char *paths[] = {
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
 ```
 
 ### DS4_CLI_FORCE_SESSION
@@ -1783,7 +1771,7 @@ DS4_CLI_FORCE_SESSION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cli.c:1296`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cli.c:1294`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (cfg->engine.distributed.role == DS4_DISTRIBUTED_COORDINATOR ||
@@ -1864,7 +1852,7 @@ DS4_CPU_DISABLE_UNROLLED_ARGMAX: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48599`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:46923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -1876,7 +1864,7 @@ static int sample_argmax(const float *logits, uint32_t n_vocab) {
     float best_v = DS4_NEG_INF;
 ```
 
-Source: `engines/ds4/ds4.c:49279`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47603`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                      int excluded_id) {
@@ -1888,7 +1876,7 @@ Source: `engines/ds4/ds4.c:49279`. Unset read: NULL from getenv; the literal con
     float best_v = DS4_NEG_INF;
 ```
 
-Source: `engines/ds4/ds4.c:82683`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80622`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 int ds4_session_argmax_excluding(ds4_session *s, int excluded_id) {
@@ -1906,7 +1894,7 @@ DS4_CPU_DUMP_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42295`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40977`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -1924,7 +1912,7 @@ DS4_CPU_DUMP_PREFILL_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49374`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47698`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double t_prefill1 = now_sec();
@@ -1942,7 +1930,7 @@ CUDA SSD DSV4.1 context buffers grow on demand in steps; 0 restores fixed full-c
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42943`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41617`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -1960,7 +1948,7 @@ Context growth step in tokens; a positive multiple of 2048.
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42944`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41618`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -2032,7 +2020,7 @@ DS4_CUDA_ATTN_COMP_CACHE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19613`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19336`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -2050,7 +2038,7 @@ DS4_CUDA_ATTN_COMP_CACHE_F16: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19355`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return DS4_GPU_COMP_KV_FORMAT_F32;
@@ -2068,7 +2056,7 @@ DS4_CUDA_ATTN_COMP_CACHE_F32: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19629`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19352`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return DS4_GPU_COMP_KV_FORMAT_Q8;
@@ -2086,7 +2074,7 @@ DS4_CUDA_ATTN_COMP_CACHE_Q8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19626`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19349`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -2272,7 +2260,7 @@ DS4_CUDA_DECODE_FLUSH_COMMANDS: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25663`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25080`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int keep = -1;
@@ -2326,7 +2314,7 @@ DS4_CUDA_DECODE_HEADS8_ONLINE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87880`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85781`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_EXACT_SCORE_SPLIT_DECODE") != NULL ||
@@ -2374,7 +2362,7 @@ DS4_CUDA_DECODE_SCORE4: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87881`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85782`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_SPLITKV_DECODE") != NULL ||
@@ -2404,7 +2392,7 @@ DS4_CUDA_DECODE_SCORE8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87882`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85783`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DECODE_HEADS8_ONLINE") != NULL ||
@@ -2434,7 +2422,7 @@ DS4_CUDA_DIRECT_MODEL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:3733`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:3479`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!m || !m->map || m->size == 0) return false;
@@ -2494,7 +2482,7 @@ DS4_CUDA_DISABLE_PREFILL_PIPELINE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40025`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38757`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool cuda_prefill_pipeline = false;
@@ -2578,16 +2566,16 @@ DS4_CUDA_DISABLE_QKV_RMS_FUSED: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20444`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20008`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_QKV_KV_ROPE_FUSE");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     if (getenv("DS4_CUDA_DISABLE_QKV_RMS_FUSED") != NULL) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
-#endif
 }
 
+static bool metal_graph_cuda_tp_prefill_ffn_requested(void) {
 ```
 
 Source: `engines/ds4/ds4_cuda.cu:533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -2626,16 +2614,16 @@ DS4_CUDA_DISABLE_SSD_MEDIUM_SWEEP: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45556`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43993`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g->carry_cap >= remaining &&
         remaining > 2048u && remaining < 8192u && remaining % 2048u >= 256u &&
         !getenv("DS4_CUDA_DISABLE_SSD_MEDIUM_SWEEP") &&
         !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return remaining;
-#endif
     if (g->carry_cap && remaining >= (ds41_short_sweep_off() ? 4096u : 3072u) &&
         !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) {
+        const uint32_t count = remaining < g->carry_cap ? remaining : g->carry_cap;
 ```
 
 ### DS4_CUDA_DISABLE_SSD_PREFETCH
@@ -2644,7 +2632,7 @@ DS4_CUDA_DISABLE_SSD_PREFETCH: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81414`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79359`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_prefill_borrow(ds41_gpu_graph *g, const ds4_weights *w, uint32_t count,
@@ -2674,7 +2662,7 @@ DS4_CUDA_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting;
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21641`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:21187`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         n_tokens <= 1 ||
@@ -2692,7 +2680,7 @@ DS4_CUDA_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_LOAD: advanced engine setting;
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24968`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24411`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         DS4_N_EXPERT == 0 ||
@@ -2710,7 +2698,7 @@ DS4_CUDA_DISABLE_STREAMING_SELECTED_SHARED_OVERLAP: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24011`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23552`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return g &&
@@ -2746,11 +2734,11 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44957`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#endif
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
+            n_expert, n_used, g->tp_rank * (n_expert / 2u),
+            n_expert / 2u, DS4_SWIGLU_CLAMP_EXP, b->norm, il, count, &mid_f16) :
         (g->draft && m==g->draft->m && (il<2 || (il==2 && getenv("DS4_CUDA_DSPARK_AUX_STAGES") && !strcmp(getenv("DS4_CUDA_DSPARK_AUX_STAGES"),"3"))) && getenv("DS4_CUDA_DSPARK_AUX_3070") &&
          !strcmp(getenv("DS4_CUDA_DSPARK_AUX_3070"),"1")) ?
         ds4_gpu_routed_moe_batch_aux_tensor(b->routed, b->gate, b->up, b->mid, b->experts,
@@ -2758,10 +2746,10 @@ Source: `engines/ds4/ds4.c:44957`. Unset read: NULL from getenv; the literal con
             l->ffn_down_exps->abs_offset, l->ffn_gate_exps->type, l->ffn_down_exps->type,
 ```
 
-Source: `engines/ds4/ds4.c:44958`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43482`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
+            n_expert / 2u, DS4_SWIGLU_CLAMP_EXP, b->norm, il, count, &mid_f16) :
         (g->draft && m==g->draft->m && (il<2 || (il==2 && getenv("DS4_CUDA_DSPARK_AUX_STAGES") && !strcmp(getenv("DS4_CUDA_DSPARK_AUX_STAGES"),"3"))) && getenv("DS4_CUDA_DSPARK_AUX_3070") &&
          !strcmp(getenv("DS4_CUDA_DSPARK_AUX_3070"),"1")) ?
         ds4_gpu_routed_moe_batch_aux_tensor(b->routed, b->gate, b->up, b->mid, b->experts,
@@ -2770,7 +2758,7 @@ Source: `engines/ds4/ds4.c:44958`. Unset read: NULL from getenv; the literal con
             gate_row * DS4_N_FF_EXP, gate_row, down_row * DS4_N_EMBD, down_row,
 ```
 
-Source: `engines/ds4/ds4.c:77527`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75518`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const uint64_t support_bias=(e->model.size+4095ull)&~4095ull;
@@ -2788,11 +2776,11 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44957`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#endif
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
+            n_expert, n_used, g->tp_rank * (n_expert / 2u),
+            n_expert / 2u, DS4_SWIGLU_CLAMP_EXP, b->norm, il, count, &mid_f16) :
         (g->draft && m==g->draft->m && (il<2 || (il==2 && getenv("DS4_CUDA_DSPARK_AUX_STAGES") && !strcmp(getenv("DS4_CUDA_DSPARK_AUX_STAGES"),"3"))) && getenv("DS4_CUDA_DSPARK_AUX_3070") &&
          !strcmp(getenv("DS4_CUDA_DSPARK_AUX_3070"),"1")) ?
         ds4_gpu_routed_moe_batch_aux_tensor(b->routed, b->gate, b->up, b->mid, b->experts,
@@ -2800,7 +2788,7 @@ Source: `engines/ds4/ds4.c:44957`. Unset read: NULL from getenv; the literal con
             l->ffn_down_exps->abs_offset, l->ffn_gate_exps->type, l->ffn_down_exps->type,
 ```
 
-Source: `engines/ds4/ds4.c:77532`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75523`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if(mapped && full_aux) mapped=ds4_gpu_dspark_aux_map_all(e->mtp_model.map,e->mtp_model.size,e->mtp_model.tensor_data_pos,1)!=0;
@@ -2818,7 +2806,7 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46549`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44891`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->streaming) {
@@ -2842,16 +2830,16 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42785`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41462`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int token,int *tokens,float *confidence,bool public_confidence,bool *drained);
 static bool ds41_draft_full_aux(void) {
     const char *s=getenv("DS4_CUDA_DSPARK_FULL_3070");return s && !strcmp(s,"1");
 }
-#endif
 
 
+static bool ds41_read_array(const ds4_model *m, const char *key, uint32_t type,
 ```
 
 ### DS4_CUDA_DSPARK_RESIDENT
@@ -2860,19 +2848,19 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45312`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43808`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
+     * prior refusal until their placement has been qualified. */
     const bool resident_stream = g->streaming
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
         && getenv("DS4_CUDA_DSPARK_RESIDENT") && !strcmp(getenv("DS4_CUDA_DSPARK_RESIDENT"), "1")
-#else
-        && false
-#endif
         ;
+    if ((g->streaming && !resident_stream) || !dw->n_stages || dw->block_size == 0 ||
+        dw->block_size > DS4_DSPARK_MAX_BLOCK_SIZE || !dw->target_layer_count ||
+        dw->missing_tensors || dw->invalid_tensors || dw->metadata_errors ||
 ```
 
-Source: `engines/ds4/ds4.c:76880`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74933`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (e->ssd_streaming) {
@@ -2884,10 +2872,10 @@ Source: `engines/ds4/ds4.c:76880`. Unset read: NULL from getenv; the literal con
                 fprintf(stderr, "ds4: --ssd-streaming is not compatible with --mtp yet"
 ```
 
-Source: `engines/ds4/ds4.c:77517`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75508`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
+        bool resident_ds41_support = false;
         resident_ds41_support = e->backend == DS4_BACKEND_CUDA && e->ssd_streaming &&
             e->ds41_dspark && getenv("DS4_CUDA_DSPARK_RESIDENT") &&
             !strcmp(getenv("DS4_CUDA_DSPARK_RESIDENT"), "1");
@@ -2896,7 +2884,7 @@ Source: `engines/ds4/ds4.c:77517`. Unset read: NULL from getenv; the literal con
                 fprintf(stderr,"ds4: resident streaming DSpark requires --mtp-model with its complete sidecar\n");
 ```
 
-Source: `engines/ds4/ds4.c:77518`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75509`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         resident_ds41_support = e->backend == DS4_BACKEND_CUDA && e->ssd_streaming &&
@@ -2908,28 +2896,28 @@ Source: `engines/ds4/ds4.c:77518`. Unset read: NULL from getenv; the literal con
                 free(load_offsets);free(load_sizes);ds4_engine_close(e);*out=NULL;return 1;
 ```
 
-Source: `engines/ds4/ds4.c:78858`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76812`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+
+```text
+                             e->mtp_model.map ? &e->mtp_model : &e->model)) {
+            fprintf(stderr, "ds4: DSpark drafting unavailable for this V4.1 session\n");
+            if (e->ssd_streaming && getenv("DS4_CUDA_DSPARK_RESIDENT") &&
+                !strcmp(getenv("DS4_CUDA_DSPARK_RESIDENT"),"1")) {
+                ds41_graph_free(&s->ds41_graph);free(s);return 1;
+            }
+        }
+```
+
+Source: `engines/ds4/ds4.c:76813`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             fprintf(stderr, "ds4: DSpark drafting unavailable for this V4.1 session\n");
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
             if (e->ssd_streaming && getenv("DS4_CUDA_DSPARK_RESIDENT") &&
                 !strcmp(getenv("DS4_CUDA_DSPARK_RESIDENT"),"1")) {
                 ds41_graph_free(&s->ds41_graph);free(s);return 1;
             }
-#endif
-```
-
-Source: `engines/ds4/ds4.c:78859`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
-            if (e->ssd_streaming && getenv("DS4_CUDA_DSPARK_RESIDENT") &&
-                !strcmp(getenv("DS4_CUDA_DSPARK_RESIDENT"),"1")) {
-                ds41_graph_free(&s->ds41_graph);free(s);return 1;
-            }
-#endif
         }
+        if (e->tp.active) {
 ```
 
 Source: `engines/ds4/ds4_cuda.cu:2079`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -3172,7 +3160,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87892`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85793`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_SCORE_TILE") != NULL ||
@@ -3244,7 +3232,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_DIM2: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87888`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85789`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_VEC4") != NULL ||
@@ -3274,7 +3262,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_FUSE_INV_ROPE: advanced engine setting; built-in defa
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87889`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85790`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_VEC4_PLAIN") != NULL ||
@@ -3304,7 +3292,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_GRAPH: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87884`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85785`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DECODE_SCORE8") != NULL ||
@@ -3334,7 +3322,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_LDG: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87885`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85786`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_DECODE_VALUE512") != NULL ||
@@ -3364,7 +3352,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_MIN_SCORE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87891`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85792`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_FUSE_INV_ROPE") != NULL ||
@@ -3394,7 +3382,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_S: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87895`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85796`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR") != NULL ||
@@ -3424,7 +3412,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87893`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85794`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_MIN_SCORE") != NULL ||
@@ -3454,7 +3442,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_S_MAX: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87894`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85795`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK") != NULL ||
@@ -3484,7 +3472,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_VEC4: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87886`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85787`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_GRAPH") != NULL ||
@@ -3514,7 +3502,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_VEC4_PLAIN: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87887`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85788`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_LDG") != NULL ||
@@ -3622,7 +3610,7 @@ DS4_CUDA_GLM_DISABLE_FFN_GRAPHS: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60990`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59167`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                        metal_graph_debug_get_config()->prefix == NULL &&
@@ -3640,7 +3628,7 @@ DS4_CUDA_GLM_DISABLE_KDA_QK_PAIR: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:52652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50902`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (l->kda_q->type == DS4_TENSOR_Q4_K &&
@@ -3694,16 +3682,16 @@ DS4_CUDA_GREEDY_SPLITKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20251`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19875`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV", false);
-#endif
 }
 
 static bool metal_graph_cuda_greedy_vec4_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4");
 ```
 
 Source: `engines/ds4/ds4_cli.c:44`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -3724,7 +3712,7 @@ DS4_CUDA_GREEDY_SPLITKV_FALLBACK_LOG: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69846`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:67931`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         anchor_ready = s->greedy_splitkv_anchor_valid;
@@ -3736,7 +3724,7 @@ Source: `engines/ds4/ds4.c:69846`. Unset read: NULL from getenv; the literal con
                     "ds4: greedy %s frontier snapshot failed at pos=%u; using exact attention\n",
 ```
 
-Source: `engines/ds4/ds4.c:69894`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:67979`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             ok = ds4_session_greedy_splitkv_replay_exact(s, token, &top, err, errlen);
@@ -3748,7 +3736,7 @@ Source: `engines/ds4/ds4.c:69894`. Unset read: NULL from getenv; the literal con
                         replay_segment_len,
 ```
 
-Source: `engines/ds4/ds4.c:69947`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68032`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if (ok &&
@@ -3766,11 +3754,11 @@ DS4_CUDA_GREEDY_SPLITKV_MARGIN: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20329`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19925`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return 0.0f;
-#else
+
+static float metal_graph_cuda_greedy_splitkv_margin_threshold(void) {
     const char *env = getenv("DS4_CUDA_GREEDY_SPLITKV_MARGIN");
     if (env && env[0]) {
         char *end = NULL;
@@ -3784,16 +3772,16 @@ DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20379`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19959`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY", false);
-#endif
 }
 
 static DS4_MAYBE_UNUSED uint32_t metal_graph_cuda_greedy_max_segment(const char *name) {
+    const char *env = getenv(name);
 ```
 
 ### DS4_CUDA_GREEDY_SPLITKV_TOP2
@@ -3802,16 +3790,16 @@ DS4_CUDA_GREEDY_SPLITKV_TOP2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20361`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19949`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_TOP2");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TOP2", true);
-#endif
 }
 
 static bool metal_graph_cuda_greedy_splitkv_trust_replay_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY", false);
 ```
 
 ### DS4_CUDA_GREEDY_SPLITKV_TRACE
@@ -3820,7 +3808,7 @@ DS4_CUDA_GREEDY_SPLITKV_TRACE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69881`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:67966`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const float margin = top2.value0 - top2.value1;
@@ -3838,16 +3826,16 @@ DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20369`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19953`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_splitkv_trust_replay_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY", false);
-#endif
 }
 
 static bool metal_graph_cuda_greedy_splitkv_pair_replay_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY");
 ```
 
 ### DS4_CUDA_GREEDY_SPLIT_TOP1
@@ -3856,16 +3844,16 @@ DS4_CUDA_GREEDY_SPLIT_TOP1: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20223`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19859`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLIT_TOP1", false);
-#endif
 }
 
 static bool metal_graph_cuda_output_fused_top1_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_OUTPUT_FUSED_TOP1", false);
 ```
 
 ### DS4_CUDA_GREEDY_TOP1
@@ -3874,7 +3862,7 @@ DS4_CUDA_GREEDY_TOP1: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:70309`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:68394`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             int n_generated = 0;
@@ -3904,16 +3892,16 @@ DS4_CUDA_GREEDY_VEC4: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20261`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19881`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_VEC4", false);
-#endif
 }
 
 static bool metal_graph_cuda_splitkv_spec_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC");
 ```
 
 Source: `engines/ds4/ds4_cli.c:49`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -3934,7 +3922,7 @@ DS4_CUDA_GREEDY_VEC4_FALLBACK_LOG: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69847`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:67932`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!anchor_ready &&
@@ -3946,7 +3934,7 @@ Source: `engines/ds4/ds4.c:69847`. Unset read: NULL from getenv; the literal con
                     vec4_fallback ? "vec4" : "split-kv",
 ```
 
-Source: `engines/ds4/ds4.c:69923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68008`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             ok = ds4_session_greedy_splitkv_replay_exact(s, token, &top, err, errlen);
@@ -3958,7 +3946,7 @@ Source: `engines/ds4/ds4.c:69923`. Unset read: NULL from getenv; the literal con
                         replay_segment_len,
 ```
 
-Source: `engines/ds4/ds4.c:69946`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68031`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             replayed_exact = ok;
@@ -3976,11 +3964,11 @@ DS4_CUDA_GREEDY_VEC4_MARGIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20299`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19903`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return 0.0f;
-#else
+
+static float metal_graph_cuda_greedy_vec4_margin_threshold(void) {
     const char *env = getenv("DS4_CUDA_GREEDY_VEC4_MARGIN");
     if (env && env[0]) {
         char *end = NULL;
@@ -3994,7 +3982,7 @@ DS4_CUDA_GREEDY_VEC4_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69910`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:67995`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const float margin = top2.value0 - top2.value1;
@@ -4024,7 +4012,7 @@ E10 synchronizing-independent host encoding timer: 1 logs per-token HC call/repl
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44775`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43315`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_hc_graph_profile_on(void) {
@@ -4174,7 +4162,7 @@ DS4_CUDA_KV_CACHE_VERBOSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26462`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25767`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                        DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0)
@@ -4186,7 +4174,7 @@ Source: `engines/ds4/ds4.c:26462`. Unset read: NULL from getenv; the literal con
                         "kv_bytes=%llu raw_cache_bytes=%llu\n",
 ```
 
-Source: `engines/ds4/ds4.c:26494`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25799`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool emit = ((pos + 1u) % ratio) == 0u;
@@ -4294,7 +4282,7 @@ DS4_CUDA_LEARNED_CACHE_POLICY: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5599`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:5331`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * enabling the losing two-bound tier path. */
@@ -4324,7 +4312,7 @@ DS4_CUDA_LEARNED_ROUTE_HOTLIST: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5591`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:5323`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -4342,7 +4330,7 @@ DS4_CUDA_LIVE_ROUTE_HOTLIST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:5338`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -4384,7 +4372,7 @@ DS4_CUDA_MIXED_PREFILL_DECODE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85970`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:83888`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     }
@@ -4396,7 +4384,7 @@ Source: `engines/ds4/ds4.c:85970`. Unset read: Wrapper/conditional default: see 
 #endif
 ```
 
-Source: `engines/ds4/ds4.c:90466`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:88328`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         (uint32_t)prefill_prompt->len - start;
@@ -4414,7 +4402,7 @@ DS4_CUDA_MIXED_ROUTED_MAX_PREFILL: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89958`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:87831`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * must use the serialized public-API fallback. */
@@ -4888,7 +4876,7 @@ DS4_CUDA_MOE_NO_DIRECT_DOWN_SUM6: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46327`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44674`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!placement || g->quality || g->imatrix || g->image_count ||
@@ -5440,7 +5428,7 @@ DS4_CUDA_MOE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44815`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43355`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                     const ds4_layer_weights *l, uint32_t il, int token) {
@@ -5452,7 +5440,7 @@ Source: `engines/ds4/ds4.c:44815`. Unset read: NULL from getenv; the literal con
             ds41_attention(g, m, l, il, false) && DS41_MARK(2) &&
 ```
 
-Source: `engines/ds4/ds4.c:44825`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43365`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->tp_world != 2 || g->streaming || g->quality || g->imatrix ||
@@ -5740,7 +5728,7 @@ DS4_CUDA_NO_COMPRESSOR_PREFILL_BATCH: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:33190`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:31931`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const uint32_t n_aligned = n_tokens - (n_tokens % ratio);
@@ -5752,7 +5740,7 @@ Source: `engines/ds4/ds4.c:33190`. Unset read: NULL from getenv; the literal con
                  (n_aligned != 0u &&
 ```
 
-Source: `engines/ds4/ds4.c:33538`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:32279`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 const uint32_t n_aligned = n_tokens - (n_tokens % ratio);
@@ -5770,7 +5758,7 @@ DS4_CUDA_NO_COMPRESSOR_PREFILL_RAGGED: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32483`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:31224`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -5836,7 +5824,7 @@ DS4_CUDA_NO_DECODE_VALUE512: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87883`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85784`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DECODE_SCORE4") != NULL ||
@@ -5926,7 +5914,7 @@ DS4_CUDA_NO_EXACT_SCORE_SPLIT_DECODE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87878`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         DS4_N_HEAD_DIM != 512u || metal_graph_attn_comp_cache_is_f16() ||
@@ -6160,16 +6148,16 @@ DS4_CUDA_NO_GREEDY_SPLITKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19873`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_splitkv_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV", false);
-#endif
 }
+
 ```
 
 Source: `engines/ds4/ds4_cli.c:43`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -6190,16 +6178,16 @@ DS4_CUDA_NO_GREEDY_SPLITKV_FALLBACK: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20349`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19941`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_splitkv_fallback_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_FALLBACK");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_cuda_greedy_splitkv_margin_threshold() > 0.0f;
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY
@@ -6208,16 +6196,16 @@ DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20377`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19957`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_splitkv_pair_replay_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY", false);
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_GREEDY_SPLITKV_TOP2
@@ -6226,16 +6214,16 @@ DS4_CUDA_NO_GREEDY_SPLITKV_TOP2: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20359`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19947`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_splitkv_top2_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_TOP2");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TOP2", true);
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_GREEDY_SPLIT_TOP1
@@ -6244,16 +6232,16 @@ DS4_CUDA_NO_GREEDY_SPLIT_TOP1: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20221`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19857`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLIT_TOP1", false);
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_GREEDY_VEC4
@@ -6262,16 +6250,16 @@ DS4_CUDA_NO_GREEDY_VEC4: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19879`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_vec4_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_VEC4", false);
-#endif
 }
+
 ```
 
 Source: `engines/ds4/ds4_cli.c:48`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -6292,16 +6280,16 @@ DS4_CUDA_NO_GREEDY_VEC4_FALLBACK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20319`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19919`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_greedy_vec4_fallback_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4_FALLBACK");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_cuda_greedy_vec4_margin_threshold() > 0.0f;
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_INDEXED_HEADS8
@@ -6868,16 +6856,16 @@ DS4_CUDA_NO_QKV_KV_ROPE_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20442`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20006`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_qkv_kv_rope_fuse_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_QKV_KV_ROPE_FUSE");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     if (getenv("DS4_CUDA_DISABLE_QKV_RMS_FUSED") != NULL) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
-#endif
+}
 ```
 
 ### DS4_CUDA_NO_QKV_PAIR
@@ -6886,7 +6874,7 @@ DS4_CUDA_NO_QKV_PAIR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20580`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20126`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->cuda_q_norm_rope_fuse = metal_graph_cuda_q_norm_rope_fuse_requested();
@@ -6904,7 +6892,7 @@ DS4_CUDA_NO_SCORE_TILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:87890`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85791`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_DIM2") != NULL ||
@@ -6982,16 +6970,16 @@ DS4_CUDA_NO_SPLITKV_SPEC: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20269`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19885`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_splitkv_spec_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC", false);
-#endif
 }
+
 ```
 
 Source: `engines/ds4/ds4_cli.c:38`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -7012,16 +7000,16 @@ DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20289`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19897`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_splitkv_spec_batch_verify_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY", false);
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0
@@ -7030,16 +7018,16 @@ DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20279`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19891`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_splitkv_spec_toponly_row0_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0", false);
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_TF32
@@ -7300,7 +7288,7 @@ DS4_CUDA_NO_TP_ATTN_OUT_HC_FUSE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20583`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20129`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->cuda_tp_attn_out_hc_fuse =
@@ -7318,16 +7306,16 @@ DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20239`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19867`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_verify_decode2_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1", false);
-#endif
 }
+
 ```
 
 ### DS4_CUDA_NO_WARP_ROUTER_SELECT
@@ -7444,16 +7432,16 @@ DS4_CUDA_OUTPUT_FUSED_TOP1: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20231`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19863`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_output_fused_top1_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_OUTPUT_FUSED_TOP1", false);
-#endif
 }
 
 static bool metal_graph_cuda_verify_decode2_split_top1_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1");
 ```
 
 ### DS4_CUDA_PREFILL_EDGE_VRAM
@@ -7462,7 +7450,7 @@ Keep 0: retain the native core in VRAM during prefill. Values enabling core evic
 
 Scope: ds4. Class: safety.
 
-Source: `engines/ds4/ds4.c:5543`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:5275`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * that build already sits at the irreducible ~8.9k floor, so there is nothing to strip. Leaving
@@ -7480,16 +7468,16 @@ DS4_CUDA_PREFILL_PIPELINE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20470`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20021`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_prefill_pipeline_requested(const ds4_gpu_graph *g) {
     const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE");
     if (env && env[0]) return strcmp(env, "0") != 0;
     return g && g->cuda_tp_decode;
-#endif
 }
+
 ```
 
 ### DS4_CUDA_PREFILL_PIPELINE_MB
@@ -7498,7 +7486,7 @@ DS4_CUDA_PREFILL_PIPELINE_MB: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20485`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20031`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -7516,16 +7504,16 @@ DS4_CUDA_PREFILL_PIPELINE_Q8_CACHE: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20480`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20027`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_prefill_pipeline_q8_cache_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_PREFILL_PIPELINE_Q8_CACHE", false);
-#endif
 }
 
 static uint32_t metal_graph_cuda_prefill_pipeline_microbatch(void) {
+    const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE_MB");
 ```
 
 ### DS4_CUDA_PREFILL_PIPELINE_SEQUENTIAL
@@ -7534,7 +7522,7 @@ DS4_CUDA_PREFILL_PIPELINE_SEQUENTIAL: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39529`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38264`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double t0 = getenv("DS4_METAL_GRAPH_PREFILL_PROFILE") ? now_sec() : 0.0;
@@ -7552,7 +7540,7 @@ DS4_CUDA_PREFILL_PIPELINE_SYNC_BOUNDARY: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39576`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38311`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     ds4_gpu_tensor *src = g->batch_cur_hc_by_tier[stages[stage_i].tier];
@@ -7564,7 +7552,7 @@ Source: `engines/ds4/ds4.c:39576`. Unset read: NULL from getenv; the literal con
                     ok = src && dst &&
 ```
 
-Source: `engines/ds4/ds4.c:39650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38385`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     ds4_gpu_tensor *src = g->batch_cur_hc_by_tier[stages[stage_i].tier];
@@ -7864,16 +7852,16 @@ DS4_CUDA_QKV_KV_ROPE_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20445`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20009`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     if (getenv("DS4_CUDA_DISABLE_QKV_RMS_FUSED") != NULL) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_prefill_ffn_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_FFN", true);
 ```
 
 ### DS4_CUDA_Q_NORM_ROPE_FUSE
@@ -7882,16 +7870,16 @@ DS4_CUDA_Q_NORM_ROPE_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20434`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20002`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_q_norm_rope_fuse_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
-#endif
 }
 
 static bool metal_graph_cuda_qkv_kv_rope_fuse_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_QKV_KV_ROPE_FUSE");
 ```
 
 ### DS4_CUDA_R4_SELECTIVE_PREPASS
@@ -7978,7 +7966,7 @@ DS4_CUDA_ROUTE_HOTLIST_FILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5743`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:5475`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !cuda_stream_learned_cache_policy_enabled()) return;
@@ -8140,7 +8128,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_ALIAS: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89670`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87543`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool alias_attn_pre =
@@ -8158,7 +8146,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_CORE: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89673`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87546`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_core =
@@ -8170,7 +8158,7 @@ Source: `engines/ds4/ds4.c:89673`. Unset read: Wrapper/conditional default: see 
         metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
 ```
 
-Source: `engines/ds4/ds4.c:90044`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87906`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -8188,7 +8176,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_POST: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89685`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87558`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_post =
@@ -8200,7 +8188,7 @@ Source: `engines/ds4/ds4.c:89685`. Unset read: Wrapper/conditional default: see 
         int32_t *router_tokens = malloc((size_t)count * sizeof(*router_tokens));
 ```
 
-Source: `engines/ds4/ds4.c:90049`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87911`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_post =
@@ -8218,7 +8206,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_PRE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89666`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87539`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_pre =
@@ -8236,7 +8224,7 @@ DS4_CUDA_SESSION_BATCH_FFN_PRE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89662`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87535`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_ffn_pre =
@@ -8254,7 +8242,7 @@ DS4_CUDA_SESSION_BATCH_INTERLEAVE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:90351`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -8272,7 +8260,7 @@ DS4_CUDA_SESSION_BATCH_KV_STORE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89681`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87554`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_kv_store =
@@ -8284,7 +8272,7 @@ Source: `engines/ds4/ds4.c:89681`. Unset read: Wrapper/conditional default: see 
         metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
 ```
 
-Source: `engines/ds4/ds4.c:90059`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87921`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_kv_store =
@@ -8302,7 +8290,7 @@ DS4_CUDA_SESSION_BATCH_MOE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46326`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:44673`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         (!g->streaming && g->tp_world == 2);
@@ -8314,7 +8302,7 @@ Source: `engines/ds4/ds4.c:46326`. Unset read: Wrapper/conditional default: see 
         if (l->ffn_gate_exps->type != DS4_TENSOR_IQ2_XXS ||
 ```
 
-Source: `engines/ds4/ds4.c:84513`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:82441`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         return false;
@@ -8326,7 +8314,7 @@ Source: `engines/ds4/ds4.c:84513`. Unset read: Wrapper/conditional default: see 
     for (int i = 0; i < count; i++) {
 ```
 
-Source: `engines/ds4/ds4.c:89654`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87527`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -8344,7 +8332,7 @@ DS4_CUDA_SESSION_BATCH_QKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89677`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87550`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_qkv =
@@ -8356,7 +8344,7 @@ Source: `engines/ds4/ds4.c:89677`. Unset read: Wrapper/conditional default: see 
         metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
 ```
 
-Source: `engines/ds4/ds4.c:90054`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87916`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_qkv =
@@ -8374,7 +8362,7 @@ DS4_CUDA_SESSION_BATCH_SHARED: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:89658`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:87531`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_shared_ffn =
@@ -8392,16 +8380,16 @@ E10 default CUDA single-GPU V4.1 HC input graphs. Explicit0 keeps eager executio
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44769`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43310`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#else
+static bool ds41_single_hc_graphs_on(void) {
     static int cached = -1;
     if (cached < 0) { const char *value = getenv("DS4_CUDA_SINGLE_GPU_HC_GRAPHS"); cached = !value || value[0] == '1'; }
     return cached != 0;
-#endif
 }
 static bool ds41_hc_graph_profile_on(void) {
+    static int cached = -1;
 ```
 
 ### DS4_CUDA_SPLITKV_CHUNK
@@ -8428,7 +8416,7 @@ DS4_CUDA_SPLITKV_DECODE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20427`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19998`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         }
@@ -8437,10 +8425,10 @@ Source: `engines/ds4/ds4.c:20427`. Unset read: Wrapper/conditional default: see 
 }
 
 static bool metal_graph_cuda_q_norm_rope_fuse_requested(void) {
-#if defined(__APPLE__)
+    return metal_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
 ```
 
-Source: `engines/ds4/ds4.c:87879`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
@@ -8500,7 +8488,7 @@ DS4_CUDA_SPLITKV_MIN_SCORE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20418`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:19989`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -8548,16 +8536,16 @@ DS4_CUDA_SPLITKV_SPEC: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20271`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19887`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC", false);
-#endif
 }
 
 static bool metal_graph_cuda_splitkv_spec_toponly_row0_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0");
 ```
 
 Source: `engines/ds4/ds4_cli.c:39`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -8578,16 +8566,16 @@ DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20291`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19899`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY", false);
-#endif
 }
 
 static float metal_graph_cuda_greedy_vec4_margin_threshold(void) {
+    const char *env = getenv("DS4_CUDA_GREEDY_VEC4_MARGIN");
 ```
 
 ### DS4_CUDA_SPLITKV_SPEC_LOG
@@ -8596,7 +8584,7 @@ DS4_CUDA_SPLITKV_SPEC_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69995`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68080`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t start = (uint32_t)s->checkpoint.len;
@@ -8608,7 +8596,7 @@ Source: `engines/ds4/ds4.c:69995`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:70003`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68088`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8620,7 +8608,7 @@ Source: `engines/ds4/ds4.c:70003`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:70013`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68098`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int draft0 = sample_argmax(s->logits, DS4_N_VOCAB);
@@ -8632,7 +8620,7 @@ Source: `engines/ds4/ds4.c:70013`. Unset read: NULL from getenv; the literal con
                     draft0 < 0 ? "no-draft0" : "eos",
 ```
 
-Source: `engines/ds4/ds4.c:70026`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68111`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     memset(&frontier, 0, sizeof(frontier));
@@ -8644,7 +8632,7 @@ Source: `engines/ds4/ds4.c:70026`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:70058`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68143`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8656,7 +8644,7 @@ Source: `engines/ds4/ds4.c:70058`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:70127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68212`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -8668,7 +8656,7 @@ Source: `engines/ds4/ds4.c:70127`. Unset read: NULL from getenv; the literal con
                     draft0,
 ```
 
-Source: `engines/ds4/ds4.c:70232`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68317`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8686,7 +8674,7 @@ DS4_CUDA_SPLITKV_SPEC_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:70034`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:68119`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8704,16 +8692,16 @@ DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20281`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19893`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0", false);
-#endif
 }
 
 static bool metal_graph_cuda_splitkv_spec_batch_verify_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY");
 ```
 
 ### DS4_CUDA_SPLITKV_S_FLOOR
@@ -8794,7 +8782,7 @@ DS4_CUDA_STREAMING_CACHE_M: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5840`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:5572`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         cuda_stream_tier_bound_env("DS4_CUDA_STREAMING_PREFETCH_K");
@@ -8878,7 +8866,7 @@ DS4_CUDA_STREAMING_EXPERT_CACHE_PROFILE: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24900`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24343`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -9070,7 +9058,7 @@ DS4_CUDA_STREAMING_HOST_HOTLIST: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:74249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72324`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t hot_experts = 0;
@@ -9088,7 +9076,7 @@ DS4_CUDA_STREAMING_HOST_SKIP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:74259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72334`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int host_skip_zero = 0;
@@ -9106,7 +9094,7 @@ DS4_CUDA_STREAMING_PREFETCH_K: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5838`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:5570`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     g_cuda_stream_tiers_initialized = true;
@@ -9124,7 +9112,7 @@ DS4_CUDA_STREAMING_PREFILL_BATCH_SELECTED_PROFILE: advanced engine setting; buil
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24983`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24426`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -9142,7 +9130,7 @@ DS4_CUDA_STREAMING_TIERS_ALL_PHASES: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:5879`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:5611`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!g_cuda_stream_phase_decode) {
@@ -9202,16 +9190,16 @@ DS4_CUDA_TP_ATTN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20051`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19771`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_attn_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_attn_peer_read_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_PEER_READ", true);
 ```
 
 ### DS4_CUDA_TP_ATTN_CACHE_DUP
@@ -9220,16 +9208,16 @@ DS4_CUDA_TP_ATTN_CACHE_DUP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20075`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19783`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_attn_cache_dup_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_CACHE_DUP", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_moe_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE", true);
 ```
 
 ### DS4_CUDA_TP_ATTN_HEADS
@@ -9238,16 +9226,16 @@ DS4_CUDA_TP_ATTN_HEADS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20067`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19779`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_attn_heads_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_attn_cache_dup_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_CACHE_DUP", false);
 ```
 
 ### DS4_CUDA_TP_ATTN_OUT_HC_FUSE
@@ -9256,7 +9244,7 @@ DS4_CUDA_TP_ATTN_OUT_HC_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20582`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20128`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->cuda_qkv_pair = getenv("DS4_CUDA_NO_QKV_PAIR") == NULL;
@@ -9274,16 +9262,16 @@ DS4_CUDA_TP_ATTN_PEER_READ: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20059`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19775`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_attn_peer_read_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_PEER_READ", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_attn_heads_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
 ```
 
 ### DS4_CUDA_TP_EP_DELAY_REDUCE
@@ -9292,16 +9280,16 @@ DS4_CUDA_TP_EP_DELAY_REDUCE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20107`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19799`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_ep_delay_reduce_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_ep_fused_hc_reduce_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_HC_REDUCE", true);
 ```
 
 ### DS4_CUDA_TP_EP_DIRECT_RETURN
@@ -9310,16 +9298,16 @@ DS4_CUDA_TP_EP_DIRECT_RETURN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20099`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19795`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_ep_direct_return_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DIRECT_RETURN", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_ep_delay_reduce_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
 ```
 
 ### DS4_CUDA_TP_EP_FUSED_HC_REDUCE
@@ -9328,16 +9316,16 @@ DS4_CUDA_TP_EP_FUSED_HC_REDUCE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20115`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19803`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_ep_fused_hc_reduce_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_HC_REDUCE", true);
-#endif
 }
 
 static DS4_MAYBE_UNUSED bool metal_graph_cuda_tp_ep_fused_shared_mid_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_SHARED_MID", true);
 ```
 
 ### DS4_CUDA_TP_EP_FUSED_SHARED_MID
@@ -9346,16 +9334,16 @@ DS4_CUDA_TP_EP_FUSED_SHARED_MID: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20123`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19807`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static DS4_MAYBE_UNUSED bool metal_graph_cuda_tp_ep_fused_shared_mid_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_SHARED_MID", true);
-#endif
 }
 
 static DS4_MAYBE_UNUSED bool metal_graph_cuda_tp_ep_balanced_shared_mid_requested(void) {
+    return metal_graph_tp_env_flag(
 ```
 
 ### DS4_CUDA_TP_EP_PACK_EXACT
@@ -9364,16 +9352,16 @@ DS4_CUDA_TP_EP_PACK_EXACT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20091`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19791`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_ep_pack_exact_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_PACK_EXACT", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_ep_direct_return_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DIRECT_RETURN", true);
 ```
 
 ### DS4_CUDA_TP_MOE
@@ -9382,16 +9370,16 @@ DS4_CUDA_TP_MOE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20083`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19787`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_moe_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_ep_pack_exact_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_PACK_EXACT", true);
 ```
 
 ### DS4_CUDA_TP_MOE_COPY3
@@ -9400,16 +9388,16 @@ DS4_CUDA_TP_MOE_COPY3: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20165`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19829`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_moe_copy3_handoff_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_COPY3", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_moe_peer_read_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_READ", false);
 ```
 
 ### DS4_CUDA_TP_MOE_DELAY_REDUCE
@@ -9418,16 +9406,16 @@ DS4_CUDA_TP_MOE_DELAY_REDUCE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20149`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19821`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_moe_delay_reduce_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_DELAY_REDUCE", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_moe_pack_handoff_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PACK", false);
 ```
 
 ### DS4_CUDA_TP_MOE_PACK
@@ -9436,16 +9424,16 @@ DS4_CUDA_TP_MOE_PACK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20157`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19825`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_moe_pack_handoff_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PACK", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_moe_copy3_handoff_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_COPY3", false);
 ```
 
 ### DS4_CUDA_TP_MOE_PEER_READ
@@ -9454,16 +9442,16 @@ DS4_CUDA_TP_MOE_PEER_READ: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20173`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19833`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_moe_peer_read_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_READ", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_moe_peer_router_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_ROUTER", false);
 ```
 
 ### DS4_CUDA_TP_MOE_PEER_ROUTER
@@ -9472,16 +9460,16 @@ DS4_CUDA_TP_MOE_PEER_ROUTER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20181`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19837`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_moe_peer_router_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_ROUTER", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_shared_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED", false);
 ```
 
 ### DS4_CUDA_TP_OUTPUT
@@ -9490,23 +9478,23 @@ DS4_CUDA_TP_OUTPUT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20213`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19853`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_output_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_OUTPUT", true);
-#endif
 }
 
 static bool metal_graph_cuda_greedy_split_top1_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
 ```
 
-Source: `engines/ds4/ds4.c:64562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62667`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
+    uint64_t output_logits_elems  = vocab_dim;
     const int planner_n_gpus = e ? e->gpu_cfg.n_gpus : 0;
-#if !defined(__APPLE__)
     const char *tp_output_env = getenv("DS4_CUDA_TP_OUTPUT");
     const bool tp_decode_requested = e && e->cuda_tensor_parallel;
     const bool tp_output_requested =
@@ -9514,16 +9502,16 @@ Source: `engines/ds4/ds4.c:64562`. Unset read: NULL from getenv; the literal con
     if (planner_n_gpus >= 2 && (planner_n_gpus & 1) == 0 &&
 ```
 
-Source: `engines/ds4/ds4.c:74861`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72917`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    return false;
-#else
+
+static bool engine_cuda_tp_output_env_requested(void) {
     const char *env = getenv("DS4_CUDA_TP_OUTPUT");
     return !env || !env[0] || strcmp(env, "0") != 0;
-#endif
 }
 
+/* Return one output-weight shard for logical_tier. Zero means the tier does
 ```
 
 ### DS4_CUDA_TP_OUTPUT_WAYS
@@ -9532,7 +9520,7 @@ DS4_CUDA_TP_OUTPUT_WAYS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:152`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:142`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -9544,7 +9532,7 @@ static uint32_t metal_graph_cuda_tp_output_requested_ways(void) {
     if (end != env && *end == '\0' && v >= 2 && v <= DS4_MAX_GPUS) {
 ```
 
-Source: `engines/ds4/ds4.c:64569`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62674`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         tp_decode_requested && tp_output_requested) {
@@ -9562,16 +9550,16 @@ DS4_CUDA_TP_PREFILL_ATTN_OUTPUT: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20461`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20017`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_prefill_attn_output_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_ATTN_OUTPUT", true);
-#endif
 }
 
 static bool metal_graph_cuda_prefill_pipeline_requested(const ds4_gpu_graph *g) {
+    const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE");
 ```
 
 ### DS4_CUDA_TP_PREFILL_FFN
@@ -9580,16 +9568,16 @@ DS4_CUDA_TP_PREFILL_FFN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20453`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20013`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_prefill_ffn_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_FFN", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_prefill_attn_output_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_ATTN_OUTPUT", true);
 ```
 
 ### DS4_CUDA_TP_Q
@@ -9598,16 +9586,16 @@ DS4_CUDA_TP_Q: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20205`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19849`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_q_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_Q", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_output_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_OUTPUT", true);
 ```
 
 ### DS4_CUDA_TP_SHARED
@@ -9616,16 +9604,16 @@ DS4_CUDA_TP_SHARED: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20189`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19841`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_shared_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED", false);
-#endif
 }
 
 static bool metal_graph_cuda_tp_shared_fold_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED_FOLD", true);
 ```
 
 ### DS4_CUDA_TP_SHARED_FOLD
@@ -9634,16 +9622,16 @@ DS4_CUDA_TP_SHARED_FOLD: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20197`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19845`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return false;
-#else
+
+static bool metal_graph_cuda_tp_shared_fold_requested(void) {
     return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED_FOLD", true);
-#endif
 }
 
 static bool metal_graph_cuda_tp_q_requested(void) {
+    return metal_graph_tp_env_flag("DS4_CUDA_TP_Q", false);
 ```
 
 ### DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1
@@ -9652,16 +9640,16 @@ DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20241`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19869`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *no = getenv("DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     return metal_graph_tp_env_flag("DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1", false);
-#endif
 }
 
 static bool metal_graph_cuda_greedy_splitkv_requested(void) {
+    const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV");
 ```
 
 ### DS4_CUDA_WEIGHT_ARENA_CHUNK_MB
@@ -9940,7 +9928,7 @@ DS4_CUDA_WEIGHT_PRELOAD_SPAN_MB: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:3533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:3283`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint64_t mb = 1024;
@@ -10000,7 +9988,7 @@ DS4_DECODE_PROFILE_DETAIL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:14481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:14208`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         bool                trace) {
@@ -10012,7 +10000,7 @@ Source: `engines/ds4/ds4.c:14481`. Unset read: NULL from getenv; the literal con
     double t_routed = 0.0;
 ```
 
-Source: `engines/ds4/ds4.c:14586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:14313`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_cpu_decode_scratch * scratch) {
@@ -10024,7 +10012,7 @@ Source: `engines/ds4/ds4.c:14586`. Unset read: NULL from getenv; the literal con
     double t_routed = 0.0;
 ```
 
-Source: `engines/ds4/ds4.c:16513`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16240`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_cpu_decode_scratch  * scratch) {
@@ -10042,7 +10030,7 @@ DS4_DISABLE_EAGER_DECODE_MAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:64017`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      *     If it somehow fails here, decode still builds it lazily exactly as before.
@@ -10054,7 +10042,7 @@ Source: `engines/ds4/ds4.c:64017`. Unset read: NULL from getenv; the literal con
         const double t_map0 = now_sec();
 ```
 
-Source: `engines/ds4/ds4.c:64040`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62150`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -10072,7 +10060,7 @@ A/B switch for the Windows Engram row reader: unset (default) reads raw rows thr
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_engram.c:253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_engram.c:244`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int enabled = -1;
@@ -10090,16 +10078,16 @@ DS4_DISABLE_V41_ENGRAM_READERS32: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_engram.c:347`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_engram.c:338`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             /* The public fork's 32 readers versus the parent 16. Capture
              * per batch; output ownership and join ordering are unchanged. */
             const size_t limit = getenv("DS4_DISABLE_V41_ENGRAM_READERS32") ? 16u : ENGRAM_READERS;
             batch.readers = count < limit ? count : limit;
-#ifdef __APPLE__
-            dispatch_apply_f(batch.readers,
-                dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), &batch, read_batch_part);
+            pthread_t threads[ENGRAM_READERS - 1];
+            engram_reader readers[ENGRAM_READERS - 1];
+            size_t started = 0;
 ```
 
 ### DS4_DIST_CONNECT_BIND_HOST
@@ -10390,7 +10378,7 @@ DS4_DS41_DSPARK_FAIL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:90615`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88477`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * once per process, to exercise the ordinary fault exit. */
@@ -10408,7 +10396,7 @@ DS4_DS41_DSPARK_MIN_DRAFT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65291`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63379`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (n >= 0.0 && n <= 1.0) c.p_min = (float)n;
@@ -10426,7 +10414,7 @@ DS4_DS41_DSPARK_MIN_SERIAL_TOKENS: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65281`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63369`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static ds41_adapt_config ds41_admission_config(void) {
@@ -10444,7 +10432,7 @@ DS4_DS41_DSPARK_P_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65286`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63374`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (n >= 0 && n <= DS41_ADAPT_ENTRY_MAX) c.min_serial_tokens = (uint32_t)n;
@@ -10462,7 +10450,7 @@ DS4_DSPARK_CACHE_RESERVE_GB: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:75540`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint64_t reserve = 4ull * 1024ull * 1024ull * 1024ull + (1ull << 29);
@@ -10480,7 +10468,7 @@ DS4_DSPARK_CONFIDENCE_THRESHOLD: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76239`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74294`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * Markov block. */
@@ -10498,7 +10486,7 @@ DS4_DSPARK_CYCLE_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86783`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:84690`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -10510,7 +10498,7 @@ Source: `engines/ds4/ds4.c:86783`. Unset read: NULL from getenv; the literal con
                         (now_sec() - verify_t0) * 1000.0, verify_timing.upload_ms, verify_timing.layer_ms,
 ```
 
-Source: `engines/ds4/ds4.c:86858`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:84765`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -10522,7 +10510,7 @@ Source: `engines/ds4/ds4.c:86858`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:86933`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:84840`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -10540,7 +10528,7 @@ DS4_DSPARK_DISABLE_ADAPTIVE_DRAFTING: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:90528`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88390`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static int ds41_draft_adapt_off(void) {
@@ -10558,7 +10546,7 @@ DS4_DSPARK_DISABLE_FINAL_OUTPUT_ALIAS: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37656`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36395`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ok &&
@@ -10570,7 +10558,7 @@ Source: `engines/ds4/ds4.c:37656`. Unset read: NULL from getenv; the literal con
                                   0,
 ```
 
-Source: `engines/ds4/ds4.c:37903`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static ds4_gpu_tensor *metal_graph_dspark_final_output_hc(const ds4_gpu_graph *g) {
@@ -10588,7 +10576,7 @@ DS4_DSPARK_DISABLE_FUSED_CPU_MARKOV_ARGMAX: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38451`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37190`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cache = -1;
@@ -10606,7 +10594,7 @@ DS4_DSPARK_DISABLE_REUSE_CONFIDENCE0_MARKOV: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38460`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37199`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cache = -1;
@@ -10624,7 +10612,7 @@ DS4_DSPARK_DISABLE_VERIFY_SELECTED_PROFILE: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40818`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39526`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool metal_graph_dspark_verify_selected_profile_enabled(void) {
@@ -10642,7 +10630,7 @@ DS4_DSPARK_EXEC_TIER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:75506`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73561`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -10660,11 +10648,11 @@ DS4_DSPARK_EXPERT_OVERLAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40991`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39673`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    }
-#endif
+    if (ok) ok = ds4_gpu_end_commands() != 0;
+    else (void)ds4_gpu_synchronize();
     if (ok && getenv("DS4_DSPARK_EXPERT_OVERLAP")) {
         /* Diagnostic: distinct routed experts selected by the block's rows
          * in the last layer (bounds the gain of a multi-row expert kernel). */
@@ -10678,7 +10666,7 @@ DS4_DSPARK_FAKE_ARGMAX_PROPOSAL: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:82928`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80867`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool probe_log = probe && probe[0];
@@ -10696,7 +10684,7 @@ DS4_DSPARK_GUARD_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37335`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36074`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * the leading suspect. Print which term trips and the values behind it. */
@@ -10714,7 +10702,7 @@ DS4_DSPARK_NO_GPU_MARKOV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38744`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37480`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * full logits row. Metal currently falls through to the CPU path. */
@@ -10726,7 +10714,7 @@ Source: `engines/ds4/ds4.c:38744`. Unset read: NULL from getenv; the literal con
             final->markov_w2->type == DS4_TENSOR_Q8_0) {
 ```
 
-Source: `engines/ds4/ds4.c:83225`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81163`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if (gpu_markov_enabled &&
@@ -10744,7 +10732,7 @@ DS4_DSPARK_NO_MARKOV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38442`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37181`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -10762,7 +10750,7 @@ DS4_DSPARK_PROBE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:82925`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80864`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                                   int token,
@@ -10780,7 +10768,7 @@ DS4_DSPARK_PROP_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36692`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35431`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* DS4_DSPARK_PROP_PROFILE=1: break the setup block into phases to
@@ -10798,7 +10786,7 @@ DS4_DSPARK_SCHEDULER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65172`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63268`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -10816,7 +10804,7 @@ DS4_DSPARK_SCHEDULER_BREAK_EVEN_WINDOW: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65222`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63316`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10834,7 +10822,7 @@ DS4_DSPARK_SCHEDULER_COLD_LOW_CONFIDENCE_MILLI: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65242`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63336`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10852,7 +10840,7 @@ DS4_DSPARK_SCHEDULER_COLD_LOW_CONFIDENCE_SKIP: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65234`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63328`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10870,7 +10858,7 @@ DS4_DSPARK_SCHEDULER_NO_DRAFT_SKIP: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65226`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63320`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10888,7 +10876,7 @@ DS4_DSPARK_SCHEDULER_SHORT_ACCEPT_NO_DRAFT_SKIP: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65230`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63324`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10906,11 +10894,11 @@ DS4_DSPARK_SCHEDULER_SKIP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65197`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63291`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
+        ds4_session_dspark_seed_batch_enabled(s) && ds4_gpu_device_is_spark())
         fallback = 8u;
-#endif
     return ds4_dspark_env_u32("DS4_DSPARK_SCHEDULER_SKIP", fallback);
 }
 
@@ -10924,7 +10912,7 @@ DS4_DSPARK_SCHEDULER_SLOW_SKIP: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65201`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63295`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10942,7 +10930,7 @@ DS4_DSPARK_SCHEDULER_TAIL_MIN_TOKENS: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65238`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63332`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -10960,7 +10948,7 @@ DS4_DSPARK_SCHEDULER_WINDOW: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65181`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:63277`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const uint32_t fallback =
@@ -10978,7 +10966,7 @@ DS4_DSPARK_SEED_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65135`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63237`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds4_session_dspark_seed_batch_enabled(
@@ -10996,7 +10984,7 @@ DS4_DSPARK_SEED_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36941`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35680`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * says which half fails, instead of another paper derivation. */
@@ -11008,7 +10996,7 @@ Source: `engines/ds4/ds4.c:36941`. Unset read: NULL from getenv; the literal con
                     stage, n_tokens,
 ```
 
-Source: `engines/ds4/ds4.c:36987`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35726`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * depend on `stage` - so print which step diverges rather than reasoning about it. */
@@ -11020,7 +11008,7 @@ Source: `engines/ds4/ds4.c:36987`. Unset read: NULL from getenv; the literal con
          * for stage 1 - so presence and type/dim are not the issue. Print the OFFSETS: the support
 ```
 
-Source: `engines/ds4/ds4.c:37173`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35912`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * separately so the actual blocker is named rather than guessed. */
@@ -11032,7 +11020,7 @@ Source: `engines/ds4/ds4.c:37173`. Unset read: NULL from getenv; the literal con
                     "| zero=%d over_prefill=%d over_cache=%d nostage=%d maxstage=%d "
 ```
 
-Source: `engines/ds4/ds4.c:37202`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35941`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool ok = ds4_gpu_begin_commands() != 0;
@@ -11044,7 +11032,7 @@ Source: `engines/ds4/ds4.c:37202`. Unset read: NULL from getenv; the literal con
         ok = metal_graph_eval_dspark_stage0_batch(g,
 ```
 
-Source: `engines/ds4/ds4.c:75516`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73571`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* [DIAG 2026-08-16] Does this run at all, and with which pointer? Three principled edits in a
@@ -11062,7 +11050,7 @@ DS4_DSPARK_SPEC_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65410`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63498`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     s->dspark_sched_skipped_cycle = true;
@@ -11074,7 +11062,7 @@ Source: `engines/ds4/ds4.c:65410`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:65477`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63565`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             s->dspark_sched_skip = skip;
@@ -11086,7 +11074,7 @@ Source: `engines/ds4/ds4.c:65477`. Unset read: NULL from getenv; the literal con
                     s->dspark_sched_skip,
 ```
 
-Source: `engines/ds4/ds4.c:65507`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         measured_unprofitable) {
@@ -11098,7 +11086,7 @@ Source: `engines/ds4/ds4.c:65507`. Unset read: NULL from getenv; the literal con
                     s->dspark_sched_cycles,
 ```
 
-Source: `engines/ds4/ds4.c:65544`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             s->dspark_sched_bypass = true;
@@ -11110,7 +11098,7 @@ Source: `engines/ds4/ds4.c:65544`. Unset read: NULL from getenv; the literal con
                         s->dspark_sched_accepted,
 ```
 
-Source: `engines/ds4/ds4.c:65562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:63650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -11122,7 +11110,7 @@ Source: `engines/ds4/ds4.c:65562`. Unset read: NULL from getenv; the literal con
                     "saved=%.3fms extra=%.3fms skip=%u\n",
 ```
 
-Source: `engines/ds4/ds4.c:86589`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:84496`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int scheduler_seed_tokens =
@@ -11134,7 +11122,7 @@ Source: `engines/ds4/ds4.c:86589`. Unset read: NULL from getenv; the literal con
         (stats_enabled ||
 ```
 
-Source: `engines/ds4/ds4.c:90654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88516`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -11146,7 +11134,7 @@ Source: `engines/ds4/ds4.c:90654`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:90752`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88614`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         d->rewind_pos == P1 && d->rewind_rows == k + 1u;
@@ -11158,7 +11146,7 @@ Source: `engines/ds4/ds4.c:90752`. Unset read: NULL from getenv; the literal con
     else ds41_draft_adapt(d, true, k, 1u + j + (replacement >= 0), now_sec() - t0, propose_s);
 ```
 
-Source: `engines/ds4/ds4.c:90911`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88767`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             dspark_tail_skip = true;
@@ -11176,7 +11164,7 @@ DS4_DSPARK_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37287`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36026`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11194,7 +11182,7 @@ DS4_DSPARK_STAGE_PROFILE_STAGE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37288`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:36027`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_dspark_stage_profile_enabled(uint32_t stage) {
@@ -11212,7 +11200,7 @@ DS4_DSPARK_STATS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:78652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76607`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #ifndef DS4_NO_GPU
@@ -11248,7 +11236,7 @@ DS4_DSPARK_VERIFY_HEAD_NO_TP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:29690`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:28715`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                  weights->output->dim[1] == vocab_dim &&
@@ -11284,7 +11272,7 @@ DS4_DSPARK_VERIFY_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40918`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39616`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (verify_profile_left < 0) {
@@ -11302,7 +11290,7 @@ DS4_DSPARK_VERIFY_SELECTED_PROFILE: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40817`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39525`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11320,7 +11308,7 @@ DS4_DSPARK_VERIFY_SPLIT_HEAD: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40864`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39572`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * Seed-plus-five blocks still need fresh states for every partial prefix. */
@@ -11338,7 +11326,7 @@ DS4_DSPARK_VERIFY_TOPS_CHECK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41059`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39741`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                    row_tops,
@@ -11434,7 +11422,7 @@ DS4_EXPERT_HOTLIST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76482`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74537`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         expert_profile_path = getenv("DS4_EXPERT_PROFILE");
@@ -11452,7 +11440,7 @@ DS4_EXPERT_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76480`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74535`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char *expert_profile_path = opt->expert_profile_path;
@@ -11560,7 +11548,7 @@ DS4_GLM53_DISABLE_INDEXED_PREFILL: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50538`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48827`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ds4_model_is_glm53()) {
@@ -11578,7 +11566,7 @@ DS4_GLM53_DISABLE_MIXED_PREFILL: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50520`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48809`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * from causal dense to indexed sparse inside one layer-major chunk. */
@@ -11596,7 +11584,7 @@ DS4_GLM_ABLATE_COMBINE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53108`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:51358`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t bytes = (uint64_t)n_tokens * DS4_N_EMBD * sizeof(float);
@@ -11680,7 +11668,7 @@ DS4_GLM_DECODE_ABLATE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53357`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:51607`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -11698,7 +11686,7 @@ DS4_GLM_DECODE_FLUSH_INTERVAL: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60121`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58298`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         decode_layer_flush_interval = use_indexed_attention ? 4u : 32u;
@@ -11716,7 +11704,7 @@ DS4_GLM_DISABLE_FLASH_PREFILL: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:54081`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:52331`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11734,7 +11722,7 @@ DS4_GLM_DISABLE_STREAMING_TOKEN_PREFILL: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60003`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58180`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t                 n_tokens) {
@@ -11788,7 +11776,7 @@ DS4_GLM_HIDDEN_DUMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41603`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40285`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * on each call — run with -n 0 so the file ends as the final prompt row. */
@@ -11800,7 +11788,7 @@ static void glm_debug_dump_hidden_row(const ds4_gpu_tensor *t, uint32_t row) {
     if (ds4_gpu_tensor_read((ds4_gpu_tensor *)t,
 ```
 
-Source: `engines/ds4/ds4.c:41639`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40321`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                      uint32_t il,
@@ -11812,7 +11800,7 @@ Source: `engines/ds4/ds4.c:41639`. Unset read: NULL from getenv; the literal con
         snprintf(full, sizeof(full), "%s.%s.L%02u.T%02u", path, tag, il, pos);
 ```
 
-Source: `engines/ds4/ds4.c:41667`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40349`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                         uint32_t il,
@@ -11830,7 +11818,7 @@ DS4_GLM_HIDDEN_DUMP_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41623`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40305`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * -2 = every layer, one file per layer). */
@@ -11848,7 +11836,7 @@ DS4_GLM_KV_DUMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81276`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79221`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (rc == 0) glm_debug_dump_prefill_logits(s->logits);
@@ -11866,7 +11854,7 @@ DS4_GLM_LOGIT_DUMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41689`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40371`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static void glm_debug_dump_prefill_logits(const float *logits) {
@@ -11884,7 +11872,7 @@ DS4_GLM_MEMORY_GUARD: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49454`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47778`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11902,7 +11890,7 @@ DS4_GLM_MEMORY_GUARD_FRACTION: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48297`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11920,7 +11908,7 @@ DS4_GLM_MEMORY_GUARD_REPORT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49916`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48233`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -11932,7 +11920,7 @@ Source: `engines/ds4/ds4.c:49916`. Unset read: NULL from getenv; the literal con
                     "ds4: GLM streaming largest active model group %s: %.2f GiB\n",
 ```
 
-Source: `engines/ds4/ds4.c:50127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48436`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11950,7 +11938,7 @@ DS4_GLM_MEMORY_GUARD_RESERVE_GB: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50004`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48313`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 #endif
@@ -12142,7 +12130,7 @@ DS4_GLM_MTP_PROBE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83695`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81630`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * Both TP ranks must set the env (the draft's routed experts ride
@@ -12154,7 +12142,7 @@ Source: `engines/ds4/ds4.c:83695`. Unset read: NULL from getenv; the literal con
             float nbest = s->logits[0];
 ```
 
-Source: `engines/ds4/ds4.c:85382`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83306`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 glm_debug_hidden_dump_layer() >= 0 ||
@@ -12166,7 +12154,7 @@ Source: `engines/ds4/ds4.c:85382`. Unset read: NULL from getenv; the literal con
             return false;
 ```
 
-Source: `engines/ds4/ds4.c:90820`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88682`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!accepted || accepted_cap <= 0) return 0;
@@ -12184,7 +12172,7 @@ DS4_GLM_PREFILL_TRUNC: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81727`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79666`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_tokens glm_trunc_prompt;
@@ -12202,7 +12190,7 @@ DS4_GLM_RESUME_PREFILL_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41442`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40124`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t glm_graph_resume_prefill_min_tokens(void) {
@@ -12214,7 +12202,7 @@ static uint32_t glm_graph_resume_prefill_min_tokens(void) {
         if (endp != env) {
 ```
 
-Source: `engines/ds4/ds4.c:41459`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40141`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* Measured on M5 Max and GB10: one token is marginally faster through
@@ -12268,7 +12256,7 @@ DS4_GLM_STREAMING_DECODE_FULL_LAYER_MAP: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50758`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:49030`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP",
@@ -12286,7 +12274,7 @@ DS4_GLM_STREAMING_DECODE_SYNC_EACH_LAYER: advanced engine setting; built-in defa
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60082`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             "DS4_ROCM_GLM_STREAMING_DECODE_SYNC_EACH_LAYER",
@@ -12304,7 +12292,7 @@ DS4_GLM_STREAMING_PREFILL_SYNC_EACH_LAYER: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50463`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48757`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             "DS4_ROCM_GLM_STREAMING_PREFILL_SYNC_EACH_LAYER",
@@ -12322,7 +12310,7 @@ DS4_GLM_STREAMING_TOKEN_PREFILL_MAX: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:59985`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58162`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             "DS4_ROCM_GLM_STREAMING_TOKEN_PREFILL_MAX",
@@ -12340,7 +12328,7 @@ DS4_GLM_SYNC_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81964`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79903`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             s->glm_graph.full_kv_cache &&
@@ -12358,7 +12346,7 @@ DS4_GLM_TP_DEBUG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53009`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:51259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!g->routed_gate || !g->routed_up || !g->routed_down ||
@@ -12370,7 +12358,7 @@ Source: `engines/ds4/ds4.c:53009`. Unset read: NULL from getenv; the literal con
                         (void *)g->routed_down,
 ```
 
-Source: `engines/ds4/ds4.c:53680`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:51930`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t tp_ffn_slot = il * DS4_TP_GATES_PER_LAYER + DS4_TP_GATE_FFN;
@@ -12382,7 +12370,7 @@ Source: `engines/ds4/ds4.c:53680`. Unset read: NULL from getenv; the literal con
         ok = glm_graph_routed_moe_one_dispatch(
 ```
 
-Source: `engines/ds4/ds4.c:60100`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58277`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         bool               defer_completion) {
@@ -12394,7 +12382,7 @@ Source: `engines/ds4/ds4.c:60100`. Unset read: NULL from getenv; the literal con
         token < 0 || token >= (int)DS4_N_VOCAB ||
 ```
 
-Source: `engines/ds4/ds4.c:61225`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59402`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (void)ds4_gpu_synchronize();
@@ -12406,19 +12394,7 @@ Source: `engines/ds4/ds4.c:61225`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:78446`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                                      uint64_t bytes) {
-#ifdef __APPLE__
-    if (g_glm_tp_debug_ids && getenv("DS4_GLM_TP_DEBUG")) {
-        fprintf(stderr,
-                "ds4-tp: big gate l=%u ids[0..7]=%d %d %d %d %d %d %d %d\n",
-                layer,
-                g_glm_tp_debug_ids[0], g_glm_tp_debug_ids[1],
-```
-
-Source: `engines/ds4/ds4_tp.c:2350`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2328`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -12436,7 +12412,7 @@ DS4_GLM_TP_EXACT_PREFILL_MAX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81899`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79838`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t glm_exact_prefill_max = 64;
@@ -12454,7 +12430,7 @@ DS4_GLM_TP_HEAD_SPLIT_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41593`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40275`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -12514,7 +12490,7 @@ DS4_HOTLIST_SEED_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35963`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:34702`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * seed to the prefill->decode transition" or something else. Print a sequence number and let
@@ -12532,7 +12508,7 @@ DS4_INDEXER_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:33453`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:32194`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              * topk_prefill_needed - so print the state instead of deriving a fourth. */
@@ -12550,7 +12526,7 @@ DS4_LOCK_FILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:64878`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62980`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * stale accidental second run is more dangerous than a normal CLI error. */
@@ -12568,7 +12544,7 @@ DS4_METAL_CB_TIMES: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_bench.c:941`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_bench.c:937`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const double prefill_t1 = bench_now_sec();
@@ -12586,7 +12562,7 @@ DS4_METAL_DECODE_INDEXER_SPARSE_THRESHOLD: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23401`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:22942`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         parsed = 0;
@@ -12604,7 +12580,7 @@ DS4_METAL_DECODE_STAGE_PROFILE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20132`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->shared_gate_up_swiglu_fuse =
@@ -12616,7 +12592,7 @@ Source: `engines/ds4/ds4.c:20586`. Unset read: NULL from getenv; the literal con
     const bool enable_splitkv_batch_verify =
 ```
 
-Source: `engines/ds4/ds4.c:26463`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25768`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 : metal_graph_decode_kv_store(metal_graph_kv(g), raw_cache, raw_cap, raw_row);
@@ -12628,7 +12604,7 @@ Source: `engines/ds4/ds4.c:26463`. Unset read: NULL from getenv; the literal con
                         il,
 ```
 
-Source: `engines/ds4/ds4.c:26495`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25800`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool decode_index_diag =
@@ -12640,7 +12616,7 @@ Source: `engines/ds4/ds4.c:26495`. Unset read: NULL from getenv; the literal con
                 fprintf(stderr, \
 ```
 
-Source: `engines/ds4/ds4.c:85361`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83289`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (e->tp.active && tp_batch && strcmp(tp_batch, "0") == 0) ||
@@ -12648,8 +12624,8 @@ Source: `engines/ds4/ds4.c:85361`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL) {
         return false;
     }
-#if defined(__APPLE__)
-    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41)
+#ifdef DS4_HAS_QWEN4_METAL
+    if (items[0].session && ds4_session_is_qwen4(items[0].session))
 ```
 
 ### DS4_METAL_DISABLE_ATTN_OUT_HC_FUSION
@@ -12658,7 +12634,7 @@ DS4_METAL_DISABLE_ATTN_OUT_HC_FUSION: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23507`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23048`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_attn_out_hc(void) {
@@ -12676,7 +12652,7 @@ DS4_METAL_DISABLE_BATCH_HC_NORM_FUSION: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23487`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23028`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (metal_graph_use_reference_hc_norm_decode()) return false;
@@ -12694,7 +12670,7 @@ DS4_METAL_DISABLE_COMPRESSOR_PAIR_PROJ: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23475`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23016`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_compressor_pair_proj(void) {
@@ -12712,35 +12688,11 @@ DS4_METAL_DISABLE_GLM53_BF16_QKV: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:52629`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    bool qkv_paired = false;
-    if (getenv("DS4_METAL_DISABLE_M3_ULTRA_GLM53_DECODE") == NULL &&
-        getenv("DS4_METAL_DISABLE_GLM53_BF16_QKV") == NULL &&
-        l->kda_q->type == DS4_TENSOR_BF16 &&
-        l->kda_k->type == DS4_TENSOR_BF16 &&
-        l->kda_v->type == DS4_TENSOR_BF16) {
-        qkv_paired = ds4_gpu_glm53_matmul_bf16_qkv(
-```
-
 ### DS4_METAL_DISABLE_HC_EXPAND_PRODUCER_FUSE
 
 DS4_METAL_DISABLE_HC_EXPAND_PRODUCER_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:25631`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-           metal_graph_debug_get_config()->prefix == NULL &&
-           ds4_gpu_device_is_m5_apple_silicon() &&
-           getenv("DS4_METAL_DISABLE_HC_EXPAND_PRODUCER_FUSE") == NULL;
-#else
-    (void)g; (void)decode_stage_profile;
-    return false;
-#endif
-```
 
 ### DS4_METAL_DISABLE_HC_FUSION
 
@@ -12748,7 +12700,7 @@ DS4_METAL_DISABLE_HC_FUSION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23455`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22996`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_hc_decode(void) {
@@ -12766,7 +12718,7 @@ DS4_METAL_DISABLE_HC_NORM_FUSION: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23480`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23021`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_hc_norm_decode(void) {
@@ -12784,7 +12736,7 @@ DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24265`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23806`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         layer->ffn_up_exps->type == DS4_TENSOR_IQ2_XXS &&
@@ -12802,7 +12754,7 @@ DS4_METAL_DISABLE_IQ2_SELECTED_SHARED_OVERLAP: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24038`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23579`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            g->ssd_streaming &&
@@ -12820,7 +12772,7 @@ DS4_METAL_DISABLE_KV_FUSION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23460`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23001`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_kv_decode(void) {
@@ -12838,35 +12790,11 @@ DS4_METAL_DISABLE_KV_NORM_DEFER: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                     * the standalone two-task dispatch. */
-                    static int defer_kv = -1;
-                    if (defer_kv < 0) defer_kv = getenv("DS4_METAL_DISABLE_KV_NORM_DEFER") == NULL;
-                    if (defer_kv && g->tp_world == 2) ds4_gpu_dsv4_qkv_norm_defer_kv_next();
-                }
-#endif
-                kv_norm_store_fused =
-```
-
 ### DS4_METAL_DISABLE_M3_ULTRA_GLM53_DECODE
 
 DS4_METAL_DISABLE_M3_ULTRA_GLM53_DECODE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:52628`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#if defined(__APPLE__)
-    bool qkv_paired = false;
-    if (getenv("DS4_METAL_DISABLE_M3_ULTRA_GLM53_DECODE") == NULL &&
-        getenv("DS4_METAL_DISABLE_GLM53_BF16_QKV") == NULL &&
-        l->kda_q->type == DS4_TENSOR_BF16 &&
-        l->kda_k->type == DS4_TENSOR_BF16 &&
-        l->kda_v->type == DS4_TENSOR_BF16) {
-```
 
 ### DS4_METAL_DISABLE_M5_ROUTER_PROJECT_SELECT_FUSE
 
@@ -12874,47 +12802,11 @@ DS4_METAL_DISABLE_M5_ROUTER_PROJECT_SELECT_FUSE: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:27766`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                parallel_full_ffn_eligible &&
-                layer->ffn_gate_tid2eid == NULL &&
-                getenv("DS4_METAL_DISABLE_M5_ROUTER_PROJECT_SELECT_FUSE") == NULL &&
-                ds4_gpu_device_is_m5_apple_silicon();
-            if (fuse_router_project_select) {
-                const int fused =
-                    ds4_gpu_router_project_select_fused_tensor(
-```
-
-Source: `engines/ds4/ds4.c:27833`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-            layer->ffn_gate_tid2eid == NULL &&
-            !metal_graph_tp_ablate("router") &&
-            getenv("DS4_METAL_DISABLE_M5_ROUTER_PROJECT_SELECT_FUSE") == NULL &&
-            ds4_gpu_device_is_m5_apple_silicon()) {
-            const int fused = ds4_gpu_router_project_select_fused_tensor(
-                    metal_graph_router_logits(g),
-                    metal_graph_router_probs(g),
-```
-
 ### DS4_METAL_DISABLE_M5_TP_PARALLEL_FFN
 
 DS4_METAL_DISABLE_M5_TP_PARALLEL_FFN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:28736`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#if defined(__APPLE__)
-        ok && tp_split_shared &&
-        getenv("DS4_METAL_DISABLE_M5_TP_PARALLEL_FFN") == NULL &&
-        ds4_gpu_device_is_m5_apple_silicon() &&
-        !g->quality && !g->ssd_streaming && !g->ssd_streaming_cold &&
-        !decode_stage_profile && !keep_ffn_out &&
-        !metal_graph_directional_steering_ffn_enabled(g) &&
-```
 
 ### DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS
 
@@ -12922,7 +12814,7 @@ DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24196`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23737`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
@@ -12934,7 +12826,7 @@ static bool metal_graph_streaming_expert_cache_seed_layer_expected(
         const ds4_gpu_graph     *g,
 ```
 
-Source: `engines/ds4/ds4.c:24270`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23811`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         layer->ffn_up_exps->type == DS4_TENSOR_MXFP4 &&
@@ -12952,7 +12844,7 @@ DS4_METAL_DISABLE_PRE_M5_ATTN_INV_ROPE_FUSE: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25687`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25104`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * 64-threadgroup dispatch per layer. */
@@ -12970,7 +12862,7 @@ DS4_METAL_DISABLE_PRE_M5_COMPRESSOR_QUAD_STORE: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25838`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (ok && quad_store == 0 && ratio == 4u &&
@@ -12988,35 +12880,11 @@ DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_PIPELINE_FAST_LOOKUP: advanced engine sett
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-     * rollback for attribution without disabling the established 2K path. */
-    if (pos < 2048u &&
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_PIPELINE_FAST_LOOKUP") != NULL) {
-        return false;
-    }
-
-    const ds4_layer_weights *layer = &weights->layer[4];
-```
-
 ### DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SECOND_SPLIT12
 
 DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SECOND_SPLIT12: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:31127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-     * independently attributable. */
-    if (eligible && pos >= 128u && pos < 2048u && DS4_N_LAYER > 12u &&
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SECOND_SPLIT12") == NULL) {
-        return 12u;
-    }
-    /* The encode/GPU overlap bubble the second split closes persists past
-     * 2815: attention cost grows only slowly through the compressed-KV
-```
 
 ### DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SPLIT3
 
@@ -13024,35 +12892,11 @@ DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SPLIT3: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31001`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        g->tp_world != 2u && mxfp4_routed &&
-        ds4_gpu_device_is_pre_m5_apple_silicon() &&
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SPLIT3") == NULL) {
-        return 3u;
-    }
-    /* At the 2K frontier the fifth layer adds enough work to overlap command
-     * encoding.  Past 2816 the larger first command buffer starts losing to
-```
-
 ### DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SPLIT5
 
 DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SPLIT5: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:31013`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        g->tp_world != 2u && mxfp4_routed &&
-        ds4_gpu_device_is_pre_m5_apple_silicon() &&
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_EARLY_SPLIT5") == NULL) {
-        return 5u;
-    }
-#else
-    (void)g;
-```
 
 ### DS4_METAL_DISABLE_PRE_M5_DECODE_PIPELINE_FAST_LOOKUP
 
@@ -13060,47 +12904,11 @@ DS4_METAL_DISABLE_PRE_M5_DECODE_PIPELINE_FAST_LOOKUP: advanced engine setting; b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31055`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        layer->ffn_down_exps->type == DS4_TENSOR_MXFP4;
-    return mxfp4_routed && ds4_gpu_device_is_pre_m5_apple_silicon() &&
-           getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_PIPELINE_FAST_LOOKUP") == NULL;
-#else
-    (void)g;
-    (void)weights;
-    (void)pos;
-```
-
 ### DS4_METAL_DISABLE_PRE_M5_DECODE_PORTS
 
 DS4_METAL_DISABLE_PRE_M5_DECODE_PORTS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:25581`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    const bool pre_m5 = ds4_gpu_device_is_pre_m5_apple_silicon();
-    if (pre_m5 &&
-        (getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_PORTS") != NULL ||
-         (pre_m5_disable_env && getenv(pre_m5_disable_env) != NULL))) {
-        return false;
-    }
-    return pre_m5 || ds4_gpu_device_is_m5_apple_silicon();
-```
-
-Source: `engines/ds4/ds4.c:30923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        g->placement != NULL || g->tp_world > 1u ||
-        getenv("DS4_METAL_DISABLE_PRE_M5_Q2_DECODE_SPLIT2_32") != NULL ||
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_PORTS") != NULL) {
-        return false;
-    }
-    const ds4_layer_weights *layer = &weights->layer[4];
-    return layer->ffn_gate_exps && layer->ffn_up_exps &&
-```
 
 ### DS4_METAL_DISABLE_PRE_M5_DECODE_SECOND_SPLIT16
 
@@ -13108,25 +12916,13 @@ DS4_METAL_DISABLE_PRE_M5_DECODE_SECOND_SPLIT16: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31135`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-     * constant, so the same 4/16 schedule stays profitable through 3327. */
-    if (eligible && pos >= 2048u && DS4_N_LAYER > 16u &&
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_SECOND_SPLIT16") == NULL) {
-        return 16u;
-    }
-#else
-    (void)g;
-```
-
 ### DS4_METAL_DISABLE_PRE_M5_HC_NORM_MIX_FUSE
 
 DS4_METAL_DISABLE_PRE_M5_HC_NORM_MIX_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25898`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25290`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             layer->hc_attn_fn->type == DS4_TENSOR_F16 &&
@@ -13135,10 +12931,10 @@ Source: `engines/ds4/ds4.c:25898`. Unset read: NULL from getenv; the literal con
             (ds4_gpu_device_is_pre_m5_apple_silicon() ||
              ds4_gpu_device_is_m5_apple_silicon()) &&
             ds4_gpu_hc_rms_norm_mix_f16_available() != 0;
-#if defined(__APPLE__)
+        if (ok && !attn_hc_producer_pre_norm_fused) {
 ```
 
-Source: `engines/ds4/ds4.c:27585`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26868`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             layer->hc_ffn_fn->type == DS4_TENSOR_F16 &&
@@ -13147,7 +12943,7 @@ Source: `engines/ds4/ds4.c:27585`. Unset read: NULL from getenv; the literal con
             (ds4_gpu_device_is_pre_m5_apple_silicon() ||
              ds4_gpu_device_is_m5_apple_silicon()) &&
             ds4_gpu_hc_rms_norm_mix_f16_available() != 0;
-#if defined(__APPLE__)
+        if (ok && !ffn_hc_producer_pre_norm_fused) {
 ```
 
 ### DS4_METAL_DISABLE_PRE_M5_KV_ROPE_FP8_FUSE
@@ -13156,7 +12952,7 @@ DS4_METAL_DISABLE_PRE_M5_KV_ROPE_FP8_FUSE: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26433`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25738`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !metal_graph_use_reference_kv_decode() &&
@@ -13174,25 +12970,13 @@ DS4_METAL_DISABLE_PRE_M5_Q2_DECODE_SPLIT2_32: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30922`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        g->quality || g->ssd_streaming || g->ssd_streaming_cold ||
-        g->placement != NULL || g->tp_world > 1u ||
-        getenv("DS4_METAL_DISABLE_PRE_M5_Q2_DECODE_SPLIT2_32") != NULL ||
-        getenv("DS4_METAL_DISABLE_PRE_M5_DECODE_PORTS") != NULL) {
-        return false;
-    }
-    const ds4_layer_weights *layer = &weights->layer[4];
-```
-
 ### DS4_METAL_DISABLE_PRE_M5_QKV_NORM_KV_STORE_FUSE
 
 DS4_METAL_DISABLE_PRE_M5_QKV_NORM_KV_STORE_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26274`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25597`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 raw_row < raw_cap &&
@@ -13201,7 +12985,7 @@ Source: `engines/ds4/ds4.c:26274`. Unset read: NULL from getenv; the literal con
                 (ds4_gpu_device_is_pre_m5_apple_silicon() ||
                  ds4_gpu_device_is_m5_apple_silicon()) &&
                 ds4_gpu_kv_rope_fp8_fuse_available() != 0) {
-#if defined(__APPLE__)
+                kv_norm_store_fused =
 ```
 
 ### DS4_METAL_DISABLE_PRE_M5_ROUTER_SHARED_FUSE
@@ -13210,7 +12994,7 @@ DS4_METAL_DISABLE_PRE_M5_ROUTER_SHARED_FUSE: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:27759`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26973`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             layer->ffn_gate_inp->dim[1] == DS4_N_EXPERT &&
@@ -13218,8 +13002,8 @@ Source: `engines/ds4/ds4.c:27759`. Unset read: NULL from getenv; the literal con
              getenv("DS4_METAL_DISABLE_PRE_M5_ROUTER_SHARED_FUSE") == NULL) &&
             (ds4_gpu_device_is_pre_m5_apple_silicon() ||
              ds4_gpu_device_is_m5_apple_silicon())) {
-#if defined(__APPLE__)
-            const bool fuse_router_project_select =
+            if (ok && !router_project_select_fused) {
+                router_shared_done =
 ```
 
 ### DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO
@@ -13228,7 +13012,7 @@ DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24063`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23604`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -13240,7 +13024,7 @@ static bool metal_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
     if (!g || (!g->ssd_streaming &&
 ```
 
-Source: `engines/ds4/ds4.c:24129`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23670`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            (metal_graph_use_pro_q4_expert_table_auto(g) ||
@@ -13258,7 +13042,7 @@ DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_PRELOAD: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:74508`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72583`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         e->ssd_streaming ||
@@ -13276,7 +13060,7 @@ DS4_METAL_DISABLE_Q4_EXPERT_TABLE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24064`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23605`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool metal_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
@@ -13288,7 +13072,7 @@ static bool metal_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
                getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL)) {
 ```
 
-Source: `engines/ds4/ds4.c:24130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23671`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
@@ -13306,7 +13090,7 @@ DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24260`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23801`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         layer->ffn_up_exps->type == DS4_TENSOR_Q4_K &&
@@ -13324,7 +13108,7 @@ DS4_METAL_DISABLE_QKV_NORM_FUSION: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23465`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23006`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_qkv_norm(void) {
@@ -13342,7 +13126,7 @@ DS4_METAL_DISABLE_QKV_PAIR_PROJ: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23470`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23011`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_qkv_pair_proj(void) {
@@ -13360,7 +13144,7 @@ DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:21190`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") != NULL ||
@@ -13372,7 +13156,7 @@ Source: `engines/ds4/ds4.c:21644`. Unset read: NULL from getenv; the literal con
         return false;
 ```
 
-Source: `engines/ds4/ds4.c:24253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23794`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         DS4_N_EXPERT < 128 ||
@@ -13384,25 +13168,13 @@ Source: `engines/ds4/ds4.c:24253`. Unset read: NULL from getenv; the literal con
         layer->ffn_gate_exps->type == DS4_TENSOR_Q4_K &&
 ```
 
-Source: `engines/ds4/ds4.c:25765`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        getenv("DS4_METAL_MOE_ONE_STAGE_PROFILE") == NULL &&
-        getenv("DS4_METAL_MOE_WRITE_CLAMPED_ACT") == NULL &&
-        getenv("DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") == NULL &&
-        layer->ffn_gate_exps->type == DS4_TENSOR_IQ2_XXS &&
-        layer->ffn_up_exps->type == DS4_TENSOR_IQ2_XXS &&
-        layer->ffn_down_exps->type == DS4_TENSOR_Q2_K &&
-        DS4_N_EXPERT == 256u && DS4_N_EXPERT_USED == 6u &&
-```
-
 ### DS4_METAL_DISABLE_SHARED_DOWN_HC_FUSION
 
 DS4_METAL_DISABLE_SHARED_DOWN_HC_FUSION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23502`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23043`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_reference_shared_down_hc(void) {
@@ -13420,7 +13192,7 @@ DS4_METAL_DISABLE_SHARED_GATE_UP_SWIGLU_FUSION: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20585`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20131`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_TP_ATTN_OUT_HC_FUSE") == NULL;
@@ -13438,7 +13210,7 @@ DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:21188`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") != NULL ||
@@ -13450,25 +13222,13 @@ Source: `engines/ds4/ds4.c:21642`. Unset read: NULL from getenv; the literal con
         DS4_N_EXPERT < 128 ||
 ```
 
-Source: `engines/ds4/ds4.c:50729`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        l->ffn_down_exps->type == DS4_TENSOR_IQ2_XXS &&
-        DS4_N_EXPERT_USED == 8 && n_tokens < 256 &&
-        getenv("DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") == NULL &&
-        getenv("DS4_METAL_DISABLE_TINY_PAIR_SWIGLU_FUSION") == NULL &&
-        getenv("DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") == NULL &&
-        glm_stream_selected_expert_cache_supported(l, il)) {
-        uint64_t gate_bytes = 0, down_bytes = 0;
-```
-
 ### DS4_METAL_DISABLE_STREAMING_IQ2_CPU_ROUTER
 
 DS4_METAL_DISABLE_STREAMING_IQ2_CPU_ROUTER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23981`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23522`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool metal_graph_use_streaming_iq2_cpu_router(void) {
@@ -13486,7 +13246,7 @@ DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21640`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:21186`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !weights ||
@@ -13498,47 +13258,11 @@ Source: `engines/ds4/ds4.c:21640`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") != NULL ||
 ```
 
-Source: `engines/ds4/ds4.c:50731`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        getenv("DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") == NULL &&
-        getenv("DS4_METAL_DISABLE_TINY_PAIR_SWIGLU_FUSION") == NULL &&
-        getenv("DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") == NULL &&
-        glm_stream_selected_expert_cache_supported(l, il)) {
-        uint64_t gate_bytes = 0, down_bytes = 0;
-        if (streaming_layer_gate_down_expert_bytes(l, &gate_bytes, &down_bytes) &&
-            ds4_gpu_stream_expert_cache_budget_for_expert_size(gate_bytes, down_bytes) >=
-```
-
 ### DS4_METAL_DISABLE_STREAMING_PREFILL_CACHE_SEED
 
 DS4_METAL_DISABLE_STREAMING_PREFILL_CACHE_SEED: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:45481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                             const ds4_layer_weights *l, uint32_t il, uint32_t count) {
-#if defined(__APPLE__) && !defined(DS4_NO_GPU)
-    if (!g->streaming || getenv("DS4_METAL_DISABLE_STREAMING_PREFILL_CACHE_SEED")) return true;
-    uint32_t target = ds4_gpu_stream_expert_cache_configured_count() / DS4_N_LAYER;
-    if (target > DS4_N_EXPERT) target = DS4_N_EXPERT;
-    if (!target) return true;
-    const int32_t *selected = ds4_gpu_tensor_contents(g->batch.selected);
-```
-
-Source: `engines/ds4/ds4.c:54739`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        g->layer_count != glm_graph_normal_layer_count() ||
-        !weights_streaming_layer_experts_uniform(weights, il) ||
-        getenv("DS4_METAL_DISABLE_STREAMING_PREFILL_CACHE_SEED") != NULL ||
-        DS4_N_EXPERT > DS4_MAX_EXPERT || DS4_N_EXPERT_USED > DS4_MAX_EXPERT_USED ||
-        !glm_graph_streaming_expert_cache_seed_layer_expected(g, weights, layer, il)) {
-        return true;
-    }
-```
 
 ### DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_EARLY_COMMIT
 
@@ -13546,7 +13270,7 @@ DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_EARLY_COMMIT: advanced engine setting
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23597`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            g->ssd_streaming &&
@@ -13564,7 +13288,7 @@ DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24045`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            g->ssd_streaming &&
@@ -13582,7 +13306,7 @@ DS4_METAL_DISABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY: advanced engine set
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24771`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24214`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            g->ssd_streaming &&
@@ -13600,7 +13324,7 @@ DS4_METAL_DISABLE_STREAMING_SELECTED_SHARED_OVERLAP: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24037`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23578`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return g &&
@@ -13618,35 +13342,11 @@ DS4_METAL_DISABLE_STREAMING_STATIC_LOCK: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:77189`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-         * budget; munmap in model_close releases the locks. */
-        if (e->ssd_streaming && !load_slice && !tp_shard &&
-            getenv("DS4_METAL_DISABLE_STREAMING_STATIC_LOCK") == NULL) {
-            ds4_model_map_span_vec spans;
-            uint64_t static_bytes = 0;
-            const uint64_t budget = ds4_streaming_manual_cache_safe_bytes(
-                    e->backend, opt->context_size, e->prefill_chunk, true);
-```
-
 ### DS4_METAL_DISABLE_TINY_PAIR_SWIGLU_FUSION
 
 DS4_METAL_DISABLE_TINY_PAIR_SWIGLU_FUSION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:50730`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        DS4_N_EXPERT_USED == 8 && n_tokens < 256 &&
-        getenv("DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") == NULL &&
-        getenv("DS4_METAL_DISABLE_TINY_PAIR_SWIGLU_FUSION") == NULL &&
-        getenv("DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") == NULL &&
-        glm_stream_selected_expert_cache_supported(l, il)) {
-        uint64_t gate_bytes = 0, down_bytes = 0;
-        if (streaming_layer_gate_down_expert_bytes(l, &gate_bytes, &down_bytes) &&
-```
 
 ### DS4_METAL_DISABLE_TP_BATCH_MOE
 
@@ -13654,7 +13354,7 @@ DS4_METAL_DISABLE_TP_BATCH_MOE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:33520`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         n_tokens > 1 && n_tokens <= 6 &&
@@ -13672,25 +13372,13 @@ DS4_METAL_DISABLE_TP_DECODE_SPLIT_FLUSH: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31763`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        g->tp_world == 2 &&
-        ds4_gpu_tp_decode_split_flush_safe() != 0 &&
-        getenv("DS4_METAL_DISABLE_TP_DECODE_SPLIT_FLUSH") == NULL;
-#else
-    const bool tp_split_flush_safe = false;
-#endif
-
-```
-
 ### DS4_METAL_DISABLE_V41_8K_CHUNK
 
 DS4_METAL_DISABLE_V41_8K_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42600`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41282`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t ds41_prefill_limit(uint32_t ctx) {
@@ -13708,7 +13396,7 @@ DS4_METAL_DISABLE_V41_BATCH_ATTN: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45524`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43973`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_tp_batch_enabled(const ds41_gpu_graph *g) {
@@ -13720,7 +13408,7 @@ static bool ds41_tp_batch_enabled(const ds41_gpu_graph *g) {
 }
 ```
 
-Source: `engines/ds4/ds4.c:45907`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool stage_profile = getenv("DS4_METAL_V41_STAGE_PROFILE") != NULL;
@@ -13738,7 +13426,7 @@ DS4_METAL_DISABLE_V41_BATCH_COMPRESS: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44512`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43057`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_INDEX");
@@ -13756,7 +13444,7 @@ DS4_METAL_DISABLE_V41_BATCH_CORE: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45525`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43974`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return g->tp_world == 1 || (g->tp_world == 2 &&
@@ -13768,7 +13456,7 @@ Source: `engines/ds4/ds4.c:45525`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:45908`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44285`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batch_moe = !getenv("DS4_METAL_DISABLE_V41_BATCH_MOE");
@@ -13786,7 +13474,7 @@ DS4_METAL_DISABLE_V41_BATCH_ENGRAM: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45924`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44301`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool xsweep = !getenv("DS4_METAL_DISABLE_V41_ENGRAM_XSWEEP") && g->tp_world == 1 && !g->streaming && !g->image_count &&
@@ -13798,7 +13486,7 @@ Source: `engines/ds4/ds4.c:45924`. Unset read: NULL from getenv; the literal con
             !memcmp(g->engram_carry.ids, ids, (size_t)total_count * sizeof(*ids))) {
 ```
 
-Source: `engines/ds4/ds4.c:45952`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44329`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool overlap_engram = total_count >= 1024u &&
@@ -13810,7 +13498,7 @@ Source: `engines/ds4/ds4.c:45952`. Unset read: NULL from getenv; the literal con
     if (carry_ok[0]) {
 ```
 
-Source: `engines/ds4/ds4.c:46113`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44463`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         ds41_engram_prefetch_wait(engram_pf, off + count, cancel, cancel_ud) :
@@ -13828,7 +13516,7 @@ DS4_METAL_DISABLE_V41_BATCH_HC: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45527`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43976`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_CORE") &&
@@ -13840,7 +13528,7 @@ static uint32_t ds41_prefill_count(const ds41_gpu_graph *g, uint32_t remaining) 
     /* TP batches use the bulk protocol; row-gate ablations stay token-major. */
 ```
 
-Source: `engines/ds4/ds4.c:45910`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44287`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batch_core = batch_attention && !getenv("DS4_METAL_DISABLE_V41_BATCH_CORE");
@@ -13858,7 +13546,7 @@ DS4_METAL_DISABLE_V41_BATCH_HEAD: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44824`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * rather than allocating another vocabulary-sized buffer per session. */
@@ -13876,7 +13564,7 @@ DS4_METAL_DISABLE_V41_BATCH_INDEX: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44510`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43055`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool exact_rows = count <= DS4_TP_BATCH_MAX_ROWS && ds41_rows_attention_on();
@@ -13894,7 +13582,7 @@ DS4_METAL_DISABLE_V41_BATCH_INDEX_PROJ: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44404`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42949`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     ds41_prefill_row *b = &g->batch;
@@ -13912,7 +13600,7 @@ DS4_METAL_DISABLE_V41_BATCH_MOE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45526`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43975`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_ATTN") &&
@@ -13924,7 +13612,7 @@ Source: `engines/ds4/ds4.c:45526`. Unset read: NULL from getenv; the literal con
 static uint32_t ds41_prefill_count(const ds41_gpu_graph *g, uint32_t remaining) {
 ```
 
-Source: `engines/ds4/ds4.c:45906`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44283`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool profile = getenv("DS4_METAL_GRAPH_PREFILL_PROFILE") != NULL;
@@ -13942,7 +13630,7 @@ DS4_METAL_DISABLE_V41_BATCH_PUBLISH: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45691`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44072`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool ok = true;
@@ -13960,7 +13648,7 @@ DS4_METAL_DISABLE_V41_BATCH_TOPK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44441`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42986`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         /* on the exact rows path a few rows pick as decode steps do (the same
@@ -13978,7 +13666,7 @@ DS4_METAL_DISABLE_V41_COMPACT_CARRY: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42610`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41292`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -13990,7 +13678,7 @@ static uint32_t ds41_carry_cap(uint32_t ctx) {
     uint64_t cap = (UINT64_C(3) << 30) / row_bytes;
 ```
 
-Source: `engines/ds4/ds4.c:42870`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41544`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .carry_cap = ds41_carry_cap(ctx),
@@ -14002,7 +13690,7 @@ Source: `engines/ds4/ds4.c:42870`. Unset read: NULL from getenv; the literal con
     floats += (uint64_t)2 * 2 * DS4_N_EMBD * DS4_N_HC;
 ```
 
-Source: `engines/ds4/ds4.c:43056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41730`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .carry_cap = ds41_carry_cap(ctx),
@@ -14014,7 +13702,7 @@ Source: `engines/ds4/ds4.c:43056`. Unset read: NULL from getenv; the literal con
 }
 ```
 
-Source: `engines/ds4/ds4.c:43244`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41918`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->prefill_cap = ds41_prefill_limit(ctx);
@@ -14032,25 +13720,13 @@ DS4_METAL_DISABLE_V41_CONCURRENT_FFN: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43941`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-#ifdef __APPLE__
-    static int c = -1;
-    return !ds41_env_flag("DS4_METAL_DISABLE_V41_CONCURRENT_FFN", &c);
-#else
-    return false;
-#endif
-}
-```
-
 ### DS4_METAL_DISABLE_V41_DECODER_SUFFIX
 
 DS4_METAL_DISABLE_V41_DECODER_SUFFIX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45916`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44293`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t suffix_rows = kept + (DS4_N_LAYER - 20u) * 127u;
@@ -14062,7 +13738,7 @@ Source: `engines/ds4/ds4.c:45916`. Unset read: NULL from getenv; the literal con
     if (!ds41_hash_tokens(g, &next_history, tokens, total_count, &ids[0][0][0]))
 ```
 
-Source: `engines/ds4/ds4.c:81650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79593`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const bool defer_decoder = !g->encoder_resident && count >= 16384u &&
@@ -14080,7 +13756,7 @@ DS4_METAL_DISABLE_V41_DEFER_DECODER: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81651`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79594`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 remaining - count >= 8192u &&
@@ -14098,25 +13774,13 @@ DS4_METAL_DISABLE_V41_ENCODER_RESIDENCY: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45613`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    if (!g->streaming || g->tp_world != 1 || g->imatrix || remaining < 16384u ||
-        getenv("DS4_METAL_DISABLE_V41_LAYER_PREFILL") ||
-        getenv("DS4_METAL_DISABLE_V41_ENCODER_RESIDENCY")) return;
-    /* A wide layer sweep reads each encoder layer only once, without pinning
-     * a second long-lived set of experts or discarding the decode cache. */
-    if (g->carry_cap && !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return;
-    const uint32_t cache = ds4_gpu_stream_expert_cache_configured_count();
-```
-
 ### DS4_METAL_DISABLE_V41_ENGRAM_PIPELINE
 
 DS4_METAL_DISABLE_V41_ENGRAM_PIPELINE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45954`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44331`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_ENGRAM");
@@ -14134,7 +13798,7 @@ DS4_METAL_DISABLE_V41_ENGRAM_PREFETCH: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44300`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return false;
@@ -14146,7 +13810,7 @@ Source: `engines/ds4/ds4.c:45923`. Unset read: NULL from getenv; the literal con
         if (xsweep && g->engram_carry.ids && g->engram_carry.count == total_count &&
 ```
 
-Source: `engines/ds4/ds4.c:45951`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44328`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t engram_src_row = 0;
@@ -14164,7 +13828,7 @@ DS4_METAL_DISABLE_V41_ENGRAM_XSWEEP: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45922`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44299`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!ds41_hash_tokens(g, &next_history, tokens, total_count, &ids[0][0][0]))
@@ -14182,7 +13846,7 @@ DS4_METAL_DISABLE_V41_EXPAND_FUSION: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43492`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:42163`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return *cached != 0;
@@ -14200,7 +13864,7 @@ DS4_METAL_DISABLE_V41_HC_BLOCK_INPUT: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43493`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:42164`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 }
@@ -14218,31 +13882,19 @@ DS4_METAL_DISABLE_V41_LAYER_PREFILL: qualified preset/runtime setting; override 
 
 Scope: ds4. Class: preset.
 
-Source: `engines/ds4/ds4.c:45533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43982`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* TP batches use the bulk protocol; row-gate ablations stay token-major. */
     if (!ds41_tp_batch_enabled(g) || g->imatrix ||
         getenv("DS4_METAL_DISABLE_V41_LAYER_PREFILL")) return 1;
     uint32_t minimum = 256u;
-#ifdef __APPLE__
-    minimum = g->tp_world == 2 &&
-        !getenv("DS4_METAL_DISABLE_V41_TP_SMALL_PREFILL") ? 32u : 256u;
+    /* Resident appends do not pay for an SSD layer sweep. In particular,
+     * the server's 128-token mixed quantum must not become scalar prefill. */
+    if (!g->streaming && g->tp_world == 1) minimum = 8u;
 ```
 
-Source: `engines/ds4/ds4.c:45612`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#else
-    if (!g->streaming || g->tp_world != 1 || g->imatrix || remaining < 16384u ||
-        getenv("DS4_METAL_DISABLE_V41_LAYER_PREFILL") ||
-        getenv("DS4_METAL_DISABLE_V41_ENCODER_RESIDENCY")) return;
-    /* A wide layer sweep reads each encoder layer only once, without pinning
-     * a second long-lived set of experts or discarding the decode cache. */
-    if (g->carry_cap && !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return;
-```
-
-Source: `engines/ds4/ds4.c:46344`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44687`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                         uint32_t remaining) {
@@ -14260,7 +13912,7 @@ DS4_METAL_DISABLE_V41_PACKED_INDEX: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44423`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42968`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * per-row causal width, including padding and tie order. */
@@ -14278,7 +13930,7 @@ DS4_METAL_DISABLE_V41_PREFILL_ALIAS: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42869`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41543`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .prefill_cap = ds41_prefill_limit(ctx),
@@ -14290,7 +13942,7 @@ Source: `engines/ds4/ds4.c:42869`. Unset read: NULL from getenv; the literal con
         floats += ((uint64_t)ctx / (i < 3 ? 2u : 1u) + 1u) * (512u + 128u) + 2u * 512u;
 ```
 
-Source: `engines/ds4/ds4.c:43055`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41729`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .prefill_cap = ds41_prefill_limit(ctx),
@@ -14302,7 +13954,7 @@ Source: `engines/ds4/ds4.c:43055`. Unset read: NULL from getenv; the literal con
     return full - all + first;
 ```
 
-Source: `engines/ds4/ds4.c:43245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41919`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->carry_cap = ds41_carry_cap(ctx);
@@ -14320,25 +13972,13 @@ DS4_METAL_DISABLE_V41_PUBLIC_CONTROLLER: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:65269`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    return s && s->ds41_graph_ready && s->ds41_graph.draft &&
-        s->ds41_graph.tp_world == 1 && !s->ds41_graph.streaming &&
-        !getenv("DS4_METAL_DISABLE_V41_PUBLIC_CONTROLLER");
-#else
-    (void)s; return false;
-#endif
-}
-```
-
 ### DS4_METAL_DISABLE_V41_QUEUED_HEAD
 
 DS4_METAL_DISABLE_V41_QUEUED_HEAD: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43637`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:42287`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 }
@@ -14356,37 +13996,13 @@ DS4_METAL_DISABLE_V41_ROUTER_ONE: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43982`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    if (!ds41_matmul(g->route_logits, m, l->ffn_gate_inp, g->norm, false)) return false;
-#ifdef __APPLE__
-    const bool routed_one = !getenv("DS4_METAL_DISABLE_V41_ROUTER_ONE") &&
-        ds4_gpu_dsv41_router_one(g->selected, g->route_weights, g->route_probs, g->route_logits,
-            m->map, m->size, bias->abs_offset, DS4_N_EXPERT, DS4_N_EXPERT_USED,
-            DS4_EXPERT_WEIGHT_SCALE);
-#else
-```
-
-Source: `engines/ds4/ds4.c:44898`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    /* a few rows: the decode router per row, two dispatches */
-    routed = !g->image_count && count <= DS4_TP_BATCH_MAX_ROWS &&
-        l->ffn_gate_inp->type == DS4_TENSOR_F32 && !getenv("DS4_METAL_DISABLE_V41_ROUTER_ONE") &&
-        ds4_gpu_dsv41_matmul_f32_rows(b->route_logits, m->map, m->size, l->ffn_gate_inp->abs_offset,
-            DS4_N_EMBD, n_expert, b->norm, count) &&
-        ds4_gpu_dsv41_router_rows(b->selected, b->route_weights, b->route_probs, b->route_logits,
-            m->map, m->size, l->ffn_exp_probs_b->abs_offset, n_expert, n_used,
-```
-
 ### DS4_METAL_DISABLE_V41_SESSION_BATCH
 
 DS4_METAL_DISABLE_V41_SESSION_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84514`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82442`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool cuda = e->backend == DS4_BACKEND_CUDA;
@@ -14404,7 +14020,7 @@ DS4_METAL_DISABLE_V41_SHORT_SWEEP: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43638`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:42288`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -14422,35 +14038,11 @@ DS4_METAL_DISABLE_V41_TP_BALANCED_ROUTE: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43503`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    static int off = -1;
-    return DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41 && !(DS4_N_EXPERT_USED & 1u) &&
-        !ds41_env_flag("DS4_METAL_DISABLE_V41_TP_BALANCED_ROUTE", &off);
-#else
-    return false;
-#endif
-}
-```
-
 ### DS4_METAL_DISABLE_V41_TP_GATE_EXPAND
 
 DS4_METAL_DISABLE_V41_TP_GATE_EXPAND: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:43532`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-#ifdef __APPLE__
-    static int c = -1;
-    return ds41_env_flag("DS4_METAL_DISABLE_V41_TP_GATE_EXPAND", &c);
-#else
-    return true;
-#endif
-}
-```
 
 ### DS4_METAL_DISABLE_V41_TP_SHARED_OWNER
 
@@ -14458,7 +14050,7 @@ DS4_METAL_DISABLE_V41_TP_SHARED_OWNER: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43974`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !tensor_nbytes(l->ffn_down_exps->type, DS4_N_FF_EXP, &down_row)) return false;
@@ -14470,7 +14062,7 @@ Source: `engines/ds4/ds4.c:43974`. Unset read: NULL from getenv; the literal con
     const ds4_tensor *bias = ds41_image_at(g, g->pos) ? l->ffn_exp_probs_vl : l->ffn_exp_probs_b;
 ```
 
-Source: `engines/ds4/ds4.c:44115`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42696`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_moe_finish(ds41_gpu_graph *g, uint32_t il) {
@@ -14482,7 +14074,7 @@ static bool ds41_moe_finish(ds41_gpu_graph *g, uint32_t il) {
     if (!ds41_sum_partial(g, routed, il, DS4_TP_GATE_FFN)) return false;
 ```
 
-Source: `engines/ds4/ds4.c:44824`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43364`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             ds41_graph_after_moe(g, m, l, il, il + 1u == DS4_N_LAYER) && DS41_MARK(5);
@@ -14494,7 +14086,7 @@ Source: `engines/ds4/ds4.c:44824`. Unset read: NULL from getenv; the literal con
         return ds41_graph_layer(g, m, l, il, token);
 ```
 
-Source: `engines/ds4/ds4.c:45414`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43905`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -14506,7 +14098,7 @@ Source: `engines/ds4/ds4.c:45414`. Unset read: NULL from getenv; the literal con
             ok = metal_graph_stream_map_layer(m, w, il) && ds4_gpu_begin_commands();
 ```
 
-Source: `engines/ds4/ds4.c:46368`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44711`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool prefill_only = prefill_rows == rows;
@@ -14524,25 +14116,13 @@ DS4_METAL_DISABLE_V41_TP_SHARED_SPLIT: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43950`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-#ifdef __APPLE__
-    static int c = -1;
-    return !ds41_env_flag("DS4_METAL_DISABLE_V41_TP_SHARED_SPLIT", &c);
-#else
-    return false;
-#endif
-}
-```
-
 ### DS4_METAL_DISABLE_V41_TP_SLAB_WRITE
 
 DS4_METAL_DISABLE_V41_TP_SLAB_WRITE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43495`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:42166`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool ds41_hc_block_input_off(void) { static int c = -1; return ds41_env_flag("DS4_METAL_DISABLE_V41_HC_BLOCK_INPUT", &c); }
@@ -14560,19 +14140,7 @@ DS4_METAL_DISABLE_V41_TP_SMALL_PREFILL: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45537`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#ifdef __APPLE__
-    minimum = g->tp_world == 2 &&
-        !getenv("DS4_METAL_DISABLE_V41_TP_SMALL_PREFILL") ? 32u : 256u;
-#endif
-    /* Resident appends do not pay for an SSD layer sweep. In particular,
-     * the server's 128-token mixed quantum must not become scalar prefill. */
-    if (!g->streaming && g->tp_world == 1) minimum = 8u;
-```
-
-Source: `engines/ds4/ds4.c:46347`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44690`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -14590,7 +14158,7 @@ DS4_METAL_DISABLE_V41_WIDE_CHUNK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42599`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41281`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -14608,40 +14176,28 @@ DS4_METAL_DISABLE_V41_WIDE_PREFILL: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43994`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         remaining > 2048u && remaining < 8192u && remaining % 2048u >= 256u &&
         !getenv("DS4_CUDA_DISABLE_SSD_MEDIUM_SWEEP") &&
         !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return remaining;
-#endif
     if (g->carry_cap && remaining >= (ds41_short_sweep_off() ? 4096u : 3072u) &&
         !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) {
         const uint32_t count = remaining < g->carry_cap ? remaining : g->carry_cap;
+        /* a short sweep keeps its final partial tile instead of a second decoder pass */
 ```
 
-Source: `engines/ds4/ds4.c:45560`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43996`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#endif
+        !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return remaining;
     if (g->carry_cap && remaining >= (ds41_short_sweep_off() ? 4096u : 3072u) &&
         !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) {
         const uint32_t count = remaining < g->carry_cap ? remaining : g->carry_cap;
         /* a short sweep keeps its final partial tile instead of a second decoder pass */
         if (remaining < 8192u && !ds41_short_sweep_off()) return count;
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
-```
-
-Source: `engines/ds4/ds4.c:45616`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    /* A wide layer sweep reads each encoder layer only once, without pinning
-     * a second long-lived set of experts or discarding the decode cache. */
-    if (g->carry_cap && !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return;
-    const uint32_t cache = ds4_gpu_stream_expert_cache_configured_count();
-    uint64_t expert_bytes = 0, bytes = 0;
-    if (!ds4_streaming_routed_expert_bytes(w, &expert_bytes)) return;
-    const uint64_t page = (uint64_t)getpagesize();
+        /* DS4COMBO: a CUDA SSD sweep that holds every remaining row keeps its
 ```
 
 ### DS4_METAL_DUMP_PREFILL_LOGITS
@@ -14650,7 +14206,7 @@ DS4_METAL_DUMP_PREFILL_LOGITS: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:64056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62166`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -14668,7 +14224,7 @@ DS4_METAL_ENABLE_BATCH_HC_NORM_FUSION: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23492`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23033`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         } else {
@@ -14686,7 +14242,7 @@ DS4_METAL_ENABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53264`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:51514`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return true;
@@ -14704,7 +14260,7 @@ DS4_METAL_ENABLE_PRO_Q4_EXPERT_ADDRESS_AUTO: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24024`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23565`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            getenv("DS4_METAL_ENABLE_Q4_EXPERT_ADDRESS_TABLE") != NULL ||
@@ -14716,7 +14272,7 @@ static bool metal_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
     if (!g) return false;
 ```
 
-Source: `engines/ds4/ds4.c:74516`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72591`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ds4_gpu_pro_q4_expert_table_auto_available() == 0 &&
@@ -14734,7 +14290,7 @@ DS4_METAL_ENABLE_PRO_Q4_EXPERT_TABLE_AUTO: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24023`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23564`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL ||
@@ -14746,7 +14302,7 @@ Source: `engines/ds4/ds4.c:24023`. Unset read: NULL from getenv; the literal con
 static bool metal_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
 ```
 
-Source: `engines/ds4/ds4.c:24068`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23609`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -14758,7 +14314,7 @@ Source: `engines/ds4/ds4.c:24068`. Unset read: NULL from getenv; the literal con
     return ds4_gpu_pro_q4_expert_table_auto_available() != 0;
 ```
 
-Source: `engines/ds4/ds4.c:74515`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72590`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -14776,7 +14332,7 @@ DS4_METAL_ENABLE_PRO_Q4_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24020`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23561`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool metal_graph_q4_non_streaming_opt_in_enabled(void) {
@@ -14794,7 +14350,7 @@ DS4_METAL_ENABLE_Q4_EXPERT_ADDRESS_TABLE: advanced engine setting; built-in defa
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24022`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23563`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
            getenv("DS4_METAL_ENABLE_PRO_Q4_SELECTED_EXPERT_VIEWS") != NULL ||
@@ -14806,7 +14362,7 @@ Source: `engines/ds4/ds4.c:24022`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:74518`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72593`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_ADDRESS_AUTO") == NULL &&
@@ -14824,7 +14380,7 @@ DS4_METAL_ENABLE_Q4_EXPERT_TABLE: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24021`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return getenv("DS4_METAL_ENABLE_Q4_SELECTED_EXPERT_VIEWS") != NULL ||
@@ -14836,7 +14392,7 @@ Source: `engines/ds4/ds4.c:24021`. Unset read: NULL from getenv; the literal con
 }
 ```
 
-Source: `engines/ds4/ds4.c:24128`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23669`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                   "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
@@ -14848,7 +14404,7 @@ Source: `engines/ds4/ds4.c:24128`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:74517`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72592`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
@@ -14866,7 +14422,7 @@ DS4_METAL_ENABLE_Q4_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24019`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23560`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -14884,7 +14440,7 @@ DS4_METAL_ENABLE_STREAMING_IQ2_CPU_ROUTER: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23980`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23521`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -14902,7 +14458,7 @@ DS4_METAL_ENABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY: advanced engine sett
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24770`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return g &&
@@ -14920,7 +14476,7 @@ DS4_METAL_ENABLE_V41_ROWS_ATTENTION: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43494`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:42165`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool ds41_expand_fusion_off(void) { static int c = -1; return ds41_env_flag("DS4_METAL_DISABLE_V41_EXPAND_FUSION", &c); }
@@ -14938,7 +14494,7 @@ DS4_METAL_GPU_BATCH_EMBED_MIN: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32111`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:30866`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t gpu_min = 512;
@@ -14956,7 +14512,7 @@ DS4_METAL_GRAPH_DUMP_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42289`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40971`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -14974,7 +14530,7 @@ DS4_METAL_GRAPH_DUMP_PREFIX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85360`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83288`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         e->support_kind != DS4_SUPPORT_NONE ||
@@ -14983,10 +14539,10 @@ Source: `engines/ds4/ds4.c:85360`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL) {
         return false;
     }
-#if defined(__APPLE__)
+#ifdef DS4_HAS_QWEN4_METAL
 ```
 
-Source: `engines/ds4/ds4.c:85995`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83913`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         prefill_session->graph.ssd_streaming ||
@@ -14998,7 +14554,7 @@ Source: `engines/ds4/ds4.c:85995`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:87726`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const ds4_weights *weights) {
@@ -15010,7 +14566,7 @@ Source: `engines/ds4/ds4.c:87726`. Unset read: NULL from getenv; the literal con
     ds4_gpu_graph *first = &items[0].session->graph;
 ```
 
-Source: `engines/ds4/ds4.c:87877`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85778`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         count > (int)DS4_GPU_ATTENTION_DECODE_BATCH_MAX ||
@@ -15022,7 +14578,7 @@ Source: `engines/ds4/ds4.c:87877`. Unset read: NULL from getenv; the literal con
         getenv("DS4_CUDA_DECODE_SCORE4") != NULL ||
 ```
 
-Source: `engines/ds4/ds4.c:88025`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85918`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         count > (int)DS4_GPU_ATTENTION_DECODE_BATCH_MAX ||
@@ -15034,7 +14590,7 @@ Source: `engines/ds4/ds4.c:88025`. Unset read: NULL from getenv; the literal con
     if (!first->placement || first->quality || first->cuda_tp_q ||
 ```
 
-Source: `engines/ds4/ds4.c:89999`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:87862`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (start % g->prefill_cap) + prefill_rows > g->prefill_cap ||
@@ -15052,7 +14608,7 @@ DS4_METAL_GRAPH_PREFILL_PROFILE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39527`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38262`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t hc_dim = (uint64_t)DS4_N_HC * DS4_N_EMBD;
@@ -15064,7 +14620,7 @@ Source: `engines/ds4/ds4.c:39527`. Unset read: NULL from getenv; the literal con
         !metal_graph_cuda_prefill_pipeline_q8_cache_requested();
 ```
 
-Source: `engines/ds4/ds4.c:45904`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44281`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return false;
@@ -15082,7 +14638,7 @@ DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85996`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83914`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_session_cancelled(prefill_session) ||
@@ -15100,7 +14656,7 @@ DS4_METAL_GRAPH_PROMPT_TOKENS: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42231`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40913`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int                ctx_size) {
@@ -15118,7 +14674,7 @@ DS4_METAL_GRAPH_RAW_CAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41398`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40080`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -15130,7 +14686,7 @@ Source: `engines/ds4/ds4.c:41398`. Unset read: NULL from getenv; the literal con
         if (endp != env && v > 0) {
 ```
 
-Source: `engines/ds4/ds4.c:64383`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62493`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -15148,7 +14704,7 @@ DS4_METAL_GRAPH_TEACHER_FORCE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30788`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29813`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (trace_layers && ok) {
@@ -15166,7 +14722,7 @@ DS4_METAL_GRAPH_TOKEN_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36142`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:34881`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int old_fast_attention =
@@ -15184,37 +14740,13 @@ DS4_METAL_GRAPH_TOKEN_SECOND_SPLIT_LAYERS: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31069`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#if defined(__APPLE__)
-    const char *split_env =
-        getenv("DS4_METAL_GRAPH_TOKEN_SECOND_SPLIT_LAYERS");
-    if (split_env && split_env[0]) {
-        char *end = NULL;
-        unsigned long v = strtoul(split_env, &end, 10);
-        if (end != split_env && v <= DS4_N_LAYER) {
-```
-
-Source: `engines/ds4/ds4.c:31094`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#if defined(__APPLE__)
-    const char *second_split_env =
-        getenv("DS4_METAL_GRAPH_TOKEN_SECOND_SPLIT_LAYERS");
-    if (second_split_env && second_split_env[0]) {
-        return env_second_split_after_layers;
-    }
-    if (metal_graph_token_split_after_layers() != 0u &&
-```
-
 ### DS4_METAL_GRAPH_TOKEN_SPLIT_LAYERS
 
 DS4_METAL_GRAPH_TOKEN_SPLIT_LAYERS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30954`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29951`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t split_after_layers = 4;
@@ -15226,25 +14758,13 @@ Source: `engines/ds4/ds4.c:30954`. Unset read: NULL from getenv; the literal con
         if (end != split_env && v <= DS4_N_LAYER) split_after_layers = (uint32_t)v;
 ```
 
-Source: `engines/ds4/ds4.c:30975`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    /* In the validated 128..2815 Q2 window, routed decode exposes enough GPU
-     * work after layer two to overlap encoding before the layer-32 flush. */
-    const char *split_env = getenv("DS4_METAL_GRAPH_TOKEN_SPLIT_LAYERS");
-    if ((!split_env || !split_env[0]) &&
-        metal_graph_pre_m5_q2_decode_schedule_eligible(
-            g, weights, pos, allow_split_flush)) {
-        return 2u;
-```
-
 ### DS4_METAL_GRAPH_TRACE_CACHE
 
 DS4_METAL_GRAPH_TRACE_CACHE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42301`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40983`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -15262,7 +14782,7 @@ DS4_METAL_GRAPH_TRACE_COMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42302`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40984`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -15280,7 +14800,7 @@ DS4_METAL_GRAPH_TRACE_LAYERS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30785`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29810`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool ok = metal_graph_alloc(&g, weights, &weights->layer[0]);
@@ -15298,7 +14818,7 @@ DS4_METAL_GRAPH_TRACE_STAGE_LAYER: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30789`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29814`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g.materialize_ffn_out = true;
@@ -15316,7 +14836,7 @@ DS4_METAL_HC_NORM_FUSION_CHECK: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23551`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23092`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_hc_norm_fusion_check_enabled(void) {
@@ -15334,7 +14854,7 @@ DS4_METAL_HC_NORM_FUSION_CHECK_TOL: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23560`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23101`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     tolerance = 2.0e-4f;
@@ -15352,7 +14872,7 @@ DS4_METAL_INDEXER_STAGE_PROFILE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20587`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20133`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_DISABLE_SHARED_GATE_UP_SWIGLU_FUSION") == NULL;
@@ -15364,7 +14884,7 @@ Source: `engines/ds4/ds4.c:20587`. Unset read: NULL from getenv; the literal con
         enable_splitkv_spec && metal_graph_cuda_splitkv_spec_batch_verify_requested();
 ```
 
-Source: `engines/ds4/ds4.c:26496`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25801`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_KV_CACHE_VERBOSE") != NULL ||
@@ -15382,7 +14902,7 @@ DS4_METAL_LAYER_STAGE_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85997`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83915`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
@@ -15394,7 +14914,7 @@ Source: `engines/ds4/ds4.c:85997`. Unset read: NULL from getenv; the literal con
     const uint32_t start = (uint32_t)prefill_session->checkpoint.len;
 ```
 
-Source: `engines/ds4/ds4.c:90000`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:87863`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         metal_graph_directional_steering_ffn_enabled(g) ||
@@ -15412,7 +14932,7 @@ DS4_METAL_MEMORY_REPORT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42256`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40938`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -15424,7 +14944,7 @@ Source: `engines/ds4/ds4.c:42256`. Unset read: NULL from getenv; the literal con
     kv_cache_init(&cpu_cache, (uint32_t)ctx_size, raw_cap);
 ```
 
-Source: `engines/ds4/ds4.c:61772`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59949`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -15436,7 +14956,7 @@ Source: `engines/ds4/ds4.c:61772`. Unset read: NULL from getenv; the literal con
     bool ok = true;
 ```
 
-Source: `engines/ds4/ds4.c:63967`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62077`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -15454,25 +14974,13 @@ DS4_METAL_MOE_ONE_STAGE_PROFILE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25763`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        !metal_graph_directional_steering_ffn_enabled(g) &&
-        metal_graph_debug_get_config()->prefix == NULL &&
-        getenv("DS4_METAL_MOE_ONE_STAGE_PROFILE") == NULL &&
-        getenv("DS4_METAL_MOE_WRITE_CLAMPED_ACT") == NULL &&
-        getenv("DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") == NULL &&
-        layer->ffn_gate_exps->type == DS4_TENSOR_IQ2_XXS &&
-        layer->ffn_up_exps->type == DS4_TENSOR_IQ2_XXS &&
-```
-
 ### DS4_METAL_MOE_WRITE_CLAMPED_ACT
 
 DS4_METAL_MOE_WRITE_CLAMPED_ACT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:21189`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") != NULL ||
@@ -15484,7 +14992,7 @@ Source: `engines/ds4/ds4.c:21643`. Unset read: NULL from getenv; the literal con
         DS4_N_EXPERT_USED != 6) {
 ```
 
-Source: `engines/ds4/ds4.c:24252`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:23793`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         DS4_N_EXPERT_USED != 6 ||
@@ -15496,25 +15004,13 @@ Source: `engines/ds4/ds4.c:24252`. Unset read: NULL from getenv; the literal con
     const bool q4 =
 ```
 
-Source: `engines/ds4/ds4.c:25764`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        metal_graph_debug_get_config()->prefix == NULL &&
-        getenv("DS4_METAL_MOE_ONE_STAGE_PROFILE") == NULL &&
-        getenv("DS4_METAL_MOE_WRITE_CLAMPED_ACT") == NULL &&
-        getenv("DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") == NULL &&
-        layer->ffn_gate_exps->type == DS4_TENSOR_IQ2_XXS &&
-        layer->ffn_up_exps->type == DS4_TENSOR_IQ2_XXS &&
-        layer->ffn_down_exps->type == DS4_TENSOR_Q2_K &&
-```
-
 ### DS4_METAL_NO_PREFILL_KERNEL_WARMUP
 
 DS4_METAL_NO_PREFILL_KERNEL_WARMUP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32209`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:30950`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (warmed) return true;
@@ -15532,7 +15028,7 @@ DS4_METAL_OUTPUT_STAGE_PROFILE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20588`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20134`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->decode_stage_profile = getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL;
@@ -15550,7 +15046,7 @@ DS4_METAL_PREFILL_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:15095`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:14822`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         cap = requested_chunk;
@@ -15568,7 +15064,7 @@ DS4_METAL_PRO_Q4_CPU_ROUTER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23976`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23517`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool metal_graph_use_pro_q4_cpu_router(void) {
@@ -15586,7 +15082,7 @@ DS4_METAL_PRO_Q4_CPU_ROUTER_PROFILE: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24695`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24138`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t                token) {
@@ -15604,7 +15100,7 @@ DS4_METAL_Q4_PRO_MAP_GROUPS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:8654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:8386`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t model_map_q4_pro_group_views(void) {
@@ -15622,7 +15118,7 @@ DS4_METAL_Q4_SELECTED_OVERLAP_SHARED: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24004`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23545`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 #endif
@@ -15631,7 +15127,7 @@ Source: `engines/ds4/ds4.c:24004`. Unset read: Wrapper/conditional default: see 
 }
 
 static bool metal_graph_use_cuda_selected_shared_overlap(const ds4_gpu_graph *g) {
-#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU) && !defined(__APPLE__)
+#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
 ```
 
 ### DS4_METAL_Q8_MV_NSG
@@ -15640,7 +15136,7 @@ DS4_METAL_Q8_MV_NSG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25171`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool parallel_full_ffn_eligible =
@@ -15658,7 +15154,7 @@ DS4_METAL_RESUME_PREFILL_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41427`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40109`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t metal_graph_resume_prefill_min_tokens(void) {
@@ -15676,7 +15172,7 @@ DS4_METAL_SESSION_BATCH_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85940`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83858`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -15688,7 +15184,7 @@ Source: `engines/ds4/ds4.c:85940`. Unset read: NULL from getenv; the literal con
                 ds4_backend_name(e->backend), count, prefill_rows,
 ```
 
-Source: `engines/ds4/ds4.c:86204`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:84111`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_session_dspark_capture_note_checkpoint(s);
@@ -15706,7 +15202,7 @@ DS4_METAL_SESSION_BATCH_QKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85446`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83370`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int count,
@@ -15724,7 +15220,7 @@ DS4_METAL_SESSION_BATCH_SHARED: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85396`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83320`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int count,
@@ -15742,7 +15238,7 @@ DS4_METAL_STREAMING_IQ2_CPU_ROUTER_PROFILE: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24696`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24139`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool profile =
@@ -15760,7 +15256,7 @@ DS4_METAL_STREAMING_SELECTED_READAHEAD_PROFILE: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24788`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24231`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -15778,7 +15274,7 @@ DS4_METAL_TP_SESSION_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85356`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int count,
@@ -15790,7 +15286,7 @@ Source: `engines/ds4/ds4.c:85356`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
 ```
 
-Source: `engines/ds4/ds4.c:85986`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83904`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -15808,7 +15304,7 @@ DS4_METAL_V41_DECODE_FLUSH_LAYERS: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45371`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43862`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -15826,7 +15322,7 @@ DS4_METAL_V41_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:45905`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44282`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!ds41_ctx_resize(g, g->pos + total_count, false)) return false;
@@ -16066,7 +15562,7 @@ DS4_MOE_REPLAY_SELECTED_IDS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:28359`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:27502`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !metal_graph_decode_cpu_router_applicable(g, layer) &&
@@ -16078,7 +15574,7 @@ Source: `engines/ds4/ds4.c:28359`. Unset read: NULL from getenv; the literal con
          cuda_selected_shared_overlap);
 ```
 
-Source: `engines/ds4/ds4.c:28380`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:27523`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !metal_graph_decode_cpu_router_applicable(g, layer) &&
@@ -16090,7 +15586,7 @@ Source: `engines/ds4/ds4.c:28380`. Unset read: NULL from getenv; the literal con
         !selected_readahead_shared_delay &&
 ```
 
-Source: `engines/ds4/ds4.c:28388`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:27531`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         metal_graph_decode_cuda_selected_slots_expected(g, layer) &&
@@ -16108,7 +15604,7 @@ DS4_MTP_BATCH_VERIFY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91186`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89042`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         draft_n == 2 &&
@@ -16126,7 +15622,7 @@ DS4_MTP_CAPTURE_PREFIX1: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91292`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89148`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          */
@@ -16144,7 +15640,7 @@ DS4_MTP_CONF_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91050`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88906`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -16162,7 +15658,7 @@ DS4_MTP_EXACT_REPLAY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91293`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89149`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool capture_prefix1 =
@@ -16180,7 +15676,7 @@ DS4_MTP_FORCE_SNAPSHOT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91297`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89153`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             draft_n > 2 ||
@@ -16198,7 +15694,7 @@ DS4_MTP_FULL_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:82910`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80849`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                    token,
@@ -16210,7 +15706,7 @@ Source: `engines/ds4/ds4.c:82910`. Unset read: NULL from getenv; the literal con
         return true;
 ```
 
-Source: `engines/ds4/ds4.c:91052`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88908`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool mtp_conf_log = getenv("DS4_MTP_CONF_LOG") != NULL;
@@ -16228,7 +15724,7 @@ DS4_MTP_MIN_MARGIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88899`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool strict_mtp = e->quality || getenv("DS4_MTP_STRICT") != NULL;
@@ -16246,7 +15742,7 @@ DS4_MTP_PROBE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83726`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81661`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -16264,7 +15760,7 @@ DS4_MTP_SPEC_DISABLE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_agent.c:10495`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:10485`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const int block_start = ds4_session_pos(w->session);
@@ -16276,7 +15772,7 @@ Source: `engines/ds4/ds4_agent.c:10495`. Unset read: NULL from getenv; the liter
                     greedy_sampling ? 0.0f : cfg->gen.temperature, 0,
 ```
 
-Source: `engines/ds4/ds4_agent.c:10896`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:10886`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const int block_start = ds4_session_pos(w->session);
@@ -16288,7 +15784,7 @@ Source: `engines/ds4/ds4_agent.c:10896`. Unset read: NULL from getenv; the liter
                 cfg->gen.top_p, cfg->gen.min_p, &rng,
 ```
 
-Source: `engines/ds4/ds4_cli.c:598`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cli.c:596`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool speculative_argmax = cfg->gen.temperature <= 0.0f &&
@@ -16300,7 +15796,7 @@ Source: `engines/ds4/ds4_cli.c:598`. Unset read: NULL from getenv; the literal c
     bool have_greedy_next = false;
 ```
 
-Source: `engines/ds4/ds4_cli.c:649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cli.c:647`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int ntok = 0;
@@ -16312,7 +15808,7 @@ Source: `engines/ds4/ds4_cli.c:649`. Unset read: NULL from getenv; the literal c
                 ds4_token_eos(engine), cfg->gen.temperature, 0,
 ```
 
-Source: `engines/ds4/ds4_cli.c:1654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cli.c:1652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool speculative_argmax = cfg->gen.temperature <= 0.0f &&
@@ -16324,7 +15820,7 @@ Source: `engines/ds4/ds4_cli.c:1654`. Unset read: NULL from getenv; the literal 
     bool have_greedy_next = false;
 ```
 
-Source: `engines/ds4/ds4_cli.c:1709`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cli.c:1707`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int ntok = 0;
@@ -16366,7 +15862,7 @@ DS4_MTP_SPEC_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91066`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88922`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      */
@@ -16378,7 +15874,7 @@ Source: `engines/ds4/ds4.c:91066`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:91271`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         free(row0_logits);
@@ -16390,7 +15886,7 @@ Source: `engines/ds4/ds4.c:91271`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:91537`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89393`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         free(row_logits);
@@ -16402,7 +15898,7 @@ Source: `engines/ds4/ds4.c:91537`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:91554`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89410`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     for (int i = 0; i < draft_n && n_accept < accepted_cap; i++) {
@@ -16414,7 +15910,7 @@ Source: `engines/ds4/ds4.c:91554`. Unset read: NULL from getenv; the literal con
                         drafts[i],
 ```
 
-Source: `engines/ds4/ds4.c:91611`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:89467`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 (now_sec() - mtp_t0) * 1000.0);
@@ -16432,7 +15928,7 @@ DS4_MTP_STRICT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91041`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88897`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ignore_eos && ds4_token_is_stop_for_think_mode(
@@ -16450,7 +15946,7 @@ DS4_MTP_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:91049`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:88905`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (end != mtp_margin_env && v >= 0.0f) mtp_margin_threshold = v;
@@ -16468,7 +15964,7 @@ DS4_NO_BATCHED_ATTN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16751`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16478`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *plain = xmalloc((size_t)DS4_N_EMBD * sizeof(plain[0]));
@@ -16486,7 +15982,7 @@ DS4_NO_BATCHED_ROPE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:15986`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batch_prefix_rope =
@@ -16504,7 +16000,7 @@ DS4_NO_PARALLEL_ATTN_ROWS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:15972`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool prefix_batch_attn =
@@ -16522,7 +16018,7 @@ DS4_NO_ROUTED_TOKEN_PARALLEL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:14860`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:14587`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool routed_token_parallel =
@@ -16540,7 +16036,7 @@ DS4_NO_SHARED_BATCH_FFN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16754`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batched_ffn = getenv("DS4_BATCHED_FFN") != NULL;
@@ -16558,7 +16054,7 @@ DS4_ORACLE_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42265`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40947`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *oracle_logits = NULL;
@@ -16576,7 +16072,7 @@ DS4_PARALLEL_ATTN_ROWS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16242`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:15969`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     t0 = profile ? now_sec() : 0.0;
@@ -16594,7 +16090,7 @@ DS4_PARALLEL_FFN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16753`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16480`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batched_attn = getenv("DS4_NO_BATCHED_ATTN") == NULL;
@@ -16612,7 +16108,7 @@ DS4_PAYLOAD_TEST_CONTEXT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/tests/test_kv_payload_roundtrip.c:597`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/tests/test_kv_payload_roundtrip.c:593`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -16702,7 +16198,7 @@ DS4_PREFILL_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16755`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16482`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool parallel_ffn = getenv("DS4_PARALLEL_FFN") != NULL;
@@ -16720,7 +16216,7 @@ DS4_PREFILL_EDGE_EXECUTION_FLOOR_GB: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:18871`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:18598`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint64_t metal_graph_prefill_execution_floor_bytes(void) {
@@ -16738,7 +16234,7 @@ DS4_PREFILL_PROFILE_DETAIL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:14827`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:14554`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const float       * steering_dirs,
@@ -16750,7 +16246,7 @@ Source: `engines/ds4/ds4.c:14827`. Unset read: NULL from getenv; the literal con
     double t_shared = 0.0;
 ```
 
-Source: `engines/ds4/ds4.c:16163`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:15890`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const float             * steering_dirs,
@@ -16768,7 +16264,7 @@ DS4_PREFILL_PROFILE_TOKEN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:16471`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:16198`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 "ds4: prefill detail layer %u attn hc_norm=%.3f q=%.3f kv=%.3f token_loop=%.3f out=%.3f total=%.3f\n",
@@ -16804,7 +16300,7 @@ DS4_QWEN4_BATCH_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84920`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82848`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * is for attribution only, never for a throughput claim. */
@@ -16822,25 +16318,13 @@ DS4_QWEN4_DENSE_MM_LEGACY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62720`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-     * large prefills retain their existing kernels. The legacy switch is an
-     * arithmetic/performance control, not a user tuning option. */
-    const bool legacy = getenv("DS4_QWEN4_DENSE_MM_LEGACY") != NULL;
-    const bool f16_batch = !legacy && n_tok > 3u && w->type == DS4_TENSOR_F16 &&
-        n_tok <= 64u && (out_dim <= 512u || n_tok > 8u);
-    if (((n_tok > 8u && w->type == DS4_TENSOR_F32) || f16_batch) &&
-        (in_dim % 32) == 0) {
-```
-
 ### DS4_QWEN4_FAKE_IMAGE
 
 DS4_QWEN4_FAKE_IMAGE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62090`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60255`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!parsed) {
@@ -16858,7 +16342,7 @@ DS4_QWEN4_FLUSH_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:63306`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61416`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * command queue preserves layer order; zero restores one submission. */
@@ -16876,7 +16360,7 @@ DS4_QWEN4_FT_HIDDEN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73070`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t V = DS4_N_VOCAB, hc_dim = DS4_N_EMBD * DS4_N_HC;
@@ -16894,7 +16378,7 @@ DS4_QWEN4_FT_LIST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72968`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71053`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * [n][vocab] f32 logits are written to the path.  One model load covers
@@ -16912,7 +16396,7 @@ DS4_QWEN4_FT_OUT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73222`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71307`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #endif
@@ -16930,7 +16414,7 @@ DS4_QWEN4_FT_TOKENS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73058`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71143`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int *seq = xmalloc(4096 * sizeof(int));
@@ -16948,7 +16432,7 @@ DS4_QWEN4_GPU: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72971`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ft_list && ft_list[0]) {
@@ -16960,7 +16444,7 @@ Source: `engines/ds4/ds4.c:72971`. Unset read: NULL from getenv; the literal con
         FILE *lf = fopen(ft_list, "r");
 ```
 
-Source: `engines/ds4/ds4.c:73078`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71163`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
@@ -16972,7 +16456,7 @@ Source: `engines/ds4/ds4.c:73078`. Unset read: NULL from getenv; the literal con
     for (uint32_t t = 0; t < n_seq && !gpu_only; t++) {
 ```
 
-Source: `engines/ds4/ds4.c:73107`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71192`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU
@@ -16984,7 +16468,7 @@ Source: `engines/ds4/ds4.c:73107`. Unset read: NULL from getenv; the literal con
         if (chunk > n_seq) chunk = n_seq;
 ```
 
-Source: `engines/ds4/ds4.c:76600`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74653`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 bool ready = ds4_gpu_init() &&
@@ -17002,7 +16486,7 @@ DS4_QWEN4_GPU_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73108`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71193`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * reference; the dumped logits (and MTP drafts) are then the GPU's. */
@@ -17020,7 +16504,7 @@ DS4_QWEN4_GPU_ONLY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73078`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71163`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
@@ -17038,7 +16522,7 @@ DS4_QWEN4_IMAGE_MAX_TOKENS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:8269`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:8001`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -17056,7 +16540,7 @@ DS4_QWEN4_MOE_NO_GROUP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:63201`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61311`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool grouped = shared_dense && l->ffn_gate_exps->type == DS4_TENSOR_Q4_K &&
@@ -17074,7 +16558,7 @@ DS4_QWEN4_MOE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:63111`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61221`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -17092,7 +16576,7 @@ DS4_QWEN4_MTP_BATCH_CHECK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73112`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71197`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (chunk == 0) chunk = 1;
@@ -17110,7 +16594,7 @@ DS4_QWEN4_MTP_DEPTH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80138`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78083`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * signal across modes. */
@@ -17128,7 +16612,7 @@ DS4_QWEN4_MTP_DRAFT_ROWS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62855`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60965`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t qwen4_mtp_draft_rows(void) {
@@ -17146,7 +16630,7 @@ DS4_QWEN4_MTP_DRAFT_VOCAB: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62795`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60905`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->draft_head_tried) return g->draft_head != NULL;
@@ -17164,7 +16648,7 @@ DS4_QWEN4_MTP_GPU_ARGMAX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:63657`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61767`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ok) ok = qwen4_graph_moe(g, m, l, T);
@@ -17182,7 +16666,7 @@ DS4_QWEN4_MTP_OUT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73090`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71175`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     qwen4_ref_state_free(&st);
@@ -17200,7 +16684,7 @@ DS4_QWEN4_MTP_SWAP_RESTORE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:63515`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61625`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_graph_state_swap(ds4_qwen4_gpu_graph *g) {
@@ -17236,7 +16720,7 @@ DS4_QWEN4_NO_BATCH_ATTN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84866`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82794`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
               qwen4_gemv(g->iq, m, l->indexer_q_proj, g->mixed, T) &&
@@ -17254,7 +16738,7 @@ DS4_QWEN4_NO_BATCH_DRAFT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86377`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:84284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         /* the next drafts, when the policy wants them: a session at its
@@ -17272,25 +16756,13 @@ DS4_QWEN4_NO_BATCH_MM: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62734`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-     * 32 rows.  DS4_QWEN4_NO_BATCH_MM=1 keeps the per-token kernel for A/B. */
-    if (!legacy && w->type == DS4_TENSOR_Q8_0 && n_tok >= 5u && n_tok <= 32u &&
-        (in_dim % 32) == 0 && (out_dim % 32) == 0 && getenv("DS4_QWEN4_NO_BATCH_MM") == NULL &&
-        ds4_gpu_tensor_bytes(x) >= 32u * in_dim * sizeof(float) &&
-        ds4_gpu_tensor_bytes(out) >= 32u * out_dim * sizeof(float)) {
-        /* Other widths round up to the tile: rows past n_tok are scratch
-         * rows both buffers hold, computed and ignored.  Past sixteen rows
-```
-
 ### DS4_QWEN4_NO_BATCH_SCAN
 
 DS4_QWEN4_NO_BATCH_SCAN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84731`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82659`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t slots[QWEN4_BATCH_MAX_ROWS];
@@ -17308,7 +16780,7 @@ DS4_QWEN4_NO_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62846`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60956`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_graph_fused(const ds4_qwen4_gpu_graph *g, uint32_t T) {
@@ -17326,7 +16798,7 @@ DS4_QWEN4_NO_IDX_SELECT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62863`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60973`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             uint32_t n_blocks, uint32_t n_tokens, uint32_t top_k) {
@@ -17338,7 +16810,7 @@ Source: `engines/ds4/ds4.c:62863`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:84867`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82795`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
               qwen4_gemv(g->ik, m, l->indexer_k_proj, g->mixed, T);
@@ -17356,7 +16828,7 @@ DS4_QWEN4_NO_MTP_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80182`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t pos = g->pos;
@@ -17374,7 +16846,7 @@ DS4_QWEN4_NO_NGRAM_OVERLAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84947`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82875`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              * GPU idle for it. */
@@ -17386,7 +16858,7 @@ Source: `engines/ds4/ds4.c:84947`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:85108`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83036`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!ngrams_staged && ds4_qwen4_layer_is_ple(il)) {
@@ -17404,7 +16876,7 @@ DS4_QWEN4_NO_STATE_POOL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:78926`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76879`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         s->qwen4_slot = -1;
@@ -17422,7 +16894,7 @@ DS4_QWEN4_PREFILL_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42087`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40769`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #endif
@@ -17440,7 +16912,7 @@ DS4_QWEN4_SESSION_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85312`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83240`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_graph_native_session_batch_check(ds4_decode_item *items, int count,
@@ -17458,7 +16930,7 @@ DS4_QWEN4_SPEC_FORCE_ACCEPT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80116`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78061`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -17476,7 +16948,7 @@ DS4_QWEN4_SPEC_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80111`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_spec_trace(void) {
@@ -17494,7 +16966,7 @@ DS4_QWEN4_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:63300`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61410`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int timing = -1;
@@ -17512,7 +16984,7 @@ DS4_QWEN4_YARN_FACTOR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:7653`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:7385`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t n_rot = DS4_N_ROT, half = n_rot / 2u;
@@ -17530,7 +17002,7 @@ DS4_ROCM_DECODE_STAGE_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21293`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20839`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
@@ -17548,7 +17020,7 @@ DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53257`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:51507`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD",
@@ -17566,11 +17038,11 @@ DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:9039`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:8766`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-        if (DS4_N_EXPERT_USED != 6) return false;
-#endif
+
+    if (l->ffn_down_exps->type == DS4_TENSOR_Q2_K) {
         return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
                                       "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
     }
@@ -17578,7 +17050,7 @@ Source: `engines/ds4/ds4.c:9039`. Unset read: Wrapper/conditional default: see t
         return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE",
 ```
 
-Source: `engines/ds4/ds4.c:24102`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23643`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
@@ -17590,7 +17062,7 @@ Source: `engines/ds4/ds4.c:24102`. Unset read: Wrapper/conditional default: see 
 
 ```
 
-Source: `engines/ds4/ds4.c:24177`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23718`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
@@ -17608,7 +17080,7 @@ DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:9043`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:8770`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     }
@@ -17626,7 +17098,7 @@ DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24158`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23699`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
@@ -17644,7 +17116,7 @@ DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:9021`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:8753`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17656,7 +17128,7 @@ Source: `engines/ds4/ds4.c:9021`. Unset read: Wrapper/conditional default: see t
         return false;
 ```
 
-Source: `engines/ds4/ds4.c:21577`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21123`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17668,7 +17140,7 @@ Source: `engines/ds4/ds4.c:21577`. Unset read: Wrapper/conditional default: see 
     }
 ```
 
-Source: `engines/ds4/ds4.c:24100`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23641`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17680,7 +17152,7 @@ Source: `engines/ds4/ds4.c:24100`. Unset read: Wrapper/conditional default: see 
     return pro_q4 || streaming_iq2;
 ```
 
-Source: `engines/ds4/ds4.c:24125`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23666`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17692,7 +17164,7 @@ Source: `engines/ds4/ds4.c:24125`. Unset read: Wrapper/conditional default: see 
            getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
 ```
 
-Source: `engines/ds4/ds4.c:24156`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23697`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17704,7 +17176,7 @@ Source: `engines/ds4/ds4.c:24156`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:24175`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23716`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17716,7 +17188,7 @@ Source: `engines/ds4/ds4.c:24175`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:24194`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23735`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
@@ -17734,7 +17206,7 @@ DS4_ROCM_DISABLE_STREAMING_DECODE_PREFILL: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35681`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34420`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         const ds4_weights   *weights) {
@@ -17752,7 +17224,7 @@ DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21573`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21119`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR",
@@ -17770,7 +17242,7 @@ DS4_ROCM_DISABLE_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24312`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23853`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            g->ssd_streaming &&
@@ -17788,7 +17260,7 @@ DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE: advanced engine setting; buil
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21291`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20837`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
@@ -17806,7 +17278,7 @@ DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21287`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20833`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            g->ssd_streaming &&
@@ -17824,7 +17296,7 @@ DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21260`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20806`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED",
@@ -17842,7 +17314,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting;
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21571`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21117`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !weights ||
@@ -17860,7 +17332,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE: advanced engine setting; built
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21514`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21060`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
@@ -17872,7 +17344,7 @@ Source: `engines/ds4/ds4.c:21514`. Unset read: Wrapper/conditional default: see 
 static uint32_t metal_graph_stream_prefill_batch_selected_addr_auto_max(void) {
 ```
 
-Source: `engines/ds4/ds4.c:22690`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22231`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
@@ -17884,7 +17356,7 @@ Source: `engines/ds4/ds4.c:22690`. Unset read: Wrapper/conditional default: see 
     } else {
 ```
 
-Source: `engines/ds4/ds4.c:56864`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55050`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
@@ -17902,7 +17374,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21482`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21028`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
@@ -17914,7 +17386,7 @@ Source: `engines/ds4/ds4.c:21482`. Unset read: Wrapper/conditional default: see 
 static bool metal_graph_stream_prefill_layer_readahead_enabled(
 ```
 
-Source: `engines/ds4/ds4.c:22699`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22240`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
@@ -17926,7 +17398,7 @@ Source: `engines/ds4/ds4.c:22699`. Unset read: Wrapper/conditional default: see 
     }
 ```
 
-Source: `engines/ds4/ds4.c:56838`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55024`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
@@ -17944,7 +17416,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP: advanced engine setting
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22369`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21910`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
@@ -17962,7 +17434,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21502`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21048`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -17974,7 +17446,7 @@ Source: `engines/ds4/ds4.c:21502`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:22668`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22209`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (g) {
@@ -17986,7 +17458,7 @@ Source: `engines/ds4/ds4.c:22668`. Unset read: Wrapper/conditional default: see 
             return true;
 ```
 
-Source: `engines/ds4/ds4.c:56853`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55039`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !layer_pagein &&
@@ -18004,7 +17476,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE: advanced engine setting; built
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21494`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21040`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18016,7 +17488,7 @@ Source: `engines/ds4/ds4.c:21494`. Unset read: Wrapper/conditional default: see 
 static bool metal_graph_stream_prefill_layer_pread_enabled(
 ```
 
-Source: `engines/ds4/ds4.c:21504`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21050`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
@@ -18028,7 +17500,7 @@ Source: `engines/ds4/ds4.c:21504`. Unset read: Wrapper/conditional default: see 
 static bool metal_graph_stream_prefill_layer_madvise_enabled(
 ```
 
-Source: `engines/ds4/ds4.c:21512`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21058`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18040,7 +17512,7 @@ Source: `engines/ds4/ds4.c:21512`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:22670`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22211`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
@@ -18052,7 +17524,7 @@ Source: `engines/ds4/ds4.c:22670`. Unset read: Wrapper/conditional default: see 
     } else if (readahead_only) {
 ```
 
-Source: `engines/ds4/ds4.c:22681`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22222`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                    glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18064,7 +17536,7 @@ Source: `engines/ds4/ds4.c:22681`. Unset read: Wrapper/conditional default: see 
     } else if (madvise_only) {
 ```
 
-Source: `engines/ds4/ds4.c:22688`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22229`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (g) {
@@ -18076,7 +17548,7 @@ Source: `engines/ds4/ds4.c:22688`. Unset read: Wrapper/conditional default: see 
             return true;
 ```
 
-Source: `engines/ds4/ds4.c:56847`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55033`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18088,7 +17560,7 @@ Source: `engines/ds4/ds4.c:56847`. Unset read: Wrapper/conditional default: see 
         !layer_pagein &&
 ```
 
-Source: `engines/ds4/ds4.c:56855`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55041`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
@@ -18100,7 +17572,7 @@ Source: `engines/ds4/ds4.c:56855`. Unset read: Wrapper/conditional default: see 
         !layer_pagein &&
 ```
 
-Source: `engines/ds4/ds4.c:56862`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55048`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !layer_pread &&
@@ -18118,7 +17590,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP: advanced engine settin
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22367`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21908`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
@@ -18136,7 +17608,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21492`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21038`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18148,7 +17620,7 @@ Source: `engines/ds4/ds4.c:21492`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:22679`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22220`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18160,7 +17632,7 @@ Source: `engines/ds4/ds4.c:22679`. Unset read: Wrapper/conditional default: see 
             return true;
 ```
 
-Source: `engines/ds4/ds4.c:56845`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55031`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18178,7 +17650,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21472`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21018`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE",
@@ -18196,7 +17668,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21462`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21008`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
@@ -18214,7 +17686,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21956`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21497`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE",
@@ -18232,7 +17704,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD: advanced engine setting; 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23008`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22549`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
@@ -18244,7 +17716,7 @@ Source: `engines/ds4/ds4.c:23008`. Unset read: Wrapper/conditional default: see 
 static bool metal_graph_stream_prefill_selected_readahead_shared_enabled(
 ```
 
-Source: `engines/ds4/ds4.c:23020`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
@@ -18262,7 +17734,7 @@ DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED: advanced engine se
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23018`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22559`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
@@ -18280,7 +17752,7 @@ DS4_ROCM_DISABLE_STREAMING_READAHEAD: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21253`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20799`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_READAHEAD",
@@ -18298,7 +17770,7 @@ DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53255`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:51505`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         const ds4_glm_gpu_graph *g) {
@@ -18316,7 +17788,7 @@ DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21265`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20811`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -18334,7 +17806,7 @@ DS4_ROCM_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE: advanced engine setting; buil
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21278`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20824`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -18352,7 +17824,7 @@ DS4_ROCM_DSPARK_FAST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:3095`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:2846`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds4_dspark_rocm_gfx1151_fast_path(void) {
@@ -18370,10 +17842,10 @@ DS4_ROCM_DSPARK_GREEDY_GPU_MARKOV: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83218`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81156`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#ifndef __APPLE__
+        } else if (markov_ready) {
             const char *gpu_markov =
                 getenv("DS4_ROCM_DSPARK_GREEDY_GPU_MARKOV");
             const bool gpu_markov_enabled =
@@ -18388,7 +17860,7 @@ DS4_ROCM_DSPARK_VERIFY_FAST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40887`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool rocm_dspark_fast = false;
@@ -18406,7 +17878,7 @@ DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE: advanced engine setting; built
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21289`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20835`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH",
@@ -18424,7 +17896,7 @@ DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21258`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20804`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -18442,7 +17914,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting; 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21618`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21164`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 #endif
@@ -18460,7 +17932,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24281`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23822`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static uint32_t metal_graph_streaming_prefill_cache_seed_k(const ds4_gpu_graph *g) {
@@ -18472,7 +17944,7 @@ static uint32_t metal_graph_streaming_prefill_cache_seed_k(const ds4_gpu_graph *
         !enabled) {
 ```
 
-Source: `engines/ds4/ds4.c:54483`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:52733`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         const ds4_glm_gpu_graph *g) {
@@ -18490,7 +17962,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21480`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21026`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18502,7 +17974,7 @@ Source: `engines/ds4/ds4.c:21480`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:22697`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22238`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (g) {
@@ -18514,7 +17986,7 @@ Source: `engines/ds4/ds4.c:22697`. Unset read: Wrapper/conditional default: see 
             return true;
 ```
 
-Source: `engines/ds4/ds4.c:56836`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55022`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool layer_pagein =
@@ -18532,7 +18004,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD: advanced engine setting; buil
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21490`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21036`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18544,7 +18016,7 @@ Source: `engines/ds4/ds4.c:21490`. Unset read: Wrapper/conditional default: see 
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
 ```
 
-Source: `engines/ds4/ds4.c:22677`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22218`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (g) {
@@ -18556,7 +18028,7 @@ Source: `engines/ds4/ds4.c:22677`. Unset read: Wrapper/conditional default: see 
                    glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
 ```
 
-Source: `engines/ds4/ds4.c:56843`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:55029`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         full_layer_prepare_base &&
@@ -18574,7 +18046,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21470`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21016`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18592,7 +18064,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN: advanced engine setting; buil
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21460`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21006`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18610,7 +18082,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD: advanced engine setting; b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23004`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22545`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18628,7 +18100,7 @@ DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED: advanced engine set
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23006`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22547`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            (glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
@@ -18640,7 +18112,7 @@ Source: `engines/ds4/ds4.c:23006`. Unset read: Wrapper/conditional default: see 
 }
 ```
 
-Source: `engines/ds4/ds4.c:23016`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22557`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -18658,7 +18130,7 @@ DS4_ROCM_ENABLE_STREAMING_READAHEAD: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21251`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20797`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -18676,7 +18148,7 @@ DS4_ROCM_ENABLE_STREAMING_STATIC_DECODE_MAP: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21270`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20816`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     }
@@ -18694,7 +18166,7 @@ DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:8964`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:8696`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         DS4_N_EXPERT_USED > 8 ||
@@ -18706,7 +18178,7 @@ Source: `engines/ds4/ds4.c:8964`. Unset read: Wrapper/conditional default: see t
     if (!weights_streaming_layer_experts_uniform(w, il) &&
 ```
 
-Source: `engines/ds4/ds4.c:9023`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:8755`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
@@ -18718,7 +18190,7 @@ Source: `engines/ds4/ds4.c:9023`. Unset read: Wrapper/conditional default: see t
 
 ```
 
-Source: `engines/ds4/ds4.c:24220`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23761`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         DS4_N_EXPERT_USED <= 8 &&
@@ -18730,7 +18202,7 @@ Source: `engines/ds4/ds4.c:24220`. Unset read: Wrapper/conditional default: see 
     if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_GLM_DSA ||
 ```
 
-Source: `engines/ds4/ds4.c:24231`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23772`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         DS4_N_EXPERT_USED > 8 ||
@@ -18748,7 +18220,7 @@ DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:61779`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:59956`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool seed_before_prefill =
@@ -18760,7 +18232,7 @@ Source: `engines/ds4/ds4.c:61779`. Unset read: Wrapper/conditional default: see 
         ds4_gpu_graph seed_graph;
 ```
 
-Source: `engines/ds4/ds4.c:79059`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:77004`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         }
@@ -18778,7 +18250,7 @@ DS4_ROCM_GLM_DISABLE_STREAMING_TOKEN_PREFILL: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60004`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:58181`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (!g || !g->ssd_streaming || g->quality || n_tokens == 0) return false;
@@ -18796,7 +18268,7 @@ DS4_ROCM_GLM_LAYER_SLICE_TOKEN_DECODE: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:51864`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50136`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #ifdef DS4_ROCM_BUILD
@@ -18808,7 +18280,7 @@ Source: `engines/ds4/ds4.c:51864`. Unset read: NULL from getenv; the literal con
 #endif
 ```
 
-Source: `engines/ds4/ds4.c:80553`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78498`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool rocm_layer_slice_token_decode =
@@ -18826,7 +18298,7 @@ DS4_ROCM_GLM_STREAMING_ASYNC_PROFILE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:53290`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:51540`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -18844,7 +18316,7 @@ DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50756`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:49028`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (!g || !g->ssd_streaming) return true;
@@ -18862,7 +18334,7 @@ DS4_ROCM_GLM_STREAMING_GROW_CACHE_AFTER_PREFILL: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:61820`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59997`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      */
@@ -18880,7 +18352,7 @@ DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50854`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:49126`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         return false;
@@ -18898,7 +18370,7 @@ DS4_ROCM_GRAPH_DUMP_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19878`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19601`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (cfg.name && !cfg.name[0]) cfg.name = NULL;
@@ -18916,7 +18388,7 @@ DS4_ROCM_GRAPH_DUMP_NAME: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19874`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19597`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                          "DS4_METAL_GRAPH_DUMP_PREFIX");
@@ -18934,7 +18406,7 @@ DS4_ROCM_GRAPH_DUMP_POS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19885`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19608`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         }
@@ -18952,7 +18424,7 @@ DS4_ROCM_GRAPH_DUMP_PREFIX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19871`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19594`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (!cfg.init) {
@@ -18964,7 +18436,7 @@ Source: `engines/ds4/ds4.c:19871`. Unset read: Wrapper/conditional default: see 
                                        "DS4_METAL_GRAPH_DUMP_NAME");
 ```
 
-Source: `engines/ds4/ds4.c:19948`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19671`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         uint32_t          il,
@@ -18976,7 +18448,7 @@ Source: `engines/ds4/ds4.c:19948`. Unset read: Wrapper/conditional default: see 
     if (ds4_gpu_synchronize() == 0) {
 ```
 
-Source: `engines/ds4/ds4.c:21295`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:20841`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
@@ -18994,7 +18466,7 @@ DS4_ROCM_GRAPH_DUMP_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:19915`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:19638`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         uint32_t          pos) {
@@ -19012,7 +18484,7 @@ DS4_ROCM_GRAPH_PREFILL_PROFILE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35788`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34527`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19024,7 +18496,7 @@ Source: `engines/ds4/ds4.c:35788`. Unset read: Wrapper/conditional default: see 
     /*
 ```
 
-Source: `engines/ds4/ds4.c:39800`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:38535`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                 n_tokens > 2048 || imatrix != NULL;
@@ -19036,7 +18508,7 @@ Source: `engines/ds4/ds4.c:39800`. Unset read: Wrapper/conditional default: see 
     double encode_s = 0.0;
 ```
 
-Source: `engines/ds4/ds4.c:40688`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:39396`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19054,7 +18526,7 @@ DS4_ROCM_GRAPH_PREFILL_SPLIT_PROFILE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39785`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:38520`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19072,7 +18544,7 @@ DS4_ROCM_GRAPH_TOKEN_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35425`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34164`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19084,7 +18556,7 @@ Source: `engines/ds4/ds4.c:35425`. Unset read: Wrapper/conditional default: see 
     g_fn_streaming.pre_t0_s += t0 > 0.0 ? (t0 - t_fn_entry) : 0.0;
 ```
 
-Source: `engines/ds4/ds4.c:35627`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34366`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19102,7 +18574,7 @@ DS4_ROCM_INDEXER_STAGE_PROFILE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32557`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:31298`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         (g->tp_rank == 0 ? tp_half_rows : n_tokens - tp_half_rows) : n_tokens;
@@ -19120,7 +18592,7 @@ DS4_ROCM_MOE_WRITE_CLAMPED_ACT: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:9019`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:8751`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         DS4_N_EXPERT_USED > 8 ||
@@ -19132,7 +18604,7 @@ Source: `engines/ds4/ds4.c:9019`. Unset read: Wrapper/conditional default: see t
         glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
 ```
 
-Source: `engines/ds4/ds4.c:21575`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21121`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE",
@@ -19144,7 +18616,7 @@ Source: `engines/ds4/ds4.c:21575`. Unset read: Wrapper/conditional default: see 
         DS4_N_LAYER == 0) {
 ```
 
-Source: `engines/ds4/ds4.c:24098`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23639`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         DS4_N_EXPERT_USED == 6 &&
@@ -19156,7 +18628,7 @@ Source: `engines/ds4/ds4.c:24098`. Unset read: Wrapper/conditional default: see 
         !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
 ```
 
-Source: `engines/ds4/ds4.c:24123`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23664`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            gate_tensor_bytes >= q4_selected_min_tensor_bytes &&
@@ -19168,7 +18640,7 @@ Source: `engines/ds4/ds4.c:24123`. Unset read: Wrapper/conditional default: see 
            (metal_graph_use_pro_q4_expert_table_auto(g) ||
 ```
 
-Source: `engines/ds4/ds4.c:24154`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23695`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             (gate_tensor_bytes >= q4_selected_min_tensor_bytes &&
@@ -19180,7 +18652,7 @@ Source: `engines/ds4/ds4.c:24154`. Unset read: Wrapper/conditional default: see 
            !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
 ```
 
-Source: `engines/ds4/ds4.c:24173`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23714`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            DS4_N_EXPERT_USED == 6 &&
@@ -19192,7 +18664,7 @@ Source: `engines/ds4/ds4.c:24173`. Unset read: Wrapper/conditional default: see 
            !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
 ```
 
-Source: `engines/ds4/ds4.c:24192`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23733`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            DS4_N_EXPERT_USED == 6 &&
@@ -19210,7 +18682,7 @@ DS4_ROCM_Q_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:31302`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool layer_stage_profile = metal_graph_layer_stage_profile_enabled(il);
@@ -19228,7 +18700,7 @@ DS4_ROCM_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35996`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34735`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const uint32_t current_count =
@@ -19246,7 +18718,7 @@ DS4_ROCM_STREAMING_EXPERT_HOTLIST_PROFILE: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36002`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34741`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !from_file && g_ds4_shape.variant == DS4_VARIANT_GLM52;
@@ -19264,7 +18736,7 @@ DS4_ROCM_STREAMING_MAP_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50784`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:49056`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     g->streaming_static_decode_map_current = false;
@@ -19276,7 +18748,7 @@ Source: `engines/ds4/ds4.c:50784`. Unset read: Wrapper/conditional default: see 
                     "ds4: GLM SSD prefill map layer=%u tokens=%u mode=full-prefill\n",
 ```
 
-Source: `engines/ds4/ds4.c:50810`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:49082`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                                        il,
@@ -19294,7 +18766,7 @@ DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24290`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:23831`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19306,7 +18778,7 @@ Source: `engines/ds4/ds4.c:24290`. Unset read: Wrapper/conditional default: see 
         unsigned long v = strtoul(env, &end, 10);
 ```
 
-Source: `engines/ds4/ds4.c:54492`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:52742`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19324,7 +18796,7 @@ DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35903`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34642`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19336,7 +18808,7 @@ Source: `engines/ds4/ds4.c:35903`. Unset read: Wrapper/conditional default: see 
     uint32_t seeded_rows = 0;
 ```
 
-Source: `engines/ds4/ds4.c:54616`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:52866`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19354,7 +18826,7 @@ DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE: advanced engine setting; built
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22658`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22199`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE",
@@ -19372,7 +18844,7 @@ DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22365`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21906`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP",
@@ -19390,7 +18862,7 @@ DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22654`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22195`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     job->readahead_only = readahead_only;
@@ -19408,7 +18880,7 @@ DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22656`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22197`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE",
@@ -19426,7 +18898,7 @@ DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22363`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21904`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19444,7 +18916,7 @@ DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22660`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22201`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
@@ -19462,7 +18934,7 @@ DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22404`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21945`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE",
@@ -19480,7 +18952,7 @@ DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:22402`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21943`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     job->ok = true;
@@ -19498,7 +18970,7 @@ DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21954`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:21495`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return g &&
@@ -19516,7 +18988,7 @@ DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE: advanced engine setting; 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23111`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:22652`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -19534,7 +19006,7 @@ DS4_ROUTED_TOKEN_PARALLEL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:14859`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:14586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t routed_q8_mid_blocks = down_in_dim / 32u;
@@ -19636,7 +19108,7 @@ DS4_SSD_PREFETCH_TOP_N: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:74311`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72386`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ssd_prefetch_top_n = 0;
@@ -19690,7 +19162,7 @@ DS4_THREADS: advanced engine setting; built-in default retained Also controls th
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4.c:2276`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:2030`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -19708,7 +19180,7 @@ DS4_TOKEN_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49387`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47711`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int n_generated = 0;
@@ -19720,7 +19192,7 @@ Source: `engines/ds4/ds4.c:49387`. Unset read: NULL from getenv; the literal con
             char label[64];
 ```
 
-Source: `engines/ds4/ds4.c:61857`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60034`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int n_decode_eval = 0;
@@ -19732,7 +19204,7 @@ Source: `engines/ds4/ds4.c:61857`. Unset read: NULL from getenv; the literal con
             char label[64];
 ```
 
-Source: `engines/ds4/ds4.c:63972`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62082`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(logits[0]));
@@ -19750,7 +19222,7 @@ DS4_TP_ABLATE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25496`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24933`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int init = 0;
@@ -19768,19 +19240,7 @@ DS4_TP_BIG_GATE_DEBUG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40899`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-#if defined(__APPLE__)
-    const bool tp_block = g->tp_batch_rows != 0 && g_tp_block_ctx != NULL;
-    if (getenv("DS4_TP_BIG_GATE_DEBUG"))
-        fprintf(stderr, "ds4: verify block: rows %u world %d ctx %p tp_block %d\n",
-                g->tp_batch_rows, g->tp_world, (void *)g_tp_block_ctx, (int)tp_block);
-    if (tp_block && !ds4_tp_batch_block_begin(g_tp_block_ctx, g->tp_batch_rows, DS4_N_LAYER)) {
-        fprintf(stderr, "ds4: TP verify-block window setup failed\n");
-```
-
-Source: `engines/ds4/ds4_tp.c:2203`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2181`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!ok) { r->block_active = false; return 0; }
@@ -19792,7 +19252,7 @@ Source: `engines/ds4/ds4_tp.c:2203`. Unset read: NULL from getenv; the literal c
     (void)tp; (void)rows; (void)n_layers;
 ```
 
-Source: `engines/ds4/ds4_tp.c:2230`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2208`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -19804,7 +19264,7 @@ Source: `engines/ds4/ds4_tp.c:2230`. Unset read: NULL from getenv; the literal c
     return ok;
 ```
 
-Source: `engines/ds4/ds4_tp.c:2293`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2271`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #ifdef DS4_TP_HAVE_VERBS
@@ -19816,7 +19276,7 @@ Source: `engines/ds4/ds4_tp.c:2293`. Unset read: NULL from getenv; the literal c
      * other. Match the bulk RDMA window's bounded grace, without relaxing
 ```
 
-Source: `engines/ds4/ds4_tp.c:2329`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2307`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const double t_end = tp_now_sec();
@@ -19834,7 +19294,7 @@ DS4_TP_DISABLE_RDMA_WARMUP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_tp.c:1265`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:1243`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -19852,7 +19312,7 @@ DS4_TP_DISABLE_VERIFY_WINDOW: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_tp.c:2189`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2167`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #ifdef DS4_TP_HAVE_VERBS
@@ -19870,7 +19330,7 @@ DS4_TP_GATE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_tp.c:1521`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:1499`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     ds4_tp_rdma *r = &tp->rdma;
@@ -19888,7 +19348,7 @@ DS4_TP_GATE_TIMEOUT_MS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_tp.c:2030`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2008`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (tmo) tp->timeout_sec = (uint64_t)atoi(tmo);
@@ -19906,7 +19366,7 @@ DS4_TP_GATE_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_tp.c:1524`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:1502`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double st0 = g_rdma_stat_enabled ? tp_now_sec() : 0.0;
@@ -19924,7 +19384,7 @@ DS4_TP_PREFILL_SPLIT_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32436`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:31177`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -19942,47 +19402,11 @@ DS4_TP_SHARED_SPLIT_SHIFT_Q16: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:28800`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                ((routed_expert_bytes << 16) + shared_bytes) /
-                (2u * shared_bytes);
-            const char *shift_env = getenv("DS4_TP_SHARED_SPLIT_SHIFT_Q16");
-            if (shift_env) shift_q16 = strtoull(shift_env, NULL, 10);
-            if (shift_q16 > 65536u) shift_q16 = 65536u;
-            parallel_full_ffn =
-                ds4_gpu_parallel_ffn_start_split(
-```
-
 ### DS4_TP_STATIC_SHARED_SPLIT
 
 DS4_TP_STATIC_SHARED_SPLIT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:28791`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        parallel_full_ffn = false;
-        if (g->tp_world == 2 && (shared_dim % 64u) == 0u &&
-            getenv("DS4_TP_STATIC_SHARED_SPLIT") == NULL) {
-            const uint64_t routed_expert_bytes =
-                2u * gate_expert_bytes + down_expert_bytes;
-            const uint64_t shared_bytes =
-                2u * ((uint64_t)DS4_N_EMBD / 32u) * 34u * shared_dim +
-```
-
-Source: `engines/ds4/ds4.c:31785`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-            static int shared_split_static = -1;
-            if (shared_split_static < 0) {
-                shared_split_static = getenv("DS4_TP_STATIC_SHARED_SPLIT") != NULL;
-            }
-            const uint64_t other_rank = (uint64_t)(1 - g->tp_rank);
-            const uint64_t attn_off[7] = {
-                moe_layer ? lw->ffn_gate_shexp->abs_offset + (uint64_t)g->tp_rank * shared_half * q8_row : 0u,
-```
 
 ### DS4_TP_TIMEOUT_SEC
 
@@ -19990,7 +19414,7 @@ DS4_TP_TIMEOUT_SEC: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_tp.c:2027`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_tp.c:2005`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     tp->data_fd = -1;
@@ -20026,7 +19450,7 @@ DS4_TRACE_SPAN_INSTALL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:21233`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:20779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         /* C, not C++: a static initialiser must be constant, so cache on first use instead. */
@@ -20044,7 +19468,7 @@ DS4_TRACE_TOP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49356`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47680`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(logits[0]));
@@ -20056,7 +19480,7 @@ Source: `engines/ds4/ds4.c:49356`. Unset read: NULL from getenv; the literal con
         fprintf(stderr, "ds4: prompt is empty or exceeds context size\n");
 ```
 
-Source: `engines/ds4/ds4.c:61697`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59874`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -20068,7 +19492,7 @@ Source: `engines/ds4/ds4.c:61697`. Unset read: NULL from getenv; the literal con
     if (!vocab_token_is_generation_stop(vocab, token) && emit) emit(emit_ud, token);
 ```
 
-Source: `engines/ds4/ds4.c:61860`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60037`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double t_decode0 = now_sec();
@@ -20080,7 +19504,7 @@ Source: `engines/ds4/ds4.c:61860`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:63971`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62081`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -23384,7 +22808,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/common/common.cpp:961`. Unset
         GGML_ABORT("not implemented on this platform");
 ```
 
-Source: `engines/ds4/ds4_agent.c:4701`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:4695`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -23396,7 +22820,7 @@ static char *agent_default_cache_dir(void) {
     if (b.len == 0 || b.ptr[b.len - 1] != '/') agent_buf_puts(&b, "/");
 ```
 
-Source: `engines/ds4/ds4_agent.c:12687`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:12677`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -23408,7 +22832,7 @@ Source: `engines/ds4/ds4_agent.c:12687`. Unset read: NULL from getenv; the liter
         .log = agent_web_log,
 ```
 
-Source: `engines/ds4/ds4_agent.c:13041`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:13031`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -23420,7 +22844,7 @@ Source: `engines/ds4/ds4_agent.c:13041`. Unset read: NULL from getenv; the liter
      * scrolls above the live linenoise prompt and status footer, so streaming
 ```
 
-Source: `engines/ds4/ds4_cli.c:1375`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cli.c:1373`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -23432,7 +22856,7 @@ static void history_file_path(char *buf, size_t len) {
 
 ```
 
-Source: `engines/ds4/ds4_web.c:1398`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_web.c:1362`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     memset(web, 0, sizeof(*web));
@@ -23977,7 +23401,7 @@ LINENOISE_ASSUME_TTY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_agent.c:12253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:12243`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                            status_start, status_end);
@@ -23989,7 +23413,7 @@ Source: `engines/ds4/ds4_agent.c:12253`. Unset read: NULL from getenv; the liter
     ed->input = input;
 ```
 
-Source: `engines/ds4/ds4_agent.c:12288`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_agent.c:12278`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * immediately reopening the editor does not leave the accepted
@@ -42689,7 +42113,7 @@ PATH: advanced engine setting; built-in default retained
 
 Scope: ds4, image, video. Class: advanced.
 
-Source: `engines/ds4/ds4_web.c:993`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_web.c:987`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         NULL

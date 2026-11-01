@@ -94,106 +94,6 @@ int ds4_gpu_flush_encoder(void);
 int ds4_gpu_flush_commands(void);
 int ds4_gpu_commands_active(void);
 #include "ds4_deepseek41_gpu.h"
-#ifdef __APPLE__
-int ds4_gpu_parallel_ffn_finish(void);
-void ds4_gpu_parallel_ffn_abort(void);
-int ds4_gpu_parallel_ffn_start(
-        ds4_gpu_tensor       *gate,
-        ds4_gpu_tensor       *up,
-        ds4_gpu_tensor       *mid,
-        ds4_gpu_tensor       *shared_out,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              gate_offset,
-        uint64_t              up_offset,
-        uint64_t              down_offset,
-        uint32_t              model_dim,
-        uint32_t              shared_dim,
-        const ds4_gpu_tensor *x,
-        float                 clamp);
-int ds4_gpu_parallel_ffn_start_bf16(
-        ds4_gpu_tensor       *gate,
-        ds4_gpu_tensor       *up,
-        ds4_gpu_tensor       *mid,
-        ds4_gpu_tensor       *shared_out,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              gate_offset,
-        uint64_t              up_offset,
-        uint64_t              down_offset,
-        uint32_t              model_dim,
-        uint32_t              shared_dim,
-        const ds4_gpu_tensor *x,
-        float                 clamp);
-int ds4_gpu_parallel_ffn_start_sliced(
-        ds4_gpu_tensor       *gate,
-        ds4_gpu_tensor       *up,
-        ds4_gpu_tensor       *mid,
-        ds4_gpu_tensor       *shared_out,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              gate_offset,
-        uint64_t              up_offset,
-        uint64_t              down_offset,
-        uint32_t              model_dim,
-        uint32_t              shared_dim,
-        uint32_t              shared_lane_offset,
-        uint32_t              shared_lane_count,
-        const ds4_gpu_tensor *x,
-        float                 clamp);
-
-/* GPU-decided shared-expert lane split for two-rank TP decode: the split
- * kernels read the selected expert ids and take complementary lane ranges
- * sized to balance the bytes each rank streams (shift_q16 = routed expert
- * bytes / (2 * shared expert bytes) in Q16; 0 reproduces static halves). */
-int ds4_gpu_parallel_ffn_start_split(
-        ds4_gpu_tensor       *gate,
-        ds4_gpu_tensor       *up,
-        ds4_gpu_tensor       *mid,
-        ds4_gpu_tensor       *shared_out,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              gate_offset,
-        uint64_t              up_offset,
-        uint64_t              down_offset,
-        uint32_t              model_dim,
-        uint32_t              shared_dim,
-        const ds4_gpu_tensor *x,
-        float                 clamp,
-        const ds4_gpu_tensor *selected,
-        uint32_t              tp_rank,
-        uint32_t              tp_world,
-        uint32_t              n_expert,
-        uint32_t              n_expert_used,
-        uint32_t              shift_q16);
-
-/* out = a + b into this rank's TP slab slot for (layer, gate), publishing the
- * gate's checked flag from the same kernel; falls back to ds4_gpu_add_tensor
- * when the fold does not apply.  Call right before ds4_gpu_tp_gate_encode. */
-int ds4_gpu_add_tensor_tp_flag(
-        ds4_gpu_tensor       *out,
-        const ds4_gpu_tensor *a,
-        const ds4_gpu_tensor *b,
-        uint32_t              n,
-        uint32_t              layer,
-        uint32_t              gate);
-
-/* Register that the next TP partial producer for (layer, gate) may publish
- * the gate's checked flag itself (taken by the attention output K-slice
- * matvec when its output is that slot; otherwise ignored). */
-void ds4_gpu_tp_flag_fold_request(uint32_t layer, uint32_t gate);
-/* Bind every routed expert and mask none (the caller splits the list). */
-void ds4_gpu_tp_full_expert_bind(int on);
-
-/* Deferred kv norm task: call before ds4_gpu_dsv4_qkv_rms_norm_kv_rope_fp8_store_tensor
- * to run only its q task now and fold the kv task into the KV staging
- * kernel of the same layer; flush runs it standalone if nothing consumed it. */
-void ds4_gpu_dsv4_qkv_norm_defer_kv_next(void);
-int ds4_gpu_kv_norm_task_pending(void);
-int ds4_gpu_kv_norm_task_flush(void);
-int ds4_gpu_kv_norm_task_begin_concurrent(void);
-void ds4_gpu_kv_norm_task_end_concurrent(void);
-#endif
 int ds4_gpu_signal_selected_readback_ready(uint64_t *event_value);
 int ds4_gpu_commit_and_wait_selected_readback(uint64_t event_value, const char *label);
 int ds4_gpu_wait_selected_readback_ready(uint64_t event_value, const char *label);
@@ -367,32 +267,8 @@ void ds4_gpu_glm_indexer_score_one_force_wide(int mode);
 void ds4_gpu_set_glm_model(bool enabled);
 void ds4_gpu_set_ssd_streaming(bool enabled);
 void ds4_gpu_set_glm_streaming_prefill_full_layer(bool enabled);
-#ifdef __APPLE__
-int ds4_gpu_device_is_pre_m5_apple_silicon(void);
-int ds4_gpu_device_is_m5_apple_silicon(void);
-int ds4_gpu_set_decode_pipeline_fast_lookup(int enabled);
-/* Strict test oracle for the fixed decode mul_mv pipeline lookup cache. */
-int ds4_gpu_test_decode_pipeline_fast_lookup(void);
-/* Strict test oracle for the extended decode mul_mv_ext (nsg + nxpsg) cache. */
-int ds4_gpu_test_decode_pipeline_fast_lookup_ext(void);
-/* Strict test oracle for the generated resident-prefill MXFP4 half LUT. */
-int ds4_gpu_test_mxfp4_down_half_lut(uint16_t *legacy_bits,
-                                     uint16_t *lut_bits);
-enum {
-    DS4_GPU_TEST_MXFP4_PAIR_TAIL_CULL = 1u << 0,
-    DS4_GPU_TEST_MXFP4_PAIR_COMPACT_TILE = 1u << 1,
-    DS4_GPU_TEST_MXFP4_MAP_SCATTER = 1u << 2,
-    DS4_GPU_TEST_MXFP4_DOWN_TAIL_CULL = 1u << 3,
-    DS4_GPU_TEST_MXFP4_DOWN_HALF_LUT = 1u << 4,
-    DS4_GPU_TEST_OUTPUT_HC_WEIGHTS4 = 1u << 5,
-    DS4_GPU_TEST_HC_RMS_SCALE_PROJ = 1u << 6,
-};
-void ds4_gpu_test_set_flags(uint32_t flags);
-void ds4_gpu_release_zero_prefix_prefill_mask_cache(void);
-#else
 static inline int ds4_gpu_device_is_pre_m5_apple_silicon(void) { return 0; }
 static inline int ds4_gpu_device_is_m5_apple_silicon(void) { return 0; }
-#endif
 void ds4_gpu_set_streaming_expert_cache_budget(uint32_t experts);
 void ds4_gpu_set_streaming_expert_cache_expert_bytes(uint64_t bytes);
 int ds4_gpu_qwen4_conv_stream_rows_tensor(
@@ -521,7 +397,7 @@ typedef struct ds4_gpu_stream_expert_table {
      * Lower is hotter. NULL preserves the existing slot-protect/LRU policy. */
     const uint32_t *expert_ranks;
 } ds4_gpu_stream_expert_table;
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
+#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
 /* Optional CUDA look-ahead between completed layers, inside the existing
  * expert cache. The foreground owns slots; the reader cannot publish them
  * or evict the current layer's inputs. */
@@ -562,13 +438,7 @@ int ds4_gpu_glm_stream_expert_cache_begin_selected_load_tensor(
         const ds4_gpu_stream_expert_table *table,
         const ds4_gpu_tensor              *selected,
         uint32_t                           n_selected);
-#ifdef __APPLE__
-/* The async selected-load worker registers itself so Metal cache paths never
- * wait on command buffers from that thread (they fail the load instead and
- * the caller retries synchronously). */
-void ds4_gpu_stream_expert_cache_note_service_thread(void);
-#endif
-#if defined(DS4_ROCM_BUILD) || (!defined(DS4_NO_GPU) && !defined(__APPLE__))
+#if defined(DS4_ROCM_BUILD) || (!defined(DS4_NO_GPU))
 int ds4_gpu_stream_expert_cache_prepare_selected_batch(
         const ds4_gpu_stream_expert_table *table,
         const int32_t                     *selected_ids,
@@ -610,14 +480,6 @@ int ds4_gpu_stream_host_expert_cache_seed_experts(
         const ds4_gpu_stream_expert_table *table,
         const int32_t                     *expert_ids,
         uint32_t                           n_experts);
-#ifdef __APPLE__
-/* Seed from mapped weights with blits appended to the active command buffer. */
-int ds4_gpu_stream_expert_cache_seed_experts_gpu_copy(
-        const ds4_gpu_stream_expert_table *table,
-        const int32_t                     *expert_ids,
-        const uint32_t                    *expert_priorities,
-        uint32_t                           n_experts);
-#endif
 void ds4_gpu_print_memory_report(const char *label);
 
 #include "ds4_gpu_tp.h"
@@ -1037,19 +899,6 @@ int ds4_gpu_router_shared_gate_up_q8_0_tensor(
         const ds4_gpu_tensor *x,
         float                 clamp,
         bool                  router_only);
-#ifdef __APPLE__
-int ds4_gpu_router_project_select_fused_tensor(
-        ds4_gpu_tensor       *router_logits,
-        ds4_gpu_tensor       *probs,
-        ds4_gpu_tensor       *selected,
-        ds4_gpu_tensor       *weights,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              router_weight_offset,
-        uint64_t              bias_offset,
-        bool                  has_bias,
-        const ds4_gpu_tensor *x);
-#endif
 int ds4_gpu_shared_mid_swiglu_q8_0_decode_exact_tensor(
         ds4_gpu_tensor       *mid,
         const void             *model_map,
@@ -2699,14 +2548,12 @@ int ds4_gpu_directional_steering_project_tensor(
 /* Changes only the per-token mean; preserves warm-up, calibration and cache state. */
 int ds4_gpu_cache_affinity_set_mean(float mean);
 void ds4_gpu_cache_affinity_decode_unbiased(void);
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
 /* Speculation restores the request's existing warm-up frontier on rejection. */
 uint64_t ds4_gpu_cache_affinity_decode_count(void);
 void ds4_gpu_cache_affinity_decode_restore(uint64_t count);
 /* Scoped existing target verifier; serial decode/drafter keep their own mean.
  * Returns2 when an override requires router observation even at decode mean0. */
 int ds4_gpu_cache_affinity_verify_scope(int active);
-#endif
 int ds4_gpu_cache_affinity_configure(float mean, uint32_t warmup, uint32_t ramp,
     const char *spread_file, const char *calibrate_file, int flat, uint32_t promotion_cap,
     int router_confidence);
@@ -2910,10 +2757,10 @@ int ds4_gpu_glm_routed_moe_batch_direct_scalar_q4_tensor(
 
 int ds4_gpu_routed_moe_set_selected_override(const int32_t *selected, uint32_t n_selected);
 void ds4_gpu_set_glm_mtp_verify_mode(bool enabled);
-#ifdef DS4_ROCM_BUILD
+#if defined(DS4_ROCM_BUILD)
 int ds4_gpu_dspark_gfx1151_fast_path(void);
 void ds4_gpu_set_dspark_verify_mode(bool enabled);
-#elif !defined(__APPLE__)
+#else
 int ds4_gpu_device_is_spark(void);
 #endif
 
@@ -3249,54 +3096,6 @@ int ds4_gpu_hc_rms_scale_project_f16_tensor(
         uint32_t                n_rows,
         float                   eps);
 
-#ifdef __APPLE__
-int ds4_gpu_hc_rms_norm_mix_split_norm_f16_tensor(
-        ds4_gpu_tensor       *mix,
-        ds4_gpu_tensor       *out,
-        ds4_gpu_tensor       *norm_out,
-        ds4_gpu_tensor       *split,
-        const ds4_gpu_tensor *residual_hc,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              mix_weight_offset,
-        uint64_t              scale_offset,
-        uint64_t              base_offset,
-        uint64_t              norm_weight_offset,
-        uint32_t              n,
-        uint32_t              mix_dim,
-        uint32_t              n_embd,
-        uint32_t              n_hc,
-        uint32_t              sinkhorn_iters,
-        float                 eps,
-        float                 hc_eps,
-        float                 norm_eps);
-int ds4_gpu_hc_expand_add_rms_norm_mix_split_norm_f16_tensor(
-        ds4_gpu_tensor       *mix,
-        ds4_gpu_tensor       *out,
-        ds4_gpu_tensor       *norm_out,
-        ds4_gpu_tensor       *split,
-        const ds4_gpu_tensor *residual_hc,
-        const ds4_gpu_tensor *block_out,
-        const ds4_gpu_tensor *block_add,
-        const ds4_gpu_tensor *residual_prev,
-        const ds4_gpu_tensor *post,
-        const ds4_gpu_tensor *comb,
-        const void           *model_map,
-        uint64_t              model_size,
-        uint64_t              mix_weight_offset,
-        uint64_t              scale_offset,
-        uint64_t              base_offset,
-        uint64_t              norm_weight_offset,
-        uint32_t              n,
-        uint32_t              mix_dim,
-        uint32_t              n_embd,
-        uint32_t              n_hc,
-        uint32_t              sinkhorn_iters,
-        float                 eps,
-        float                 hc_eps,
-        float                 norm_eps);
-
-#endif
 int ds4_gpu_output_hc_weights_tensor(
         ds4_gpu_tensor       *out,
         const ds4_gpu_tensor *pre,

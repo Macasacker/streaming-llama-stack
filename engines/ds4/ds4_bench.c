@@ -27,11 +27,9 @@
 
 /* CUDA builds resolve these weak symbols through libcudart; other builds
  * remain independent of CUDA headers and libraries. */
-#if defined(__GNUC__) && !defined(__APPLE__)
 #define DS4_BENCH_HAVE_CUDA_PROFILER 1
 extern int cudaProfilerStart(void) __attribute__((weak));
 extern int cudaProfilerStop(void) __attribute__((weak));
-#endif
 
 #define DS4_BENCH_DEFAULT_SNAPSHOT_MAX_BYTES (UINT64_C(1) << 30)
 
@@ -217,8 +215,6 @@ static ds4_backend parse_backend(const char *s, const char *opt) {
 static ds4_backend default_backend(void) {
 #ifdef DS4_NO_GPU
     return DS4_BACKEND_CPU;
-#elif defined(__APPLE__)
-    return DS4_BACKEND_METAL;
 #else
     return DS4_BACKEND_CUDA;
 #endif

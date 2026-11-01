@@ -66,9 +66,8 @@ int format_gpu_layout_line(const ds4_gpu_config *cfg,
  * length filter_len (use only those device indices).
  *
  * Declared here for the parser's use; not called by application code
- * directly. The Mac/CPU builds skip this branch via the
- * #if !defined(DS4_NO_GPU) && !defined(__APPLE__) gate in the parser. */
-#if !defined(DS4_NO_GPU) && !defined(__APPLE__)
+ * directly. CPU builds skip this branch via the `!defined(DS4_NO_GPU)` gate. */
+#if !defined(DS4_NO_GPU)
 int ds4_gpu_args_probe_auto_cuda(const int      *device_filter,
                                   int             filter_len,
                                   ds4_gpu_config *out,

@@ -209,9 +209,7 @@ DS4X_EXPORT int ds4x_replace_weight(uint64_t file_offset, uint64_t bytes, void *
 DS4X_EXPORT uint64_t ds4x_drop_weights(void) {
     if (ds41_single_hc_graphs_on()) ds4_gpu_decode_graphs_invalidate();
     if (!g_ds4x.open) return 0;
-#if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD)
     ds4_gpu_decode_graphs_invalidate();   /* captured islands hold weight pointers (unused at tp_world 1) */
-#endif
     return ds4_gpu_drop_external_ranges();
 }
 

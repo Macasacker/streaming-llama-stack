@@ -100,9 +100,6 @@ bool ds4_engram_table_open(ds4_engram_table *t, const char *path,
         errno = EINVAL;
         goto fail;
     }
-#ifdef __APPLE__
-    if (fcntl(fd, F_NOCACHE, 1) != 0 || fcntl(fd, F_RDAHEAD, 0) != 0) goto fail;
-#endif
     *t = (ds4_engram_table){.fd = fd, .offset = offset, .rows = rows};
     return true;
 fail: {
@@ -195,11 +192,7 @@ static int request_order(const void *a, const void *b) {
     return (x->row > y->row) - (x->row < y->row);
 }
 
-#ifdef __APPLE__
-enum { ENGRAM_READERS = 32 };
-#else
 enum { ENGRAM_READERS = 16 };
-#endif
 
 typedef struct {
     const ds4_engram_table *table;
@@ -229,7 +222,6 @@ static void read_batch_part(void *context, size_t part) {
     }
 }
 
-#ifndef __APPLE__
 typedef struct {
     engram_batch *batch;
     size_t part;
@@ -240,7 +232,6 @@ static void *read_batch_thread(void *context) {
     read_batch_part(reader->batch, reader->part);
     return NULL;
 }
-#endif
 
 #if defined(__linux__)
 /* ds4_engram_iouring.c: the io_uring Engram row reader. */
@@ -346,10 +337,6 @@ bool ds4_engram_read_batch(const ds4_engram_table *t, const uint32_t *rows,
              * per batch; output ownership and join ordering are unchanged. */
             const size_t limit = getenv("DS4_DISABLE_V41_ENGRAM_READERS32") ? 16u : ENGRAM_READERS;
             batch.readers = count < limit ? count : limit;
-#ifdef __APPLE__
-            dispatch_apply_f(batch.readers,
-                dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), &batch, read_batch_part);
-#else
             pthread_t threads[ENGRAM_READERS - 1];
             engram_reader readers[ENGRAM_READERS - 1];
             size_t started = 0;
@@ -365,7 +352,6 @@ bool ds4_engram_read_batch(const ds4_engram_table *t, const uint32_t *rows,
                 read_batch_part(&batch, part);
             for (size_t part = 0; part < started; part++)
                 if (pthread_join(threads[part], NULL)) abort();
-#endif
         } else
         read_batch_part(&batch, 0);
         for (size_t i = 0; i < batch.readers; i++) {
@@ -389,12 +375,8 @@ struct ds4_engram_prefetch {
     float *out;
     bool ok;
     int error;
-#ifdef __APPLE__
-    dispatch_group_t group;
-#else
     pthread_t thread;
     bool threaded;
-#endif
 };
 
 static void prefetch_run(void *context) {
@@ -403,36 +385,24 @@ static void prefetch_run(void *context) {
     if (!p->ok) p->error = errno ? errno : EIO;
 }
 
-#ifndef __APPLE__
 static void *prefetch_thread(void *context) {
     prefetch_run(context);
     return NULL;
 }
-#endif
 
 ds4_engram_prefetch *ds4_engram_read_batch_start(const ds4_engram_table *table, const uint32_t *rows,
                                                  size_t tokens, size_t stride, float *out) {
     ds4_engram_prefetch *p = calloc(1, sizeof(*p));
     if (!p) return NULL;
     *p = (ds4_engram_prefetch){.table = table, .rows = rows, .tokens = tokens, .stride = stride, .out = out};
-#ifdef __APPLE__
-    p->group = dispatch_group_create();
-    dispatch_group_async_f(p->group, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), p, prefetch_run);
-#else
     p->threaded = pthread_create(&p->thread, NULL, prefetch_thread, p) == 0;
     if (!p->threaded) prefetch_run(p);
-#endif
     return p;
 }
 
 bool ds4_engram_read_batch_finish(ds4_engram_prefetch *p) {
     if (!p) return false;
-#ifdef __APPLE__
-    dispatch_group_wait(p->group, DISPATCH_TIME_FOREVER);
-    dispatch_release(p->group);
-#else
     if (p->threaded && pthread_join(p->thread, NULL)) abort();
-#endif
     const bool ok = p->ok;
     if (!ok) errno = p->error;
     free(p);
