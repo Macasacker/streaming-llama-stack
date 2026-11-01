@@ -4363,7 +4363,7 @@ static void ds4_vec_dot_q4_K_q8_K(int n,float*s,const block_q4_K*x,const block_q
         g_external_cpu_dot(n,s,0,x,0,y,0,1);
         if(g_external_cpu_verify){
             static volatile long calls=0;
-            if(_InterlockedIncrement(&calls)<=16){float ref;ds4_vec_dot_q4_K_q8_K_builtin(n,&ref,x,y);fprintf(stderr,"LLAMADECODE_HOST_CPU_DOT n=%d simd=%.9g scalar=%.9g\n",n,*s,ref);}
+            if(__atomic_add_fetch(&calls,1,__ATOMIC_RELAXED)<=16){float ref;ds4_vec_dot_q4_K_q8_K_builtin(n,&ref,x,y);fprintf(stderr,"LLAMADECODE_HOST_CPU_DOT n=%d simd=%.9g scalar=%.9g\n",n,*s,ref);}
         }
         return;
     }

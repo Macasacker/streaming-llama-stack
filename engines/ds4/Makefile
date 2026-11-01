@@ -4,10 +4,14 @@ CUDA_HOME ?= $(shell if [ -x "$(NVCC)" ]; then dirname "$$(dirname "$(NVCC)")"; 
 
 NATIVE_CPU_FLAG ?= -march=native
 DEBUG_FLAGS ?= -g
+# Every object is position independent: ds4-decode.so links the same objects as the
+# executables, and a non-PIC object cannot go into a shared library (TLS relocations
+# fail at link time). The binaries are PIE anyway, so this costs nothing measurable.
+PIC_FLAGS := -fPIC
 # -ffast-math is deliberate: the engine's reduction order is qualified against
 # hash-pinned fixtures, not against IEEE-exact reference math.
 CFLAGS ?= -O3 -ffast-math $(DEBUG_FLAGS) $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c99 \
-	-D_GNU_SOURCE -fno-finite-math-only
+	-D_GNU_SOURCE -fno-finite-math-only $(PIC_FLAGS)
 QUALITY_CFLAGS ?= -O3 $(DEBUG_FLAGS) $(NATIVE_CPU_FLAG) -Wall -Wextra -std=c11
 
 LDLIBS ?= -lm -pthread -luring
@@ -27,7 +31,7 @@ NVCC_ARCH_FLAGS := -arch=$(CUDA_ARCH)
 endif
 endif
 NVCCFLAGS ?= -O3 -g -lineinfo --use_fast_math $(NVCC_ARCH_FLAGS) \
-	-Xcompiler $(NATIVE_CPU_FLAG) -Xcompiler -pthread
+	-Xcompiler $(NATIVE_CPU_FLAG) -Xcompiler -pthread -Xcompiler $(PIC_FLAGS)
 CUDA_LDLIBS ?= -lm -Xcompiler -pthread -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart -lcublas -lcuda -luring
 DS4_LINK ?= $(NVCC) $(NVCCFLAGS)
 DS4_LINK_LIBS ?= $(CUDA_LDLIBS)
@@ -42,10 +46,9 @@ CORE_OBJS = ds4.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_cuda.o ds4_layer_pack
 	ds4_engram_iouring.o ds4_image.o ds4_prompt_prefix.o $(HOST_IO_OBJS) $(MMQ_OBJS)
 CPU_CORE_OBJS = ds4_cpu.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o ds4_engram.o \
 	ds4_engram_iouring.o ds4_image.o ds4_prompt_prefix.o ds4_host_memory_cpu.o
-PIC_FLAGS := -fPIC
 
 .PHONY: all help clean test cpu cuda cuda-generic cuda-decode cuda-regression \
-	test-mxfp4-cuda test-kv-payload-roundtrip test-cpu-fp4 dspark-acceptance \
+	test-mxfp4-cuda test-kv-payload-roundtrip test-cpu-fp4 test-batch-io test-decode-library dspark-acceptance \
 	dspark-verify-depth mtp-verify-depth
 
 all: help
@@ -59,6 +62,8 @@ help:
 	@echo "  make test                      Build and run the tests that need no model file"
 	@echo "  make test-mxfp4-cuda           MXFP4 exactness test (needs tests/test_mxfp4_cuda.cu)"
 	@echo "  make test-cpu-fp4              CPU mirror of the packed FP4 MoE path"
+	@echo "  make test-batch-io             io_uring expert-read transport against pread (no GPU, no model)"
+	@echo "  make test-decode-library       dlopen ds4-decode.so and bind its ds4x_* entry points"
 	@echo "  make dspark-verify-depth       DSpark speculative verification smoke if support GGUF is present"
 	@echo "  make mtp-verify-depth          Legacy MTP speculative verification smoke if MTP GGUF is present"
 	@echo "  make clean                     Remove build outputs"
@@ -91,8 +96,28 @@ ds4-agent: ds4_agent.o ds4_help.o ds4_web.o ds4_kvstore.o linenoise.o ds4_gpu_ar
 
 # The producer loads this beside itself instead of ds4-decode.dll: it binds the
 # ds4x_* entry points in ds4_decode_adapter.inc with dlopen.
-ds4-decode.so: ds4.o ds4_cuda.o ds4_lora.o ds4_image.o $(MMQ_OBJS) $(HOST_IO_OBJS) ds4_layer_pack.o ds4_ssd.o ds4_distributed.o ds4_tp.o
-	$(NVCC) $(NVCCFLAGS) -Xcompiler -fPIC -shared -o $@ $^ $(CUDA_LDLIBS)
+# DS4_EXTERNAL_DECODE is a second compilation of the engine, not a flag on the shared
+# objects: it switches ds4.c and ds4_cuda.cu to decoding on a caller-owned state, and
+# it suppresses the host-memory watchdog, which must not force-kill the producer.
+ds4_ext.o: ds4.c ds4.h ds4_gpu.h ds4_gpu_mgpu.h ds4_layer_pack.h ds4_ssd.h ds4_deepseek41_gpu.h \
+	ds4_host_memory.h ds4_decode_adapter.inc ds4_external_host_cache.inc \
+	ds4_external_host_compute.inc ds4_external_host_compute_wrapper.inc dsv41-native-c-layout.h
+	$(CC) $(CFLAGS) -Wno-unused-function -DDS4_EXTERNAL_DECODE=1 -c -o $@ ds4.c
+
+ds4_cuda_ext.o: ds4_cuda.cu ds4.h ds4_gpu.h ds4_deepseek41_gpu.h ds4_deepseek4_vision_gpu.cuh \
+	ds4_deepseek41_cuda.cuh ds4_ds41_dspark_adaptive.h ds4_ds41_dspark_fault.h ds4_dspark_controller.h \
+	ds4_dspark_q3.h ds4_cuda_dspark_aux.cuh ds4_dspark_aux_graph.cuh ds4_cache_affinity.h \
+	ds4_cache_affinity_adaptive.h ds4_cache_affinity_cuda.cuh ds4_cache_affinity_background.cuh \
+	ds4_host_memory.h ds4_batch_io.h
+	$(NVCC) $(NVCCFLAGS) -DDS4_EXTERNAL_DECODE=1 -c -o $@ ds4_cuda.cu
+
+ds4_host_memory_ext.o: ds4_host_memory.c ds4_host_memory.h
+	$(CC) $(CFLAGS) -DDS4_EXTERNAL_DECODE=1 -c -o $@ ds4_host_memory.c
+
+ds4-decode.so: ds4_ext.o ds4_cuda_ext.o ds4_host_memory_ext.o ds4_lora.o ds4_image.o \
+	$(MMQ_OBJS) ds4_batch_io.o ds4_layer_pack.o ds4_ssd.o ds4_distributed.o ds4_tp.o \
+	ds4_engram.o ds4_engram_iouring.o ds4_prompt_prefix.o ds4_cpu_fp4.o
+	$(NVCC) $(NVCCFLAGS) -shared -o $@ $^ $(CUDA_LDLIBS)
 
 cuda-decode:
 	@if [ -z "$(strip $(CUDA_ARCH))" ]; then \
@@ -281,8 +306,42 @@ tests/test_kv_payload_roundtrip: tests/test_kv_payload_roundtrip.o $(CORE_OBJS)
 test-kv-payload-roundtrip: tests/test_kv_payload_roundtrip
 	DS4_TEST_MODEL="$(DS4_TEST_MODEL)" ./tests/test_kv_payload_roundtrip --all-formats
 
+# The io_uring expert-read transport, gated without a GPU and without a model file. The transport
+# only creates a CUDA stream when a batch actually has device destinations, so this runs while
+# another process holds the GPU.
+tests/test_batch_io.o: tests/test_batch_io.cpp ds4_batch_io.h
+	$(CXX) -O3 -g -std=c++17 -Wall -Wextra -I. -I$(CUDA_HOME)/include -c -o $@ $<
+
+tests/test_batch_io: tests/test_batch_io.o ds4_batch_io.o
+	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(CUDA_LDLIBS)
+
+DS4_IO_FILE ?= /tmp/ds4-batch-io.bin
+.PHONY: test-batch-io
+test-batch-io: tests/test_batch_io
+	@if [ ! -f "$(DS4_IO_FILE)" ]; then dd if=/dev/urandom of="$(DS4_IO_FILE)" bs=1M count=64 status=none; fi
+	./tests/test_batch_io "$(DS4_IO_FILE)" 1,4,8 1,8,16
+
+# The decode library is loaded by the producer with dlopen (chunk 3.2 wires that).
+# This binds the exported ABI and exercises the two host-side entry points that need
+# no GPU and no model file.
+tests/test_decode_library.o: tests/test_decode_library.cpp ds4_external_host_cache.h
+	$(CXX) -O3 -g -std=c++17 -Wall -Wextra -I. -c -o $@ $<
+
+tests/test_decode_library: tests/test_decode_library.o
+	$(CC) -O2 $(DEBUG_FLAGS) -o $@ $^ -ldl
+
+DS4_NOT_MODEL ?= /tmp/ds4-not-a-model.bin
+.PHONY: test-decode-library
+test-decode-library: ds4-decode.so tests/test_decode_library
+	@if [ ! -f "$(DS4_NOT_MODEL)" ]; then head -c 4096 /dev/urandom > "$(DS4_NOT_MODEL)"; fi
+	./tests/test_decode_library ./ds4-decode.so "$(DS4_NOT_MODEL)"
+
+# The packed FP4 MoE CPU lane: AVX-512 BW/VL/DQ/VNNI plus F16C/FMA, checked at runtime.
+ds4_cpu_fp4.o: ds4_cpu_fp4.cpp ds4.h
+	$(CXX) $(PIC_FLAGS) -O3 -g -std=c++17 -Wall -Wextra $(NATIVE_CPU_FLAG) -c -o $@ $<
+
 tests/test_cpu_fp4: tests/test_cpu_fp4.cpp ds4_cpu_fp4.cpp ds4.h
-	$(CXX) -O2 -Wall -Wextra -std=c++17 -o $@ tests/test_cpu_fp4.cpp ds4_cpu_fp4.cpp -lm
+	$(CXX) -O2 -Wall -Wextra -std=c++17 $(NATIVE_CPU_FLAG) -o $@ tests/test_cpu_fp4.cpp ds4_cpu_fp4.cpp -lm
 	./tests/test_cpu_fp4
 
 test-cpu-fp4: tests/test_cpu_fp4

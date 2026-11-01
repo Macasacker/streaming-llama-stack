@@ -3897,7 +3897,9 @@ int ds4_gpu_qwen4_mtp_combine_tensor(
 
 
 #ifdef DS4_EXTERNAL_DECODE
-/* LLAMADECODE (ds4-decode.dll only): run ds4-win's decode on another engine's
+#include "ds4_export.h"   /* DS4X_EXPORT */
+
+/* LLAMADECODE (ds4-decode.so only): run ds4's decode on another engine's
  * resident weights and expert cache. */
 int ds4_gpu_register_external_range(const void *model_map, uint64_t offset, uint64_t bytes, void *device_ptr);
 void ds4_gpu_external_decode_mode(int on);   /* unregistered weights refuse */

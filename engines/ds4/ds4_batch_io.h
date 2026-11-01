@@ -92,7 +92,8 @@ void ds4_ds_prefill_waves_release(void);
 uint32_t ds4_ds_batch_count(void);
 /* Pending bytes and conservative logical batch_add span capacity. With the default
  * DS4_DS_READ_PARTS=8, a span can expand to several physical requests; capacity already
- * accounts for that expansion. batch_count counts physical requests. */
+ * accounts for that expansion. batch_count counts pending logical spans, which is what
+ * batch_add refuses on. */
 uint64_t ds4_ds_batch_bytes(void);
 uint32_t ds4_ds_batch_capacity(void);
 

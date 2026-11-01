@@ -16,11 +16,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
 #include "ds4_host_memory.h"
+#include "ds4_export.h"   /* DS4X_EXPORT, only under DS4_EXTERNAL_DECODE */
 #include "ds4_linux_memory.h"
 #include <unordered_map>
 #include <vector>

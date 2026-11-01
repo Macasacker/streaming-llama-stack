@@ -28,10 +28,9 @@
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <intrin.h>
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
+#include <cpuid.h>
+#include <sys/resource.h>
+#include <unistd.h>
 
 namespace {
 constexpr int DIM_IN = 5120, DIM_MID = 2304, DIM_OUT = 5120, MAXE = 6;
@@ -235,7 +234,9 @@ static void work(int tid) {
 }
 
 static void worker_main(int tid) {
-    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+    /* A scheduling hint, not a correctness requirement: the arithmetic is identical
+     * whether the priority change is granted. */
+    setpriority(PRIO_PROCESS, 0, -1);
     uint64_t seen = 0;
     for (;;) {
         {
@@ -255,12 +256,12 @@ static void worker_main(int tid) {
 }
 
 static bool cpu_ok() {
-    int r[4];
-    __cpuidex(r, 7, 0);
-    const bool avx512f = r[1] & (1 << 16), bw = r[1] & (1 << 30), vl = r[1] & (1u << 31), dq = r[1] & (1 << 17);
-    const bool vnni = r[2] & (1 << 11);
-    __cpuid(r, 1);
-    const bool f16c = r[2] & (1 << 29), fma = r[2] & (1 << 12);
+    unsigned a = 0, b = 0, c = 0, d = 0;
+    __cpuid_count(7, 0, a, b, c, d);
+    const bool avx512f = b & (1u << 16), bw = b & (1u << 30), vl = b & (1u << 31), dq = b & (1u << 17);
+    const bool vnni = c & (1u << 11);
+    __cpuid(1, a, b, c, d);
+    const bool f16c = c & (1u << 29), fma = c & (1u << 12);
     return avx512f && bw && vl && dq && vnni && f16c && fma;
 }
 } // namespace

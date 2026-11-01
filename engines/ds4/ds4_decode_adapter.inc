@@ -1,24 +1,20 @@
 /* LLAMADECODE: ds4-win's own V4.1 single-token decode (ds41_graph_step and
  * everything it calls, unchanged) driven on another engine's state.
  *
- * Built only with -DDS4_EXTERNAL_DECODE=1 (ds4-decode.dll). Normal ds4-win
- * builds do not include this file. The caller (the streaming-llama ULTRA
+ * Built only with -DDS4_EXTERNAL_DECODE=1 (ds4-decode.so). Normal engine builds
+ * do not include this file. The caller (the streaming-llama ULTRA
  * producer) owns:
  *   - every weight the decode reads: it registers each tensor's file offset
  *     against its own device copy (ds4_gpu_register_external_range); an
  *     unregistered weight is a refusal, never a host mapping;
  *   - the canonical V4.1 state: raw rings, compressed/index caches and pool
- *     tails, bound as views (same layout and values as ds4-win's own);
+ *     tails, bound as views (same layout and values as ds4's own);
  *   - the routed experts: a hook returns cache-pool bases and slot ids.
- * ds4-win allocates its per-token scratch. The optional versioned host-cache
+ * ds4 allocates its per-token scratch. The optional versioned host-cache
  * bridge reuses ds4's pinned cache for producer-owned expert victims. No
  * standalone streamer, prefill workspace or draft model starts here. */
 #ifdef DS4_EXTERNAL_DECODE
-#if defined(_WIN32)
-#define DS4X_EXPORT __declspec(dllexport)
-#else
-#define DS4X_EXPORT __attribute__((visibility("default")))
-#endif
+/* DS4X_EXPORT comes from ds4_gpu.h. */
 
 static struct {
     bool open;
@@ -136,9 +132,30 @@ DS4X_EXPORT int ds4x_vision_file(const char *model_path, const char *vision_path
     model_close(&e->vision_model);model_close(&e->model);free(e);return ok;
 }
 
+/* The engine loader exits the process on a file it cannot read as a model, which is correct
+ * for standalone ds4 and fatal for a library the producer has loaded. Preflight the GGUF
+ * header so an obvious wrong path is a refusal. A truncated or corrupt GGUF still dies in the
+ * loader, as it does standalone; the producer checks the model path before loading this
+ * library. */
+static bool ds4x_gguf_preflight(const char *path, char *error, size_t cap) {
+    const int fd = open(path, O_RDONLY);
+    if (fd < 0) { ds4x_set_error(error, cap, "ds4x_open cannot open the model file"); return false; }
+    struct stat st;
+    uint32_t magic = 0;
+    /* magic + version + n_tensors + n_kv: the shortest header the loader reads before it
+     * starts walking metadata. */
+    const bool header_readable = fstat(fd, &st) == 0 && (uint64_t)st.st_size >= 24
+        && pread(fd, &magic, sizeof(magic), 0) == (ssize_t)sizeof(magic);
+    close(fd);
+    if (!header_readable) { ds4x_set_error(error, cap, "ds4x_open model file is shorter than a GGUF header"); return false; }
+    if (magic != DS4_GGUF_MAGIC) { ds4x_set_error(error, cap, "ds4x_open model file is not a GGUF file"); return false; }
+    return true;
+}
+
 DS4X_EXPORT int ds4x_open(const char *model_path, uint32_t ctx, char *error, size_t cap) {
     if (g_ds4x.open) { ds4x_set_error(error, cap, "ds4x already open"); return 0; }
     if (!model_path || !ctx) { ds4x_set_error(error, cap, "ds4x_open requires a model and context"); return 0; }
+    if (!ds4x_gguf_preflight(model_path, error, cap)) return 0;
     model_open(&g_ds4x.model, model_path, false, false);
     config_validate_model(&g_ds4x.model);
     if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK41) {

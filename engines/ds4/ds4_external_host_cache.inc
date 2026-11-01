@@ -28,7 +28,7 @@ static void external_host_release_payload(void) {
     uint64_t n[3] = {c->gate_capacity,c->up_capacity,c->down_capacity};
     external_host_unregister();
     for(int k=0;k<3;++k) {
-        if(g_external_host_locked[k]) VirtualUnlock(p[k],size_t(n[k]));
+        if(g_external_host_locked[k]) munlock(p[k],size_t(n[k]));
         g_external_host_locked[k]=false;
     }
     cuda_stream_host_expert_cache_release(c,0);
@@ -63,10 +63,10 @@ static uint32_t external_host_resize(uint64_t bytes, uint64_t gate, uint64_t dow
     external_host_clear();
     if(!wanted)return 0;
     g_external_host_index.assign(40u*384u,-1);
-    /* WDDM can reject a multi-GiB CUDA-pinned tier despite abundant RAM.
-     * Reuse ds4's pageable allocator for the payload, but VirtualLock every
-     * page: this tier is never swappable. One expert's existing pinned cache
-     * buffers stage both directions. No pageable pointer reaches CUDA. */
+    /* Reuse ds4's pageable allocator for the payload, but mlock every page so this
+     * tier is never swappable (mlock needs RLIMIT_MEMLOCK or a cgroup allowance for
+     * the tier). One expert's existing pinned cache buffers stage both directions.
+     * No pageable pointer reaches CUDA. */
     if(!external_host_allocate(&g_external_host_stage,1,gate,down,1)){
         fprintf(stderr,"LLAMADECODE_HOST_RESIZE_REFUSED reason=pinned_one_expert_stage wanted=%u error=%s\n",wanted,cudaGetErrorString(cudaGetLastError()));
         return 0;}
@@ -75,9 +75,9 @@ static uint32_t external_host_resize(uint64_t bytes, uint64_t gate, uint64_t dow
         if (!external_host_allocate(cache,n,gate,down,0)) {fprintf(stderr,"LLAMADECODE_HOST_RESIZE_STEP reason=allocation slots=%u\n",n);continue;}
         char *p[3]={cache->gate_ptr,cache->up_ptr,cache->down_ptr};
         uint64_t sizes[3]={cache->gate_capacity,cache->up_capacity,cache->down_capacity};
-        /* RAMFIX: register the payload with CUDA first (the driver pins it, so no VirtualLock;
-         * WDDM refuses to register already-locked pages). RAM hits then DMA straight from it,
-         * with no CPU staging copy. Any refusal keeps the locked, staged path. */
+        /* RAMFIX: register the payload with CUDA first (the driver pins it, so no mlock;
+         * the driver refuses to register already-locked pages). RAM hits then DMA straight
+         * from it, with no CPU staging copy. Any refusal keeps the locked, staged path. */
         bool registered_all=false;
         {static const bool want=[]{const char*v=getenv("LLAMADECODE_HOST_REGISTER");return !(v&&v[0]=='0'&&!v[1]);}();
          /* Bounded, slot-aligned chunks: no expert copy spans two registrations. */
@@ -100,10 +100,10 @@ static uint32_t external_host_resize(uint64_t bytes, uint64_t gate, uint64_t dow
         bool locked=true;
         if(!registered_all)
         {for(int k=0;k<3;++k){
-            if(!VirtualLock(p[k],size_t(sizes[k]))){locked=false;break;}
+            if(mlock(p[k],size_t(sizes[k]))!=0){locked=false;break;}
             g_external_host_locked[k]=true;
         }}
-        if(!locked){fprintf(stderr,"LLAMADECODE_HOST_RESIZE_STEP reason=virtual_lock slots=%u error=%lu\n",n,(unsigned long)GetLastError());external_host_release_payload();continue;}
+        if(!locked){fprintf(stderr,"LLAMADECODE_HOST_RESIZE_STEP reason=mlock slots=%u errno=%d\n",n,errno);external_host_release_payload();continue;}
 
         cache->slots.swap(slots);
         return n;
@@ -212,7 +212,7 @@ static int external_host_store_host(uint32_t layer, uint32_t expert, const char 
     return 1;
 }
 
-extern "C" __declspec(dllexport) int ds4x_host_cache_v2(ds4_external_host_cache_v2 *api) {
+extern "C" DS4X_EXPORT int ds4x_host_cache_v2(ds4_external_host_cache_v2 *api) {
     if (!api) return 0;
     api->v1 = {external_host_resize, external_host_find, external_host_upload, external_host_store, external_host_clear};
     api->payload = external_host_payload; api->store_host = external_host_store_host;
@@ -220,7 +220,7 @@ extern "C" __declspec(dllexport) int ds4x_host_cache_v2(ds4_external_host_cache_
     return 1;
 }
 
-extern "C" __declspec(dllexport) int ds4x_host_cache_v1(ds4_external_host_cache_v1 *api) {
+extern "C" DS4X_EXPORT int ds4x_host_cache_v1(ds4_external_host_cache_v1 *api) {
     if (!api) return 0;
     *api = {external_host_resize, external_host_find, external_host_upload, external_host_store, external_host_clear};
     return 1;

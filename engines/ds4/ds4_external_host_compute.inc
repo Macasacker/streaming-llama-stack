@@ -56,7 +56,7 @@ static bool external_cpu_choose(uint32_t count){
     const double upload=g_external_upload_cost_ms/g_external_upload_samples;
     return cpu<upload||calls%128==0;
 }
-extern "C" __declspec(dllexport) void ds4x_host_timing_v1(double *times,uint64_t *counts){
+extern "C" DS4X_EXPORT void ds4x_host_timing_v1(double *times,uint64_t *counts){
     if(times){times[0]=g_external_cpu_ms;times[1]=g_external_wait_ms;times[2]=g_external_transfer_ms;times[3]=g_external_merge_ms;}
     if(counts){counts[0]=g_external_cpu_experts;counts[1]=g_external_cpu_layers;}
 }

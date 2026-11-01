@@ -1561,7 +1561,7 @@
     "doc": "Record unbiased per-layer routing spreads and write their calibration when the engine closes. Use bias0 with at least16 decoded samples per layer. Restart with the resulting spread file for live quality controls.",
     "reads": [
       "engines/ds4/ds4.c:76404",
-      "engines/ds4/ds4_decode_adapter.inc:264"
+      "engines/ds4/ds4_decode_adapter.inc:285"
     ],
     "code_defaults": [
       {
@@ -1571,7 +1571,7 @@
         "consumer": "    }\n    const char *spread = opt->cache_affinity_spread_file ? opt->cache_affinity_spread_file : getenv(\"DS4_CACHE_AFFINITY_SPREAD_FILE\");\n    const char *calibrate = opt->cache_affinity_calibrate ? opt->cache_affinity_calibrate : getenv(\"DS4_CACHE_AFFINITY_CALIBRATE\");\n    uint32_t warmup = opt->cache_affinity_warmup_set ? opt->cache_affinity_warmup_tokens : 100u;\n    uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;\n    uint32_t cap = opt->cache_affinity_promotion_cap ? opt->cache_affinity_promotion_cap : 1u;\n    const char *warm_env=getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\"), *ramp_env=getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\"), *cap_env=getenv(\"DS4_CACHE_AFFINITY_PROMOTION_CAP\");"
       },
       {
-        "source": "engines/ds4/ds4_decode_adapter.inc:264",
+        "source": "engines/ds4/ds4_decode_adapter.inc:285",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *calibrate=getenv(\"DS4_CACHE_AFFINITY_CALIBRATE\");",
         "consumer": "    if (!g_ds4x.open || !isfinite(mean) || mean < 0.0f || mean > 1.36125f) return 0;\n    ds4_gpu_set_external_residency_hook(residency, user);\n    const char *calibrate=getenv(\"DS4_CACHE_AFFINITY_CALIBRATE\");\n    if (!ds4_gpu_cache_affinity_configure(mean, warmup, ramp, spread_file, calibrate, 0, 0u, 0)) return 0;\n    g_cache_affinity_observe=calibrate && *calibrate;\n    if ((mean > 0.0f || g_cache_affinity_observe) &&\n        !ds4_gpu_cache_affinity_prepare_model(g_ds4x.model.map, g_ds4x.model.size, DS4_N_EXPERT, DS4_N_LAYER)) return 0;"

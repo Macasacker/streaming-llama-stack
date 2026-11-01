@@ -268,8 +268,23 @@ bool cqe_result(const io_uring_cqe *cqe, const ds4_tag &tag, const char *what, i
     return true;
 }
 
+/* The upload stream is created on first use, not at transport init. A batch with host
+ * destinations never touches CUDA, so the selftest and a host-only decode run without a CUDA
+ * context. The first device batch that cannot create the stream fails loudly, as every other
+ * CUDA-side refusal here does. */
+bool upload_stream_ensure(void) {
+    if (g_upload_stream) return true;
+    if (cudaStreamCreateWithFlags(&g_upload_stream, cudaStreamNonBlocking) != cudaSuccess) {
+        g_upload_stream = nullptr;
+        report("ds4: transport upload stream creation FAILED\n");
+        return false;
+    }
+    return true;
+}
+
 /* Move a completed device batch into the CUDA arena on the upload stream. */
 bool upload_reqs(const std::vector<ds4_req> &reqs, void *device, const char *what) {
+    if (!upload_stream_ensure()) return false;
     for (const auto &req : reqs) {
         const cudaError_t err = cudaMemcpyAsync(
             (char *)device + req.device_offset, req.host, req.bytes,
@@ -505,14 +520,6 @@ extern "C" int ds4_ds_init_from_fd(int fd) {
     if (!controls_from_env()) return 0;
     if (!ring_create(g_demand, g_queue_capacity, "demand")) return 0;
     if (!ring_create(g_background, 32, "background")) return 0;
-    if (cudaStreamCreateWithFlags(&g_upload_stream, cudaStreamNonBlocking) != cudaSuccess) {
-        report("ds4: transport init: upload stream creation failed\n");
-        io_uring_queue_exit(&g_demand.ring);
-        g_demand.live = false;
-        io_uring_queue_exit(&g_background.ring);
-        g_background.live = false;
-        return 0;
-    }
     g_fd = fd;
     g_file_dev = dev;
     g_file_ino = ino;
@@ -526,6 +533,15 @@ extern "C" int ds4_ds_init_from_fd(int fd) {
 
 extern "C" int ds4_ds_available(void) { return g_init_ok ? 1 : 0; }
 
+/* Logical batch limit: a span can split into `read_parts` physical requests, so the number of
+ * pending batch_add calls is the ring capacity divided by that worst case. This is the limit
+ * batch_add refuses on and the number ds4_ds_batch_capacity() reports, so a caller that sizes a
+ * layer's expert batch from the capacity cannot queue a batch the ring cannot hold. */
+uint32_t logical_capacity(void) {
+    if (!g_init_ok) return 0;
+    return g_read_parts > 1 ? (uint32_t)(g_queue_capacity / g_read_parts) : (uint32_t)g_queue_capacity;
+}
+
 extern "C" void ds4_ds_batch_reset(void) {
     g_batch.clear();
     g_batch_bytes = 0;
@@ -537,7 +553,7 @@ extern "C" int ds4_ds_batch_add(uint64_t file_offset, uint32_t bytes, void *dst_
     if (!g_init_ok || !dst_host || !bytes) return 0;
     if (g_batch_gpu) { g_gpu_add_fail_reason = 6; return 0; }
     if (file_offset + bytes > g_file_size) return 0;
-    if (g_batch.size() >= g_queue_capacity) return 0;
+    if (g_batch.size() >= logical_capacity()) return 0;
     g_batch.push_back({file_offset, bytes, dst_host, 0});
     g_batch_bytes += bytes;
     return 1;
@@ -545,6 +561,7 @@ extern "C" int ds4_ds_batch_add(uint64_t file_offset, uint32_t bytes, void *dst_
 
 extern "C" int ds4_ds_gpu_arena_create(uint64_t bytes, void **out_cuda_ptr) {
     if (!g_init_ok || !bytes || !out_cuda_ptr) return 0;
+    if (!upload_stream_ensure()) return 0;
     void *device = nullptr;
     if (cudaMalloc(&device, bytes) != cudaSuccess || !device) {
         report("ds4: GPU arena cudaMalloc %.2fMiB failed\n", (double)bytes / (1024.0 * 1024.0));
@@ -573,7 +590,7 @@ extern "C" int ds4_ds_batch_add_gpu(uint64_t file_offset, uint32_t bytes, uint64
     if (!g_gpu_cuda_ptr) { g_gpu_add_fail_reason = 2; return 0; }
     if (!bytes) { g_gpu_add_fail_reason = 3; return 0; }
     if (arena_offset + bytes > g_gpu_arena_size) { g_gpu_add_fail_reason = 4; return 0; }
-    if (g_batch.size() >= g_queue_capacity) { g_gpu_add_fail_reason = 5; return 0; }
+    if (g_batch.size() >= logical_capacity()) { g_gpu_add_fail_reason = 5; return 0; }
     if (!g_batch_gpu && !g_batch.empty()) { g_gpu_add_fail_reason = 6; return 0; }
     if (file_offset + bytes > g_file_size) { g_gpu_add_fail_reason = 7; return 0; }
     g_batch_gpu = true;
@@ -594,6 +611,7 @@ extern "C" int ds4_ds_prefill_arenas_create(const uint64_t *bytes, uint32_t coun
     }
     arena_release();
     prefill_arenas_release();
+    if (!upload_stream_ensure()) return 0;
     for (uint32_t i = 0; i < count; ++i) {
         void *device = nullptr;
         if (cudaMalloc(&device, bytes[i]) != cudaSuccess || !device) {
@@ -725,6 +743,10 @@ extern "C" int ds4_ds_prefill_wave_cuda_wait(uint64_t fence_value, void *cuda_st
         }
         uint64_t bytes = 0;
         for (const auto &req : w.spans) bytes += req.bytes;
+        if (!upload_stream_ensure()) {
+            w.error = -EIO;
+            return 0;
+        }
         if (w.event) cudaEventRecord(w.event, g_upload_stream);
         if (cuda_stream) {
             if (cudaStreamWaitEvent((cudaStream_t)cuda_stream, w.event, 0) != cudaSuccess) {
@@ -764,10 +786,7 @@ extern "C" uint32_t ds4_ds_batch_count(void) { return (uint32_t)g_batch.size(); 
 extern "C" uint64_t ds4_ds_batch_bytes(void) { return g_batch_bytes; }
 
 /* Logical capacity: a span that splits into parts consumes several physical SQE slots. */
-extern "C" uint32_t ds4_ds_batch_capacity(void) {
-    const uint64_t cap = g_init_ok ? g_queue_capacity : 0;
-    return g_read_parts > 1 ? (uint32_t)(cap / g_read_parts) : (uint32_t)cap;
-}
+extern "C" uint32_t ds4_ds_batch_capacity(void) { return logical_capacity(); }
 
 extern "C" void ds4_ds_stats_set_phase(int decode) { g_phase_decode = decode ? 1 : 0; }
 
