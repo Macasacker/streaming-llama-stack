@@ -45,6 +45,12 @@ make -C engines/ds4 test-batch-io            # needs /tmp/ds4-batch-io.bin (64 M
 # dlopen ds4-decode.so and bind its ds4x_* entry points: no GPU, no model.
 make -C engines/ds4 test-decode-library
 
+# The engine has no Win32 host code left. Vendored files are excluded on purpose.
+grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
+  --include=*.c --include=*.cpp --include=*.h --include=*.hpp \
+  --include=*.cu --include=*.cuh --include=*.inc
+# 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
+
 cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 ```
 

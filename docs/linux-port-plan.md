@@ -235,12 +235,20 @@ Known gaps carried forward, not hidden:
 - The io_uring transport is correct-by-construction but unmeasured. No model file exists on this
   box, so `ds4_ds_selftest` and the decode pipeline have never run against real weights.
 - Reads are buffered. `O_DIRECT` with 4 KiB-aligned offsets and buffers is a separate chunk.
-- `ds4_cuda.cu` still has 34 `#if defined(_WIN32)` guards and `ds4.c` has Windows host code left;
-  they compile away on Linux. Phase 2 deletes them, and the Phase 2 grep gate cannot pass until
-  then.
-- `./ds4 --help` still advertises `--metal`. Help text and CLI backend names are Phase 2 work.
-- `engines/ds4-win`, `engines/ds4-mac` and `engines/ds4-peer` still exist until chunk 1.8 lands,
-  so the fork temporarily has four engines.
+- The engine refuses four things on Linux, because their only implementation was Windows-only
+  and chunk 2.1 deleted it: the two-process combo handoff, expert-cache restore and snapshot at
+  relaunch, background affinity promotion, and output LoRA. Each prints a refusal naming the
+  build rather than failing silently. Porting any of them is new work, not a port - decide which
+  are wanted before Phase 5 rewrites `combo_ram.py`.
+- `--ds-read-parts` is parsed but refused on Linux; `DS4_DS_READ_PARTS` is the only way to set the
+  transport's span count. Making the flag call `ds4_ds_configure_read_parts` before the transport is
+  initialised is a small, separate change.
+- `./ds4 --help` still advertises `--metal`, `--backend metal`, `--metal-graph-test`,
+  `--ssd-streaming-full-layers` (GLM Metal) and `--expert-profile` (Metal-only). Help text and CLI
+  backend names are chunk 2.2 work: `engines/ds4` holds 4,100 Apple/Metal references, 3,959 of
+  them in `ds4.c`.
+- `engines/ds4-win`, `engines/ds4-mac` and `engines/ds4-peer` are deleted (chunk 1.8 settled by
+  1.10a); `engines/` holds `ds4` and `streaming-llama` only.
 
 ## Phase 2: engine host layer
 
@@ -435,10 +443,44 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     list is DeepSeek V4.x on ds4 CUDA; Kimi, GLM, MiniMax and Step lose their MLX decode, and
     `general` mode now raises. Decision 3: ROCm stays deleted, there is no AMD hardware here.
 
-2.1 Remaining Win32 host code in the engine: `ds4.c` (~50 refs), `ds4_cuda.cu` (34 guards),
-    `ds4_cli.c`, `ds4_server.c`, `ds4_agent.c` (drive-letter path handling), `ds4_web.c`,
-    `ds4_ssd.c`, `ds4_kvstore.c`, `ds4.h`, `ds4_gpu.h`, `ds4_peer.c` (deleted with 1.9),
-    `ds4_combo_api.inc` (Windows-only; delete). Gate: `grep -rn "_WIN32\|windows.h\|Win32\|DStorage\|IoRing" engines/ds4` returns nothing.
+2.1 Remaining Win32 host code in the engine. Done. Every conditional whose expression named
+    Win32 now compiles to what the Linux build already compiled: the Windows branch is gone and
+    the branch Linux already took is unconditional. 4,088 lines of engine source deleted; no Linux
+    code path changed.
+
+    The gate is
+    `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4` restricted to source
+    extensions (`--include=*.c --include=*.cpp --include=*.h --include=*.hpp --include=*.cu
+    --include=*.cuh --include=*.inc`), because the gate as first written also matched build
+    outputs. It returns three hits, all vendored and deliberately untouched:
+    `engines/ds4/external/nlohmann/json.hpp` (two, the header `ds4_lora.cpp` uses) and the
+    upstream `linenoise.c` feature comment.
+
+    What went with the Windows branches: the two-process combo handoff (`ds4_combo_api.inc` keeps
+    only its refusal stubs; `ds4_native_checkpoint.h`, the BCrypt checkpoint hasher, is deleted),
+    asynchronous expert-cache restore and snapshot (`ds4_expert_restore_async.cuh`, now stubs), and
+    background affinity promotion (`ds4_cache_affinity_background.cuh`, stubs). Each refuses with a
+    message naming the build; none reports success. `ds4_web.c` is the opposite case - the whole
+    file was a Windows guard whose `#else` branch is a real POSIX implementation, so that 1,456-line
+    browser-tool implementation is now unconditional and live.
+
+    Refusal text that named Windows as the requirement now says what is true here. One refusal kept
+    its behaviour and lost its stale reason: `--ds-read-parts` is refused at engine open, as it was
+    on Linux before this chunk, because the code that applied the option value to the transport
+    (`ds4_ds_configure_read_parts`) sat in the deleted Windows branch. The CLI parses the flag into
+    `ds4_engine_options.ds_read_parts` (`ds4_cli.c:2215`, `ds4_server.c:17017`) and nothing reads it
+    on Linux; `DS4_DS_READ_PARTS` is the live path. Wiring the flag to the transport is a one-line
+    follow-up, listed under the known gaps.
+
+    Gate met: `make cuda CUDA_ARCH=sm_120 -j4` and `make cuda-decode CUDA_ARCH=sm_120` build with
+    the warning profile the pre-change sources had; the CPU objects compile with the same warnings
+    as the same objects built from the pre-change sources; `test-batch-io`, `test-decode-library`,
+    `test-cpu-fp4` and `./ds4 --help` pass. Equivalence was checked, not assumed: `gcc -E
+    -fdirectives-only -P` per changed `.c` file, before and after, yields the same live line count
+    and differs only in four refusal strings; `nvcc -E` on `ds4_cuda.cu` differs only in three
+    refusal strings and one `__LINE__` inside a HOST_MEMORY trace line. `envvars.json` and
+    `docs/VARIABLES.md` were regenerated: no variable name was added or removed, only source line
+    numbers and the snippets of read sites that were inside the deleted branches.
 
 2.2 Apple/Metal dead code in the engine (4,109 refs, most inside `#ifdef __APPLE__` blocks in
     `ds4.c`, `ds4_gpu.h`, `ds4_tp.c`, `ds4_image.c`, `ds4_web.c`, `ds4_cli.c`, `ds4_help.c`).
@@ -516,20 +558,20 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts: Phase 0 about 940 Windows references and about 12,300 Apple/MLX references. After chunk
-1.7 the repo is 1,131 Windows and 13,878 Apple/MLX, with `engines/ds4` at 162 Windows and 4,109
-Apple/Metal references. After chunks 1.10a, 1.10b and 1.10c: 495 Apple/MLX references outside
-`engines/ds4` (mostly `engines/streaming-llama` and vendored Studio), 281 Windows references
-outside `engines/ds4`, `engines/` holds only `ds4` and `streaming-llama`, and the working tree is
-about 518 MB with a 55 MB `.git`. Re-count before trusting any of these numbers.
+Counts, re-counted after chunk 2.1 with the commands above: 752 Windows references across
+`engines slstack vendor scripts examples tests docs README.md`, of which 3 are first-party
+`engines/ds4` hits and all three are vendored files; 7,978 Apple/MLX references repo-wide, 4,100 of
+them inside `engines/ds4`. Re-count before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.
 
 Python suite: `timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p
-'test_*.py'` runs 677 tests with 5 failures and 6 errors. The fork baseline was 8 failures and 6
-errors, so nothing regressed. The survivors are Linux gaps, not Mac leftovers: Windows-only guard
-and producer paths (`test_combo_process`, `test_shared_guard_adapter`, `test_single_liveness`,
+'test_*.py'` runs 584 tests with 5-6 failures and 5 errors (fork baseline 6 failures and 6 errors
+over 585). Two of the process tests vary run to run (`test_real_owned_child_stops_on_kit11_hold`,
+`test_disconnect_inside_reasoning_then_next_turn_appends_only`), so compare the set of names, not
+the count. The stable survivors are Linux gaps, not Mac leftovers: Windows-only guard and producer
+paths (`test_combo_process`, `test_shared_guard_adapter`, `test_single_liveness`,
 `test_journal_recovery_flags`), the missing `cosmos_windows` vendor module
 (`test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco`), and GPU/video gates that need a
 model on disk (`test_h3_video_delivery`, `test_yoco_transfer`). Chunk 5.1 and 8.1 own them.

@@ -6,9 +6,9 @@ Runnable commands for the user: `docs/linux-port-commands.md`.
 
 ## What the next session is for
 
-Chunk 1.6 is committed (`90b8605`). Take chunk 2.1 (Windows host code inside `engines/ds4`) and
-2.2 (Apple/Metal dead code). Everything verified so far is a compile or host-code gate; nothing is
-a performance result, because no model weights are on disk.
+Chunks 1.6 and 2.1 are committed. Take chunk 2.2 (Apple/Metal dead code inside `engines/ds4`,
+4,100 refs, 3,959 of them in `ds4.c`). Everything verified so far is a compile or host-code gate;
+nothing is a performance result, because no model weights are on disk.
 
 ## State
 
@@ -17,12 +17,33 @@ Commits, oldest first: `58ff877` (chunk 1: `engines/ds4` from the Windows engine
 `6dc410f` (1.10b: one environment scope), `4abb73f` (1.10c: delete the Mac Python surface),
 `bc439fe` (plan update), `5c32214` (handoff + command notes + nvcc shared-link fix),
 `ebc5ba4` (1.10d: dead Mac/Windows branches in the launcher), `90b8605` (1.6: the decode library
-builds and is gated without a GPU or a model file).
+builds and is gated without a GPU or a model file), `8c2ac02` (plan and handoff for 1.6),
+`171319a` (2.1: Win32 host code deleted from `engines/ds4`).
 
 `python3 -B scripts/release_check.py` reports 0 findings, so commits need no `--no-verify`.
-Python suite: **584 tests, 6 failures, 5 errors** (fork baseline 585 tests, 6 failures, 6 errors).
-The environment-contract error (`Environment table out of date`) is fixed; the survivors are the
-same Windows/vendor-gated paths and GPU/video gates that need a model on disk.
+Python suite: **584 tests, 5-6 failures, 5 errors** (fork baseline 585 tests, 6 failures, 6
+errors). Two process tests vary run to run, so compare the failing names rather than the count.
+
+## What chunk 2.1 landed
+
+4,088 lines of engine source deleted, no Linux code path changed. The rule was mechanical: for each
+conditional mentioning `_WIN32`/`windows.h`/`Win32`/`DStorage`/`IoRing`, keep what Linux already
+compiled and delete the rest. Largest sites: `ds4_cuda.cu` 2,242, `ds4.c` 748,
+`ds4_combo_api.inc` 285, `ds4_expert_restore_async.cuh` 249, `ds4_agent.c` 224,
+`ds4_cache_affinity_background.cuh` 179, `ds4_server.c` 71, `ds4_web.c` 48.
+
+Deleted subsystems, each now a refusal that names the build rather than a silent success:
+combo handoff (`ds4_combo_api.inc` keeps its stubs; `ds4_native_checkpoint.h` deleted with its
+BCrypt hasher), expert-cache restore and snapshot, background affinity promotion, output LoRA.
+`ds4_web.c`'s guard hid the real POSIX browser-tool implementation in its `#else` branch; that is
+now unconditional and live.
+
+Gate results: `make cuda CUDA_ARCH=sm_120 -j4`, `make cuda-decode`, the CPU objects, and
+`test-batch-io` / `test-decode-library` / `test-cpu-fp4` / `./ds4 --help` all pass with the
+pre-change warning profile. `gcc -E -fdirectives-only -P` before vs after is identical per changed
+`.c` file except four refusal strings; `nvcc -E` on `ds4_cuda.cu` differs only in three strings and
+one `__LINE__` in a HOST_MEMORY trace. `envvars.json` and `docs/VARIABLES.md` regenerated; the
+variable name set is unchanged.
 
 ## What chunk 1.6 landed (`90b8605`)
 
@@ -94,12 +115,18 @@ same Windows/vendor-gated paths and GPU/video gates that need a model on disk.
 
 ## Next chunks, in order
 
-From `docs/linux-port-plan.md`: 2.1 (Windows code inside `engines/ds4`, 154 refs left:
-`ds4.c` 43, `ds4_cuda.cu` 41, `ds4_agent.c` 15, `ds4_server.c` 11, `ds4_engram.c` 6, `ds4_cli.c` 5,
-plus `ds4_web.c`, `ds4_ssd.c`, `ds4_kvstore.c`, `ds4.h`, `ds4_gpu.h`, `ds4_peer.c`,
-`ds4_combo_api.inc`), gate: `grep -rn "_WIN32\|windows.h\|Win32\|DStorage\|IoRing" engines/ds4`
-returns nothing. Then 2.2 (~4,100 Apple/Metal refs), 3.1 (Linux producer), 3.2 (producer
+From `docs/linux-port-plan.md`: 2.2 (Apple/Metal inside `engines/ds4`, 4,100 refs left, 3,959 of
+them in `ds4.c`; gate `grep -rn "__APPLE__\|TARGET_OS\|Metal\|metal" engines/ds4 --include=<source
+extensions>` returns nothing and `make cuda` still builds), then 3.1 (Linux producer), 3.2 (producer
 `dlopen` of `ds4-decode.so`), 4.1, 5.1, 6.1, 7.1, 8.1.
+
+Chunk 2.1 landed: every conditional whose expression named Win32 now compiles to what Linux already
+compiled, 4,088 lines of engine source deleted, and `engines/ds4` is clean of the gate tokens
+except the two vendored files (`external/nlohmann/json.hpp`, `linenoise.c`), which were left alone
+on purpose. Four capabilities the Windows branches used to implement now refuse instead of
+silently succeeding: combo handoff, expert-cache restore and snapshot, background affinity
+promotion, output LoRA. `ds4_web.c` gained the opposite: its `#else` branch is a real POSIX
+browser-tool implementation, now unconditional.
 
 Chunk 1.6's producer side is NOT wired here: nothing in `engines/streaming-llama` loads
 `ds4-decode.so` today - `grep -rn ds4x_ engines/streaming-llama` finds only
@@ -124,6 +151,20 @@ Chunk 1.6's producer side is NOT wired here: nothing in `engines/streaming-llama
 
 ## Gotchas learned this session
 
+- Proof of a behavior-preserving dead-branch deletion: run `gcc -E -fdirectives-only -P` (or
+  `nvcc -E`, then strip the `# N "file"` markers) on the pre-change file from `git show HEAD:<path>`
+  and on the changed file, and diff. Comments and dead branches vanish, so the diff shows only what
+  actually changed in the compiled code. For chunk 2.1 that diff was four refusal strings and one
+  `__LINE__`.
+- The strip was done by a script that builds the directive tree, evaluates each Windows-named
+  condition in three-valued logic (`_WIN32` false, other macros unknown), and deletes only what is
+  definitely dead or definitely live; anything unknown it reported and left alone. Two sites needed
+  hand work: a `#if _WIN32 / #elif defined(POSIX_MADV_DONTNEED)` chain (keep the `#elif` as the new
+  `#if`) and `#ifdef __APPLE__ / #elif !defined(_WIN32)`. Reuse that shape for 2.2 with
+  `__APPLE__` false.
+- `envvars.json` churns heavily on a deletion chunk: every row records a source line number, so a
+  4,000-line deletion rewrites thousands of rows. Check the variable *names* are unchanged
+  (`git show HEAD:envvars.json` vs the new file) rather than reading the diff.
 - nvcc rejects a bare `-fPIC`; use `-Xcompiler -fPIC`. A shared library also needs every linked
   object compiled with `-fPIC` when it contains TLS (`__thread`).
 - `make -B` on a target rebuilds its prerequisites too, including the slow mmq objects. Use
@@ -149,7 +190,10 @@ Chunk 1.6's producer side is NOT wired here: nothing in `engines/streaming-llama
 ## Suggested skills
 
 - `add-unit-test` for extending the batch-io or decode-library harnesses.
-- `adversarial-code-review` before declaring 2.1 or 2.2 done - those chunks delete large blocks.
+- `adversarial-code-review` before declaring 2.2 done, but hand the reviewer the equivalence
+  command as evidence: `gcc -E -fdirectives-only -P` on `git show HEAD:<path>` and on the working
+  file, then diff. The review of 2.1 produced three findings, all quoting text that is not in the
+  working tree, so a deletion chunk needs that proof alongside the reviewer.
 - `web-research` for liburing or `sm_120a` details.
 - `unslop` / `writing-style` on docs and commit messages.
 - `handoff` again when the next session runs out of context.
