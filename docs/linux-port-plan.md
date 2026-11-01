@@ -175,9 +175,9 @@ and drops 4,114 Apple/Metal references instead of 6,091. Steps 4, 5 and 6 below 
     `#if defined(_WIN32)` (around lines 257 and 346) - change to `__linux__`.
 
 1.6 Decode library. `make cuda-decode CUDA_ARCH=sm_120` builds `ds4-decode.so`, the dlopen twin
-    of `ds4-decode.dll`. Not yet compiled; needs `DS4_EXTERNAL_DECODE` and the `ds4x_*` entry
-    points in `ds4_decode_adapter.inc`, and the producer's loader path in
-    `engines/streaming-llama` must use `dlopen`/`dlsym` instead of `LoadLibrary`/`GetProcAddress`.
+    of `ds4-decode.dll`, exporting the `ds4x_*` entry points in `ds4_decode_adapter.inc`. The
+    producer's loader path in `engines/streaming-llama` must use `dlopen`/`dlsym` instead of
+    `LoadLibrary`/`GetProcAddress`; that part is chunk 3.2.
 
 1.7 First CUDA build. Done. `make -C engines/ds4 cuda CUDA_ARCH=sm_120` builds `ds4`,
     `ds4-server`, `ds4-bench`, `ds4-eval`, `ds4-agent` (56-58 MB each) and `make cpu` builds the
@@ -199,10 +199,24 @@ and drops 4,114 Apple/Metal references instead of 6,091. Steps 4, 5 and 6 below 
       `ds4_engram_iouring.o`, and `ds4_eval_cases.c/.h` copied from `engines/ds4-mac` (the
       Windows engine never had them, but `ds4_eval.c` needs `eval_hard_cases`).
 
-1.6 Decode library. Open: `make cuda-decode CUDA_ARCH=sm_120` builds `ds4-decode.so`. Not yet
-    compiled. Needs `DS4_EXTERNAL_DECODE` and the `ds4x_*` entry points from
-    `ds4_decode_adapter.inc`, and the producer's loader in `engines/streaming-llama` must use
-    `dlopen`/`dlsym` instead of `LoadLibrary`/`GetProcAddress`.
+1.6 Decode library. Done. `make -C engines/ds4 cuda-decode CUDA_ARCH=sm_120` builds
+    `ds4-decode.so` (59 MB, 19 `ds4x_*` entry points). It is a second compilation of the engine:
+    `ds4_ext.o`, `ds4_cuda_ext.o`, `ds4_host_memory_ext.o` with `-DDS4_EXTERNAL_DECODE=1`, plus
+    the shared objects the entry points reach (`ds4_batch_io.o`, `ds4_engram*.o`,
+    `ds4_prompt_prefix.o`, `ds4_cpu_fp4.o`). Every object is now `-fPIC`, which a shared library
+    needs once it contains TLS. What landed with it: the upload stream is created lazily so a
+    host-destination batch never makes a CUDA context, `batch_add`/`batch_add_gpu` refuse at the
+    logical capacity `ds4_ds_batch_capacity()` reports, `ds4x_open` refuses a non-GGUF path
+    instead of letting the loader `exit(1)` the producer, and the Win32 intrinsics in the external
+    host cache, host compute and CPU FP4 lanes are POSIX (`mlock`/`munlock`, `setpriority`,
+    `__cpuid_count`). Nothing in `engines/streaming-llama` loads the library yet, so
+    `tests/test_decode_library.cpp` (dlopen + the `ds4x_*` ABI) is the gate until chunk 3.2; the
+    producer still decodes through its own ggml CUDA path.
+
+    Gate met: `make cuda CUDA_ARCH=sm_120 -j4`, `make ds4-decode.so CUDA_ARCH=sm_120`,
+    `make test-batch-io`, `make test-decode-library`, `make test-cpu-fp4` all pass, with Strata
+    holding the GPU. The `mlock` of the pinned host tier needs an `RLIMIT_MEMLOCK` or cgroup
+    allowance - still open, listed under the locked-memory risk.
 
 1.8 Delete the old engines. Open: delete `engines/ds4-mac` and `engines/ds4-peer`, carry
     provenance from `engines/ds4-win/PROVENANCE.md` and `THIRD_PARTY_NOTICES.md` into
@@ -411,11 +425,11 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     (`native_broker.stage_vision`) because SLVP projection was the Mac receiver's job -
     single-engine serving stages images through `slstack/vision.py`.
 
-1.10d Dead Mac and Windows branches in the launcher. Open: unreachable `cfg.get('mac')` branches
-    at `slstack/engines.py:81,199,340` and `slstack/router.py:64-65,137-138,168,313,324`, the
-    `os.name == 'nt'` branch at `slstack/engines.py:85`, Mac-local token counts in
-    `combo_crossover.py`, and the `mac=` hold-ledger semantics in `lease.py`. Gate: the Python
-    suite stays at or below 6 failures / 5 errors.
+1.10d Dead Mac and Windows branches in the launcher. Done (`ebc5ba4`): the unreachable
+    `cfg.get('mac')` branches in `slstack/engines.py` and `slstack/router.py`, the
+    `os.name == 'nt'` branch, Mac-local token counts in `combo_crossover.py`, and the `mac=`
+    hold-ledger semantics in `lease.py`. Gate met: the Python suite is at 584 tests,
+    6 failures / 5 errors.
 
 1.9 Settled by chunk 1.10c. Decision 1 is (b), single machine only. Decision 2: the supported
     list is DeepSeek V4.x on ds4 CUDA; Kimi, GLM, MiniMax and Step lose their MLX decode, and

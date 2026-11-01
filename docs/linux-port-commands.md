@@ -24,9 +24,9 @@ make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4
 make -C engines/ds4 cpu -j4
 ```
 
-`make -C engines/ds4 cuda-decode CUDA_ARCH=sm_120` currently fails at the link step. An uncommitted
-Makefile fix replaces `-fPIC` with `-Xcompiler -fPIC` for the nvcc shared link; the remaining link
-error is not yet diagnosed. See `HANDOFF.md`.
+`make -C engines/ds4 cuda-decode CUDA_ARCH=sm_120` builds `ds4-decode.so` (the producer's decode
+library, compiled a second time with `-DDS4_EXTERNAL_DECODE=1`). It links `ds4_ext.o`,
+`ds4_cuda_ext.o` and `ds4_host_memory_ext.o` rather than the engine's own objects.
 
 ## Gates that pass today
 
@@ -35,11 +35,16 @@ python3 -B scripts/release_check.py          # Release check: 0 findings
 timeout 300 env PYTHONPATH=.:tests python3 -m unittest \
   test_release_check test_dsv41_single_launch test_example_launchers   # 32 tests, OK
 timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'test_*.py'
-# 585 tests, 6 failures, 5 errors. Fork baseline was 8 failures / 6 errors over 683 tests.
+# 584 tests, 6 failures, 5 errors. Fork baseline was 6 failures / 6 errors over 585 tests.
 # The survivors are Windows-only guard paths, the missing cosmos_windows vendor module,
 # and GPU/video gates with no model on disk.
 
-timeout 300 env PYTHONPATH=.:tests python3 -m slstack --help | head -20
+# io_uring expert-read transport against pread: no GPU, no model, runs while Strata is up.
+make -C engines/ds4 test-batch-io            # needs /tmp/ds4-batch-io.bin (64 MiB); the target creates it
+
+# dlopen ds4-decode.so and bind its ds4x_* entry points: no GPU, no model.
+make -C engines/ds4 test-decode-library
+
 cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 ```
 
@@ -49,9 +54,6 @@ cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 make -C engines/ds4 test
 # No rule to make target 'tests/test_layer_pack.c' - the published tree ships only 8 test
 # sources, but the Makefile asks for 10. Prune the test target or restore the sources.
-
-make -C engines/ds4 test-cpu-fp4
-# ds4_cpu_fp4.cpp:31 includes <intrin.h> (MSVC). Needs <immintrin.h> on Linux.
 
 make -C engines/ds4 test-kv-payload-roundtrip CUDA_ARCH=sm_120
 # Builds and runs through engine open, prints HOST_MEMORY_ADMITTED / HOST_MEMORY_SNAPSHOT
