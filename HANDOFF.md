@@ -1,245 +1,161 @@
 # Handoff: Linux-only port of streaming-llama-stack
 
 Working dir: this checkout (`streaming-llama-stack`), branch `linux-only`.
-Durable plan: `docs/linux-port-plan.md` (chunk backlog near the end). Repo review: `linux-port.md`.
-Runnable commands for the user: `docs/linux-port-commands.md`.
+Durable plan with the chunk backlog: `docs/linux-port-plan.md`. Commands the user can run:
+`docs/linux-port-commands.md`. Repo review: `linux-port.md`. Port scaffolding: `scripts/port/`
+(its README explains each tool and when to use it).
+
+What a chunk landed *is* in its commit message and in the plan; this file only carries what neither
+records - the open decisions, the box's constraints, the verification method, and the traps.
 
 ## What the next session is for
 
-Chunks 1.6, 2.1, 2.2a and 2.2b are committed, so `engines/ds4` has no Win32 host code, no Apple
-conditionals and no Metal-named identifiers left. Two things are open, in order:
+Phase 2 is nearly done: `engines/ds4` has no Win32 host code, no Apple conditional and no
+Metal-named identifier. Two things are open, and the first needs an owner decision before work:
 
-1. **Chunk 2.2c, and it needs your call.** The Metal *backend* is still in the engine: `--metal`,
-   `--backend metal`, `--metal-graph-test`, `--metal-graph-full-test`, `--metal-graph-prompt-test`,
-   `--rocm`, and the 46 `DS4_BACKEND_METAL` sites. `--metal` parses, gets selected, and then fails
-   at engine open. Nothing in `slstack`, `scripts` or the presets passes it, so removing the
-   backend outright is safe here - but it is a behaviour change (the flag becomes unknown instead of
-   accepted-then-failed), so it was left for you. Either delete it, or make the parser refuse it
-   with a message and leave the dead branches for chunk 6.1.
-2. **Chunk 3.1, the Linux producer** (`engines/streaming-llama`): io_uring weight fetch worker,
-   `dlopen` of `ds4-decode.so` (3.2), OpenSSL instead of BCrypt, no DXGI. Its gates need weights
-   on disk, which this box does not have.
+1. **Chunk 2.2c - the Metal backend itself.** `--metal`, `--backend metal`, `--metal-graph-test`,
+   `--metal-graph-full-test`, `--metal-graph-prompt-test` and `--rocm` are still accepted; 46 sites
+   reference `DS4_BACKEND_METAL`. `--metal` parses, gets selected, then fails at engine open.
+   Nothing in `slstack`, `scripts` or the presets passes it, so deleting the backend is safe here -
+   but it changes observable behaviour (unknown flag instead of accepted-then-failed), which is why
+   it was left. Alternative: refuse it in the parser with a message and leave the dead branches for
+   chunk 6.1. Ask, then do it.
+2. **Chunk 3.1 - the Linux producer** (`engines/streaming-llama`), then 3.2. Inventory below.
 
-Everything verified so far is a compile or host-code gate; nothing is a performance result, because
-no model weights are on disk.
+Everything verified so far is a compile or host-code gate. Nothing is a performance result, because
+no supported model weights exist on this box.
 
 ## State
 
-Commits, oldest first: `58ff877` (chunk 1: `engines/ds4` from the Windows engine), `be340bb`
-(1.7: CUDA build passes on Linux), `3d36bd6` (1.10a: delete Windows/Mac/peer engine trees),
-`6dc410f` (1.10b: one environment scope), `4abb73f` (1.10c: delete the Mac Python surface),
-`bc439fe` (plan update), `5c32214` (handoff + command notes + nvcc shared-link fix),
-`ebc5ba4` (1.10d: dead Mac/Windows branches in the launcher), `90b8605` (1.6: the decode library
-builds and is gated without a GPU or a model file), `8c2ac02` (plan and handoff for 1.6),
-`171319a` (2.1: Win32 host code deleted from `engines/ds4`), `b7c5906` (plan and handoff for 2.1),
-`7cc2ca3` (2.2a: Apple conditional branches deleted), `3a49385` (2.1 follow-up: the claims about
-what the deleted Windows paths leave behind), `c4dae9f` + `7da2c23` (plan and handoff, including
-the option-(b) decision), `535beef` (2.2b: Metal identifiers renamed).
+`git log --oneline` from `58ff877` forward is the port, chunk by chunk; `docs/linux-port-plan.md`
+maps chunk numbers to commits. As of the last session: `171319a` (2.1), `7cc2ca3` (2.2a),
+`3a49385` (2.1 follow-up), `535beef` (2.2b), plus plan/handoff commits. Two of them were unpushed;
+check `git status -sb` for `[ahead N]` and say so rather than assuming.
 
-`python3 -B scripts/release_check.py` reports 0 findings, so commits need no `--no-verify`.
-Python suite: **584 tests, 5-6 failures, 5 errors** (fork baseline 585 tests, 6 failures, 6
-errors). Two process tests vary run to run, so compare the failing names rather than the count.
+`python3 -B scripts/release_check.py` reports 0 findings, so commits need no `--no-verify`
+(`core.hooksPath` runs it as a pre-commit hook). Python suite: **584 tests, 5-6 failures, 5 errors**
+(fork baseline 585 / 6 / 6). Two process tests flip between runs (`test_hold_yield.py`'s
+`test_real_owned_child_stops_on_kit11_hold` and `test_combo_single_stop.py`'s
+`test_disconnect_inside_reasoning_then_next_turn_appends_only`), so compare the failing *names*
+against the plan's list, not the counts.
 
-## What chunk 2.2b landed (`535beef`)
+Working tree should be clean at session start. Build outputs (`*.o`, `*.so`, engine binaries) are
+gitignored.
 
-3,323 lines renamed, 3,311 in `ds4.c`: `metal_graph_*` to `gpu_graph_*` (the CUDA graph layer's
-per-stage tensor accessors), the decode phase enum to `gpu_decode_layer_phase` /
-`GPU_DECODE_LAYER_*`, `metal_ready` to `gpu_ready`, and three names that were simply wrong: the GLM
-env helpers' `metal_name`/`metal_env` are what a non-ROCm build reads, so `cuda_name`/`cuda_env`,
-and `model_open`'s `metal_mapping` is `shared_mapping`. The 215 `DS4_METAL_*` environment names are
-untouched, as decided; `_` is a word character, so the identifier gate cannot match them.
-Dead `#include <metal_stdlib>` branches in `cuda/mmq/ggml-common.h` and comments naming the deleted
-`ds4_metal.m` and a nonexistent `misc/METAL_TENSOR_PARALLELISM.md` went too.
+## How a mechanical sweep is proven here
 
-The rename was proven, not read: a `git worktree` at HEAD built the same objects for a warning
-comparison (26 vs 26, only the renamed unused symbol differs), and `gcc -E -fdirectives-only -P`
-before vs after - with the same rename applied to the "before" text - is byte-identical for ds4.c
-plain and with `-DDS4_EXTERNAL_DECODE=1`, and for `ds4_cli.c`. That worktree trick (build HEAD in a
-throwaway tree, compare normalized warning sets) is the cheapest honest regression check for a
-mechanical sweep; reuse it for 2.2c.
+Deletion chunks are behaviour-preserving by construction only if the rule is "keep the branch the
+compiler already kept". Use the scaffolding in `scripts/port/`:
 
-## What chunk 2.2a landed (`7cc2ca3`)
+- `collapse_conditionals.py --tokens ...` does that collapse in three-valued logic and reports
+  anything it cannot decide instead of guessing. Its `BLOCKED` output is the manual work: usually a
+  `#if DEAD / #elif LIVE` chain where the guard must be rewritten, not removed.
+- `preprocess_equiv.py` compares `git show HEAD:<path>` against the working file with conditionals
+  resolved and macros untouched, so dead branches vanish on both sides and the diff shows only real
+  changes. Pass `--rename-file` for a rename sweep so the rename cancels itself out; a 0-exit means
+  the compiled code is identical.
+- Warning-profile comparison: `git worktree add /tmp/base HEAD`, build the same object list in both
+  trees, diff the warning texts with line numbers stripped. Cheapest honest regression check for a
+  rename; chunk 2.2b differed only in the renamed symbol's own warning.
 
-3,475 more lines of engine source deleted with the same mechanical rule, applied to
-`__APPLE__`/`TARGET_OS`/`__MACH__`. ds4.c carried the Mac graph layer behind
-`#if defined(__APPLE__)`, so the Metal implementations went and the CUDA ones stayed. Three guards
-needed hand work because a later branch was the live one: the n-gram read advisory
-(`#ifdef __APPLE__ / #elif defined(POSIX_FADV_RANDOM)`), `ds4_gpu.h`'s `ds4_gpu_device_is_spark()`
-behind `#elif !defined(__APPLE__)`, and two `#if defined(_WIN32) / #elif defined(__linux__)` pairs
-in `ds4_agent.c`. 77 conditions in ds4.c kept their guard and lost only the Apple operand, because
-they still test `DS4_NO_GPU` or `DS4_ROCM_BUILD`.
+When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
+but give it the equivalence commands as evidence. The 2.1 review produced three findings quoting
+text that was not in the working tree (it read the diff base rather than the tree), yet its second
+pass caught three real problems in what the commit *claimed*: combo handoff described as still
+honouring `/decode/shutdown` when nothing sets `ds4_combo_active`, expert-cache restore/snapshot
+described as refusing when nothing calls them, and a fence banner implying live wave ordering that
+`cuda_stream_selected_ds_upload()` stubs out. Reviewers check claims, not just code - re-verify the
+wording in docs and messages, not only the C.
 
-## What chunk 2.1 landed
+## Constraints on this box
 
-4,088 lines of engine source deleted, no Linux code path changed. The rule was mechanical: for each
-conditional mentioning `_WIN32`/`windows.h`/`Win32`/`DStorage`/`IoRing`, keep what Linux already
-compiled and delete the rest. Largest sites: `ds4_cuda.cu` 2,242, `ds4.c` 748,
-`ds4_combo_api.inc` 285, `ds4_expert_restore_async.cuh` 249, `ds4_agent.c` 224,
-`ds4_cache_affinity_background.cuh` 179, `ds4_server.c` 71, `ds4_web.c` 48.
+1. A Strata serve process (`qwen38-gyro/Strata/build/strata --serve ...`) holds ~29.9 GiB of 32 GiB
+   VRAM, leaving ~1.3 GiB. **Its pid changes between sessions** - read it from
+   `nvidia-smi --query-compute-apps=pid,used_memory`. Stopping Strata also stops this assistant, so
+   GPU work is the user's to run by hand. Never kill it to test. Host-only gates work because the
+   transport now creates its CUDA upload stream lazily.
+2. No supported model file exists. The GGUFs on disk are
+   `qwen38-gyro/Strata/models/Qwen3.8-Flash-Next-Gyro-{S,M,L}-TQ1_0/TQ2_0/TQ3_0.gguf`
+   (54.5 / 92 / 108 GiB); their metadata matches `DS4_SHAPE_QWEN4_EXP` but they are TQ-quantized
+   (`type 145/146`), outside ds4's tensor type table (`ds4.c` around line 2481), so the loader
+   rejects them. Phase 3's prefill gates and Phase 8 are blocked on a qualified GGUF.
 
-Deleted subsystems, each now a refusal that names the build rather than a silent success:
-combo handoff (`ds4_combo_api.inc` keeps its stubs; `ds4_native_checkpoint.h` deleted with its
-BCrypt hasher), expert-cache restore and snapshot, background affinity promotion, output LoRA.
-`ds4_web.c`'s guard hid the real POSIX browser-tool implementation in its `#else` branch; that is
-now unconditional and live.
+## Producer inventory (Phase 3), re-measured
 
-Gate results: `make cuda CUDA_ARCH=sm_120 -j4`, `make cuda-decode`, the CPU objects, and
-`test-batch-io` / `test-decode-library` / `test-cpu-fp4` / `./ds4 --help` all pass with the
-pre-change warning profile. `gcc -E -fdirectives-only -P` before vs after is identical per changed
-`.c` file except four refusal strings; `nvcc -E` on `ds4_cuda.cu` differs only in three strings and
-one `__LINE__` in a HOST_MEMORY trace. `envvars.json` and `docs/VARIABLES.md` regenerated; the
-variable name set is unchanged.
-
-## What chunk 1.6 landed (`90b8605`)
-
-`make -C engines/ds4 cuda-decode CUDA_ARCH=sm_120` now builds `ds4-decode.so` (59 MB, 19
-`ds4x_*` exports). Changes:
-
-- `Makefile`: `-fPIC` in `CFLAGS` and `-Xcompiler -fPIC` in `NVCCFLAGS` (a non-PIC object cannot
-  go into a shared library: `ds4.o` failed with `relocation R_X86_64_TPOFF32 against
-  g_parallel_depth`). New objects compiled a second time with `-DDS4_EXTERNAL_DECODE=1`:
-  `ds4_ext.o`, `ds4_cuda_ext.o`, `ds4_host_memory_ext.o` (the last one is what suppresses the
-  host-memory watchdog in the decode library). `ds4-decode.so` also needs
-  `ds4_engram.o ds4_engram_iouring.o ds4_prompt_prefix.o ds4_cpu_fp4.o` - without them `dlopen`
-  fails with `undefined symbol: ds4_engram_hash`, then `ds4_cpu_fp4_init`.
-  New targets: `test-batch-io`, `test-decode-library`, `ds4_cpu_fp4.o`, and `test-cpu-fp4` now
-  builds with `-march=native`.
-- `ds4_batch_io.cpp`: the CUDA upload stream is created lazily (`upload_stream_ensure`) instead
-  of at `ds4_ds_init_from_fd`, so a host-destination transport never creates a CUDA context.
-  `batch_add`/`batch_add_gpu` now refuse at `logical_capacity()` (ring capacity / read_parts),
-  which is what `ds4_ds_batch_capacity()` reports - they previously accepted up to the raw ring
-  capacity. `ds4_batch_io.h` comment corrected: `batch_count` counts pending logical spans.
-- `ds4.c:4366`: `_InterlockedIncrement` → `__atomic_add_fetch` (MSVC intrinsic in the
-  `DS4_EXTERNAL_DECODE` verify lane).
-- `ds4_export.h` (new): `DS4X_EXPORT` as `__attribute__((visibility("default")))`. Needed because
-  `ds4_cuda.cu` does not include `ds4_gpu.h`. `ds4_gpu.h` includes it, `ds4_cuda.cu` includes it
-  directly, `ds4_decode_adapter.inc` and the two external `.inc` files now use `DS4X_EXPORT`.
-- `ds4_decode_adapter.inc`: `ds4x_open` now preflights the GGUF header (`ds4x_gguf_preflight`) and
-  refuses with an error message instead of loading the file. Without it the shared loader's
-  `ds4_die` called `exit(1)` on a wrong model path, which would kill the producer rather than
-  report a refusal. A truncated or corrupt GGUF still dies in the loader, as it does standalone.
-- `ds4_external_host_cache.inc`: `VirtualLock`/`VirtualUnlock` → `mlock`/`munlock`,
-  `GetLastError` → `errno`. `mlock` needs `RLIMIT_MEMLOCK` or a cgroup allowance sized to the
-  pinned tier - that decision is still open (plan's "locked memory" risk).
-- `ds4_cuda.cu`: `#include <sys/mman.h>` and `ds4_export.h`.
-- `ds4_cpu_fp4.cpp`: `<intrin.h>`/`<windows.h>` → `<immintrin.h>`/`<cpuid.h>`/`<sys/resource.h>`,
-  `SetThreadPriority(GetCurrentThread(), ...)` → `setpriority(PRIO_PROCESS, 0, -1)`,
-  `__cpuidex(r,7,0)` → `__cpuid_count(7,0,a,b,c,d)`, `__cpuid(r,1)` → `__cpuid(1,a,b,c,d)`
-  (GCC's macro takes the level first).
-- New harnesses: `tests/test_batch_io.cpp` and `tests/test_decode_library.cpp`.
-
-## Gate results (all re-run, all green)
-
-- `make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4` builds the executables.
-- `make -C engines/ds4 ds4-decode.so CUDA_ARCH=sm_120` links; `nm -D ds4-decode.so | grep -c ds4x_`
-  reports 19 entry points.
-- `make -C engines/ds4 test-batch-io` PASS: 18 `ds4_ds_selftest` combos (chunk 1/4/8 MiB x batch
-  1/8/16, `read_parts` 1 and 8) matched `pread`, plus refusal checks, the split submit/wait
-  pipeline, and the background ring. GPU memory used did not change, which is the point of the lazy
-  upload stream: it runs while Strata holds the GPU. The target creates `/tmp/ds4-batch-io.bin` if
-  missing; running `./tests/test_batch_io` by hand without that file exits 2.
-- `make -C engines/ds4 test-decode-library` PASS: `dlopen` binds all 19 `ds4x_*` entry points,
-  `ds4x_host_cpu_v1` accepts the caller's dot kernel, `ds4x_open` refuses a non-GGUF file with
-  "ds4x_open model file is not a GGUF file", and `ds4x_model_map` / `ds4x_close` are safe with
-  nothing open. No GPU, no model.
-- `make -C engines/ds4 test-cpu-fp4` PASS (AVX-512 CPU FP4 lane on host).
-- `python3 -B scripts/release_check.py` reports 0 findings.
-
-## Two hard constraints
-
-1. Strata (`qwen38-gyro/Strata/build/strata --serve --native
-   models/Qwen3.8-Flash-Next-Gyro-M-TQ2_0.gguf ...`, pid 1020467) holds ~29.2 GiB of 32 GiB VRAM,
-   leaving ~1.29 GiB free. Stopping Strata also stops this assistant, so GPU work must be run by
-   the user by hand. Never kill Strata to test. Host-only gates are now available thanks to the
-   lazy upload stream.
-2. No supported model file exists on disk. The large GGUFs are
-   `qwen38-gyro/Strata/models/Qwen3.8-Flash-Next-Gyro-{S,M,L}-TQ1_0/TQ2_0/TQ3_0.gguf` (54.5 / 92 /
-   108 GiB). The metadata matches `DS4_SHAPE_QWEN4_EXP`, but they are TQ-quantized
-   (`type 145/146`), outside ds4's tensor type table (`ds4.c:2481-2496`), so the loader rejects
-   them.
-
-## Next chunks, in order
-
-From `docs/linux-port-plan.md`: 2.2c (remove or refuse the Metal backend and the `--rocm` flag -
-the owner's call, see above), then 3.1 (Linux producer), 3.2 (producer
-`dlopen` of `ds4-decode.so`), 4.1, 5.1, 6.1, 7.1, 8.1.
-
-Chunk 2.1 landed: every conditional whose expression named Win32 now compiles to what Linux already
-compiled, 4,088 lines of engine source deleted, and `engines/ds4` is clean of the gate tokens
-except the two vendored files (`external/nlohmann/json.hpp`, `linenoise.c`), which were left alone
-on purpose. Four capabilities the Windows branches used to implement are gone: combo handoff,
-background affinity promotion and output LoRA now refuse with a message naming the build, while
-expert-cache restore and snapshot are inert - nothing on Linux calls
-`ds4_expert_cache_restore_prepare`/`ds4_expert_cache_snapshot_write`, so the two
-`DS4_COMBO_EXPERT_*_FILE` variables `slstack` sets for a combo run do nothing. `ds4_web.c` gained
-the opposite: its `#else` branch is a real POSIX browser-tool implementation, now unconditional.
-
-Chunk 1.6's producer side is NOT wired here: nothing in `engines/streaming-llama` loads
-`ds4-decode.so` today - `grep -rn ds4x_ engines/streaming-llama` finds only
-`llama-dsv41-ds4x-keep.h`. The producer decodes through its own ggml CUDA path
-(`ggml-ds4-native-half`). The `LoadLibraryW`/`GetProcAddress` sites left in the producer are
-`llama-dsv41-engram-prefetch.cpp:95-104` (IoRing), `llama-mmap.cpp:532`, and
-`ggml/src/ggml-backend-dl.cpp` - all chunk 3.1/4.1 work, not 1.6.
+- `engines/streaming-llama` has **680** Windows-flavoured sites and **2,372** Apple/Metal sites in
+  its sources (`--include=*.cpp --include=*.c --include=*.h --include=*.hpp --include=*.inl`).
+- There is **no `build/` directory**: the producer has never been built on Linux. Getting a cmake
+  build to configure and link is chunk 3.1's first task, before any porting.
+- Chunk 3.2 is smaller than the plan's wording suggests. The producer-side decode-library loader is
+  already written, in `prefill_llama.cpp/tools/dsv41-prefill/live-session.inc` (880 lines, 35 Win32
+  sites): it `LoadLibraryExW`s `ds4-decode.dll` beside the executable and `bind`s `ds4x_open`,
+  `ds4x_model_map`, `ds4x_register_weight`, `ds4x_bind_state`, `ds4x_set_expert_hook`,
+  `ds4x_decode`, `ds4x_close`, `ds4x_set_affinity`, `ds4x_host_cache_v1/v2`, `ds4x_host_cpu_v1`,
+  `ds4x_host_timing_v1` and (when enabled) `ds4x_prefill_workspace` / `ds4x_prefill`. Chunk 1.6's
+  `ds4-decode.so` exports exactly those 19 names. So 3.2 is `dlopen`/`dlsym`, a `.so` path, and
+  UTF-8 paths in that one file - not new wiring.
+- Without `ds4-decode.so` loaded the producer decodes through its own ggml CUDA path
+  (`ggml-ds4-native-half`), which is why the engine library has never been exercised end to end.
 
 ## Behaviour changes worth re-checking
 
 - `slstack/engines.py:combo_enabled()` no longer requires `os.name == 'nt'`, so `serving=native`
-  now reaches the combo lifecycle on Linux. Its process admission is `slstack/guard.py`'s Windows
-  Job Object branch, which chunk 5.1 replaces with a cgroup v2 scope. If native serving misbehaves
-  on Linux, that is the likely cause, not the removal itself.
-- `slstack/lease.py:active_holds()` dropped the `mac=` namespace; MAC hold lines are no longer
-  scanned. `tests/test_hold_yield.py` was rewritten for RTX-only semantics.
+  reaches the combo lifecycle on Linux, where the engine refuses it with
+  "combo handoff is not implemented in this build". Its process admission is still
+  `slstack/guard.py`'s Windows Job Object branch (chunk 5.1 replaces it with a cgroup v2 scope). If
+  native serving misbehaves on Linux, that is the likely cause, not the refusal.
+- `slstack/lease.py:active_holds()` has no `mac=` namespace any more, so MAC KIT11 lines are not
+  scanned as RTX blockers. `tests/test_hold_yield.py` was rewritten for RTX-only semantics.
 - `slstack/router.py` no longer annotates routes: rows say `single-engine` or `ds4-native`, and
   `ultra_handoff` is always false.
 - Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
   `slstack-weight-fetcher.dll`, and `scripts/build_combo_runtime.py` builds a preset named
-  "RTX: ULTRA prefill → ds4-win decode" with `mac={}`. Those belong to 5.1/7.1.
+  "RTX: ULTRA prefill -> ds4-win decode". Those are 5.1/7.1.
+- Engine capabilities the deleted Windows branches used to implement: combo handoff, background
+  affinity promotion and output LoRA now refuse with a message naming the build; expert-cache
+  restore and snapshot are **inert** (no Linux caller), so `DS4_COMBO_EXPERT_RESTORE_FILE` and
+  `DS4_COMBO_EXPERT_SNAPSHOT_FILE`, which `slstack/combo_native.py` and `slstack/engines.py` set
+  for a combo run, do nothing. `--ds-read-parts` is parsed into
+  `ds4_engine_options.ds_read_parts` and then refused; `DS4_DS_READ_PARTS` is the live path. Each of
+  these is listed in the plan's known-gaps section.
 
-## Gotchas learned this session
+## Gotchas
 
-- Proof of a behavior-preserving dead-branch deletion: run `gcc -E -fdirectives-only -P` (or
-  `nvcc -E`, then strip the `# N "file"` markers) on the pre-change file from `git show HEAD:<path>`
-  and on the changed file, and diff. Comments and dead branches vanish, so the diff shows only what
-  actually changed in the compiled code. For chunk 2.1 that diff was four refusal strings and one
-  `__LINE__`.
-- The strip was done by a script that builds the directive tree, evaluates each Windows-named
-  condition in three-valued logic (`_WIN32` false, other macros unknown), and deletes only what is
-  definitely dead or definitely live; anything unknown it reported and left alone. Two sites needed
-  hand work: a `#if _WIN32 / #elif defined(POSIX_MADV_DONTNEED)` chain (keep the `#elif` as the new
-  `#if`) and `#ifdef __APPLE__ / #elif !defined(_WIN32)`. Reuse that shape for 2.2 with
-  `__APPLE__` false.
-- `envvars.json` churns heavily on a deletion chunk: every row records a source line number, so a
-  4,000-line deletion rewrites thousands of rows. Check the variable *names* are unchanged
+- Regenerate the env table in the same commit as any engine source edit:
+  `python3 -B -m slstack.envdocs --refresh-defaults` then `python3 -B -m slstack.envdocs`. Any line
+  shift makes `test_environment_contract` error with `Environment table out of date`. Deletion
+  chunks churn thousands of rows - check that the variable *name* set is unchanged
   (`git show HEAD:envvars.json` vs the new file) rather than reading the diff.
-- nvcc rejects a bare `-fPIC`; use `-Xcompiler -fPIC`. A shared library also needs every linked
-  object compiled with `-fPIC` when it contains TLS (`__thread`).
-- `make -B` on a target rebuilds its prerequisites too, including the slow mmq objects. Use
-  `make -B <target>` only when the prerequisite list changed, and give it a long timeout.
-- `envvars.py:inventory()` treats `setenv("NAME")` in a source file as a read, so a test that sets
-  an engine variable creates an undocumented table row. The batch-io harness no longer sets
-  `DS4_DS_QUEUE_CAPACITY`; it uses the built-in default.
-- Regenerating the table: `python3 -B -m slstack.envdocs --refresh-defaults` then
-  `python3 -B -m slstack.envdocs`. Any line-number shift in an engine source makes
-  `test_environment_contract` error with `Environment table out of date: stale=[...]` until both
-  commands have run, so regenerate in the same commit as the source edit. It writes
-  `envvars.json` with indent 2 - a hand-rolled `json.dump(indent=1)` rewrite produces a 54k-line
-  diff. `validate_table()` deliberately keeps `engines/mlx-serve/` references that point at the
-  deleted tree.
-- `scripts/release_check.py` flags any absolute path under a user's home directory as a
-  "machine path" in docs; docs must use repo-relative paths.
-- `make cpu` overwrites the CUDA binaries with CPU variants of the same names. Rebuild CUDA after.
-- `make test` still cannot run: the Makefile asks for 10 test sources, only 8 are published.
+  `envvars.py:inventory()` scans only `engines/` and `vendor/`, and treats `setenv("NAME")` in a
+  source file as a read.
+- Gate greps must be scoped: `grep -rn "_WIN32\|windows.h\|..." engines/ds4` also matches build
+  outputs, and vendored files (`engines/ds4/external/nlohmann/json.hpp`, `linenoise.c`) are left
+  untouched on purpose - 3 hits there are expected, not failures.
+- `_` is a word character, so `\bMETAL_` cannot match inside `DS4_METAL_FOO`. That is what lets
+  chunk 2.2b rename identifiers while keeping the 215 `DS4_METAL_*` environment names, which the
+  owner chose to keep because they are documented in `docs/VARIABLES.md` and named in
+  `docs/macdecode-r6/r6-controls.json` and `docs/MACDECODE_ROUND6.md`.
+- nvcc rejects a bare `-fPIC`; use `-Xcompiler -fPIC`. A shared library needs every linked object
+  `-fPIC` once it contains TLS (`__thread`).
+- `make -B <target>` rebuilds its prerequisites too, including the slow mmq objects. Use it only
+  when the prerequisite list changed, and give it a long timeout. `make cpu` overwrites the CUDA
+  binaries with CPU variants of the same names - rebuild CUDA afterwards.
+- `make test` still cannot run: the engine Makefile asks for 10 test sources, only 8 are published.
+- `scripts/release_check.py` flags any absolute path under a user's home directory as a "machine
+  path" in docs; docs must use repo-relative paths.
 - CUDA facts: `nvcc` at `/opt/cuda/bin/nvcc`, libs in `/opt/cuda/lib` and `/opt/cuda/lib64`,
   `-luring` required, `sm_120` maps to `-gencode arch=compute_120a,code=sm_120a
   -DDS4_CUDA_HAVE_MXF4=1`.
+- `mlock` of the pinned host tier needs an `RLIMIT_MEMLOCK` or cgroup allowance - still undecided
+  (plan's "locked memory" risk), and it gates the decode library's host-cache path.
 
 ## Suggested skills
 
-- `add-unit-test` for extending the batch-io or decode-library harnesses.
-- `adversarial-code-review` before declaring 2.2 done, but hand the reviewer the equivalence
-  command as evidence: `gcc -E -fdirectives-only -P` on `git show HEAD:<path>` and on the working
-  file, then diff. The review of 2.1 produced three findings, all quoting text that is not in the
-  working tree, so a deletion chunk needs that proof alongside the reviewer.
-- `web-research` for liburing or `sm_120a` details.
+- `adversarial-code-review` after a deletion or rename chunk, with the `scripts/port/` equivalence
+  commands handed to the reviewer as evidence (see the method section for what it caught last time).
+- `add-unit-test` for extending `engines/ds4/tests/test_batch_io.cpp` or `test_decode_library.cpp`.
+- `code-design` / `code-reviewer` when porting the producer's io_uring worker in 3.1.
+- `web-research` for liburing, `sm_120a` or llama.cpp cmake details.
 - `unslop` / `writing-style` on docs and commit messages.
-- `handoff` again when the next session runs out of context.
+- `handoff` again when this session runs out of context - update this file, don't replace it with
+  chat recap.

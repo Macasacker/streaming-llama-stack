@@ -622,6 +622,12 @@ Build a CUDA engine with `make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4` (~4 min
 builds the same binary names as CPU variants, so rebuild CUDA afterwards if you need the CUDA
 binaries.
 
+Mechanical sweeps (deleting a platform's dead branches, renaming an inherited identifier) use the
+scaffolding in `scripts/port/` - `collapse_conditionals.py`, `preprocess_equiv.py`,
+`rename_identifiers.py` - and its README states the proof each one gives. A deletion chunk is only
+behaviour-preserving if the rule is "keep the branch the compiler already kept", and a rename is
+only safe if the preprocessed live text is unchanged; do not hand-edit either sweep.
+
 `.githooks` is wired through `core.hooksPath`, so `pre-commit` runs `release_check.py` and will
 refuse a commit while the VARIABLES finding stands. Either regenerate the table first or commit
 the work-in-progress chunks with `--no-verify` and say so in the commit message.
