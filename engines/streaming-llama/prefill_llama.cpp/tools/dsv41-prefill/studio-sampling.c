@@ -1,4 +1,4 @@
-/* Derived from vendored ds4.c; original MIT license retained at engines/ds4-win/LICENSE.
+/* Derived from vendored ds4.c; original MIT license retained at engines/ds4/LICENSE.
  * Source SHA-256: d25b29076ab04530217d41a266256b0890dca8e97db98bea15aa3614ee0f1cc7. Refresh with scripts/export_ds4_sampling.py.
  * Shared Studio/native sampler: temperature, top-k, top-p, min-p and seeded RNG.
  */

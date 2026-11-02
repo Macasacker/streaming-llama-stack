@@ -54,8 +54,8 @@ inline result recheck(uint64_t first_free, uint64_t second_free, uint64_t bound,
 // Device bytes the context cache can occupy: `required` = its full-context
 // logical bytes (llama_dsv41_cache_storage::required_bytes), plus per-owner VMM
 // rounding (8 owner tensors x granularity) and 1 MiB tensor-alignment slack.
-inline uint64_t cache_charge(uint64_t admitted_cache, uint64_t required, uint64_t granularity = 2ull << 20) {
-    return std::min(admitted_cache, required + 8 * granularity + (1ull << 20));
+inline uint64_t cache_charge(uint64_t admitted_cache, uint64_t required, uint64_t granularity = uint64_t(2) << 20) {
+    return std::min<uint64_t>(admitted_cache, required + 8 * granularity + (uint64_t(1) << 20));
 }
 
 } // namespace llama_dsv41_device_admission

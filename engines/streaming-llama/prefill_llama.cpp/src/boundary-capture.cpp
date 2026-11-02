@@ -559,9 +559,9 @@ void capture::verify_attention_contract(const std::vector<int32_t>&ids,const std
         require(visible?mask[at]==0.f:(std::isinf(mask[at])&&mask[at]<0),"actual mask violates cold causal plan");
         half_mask[at]=visible?uint16_t(0):uint16_t(0xfc00);
     }
-    require(sha256(ids.data(),ids.size()*4)==p->attention_contract.at("raw_ids_sha256")&&
-        sha256(mask.data(),mask.size()*4)==p->attention_contract.at("raw_mask_f32_sha256")&&
-        sha256(half_mask.data(),half_mask.size()*2)==p->attention_contract.at("native_mask_f16_sha256"),"actual IDs/F32 mask/native logical F16 mask SHA mismatch");
+    require(sha256(ids.data(),ids.size()*4)==p->attention_contract.at("raw_ids_sha256").get<std::string>()&&
+        sha256(mask.data(),mask.size()*4)==p->attention_contract.at("raw_mask_f32_sha256").get<std::string>()&&
+        sha256(half_mask.data(),half_mask.size()*2)==p->attention_contract.at("native_mask_f16_sha256").get<std::string>(),"actual IDs/F32 mask/native logical F16 mask SHA mismatch");
     p->attention_contract_verified=true;
 }
 void capture::write(ggml_backend_t backend,const ggml_tensor *kv_weight,const ggml_tensor *attn_norm,const ggml_tensor *kv_norm) {

@@ -32,7 +32,9 @@ inline bool ggml_dsv41_index_bf16_causal_tag(ggml_tensor*t,uint32_t start,uint32
     if(t->op_params[8]&&(!ggml_dsv41_index_window_requested(t)||!ggml_dsv41_index_window_shape(t)))return false;
     t->op_params[5]=int32_t(start);t->op_params[6]=int32_t(ratio);return true;
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_index_cublas_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_index_cublas_queued(void);
+}
 
 inline bool ggml_dsv41_index_f32_requested(const ggml_tensor*t){return ggml_dsv41_index_cublas_requested(t)&&t->op_params[4]==2;}
 inline bool ggml_dsv41_index_f32_tag(ggml_tensor*t){if(!ggml_dsv41_index_cublas_tag(t))return false;t->op_params[4]=2;return true;}

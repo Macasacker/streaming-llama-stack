@@ -14,4 +14,6 @@ inline bool ggml_dsv41_dense_fp8_eligible(const ggml_tensor *t){
     return (n==1280&&k==5120)||(n==32768&&k==1280)||(n==512&&k==5120)||(n==128&&k==512)||
            (n==5120&&k==8192)||(n==2304&&k==5120)||(n==5120&&k==2304);
 }
-extern "C" GGML_API uint64_t ggml_backend_cuda_dsv41_dense_fp8_queued(void);
+extern "C" {
+GGML_API uint64_t ggml_backend_cuda_dsv41_dense_fp8_queued(void);
+}

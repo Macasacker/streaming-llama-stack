@@ -25,4 +25,6 @@ inline uint32_t ggml_dsv41_index_window_offset(const ggml_tensor*t){
     GGML_ASSERT(t);if(!t->op_params[8])return 0;
     GGML_ASSERT(ggml_dsv41_index_window_requested(t)&&ggml_dsv41_index_window_shape(t));return uint32_t(t->op_params[7]);
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_candidate_window_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_candidate_window_queued(void);
+}

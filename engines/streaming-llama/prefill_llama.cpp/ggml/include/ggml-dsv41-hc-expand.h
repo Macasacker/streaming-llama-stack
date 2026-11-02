@@ -3,8 +3,10 @@
 #define GGML_DSV41_HC_EXPAND_MAGIC 0x44534845
 #define GGML_DSV41_HC_BF16_MAGIC 0x42463146
 #ifdef __cplusplus
-extern "C" GGML_API uint64_t ggml_backend_cuda_dsv41_hc_expand_queued(void);
-extern "C" GGML_API uint64_t ggml_backend_cuda_dsv41_hc_bf16_queued(void);
+extern "C" {
+GGML_API uint64_t ggml_backend_cuda_dsv41_hc_expand_queued(void);
+GGML_API uint64_t ggml_backend_cuda_dsv41_hc_bf16_queued(void);
+}
 #endif
 static inline bool ggml_dsv41_hc_expand_requested(const struct ggml_tensor*t){return t&&t->op==GGML_OP_MAP_CUSTOM3&&t->op_params[7]==GGML_DSV41_HC_EXPAND_MAGIC;}
 static inline bool ggml_dsv41_hc_expand_valid(const struct ggml_tensor*t){

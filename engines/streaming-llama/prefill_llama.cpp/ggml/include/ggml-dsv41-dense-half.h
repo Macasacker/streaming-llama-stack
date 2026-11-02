@@ -45,4 +45,6 @@ inline bool ggml_dsv41_dense_half_tag(ggml_tensor *t){
     if(!accepted)return false;
     t->op_params[2]=0x44344846;t->op_params[3]=1;return true;
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_dense_half_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_dense_half_queued(void);
+}

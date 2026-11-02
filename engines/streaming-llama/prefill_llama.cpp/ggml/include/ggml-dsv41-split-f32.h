@@ -33,4 +33,6 @@ inline bool ggml_dsv41_split_f32_pv_tag(ggml_tensor * t) {
     if(!ggml_dsv41_split_f32_pv_shape(t))return false;
     t->op_params[4]=0x53335446;t->op_params[5]=1;return true;
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_split_f32_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_split_f32_queued(void);
+}

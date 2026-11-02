@@ -21,4 +21,6 @@ inline bool ggml_dsv41_native_ffn_valid(const ggml_tensor *t){
     float limit;std::memcpy(&limit,t->op_params+2,sizeof(limit));
     return std::isfinite(limit)&&limit>0;
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_native_ffn_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_native_ffn_queued(void);
+}

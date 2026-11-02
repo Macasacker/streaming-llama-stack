@@ -1,7 +1,7 @@
 #pragma once
 // Reuse the native phase tracker and the Studio/native ds4 sampler. No CUDA
 // state is serialized; the side channel contains only a few sampling numbers.
-#include "../../../../ds4-win/ds4_quality_phase.h"
+#include "../../../../ds4/ds4_quality_phase.h"
 #include <fstream>
 #include <cmath>
 extern "C" int slstack_sample_logits(const float*,int,float,int,float,float,uint64_t*);

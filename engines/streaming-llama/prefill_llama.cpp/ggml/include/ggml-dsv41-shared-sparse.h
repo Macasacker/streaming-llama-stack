@@ -3,9 +3,11 @@
 #define GGML_DSV41_SHARED_SPARSE_MAGIC 0x44534635
 #define GGML_DSV41_TOKEN_TILE_MAGIC 0x44535454
 #ifdef __cplusplus
-extern "C" GGML_API uint64_t ggml_backend_cuda_dsv41_token_tile_queued(void);
-extern "C" GGML_API uint64_t ggml_backend_cuda_dsv41_token_union_queued(void);
-extern "C" GGML_API uint64_t ggml_backend_cuda_dsv41_token_f16_table_queued(void);
+extern "C" {
+GGML_API uint64_t ggml_backend_cuda_dsv41_token_tile_queued(void);
+GGML_API uint64_t ggml_backend_cuda_dsv41_token_union_queued(void);
+GGML_API uint64_t ggml_backend_cuda_dsv41_token_f16_table_queued(void);
+}
 #endif
 static inline bool ggml_dsv41_token_tile_requested(const struct ggml_tensor *t){
     return t&&t->op==GGML_OP_FLASH_ATTN_EXT_SPARSE&&t->op_params[4]==GGML_DSV41_TOKEN_TILE_MAGIC;

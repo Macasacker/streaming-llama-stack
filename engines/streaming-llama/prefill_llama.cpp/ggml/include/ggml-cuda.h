@@ -52,15 +52,15 @@ GGML_BACKEND_API size_t ggml_backend_cuda_pool_clear(ggml_backend_t backend);
 // Use to spot leaks across streaming-prefill cycles: alloc - free should equal
 // (live count's worth of) currently-held buffers. If alloc keeps growing
 // without matching free, buffers are being leaked at the ggml wrapper level.
-extern "C" GGML_BACKEND_API int64_t ggml_backend_cuda_buffer_alloc_total();
-extern "C" GGML_BACKEND_API int64_t ggml_backend_cuda_buffer_free_total();
-extern "C" GGML_BACKEND_API int64_t ggml_backend_cuda_buffer_live_count();
+GGML_BACKEND_API int64_t ggml_backend_cuda_buffer_alloc_total();
+GGML_BACKEND_API int64_t ggml_backend_cuda_buffer_free_total();
+GGML_BACKEND_API int64_t ggml_backend_cuda_buffer_live_count();
 
 // Phase 300 (2026-05-04): per-process cudaMalloc accounting via
 // ggml_cuda_device_malloc. Catches both wrapper AND pool direct allocations,
 // pinpointing whether the leak is in wrapper code or pool code.
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_device_malloc_total_bytes();
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_device_malloc_total_count();
+GGML_BACKEND_API int64_t ggml_cuda_device_malloc_total_bytes();
+GGML_BACKEND_API int64_t ggml_cuda_device_malloc_total_count();
 
 // Phase 301 (2026-05-04): cuda_graphs map accounting + clear API.
 // Each unique graph first_node_ptr creates a ggml_cuda_graph holding device
@@ -79,21 +79,21 @@ GGML_BACKEND_API bool ggml_backend_cuda_graphs_reserve(ggml_backend_t backend, s
 // from the file-scope Meyers-singleton atomics in common.cuh. Counts only the
 // call sites we've explicitly hooked (currently: streaming-prefill event
 // creates in llama-context.cpp — the suspected per-cycle leak source).
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_event_create_total();
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_event_destroy_total();
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_stream_create_total();
+GGML_BACKEND_API int64_t ggml_cuda_event_create_total();
+GGML_BACKEND_API int64_t ggml_cuda_event_destroy_total();
+GGML_BACKEND_API int64_t ggml_cuda_stream_create_total();
 // Manual increment APIs for callers outside ggml-cuda translation units.
-extern "C" GGML_BACKEND_API void ggml_cuda_event_create_count_inc();
-extern "C" GGML_BACKEND_API void ggml_cuda_event_destroy_count_inc();
-extern "C" GGML_BACKEND_API void ggml_cuda_stream_create_count_inc();
+GGML_BACKEND_API void ggml_cuda_event_create_count_inc();
+GGML_BACKEND_API void ggml_cuda_event_destroy_count_inc();
+GGML_BACKEND_API void ggml_cuda_stream_create_count_inc();
 // Phase 306 (2026-05-04): pinned host memory tracking. cudaMallocHost on
 // Windows consumes GPU page-table entries that show up in cudaMemGetInfo
 // as VRAM "free" decrease, even though physical memory is host RAM. Tracking
 // alloc - free totals shows whether pinned memory is the per-cycle leak.
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_pinned_alloc_total_bytes();
-extern "C" GGML_BACKEND_API int64_t ggml_cuda_pinned_free_total_bytes();
-extern "C" GGML_BACKEND_API void    ggml_cuda_pinned_alloc_track(size_t bytes);
-extern "C" GGML_BACKEND_API void    ggml_cuda_pinned_free_track(size_t bytes);
+GGML_BACKEND_API int64_t ggml_cuda_pinned_alloc_total_bytes();
+GGML_BACKEND_API int64_t ggml_cuda_pinned_free_total_bytes();
+GGML_BACKEND_API void    ggml_cuda_pinned_alloc_track(size_t bytes);
+GGML_BACKEND_API void    ggml_cuda_pinned_free_track(size_t bytes);
 
 GGML_BACKEND_API ggml_backend_reg_t ggml_backend_cuda_reg(void);
 

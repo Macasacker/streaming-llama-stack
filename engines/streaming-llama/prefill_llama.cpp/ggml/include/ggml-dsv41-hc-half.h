@@ -19,4 +19,6 @@ inline bool ggml_dsv41_hc_half_valid(const ggml_tensor *t){
 inline bool ggml_dsv41_hc_half_tag(ggml_tensor *t){
     if(!ggml_dsv41_hc_half_valid(t))return false;t->op_params[2]=0x48434648;t->op_params[3]=1;return true;
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_hc_half_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_hc_half_queued(void);
+}

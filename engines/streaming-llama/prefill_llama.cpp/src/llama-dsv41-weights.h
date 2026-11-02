@@ -8,7 +8,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "../../../ds4-win/ds4_external_host_cache.h"
+#include "../../../ds4/ds4_external_host_cache.h"
 
 // Original native-1017 GGUF -> bounded DirectStorage layer staging. Metadata
 // tensors never mmap or allocate their complete file payload. Engram tables

@@ -14,17 +14,23 @@ inline bool ggml_dsv41_native_fp4_valid(const ggml_tensor *t){
         t->ne[0]==w->ne[1]&&t->ne[1]==6&&t->ne[2]==x->ne[2]&&t->ne[3]==1&&
         ggml_is_contiguous(w)&&ggml_is_contiguous(x)&&ggml_is_contiguous(ids)&&ggml_is_contiguous(t);
 }
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_native_mxfp4_routed_queued(void);
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_native_mxfp4_dense_queued(void);
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_flashinfer_queued(void);
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_runtime_fp4_repacks_queued(void);
+extern "C" {
+GGML_BACKEND_API uint64_t ggml_backend_cuda_native_mxfp4_routed_queued(void);
+GGML_BACKEND_API uint64_t ggml_backend_cuda_native_mxfp4_dense_queued(void);
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_flashinfer_queued(void);
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_runtime_fp4_repacks_queued(void);
+}
 // Reuses the existing FP4 activation quantizer with ordinary17-byte weight
 // blocks as its destination. Caller owns disjoint CUDA input/output/scratch.
 // No allocation, model edit, disk I/O or implicit stream synchronization.
-extern "C" GGML_BACKEND_API int ggml_backend_cuda_dsv41_pack_weights_mxfp4(
+extern "C" {
+GGML_BACKEND_API int ggml_backend_cuda_dsv41_pack_weights_mxfp4(
     const ggml_tensor *source,ggml_tensor *destination,void *scratch,size_t scratch_bytes,void *stream);
-extern "C" GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_mxfp4_weight_packs_queued(void);
+GGML_BACKEND_API uint64_t ggml_backend_cuda_dsv41_mxfp4_weight_packs_queued(void);
+}
 
 // Explicit disjoint Q4_K source-loader fusion; same FP4 rounding rules.
-extern "C" GGML_BACKEND_API int ggml_backend_cuda_dsv41_pack_q4k_mxfp4_fused(
+extern "C" {
+GGML_BACKEND_API int ggml_backend_cuda_dsv41_pack_q4k_mxfp4_fused(
     const ggml_tensor *source,ggml_tensor *destination,void *stream);
+}
