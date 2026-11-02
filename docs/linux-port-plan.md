@@ -249,9 +249,9 @@ Known gaps carried forward, not hidden:
   transport's span count. Making the flag call `ds4_ds_configure_read_parts` before the transport is
   initialised is a small, separate change.
 - `./ds4 --help` still advertises `--metal`, `--backend metal`, `--metal-graph-test`,
-  `--ssd-streaming-full-layers` (GLM Metal) and `--expert-profile` (Metal-only). Those belong to
-  chunk 2.2b with the identifier rename, not to 2.2a: the words name options the Linux binary
-  parses today.
+  `--metal-graph-full-test`, `--metal-graph-prompt-test`, `--ssd-streaming-full-layers` (GLM Metal)
+  and `--expert-profile` (Metal-only), plus `--rocm`, which has no hardware here. They parse today
+  and fail later; chunk 2.2c decides whether to remove or refuse them.
 - `engines/ds4-win`, `engines/ds4-mac` and `engines/ds4-peer` are deleted (chunk 1.8 settled by
   1.10a); `engines/` holds `ds4` and `streaming-llama` only.
 
@@ -498,18 +498,32 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `DS4_NO_GPU` or `DS4_ROCM_BUILD`. The only `__APPLE__` left in `engines/ds4` is one inside the
     vendored `external/nlohmann/json.hpp`.
 
-2.2b Metal naming in live CUDA code. Open, decided: option (b). `engines/ds4` holds 516 distinct
-    `metal_*` identifiers (the graph helpers, e.g. `metal_graph_attn_cur`), 237 distinct `METAL_*`
-    constants (decode layer phases) and 215 distinct `DS4_METAL_*` environment variables, all doing
-    CUDA work in `ds4.c`. Only the first two are in scope: the variables keep their names, because
-    they are documented in `docs/VARIABLES.md` and named in `docs/macdecode-r6/r6-controls.json`
-    and `docs/MACDECODE_ROUND6.md`, and a silent rename would leave a saved control file setting
-    nothing. The chunk 2.2 gate is therefore narrowed to code identifiers:
-    `grep -rn "\bmetal_\|\bMETAL_" engines/ds4` over the source extensions returns nothing, the
-    `--metal`, `--backend metal` and `--metal-graph-test` CLI surface in `ds4_help.c` and the
-    parsers goes with them, and `make cuda CUDA_ARCH=sm_120` still builds with the host gates
-    passing. What stays named is then deliberate: 215 environment variables carrying the Metal
-    prefix while doing CUDA work, and chunk 7.1 relabels the docs that mention them.
+2.2b Metal naming in live CUDA code. Done. Option (b): the environment names stay, the code
+    identifiers went - 3,323 lines, 3,311 of them in `ds4.c`. `metal_graph_*` (the CUDA graph
+    layer's per-stage tensor accessors) became `gpu_graph_*`, the decode phase enum became
+    `gpu_decode_layer_phase` / `GPU_DECODE_LAYER_*`, `metal_ready` became `gpu_ready`, and three
+    names that were wrong rather than legacy were corrected: the GLM env helpers' `metal_name` /
+    `metal_env` are the names a non-ROCm build reads, so `cuda_name` / `cuda_env`, and
+    `model_open`'s `metal_mapping` is `shared_mapping` (MAP_SHARED vs MAP_PRIVATE, always false
+    here). All 215 `DS4_METAL_*` names are untouched, and they survive the gate by construction:
+    `_` is a word character, so `\bMETAL_` cannot match inside `DS4_METAL_FOO`. Also deleted: the
+    dead `GGML_COMMON_DECL_METAL` / `GGML_COMMON_IMPL_METAL` branches of
+    `cuda/mmq/ggml-common.h` (the only remaining `#include <metal_stdlib>`), a comment pointing at
+    `misc/METAL_TENSOR_PARALLELISM.md` which is not in this checkout, and two comments still
+    describing `ds4_metal.m`.
+    Gate met: `grep -rn "\bmetal_\|\bMETAL_" engines/ds4` over the source extensions returns
+    nothing, `make cuda` and `make cuda-decode` build with the pre-rename warning profile (26 vs
+    26, only the renamed unused function differs), the host gates pass, and `gcc -E
+    -fdirectives-only -P` of each changed file before and after - with the same rename applied to
+    the "before" text - is byte-identical.
+
+2.2c The Metal backend itself. Open, and it is a behaviour decision, not a rename. `--metal`,
+    `--backend metal`, `--metal-graph-test`, `--metal-graph-full-test`, `--metal-graph-prompt-test`
+    and the 46 `DS4_BACKEND_METAL` sites are still in the engine, so `--metal` parses, is selected,
+    and then fails at engine open. Nothing in `slstack`, `scripts` or the presets passes `--metal`.
+    Either delete the backend (enum, branches, flags, help lines) or make the parser refuse it with
+    a message and leave the dead branches for chunk 6.1. The help text still advertises `--rocm`
+    too, which is the same shape and has no hardware here.
 
 3.1 Streaming producer on Linux. `engines/streaming-llama/prefill_llama.cpp`: implement
     `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`, delete
@@ -582,10 +596,14 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunk 2.2a with the commands above: 7,600 Apple/MLX references repo-wide,
-3,704 of them inside `engines/ds4` - all Metal naming now, with no Apple conditional left there
-except one inside the vendored json.hpp. Windows references: 752 repo-wide, 3 first-party
-`engines/ds4` hits, all three vendored files. Re-count before trusting any of these numbers.
+Counts, re-counted after chunk 2.2b with the commands above: 3,998 Apple/MLX references repo-wide,
+441 of them inside `engines/ds4` - none matched by the code-identifier gate, which returns 0 there;
+what remains is the 215 `DS4_METAL_*` environment names kept on purpose, plus Metal and Apple words
+in comments, help text and the Metal backend surface (chunk 2.2c). Windows references: 755
+repo-wide, 3 first-party `engines/ds4` hits, all three vendored files
+(`external/nlohmann/json.hpp` x2, the `linenoise.c` comment). Both counts include this plan's own
+quoted grep patterns, so they read higher than the code alone. Re-count before trusting any of
+these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.

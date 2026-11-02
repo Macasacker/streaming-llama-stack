@@ -51,6 +51,13 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
 
+# No Metal-named identifiers left in the engine. The DS4_METAL_* environment names are kept on
+# purpose and cannot match: `_` is a word character, so \bMETAL_ does not match DS4_METAL_FOO.
+grep -rn "\bmetal_\|\bMETAL_" engines/ds4 \
+  --include=*.c --include=*.cpp --include=*.h --include=*.hpp \
+  --include=*.cu --include=*.cuh --include=*.inc
+# 0 hits
+
 cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 ```
 

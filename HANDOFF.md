@@ -6,13 +6,22 @@ Runnable commands for the user: `docs/linux-port-commands.md`.
 
 ## What the next session is for
 
-Chunks 1.6, 2.1 and the Apple half of 2.2 are committed. Chunk 2.2b is open and already decided -
-the owner chose to keep the `DS4_METAL_*` environment variable names and narrow the gate to code
-identifiers - but none of it has been done. What remains is a rename of the 516 `metal_*`
-identifiers and 237 `METAL_*` constants in `engines/ds4`, plus the `--metal`, `--backend metal`,
-`--metal-graph-test` CLI surface in `ds4_help.c` and the parsers, while the 215 `DS4_METAL_*`
-variables keep their names exactly as documented. Everything verified so far is a compile or
-host-code gate; nothing is a performance result, because no model weights are on disk.
+Chunks 1.6, 2.1, 2.2a and 2.2b are committed, so `engines/ds4` has no Win32 host code, no Apple
+conditionals and no Metal-named identifiers left. Two things are open, in order:
+
+1. **Chunk 2.2c, and it needs your call.** The Metal *backend* is still in the engine: `--metal`,
+   `--backend metal`, `--metal-graph-test`, `--metal-graph-full-test`, `--metal-graph-prompt-test`,
+   `--rocm`, and the 46 `DS4_BACKEND_METAL` sites. `--metal` parses, gets selected, and then fails
+   at engine open. Nothing in `slstack`, `scripts` or the presets passes it, so removing the
+   backend outright is safe here - but it is a behaviour change (the flag becomes unknown instead of
+   accepted-then-failed), so it was left for you. Either delete it, or make the parser refuse it
+   with a message and leave the dead branches for chunk 6.1.
+2. **Chunk 3.1, the Linux producer** (`engines/streaming-llama`): io_uring weight fetch worker,
+   `dlopen` of `ds4-decode.so` (3.2), OpenSSL instead of BCrypt, no DXGI. Its gates need weights
+   on disk, which this box does not have.
+
+Everything verified so far is a compile or host-code gate; nothing is a performance result, because
+no model weights are on disk.
 
 ## State
 
@@ -24,21 +33,40 @@ Commits, oldest first: `58ff877` (chunk 1: `engines/ds4` from the Windows engine
 builds and is gated without a GPU or a model file), `8c2ac02` (plan and handoff for 1.6),
 `171319a` (2.1: Win32 host code deleted from `engines/ds4`), `b7c5906` (plan and handoff for 2.1),
 `7cc2ca3` (2.2a: Apple conditional branches deleted), `3a49385` (2.1 follow-up: the claims about
-what the deleted Windows paths leave behind).
+what the deleted Windows paths leave behind), `c4dae9f` + `7da2c23` (plan and handoff, including
+the option-(b) decision), `535beef` (2.2b: Metal identifiers renamed).
 
 `python3 -B scripts/release_check.py` reports 0 findings, so commits need no `--no-verify`.
 Python suite: **584 tests, 5-6 failures, 5 errors** (fork baseline 585 tests, 6 failures, 6
 errors). Two process tests vary run to run, so compare the failing names rather than the count.
 
+## What chunk 2.2b landed (`535beef`)
+
+3,323 lines renamed, 3,311 in `ds4.c`: `metal_graph_*` to `gpu_graph_*` (the CUDA graph layer's
+per-stage tensor accessors), the decode phase enum to `gpu_decode_layer_phase` /
+`GPU_DECODE_LAYER_*`, `metal_ready` to `gpu_ready`, and three names that were simply wrong: the GLM
+env helpers' `metal_name`/`metal_env` are what a non-ROCm build reads, so `cuda_name`/`cuda_env`,
+and `model_open`'s `metal_mapping` is `shared_mapping`. The 215 `DS4_METAL_*` environment names are
+untouched, as decided; `_` is a word character, so the identifier gate cannot match them.
+Dead `#include <metal_stdlib>` branches in `cuda/mmq/ggml-common.h` and comments naming the deleted
+`ds4_metal.m` and a nonexistent `misc/METAL_TENSOR_PARALLELISM.md` went too.
+
+The rename was proven, not read: a `git worktree` at HEAD built the same objects for a warning
+comparison (26 vs 26, only the renamed unused symbol differs), and `gcc -E -fdirectives-only -P`
+before vs after - with the same rename applied to the "before" text - is byte-identical for ds4.c
+plain and with `-DDS4_EXTERNAL_DECODE=1`, and for `ds4_cli.c`. That worktree trick (build HEAD in a
+throwaway tree, compare normalized warning sets) is the cheapest honest regression check for a
+mechanical sweep; reuse it for 2.2c.
+
 ## What chunk 2.2a landed (`7cc2ca3`)
 
 3,475 more lines of engine source deleted with the same mechanical rule, applied to
-`__APPLE__`/`TARGET_OS`/`__MACH__`. ds4.c carried the Mac graph layer behind `#if defined(__APPLE__)`,
-so the Metal implementations went and the CUDA ones stayed. Three guards needed hand work because
-a later branch was the live one: the n-gram read advisory (`#ifdef __APPLE__ / #elif
-defined(POSIX_FADV_RANDOM)`), `ds4_gpu.h`'s `ds4_gpu_device_is_spark()` behind
-`#elif !defined(__APPLE__)`, and two `#if defined(_WIN32) / #elif defined(__linux__)` pairs in
-`ds4_agent.c`. 77 conditions in ds4.c kept their guard and lost only the Apple operand, because
+`__APPLE__`/`TARGET_OS`/`__MACH__`. ds4.c carried the Mac graph layer behind
+`#if defined(__APPLE__)`, so the Metal implementations went and the CUDA ones stayed. Three guards
+needed hand work because a later branch was the live one: the n-gram read advisory
+(`#ifdef __APPLE__ / #elif defined(POSIX_FADV_RANDOM)`), `ds4_gpu.h`'s `ds4_gpu_device_is_spark()`
+behind `#elif !defined(__APPLE__)`, and two `#if defined(_WIN32) / #elif defined(__linux__)` pairs
+in `ds4_agent.c`. 77 conditions in ds4.c kept their guard and lost only the Apple operand, because
 they still test `DS4_NO_GPU` or `DS4_ROCM_BUILD`.
 
 ## What chunk 2.1 landed
@@ -132,9 +160,8 @@ variable name set is unchanged.
 
 ## Next chunks, in order
 
-From `docs/linux-port-plan.md`: 2.2b (rename the `metal_*` identifiers, the `METAL_*` constants
-and the `--metal` CLI surface inside `engines/ds4`; the `DS4_METAL_*` environment variables keep
-their names by owner decision), then 3.1 (Linux producer), 3.2 (producer
+From `docs/linux-port-plan.md`: 2.2c (remove or refuse the Metal backend and the `--rocm` flag -
+the owner's call, see above), then 3.1 (Linux producer), 3.2 (producer
 `dlopen` of `ds4-decode.so`), 4.1, 5.1, 6.1, 7.1, 8.1.
 
 Chunk 2.1 landed: every conditional whose expression named Win32 now compiles to what Linux already
