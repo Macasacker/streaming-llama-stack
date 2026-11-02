@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cassert>
+#include <cmath>
 
 // bump if necessary
 #define LLAMA_MAX_LAYERS  512
