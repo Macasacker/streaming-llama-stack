@@ -19,9 +19,9 @@
  * registered memory slab: two-sided RDMA SEND/RECV when RDMA over
  * Thunderbolt is available, or a full-duplex TCP exchange as fallback.
  *
- * Layering: ds4.c calls the session-mirroring and slab entry points;
- * ds4_metal.m only ever sees ds4_tp_gate_exchange() through a callback
- * registered with the GPU gate machinery.  Nothing here touches tensors.
+ * Layering: ds4.c calls the session-mirroring and slab entry points; the GPU
+ * gate machinery only ever sees ds4_tp_gate_exchange() through a callback it
+ * registers with the engine.  Nothing here touches tensors.
  */
 
 typedef struct ds4_tp ds4_tp;

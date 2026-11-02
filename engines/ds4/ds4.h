@@ -97,7 +97,7 @@ typedef struct {
 
 /* Tensor parallelism: two identical machines run the model in lockstep and
  * split the heavy per-layer matvecs, exchanging partial sums at gates inside
- * the graph (see misc/METAL_TENSOR_PARALLELISM.md).  Each rank keeps one
+ * the graph.  Each rank keeps one
  * contiguous half of the routed experts resident; dense and shared weights
  * remain replicated.  The leader owns prompt/sampling and listens; the worker
  * dials in and mirrors every session sync/eval. */
@@ -202,7 +202,7 @@ typedef struct {
      * known. The context-derived chunk remains a hard upper bound. */
     bool request_sized_prefill_workspace;
     bool first_token_test;
-    bool metal_graph_test;
+    bool gpu_graph_test;
     bool load_slice;
     uint32_t load_layer_start;
     uint32_t load_layer_end;

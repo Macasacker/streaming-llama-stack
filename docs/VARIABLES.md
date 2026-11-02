@@ -985,7 +985,7 @@ Diagnostic: 1 makes each borrowed layer-major DirectStorage expert wave wait on 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:36836`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36838`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int v = -1;
@@ -1044,7 +1044,7 @@ Source: `engines/ds4/ds4.c:43357`. Unset read: NULL from getenv; the literal con
 ```text
     if (g->tp_world == 1 && !g->streaming && !g->quality && !g->imatrix && !g->image_count &&
         !g_expert_profile.active && !getenv("DS4_CUDA_MOE_PROFILE") &&
-        !metal_graph_debug_get_config()->prefix && !getenv("DS4COMBO_V41_DUMP") &&
+        !gpu_graph_debug_get_config()->prefix && !getenv("DS4COMBO_V41_DUMP") &&
         !ds41_engram_layer(il) && (ds41_single_hc_graphs_on() || ds41_hc_graph_profile_on()))
         return DS41_MARK(0) && ds41_single_hc_island(g, m, l, il) && DS41_MARK(1) &&
             ds41_attention(g, m, l, il, false) && DS41_MARK(2) &&
@@ -1087,7 +1087,7 @@ Diagnostic: comma-separated layers (<64) whose borrowed layer-major expert slots
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:36830`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36832`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static int cuda_loader_check_enabled(void) {
@@ -1099,7 +1099,7 @@ static int cuda_ds_fence_enabled(void) {
     static int v = -1;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:36876`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36878`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!parsed) {
@@ -1237,7 +1237,7 @@ Single-engine decode: 1 copies the router selection to the host as soon as it is
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:33582`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:33584`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     (void)selected; (void)count; return 1;
@@ -1255,7 +1255,7 @@ Decode attribution: 1 records CUDA events at single-engine decode stage boundari
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:33562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:33564`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 extern "C" int ds4_gpu_stage_mark(int id) {
@@ -1294,7 +1294,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:19338`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static uint32_t metal_graph_attn_comp_cache_default_format(void) {
+static uint32_t gpu_graph_attn_comp_cache_default_format(void) {
     const char *env = getenv("DS4_CUDA_ATTN_COMP_CACHE");
     if (!env || !env[0]) env = getenv("DS4_ATTN_COMP_CACHE");
     if (env && env[0]) {
@@ -1603,7 +1603,7 @@ Source: `engines/ds4/ds4.c:74201`. Unset read: NULL from getenv; the literal con
         *out=NULL;return 1;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:28365`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28367`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint64_t gate_bytes, uint64_t down_bytes, float scale, float lambda) {
@@ -1966,7 +1966,7 @@ DS4_CUDA_ATTENTION_OUTPUT_A_CUBLAS_MIN: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:27626`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27628`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const __half *out_a_f16 = NULL;
@@ -2002,7 +2002,7 @@ DS4_CUDA_ATTNOUT_WEIGHT_HASH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:27443`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27445`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int enabled = -1;
@@ -2024,7 +2024,7 @@ Source: `engines/ds4/ds4.c:19337`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static uint32_t metal_graph_attn_comp_cache_default_format(void) {
+static uint32_t gpu_graph_attn_comp_cache_default_format(void) {
     const char *env = getenv("DS4_CUDA_ATTN_COMP_CACHE");
     if (!env || !env[0]) env = getenv("DS4_ATTN_COMP_CACHE");
     if (env && env[0]) {
@@ -2092,7 +2092,7 @@ DS4_CUDA_ATTN_OUTPUT_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:27611`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27613`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                    out_b, out_b_bytes, out_b_kind);
@@ -2224,7 +2224,7 @@ Source: `engines/ds4/ds4_cuda.cu:8521`. Unset read: NULL from getenv; the litera
     return 1;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:43276`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:43278`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * Registering a whole read-only mapping is pointless when the design is to STREAM it. */
@@ -2464,7 +2464,7 @@ DS4_CUDA_DISABLE_HC_SPLIT_NORM_FUSED: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:36249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36251`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         float                   eps,
@@ -2512,7 +2512,7 @@ DS4_CUDA_DISABLE_Q8_HC_EXPAND_FUSED: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:36441`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36443`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t                n_embd,
@@ -2524,7 +2524,7 @@ Source: `engines/ds4/ds4_cuda.cu:36441`. Unset read: NULL from getenv; the liter
                                                         in_dim, out_dim,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:36477`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36479`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t                n_embd,
@@ -2536,7 +2536,7 @@ Source: `engines/ds4/ds4_cuda.cu:36477`. Unset read: NULL from getenv; the liter
                                                         in_dim, out_dim,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:36516`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36518`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t n_embd,
@@ -2548,7 +2548,7 @@ Source: `engines/ds4/ds4_cuda.cu:36516`. Unset read: NULL from getenv; the liter
             model_map,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:36552`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:36554`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t                n_embd,
@@ -2572,10 +2572,10 @@ Source: `engines/ds4/ds4.c:20009`. Unset read: NULL from getenv; the literal con
     const char *no = getenv("DS4_CUDA_NO_QKV_KV_ROPE_FUSE");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     if (getenv("DS4_CUDA_DISABLE_QKV_RMS_FUSED") != NULL) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
+    return gpu_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
 }
 
-static bool metal_graph_cuda_tp_prefill_ffn_requested(void) {
+static bool gpu_graph_cuda_tp_prefill_ffn_requested(void) {
 ```
 
 Source: `engines/ds4/ds4_cuda.cu:533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -2596,7 +2596,7 @@ DS4_CUDA_DISABLE_SHARED_GATE_UP_PAIR: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:28038`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28040`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const ds4_gpu_tensor *x,
@@ -2644,7 +2644,7 @@ static bool ds41_prefill_borrow(ds41_gpu_graph *g, const ds4_weights *w, uint32_
     const uint64_t down = routed_expert_row_bytes(l->ffn_down_exps) * DS4_N_EMBD;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:37482`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:37484`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     auto &cache = g_stream_selected_cache;
@@ -2968,7 +2968,7 @@ Source: `engines/ds4/ds4_cuda.cu:12447`. Unset read: NULL from getenv; the liter
 
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:33826`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:33828`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #endif
@@ -3172,7 +3172,7 @@ Source: `engines/ds4/ds4.c:85794`. Unset read: NULL from getenv; the literal con
         return false;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25997`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:25999`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_SCORE_TILE") != NULL ||
@@ -3214,7 +3214,7 @@ Source: `engines/ds4/ds4_cuda.cu:17324`. Unset read: Wrapper/conditional default
     const bool single_all = (ratio == 0u);
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25986`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
      * one-session dispatcher until they gain equivalent row-table variants. */
@@ -3364,7 +3364,7 @@ Source: `engines/ds4/ds4.c:85793`. Unset read: NULL from getenv; the literal con
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_S") != NULL) {
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25996`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:25998`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_cuda_exact_score_split_fuse_inv_rope ||
@@ -3394,7 +3394,7 @@ Source: `engines/ds4/ds4.c:85797`. Unset read: NULL from getenv; the literal con
     ds4_gpu_graph *first = &items[0].session->graph;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:26000`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26002`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR") != NULL ||
@@ -3424,7 +3424,7 @@ Source: `engines/ds4/ds4.c:85795`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25998`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26000`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_MIN_SCORE") != NULL ||
@@ -3454,7 +3454,7 @@ Source: `engines/ds4/ds4.c:85796`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25999`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26001`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK") != NULL ||
@@ -3613,7 +3613,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:59168`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-                       metal_graph_debug_get_config()->prefix == NULL &&
+                       gpu_graph_debug_get_config()->prefix == NULL &&
                        !glm_debug_hidden_dump_layer_match(il) &&
                        getenv("DS4_CUDA_GLM_DISABLE_FFN_GRAPHS") == NULL &&
                        ds4_gpu_decode_graphs_supported() != 0;
@@ -3687,10 +3687,10 @@ Source: `engines/ds4/ds4.c:19876`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV", false);
 }
 
-static bool metal_graph_cuda_greedy_vec4_requested(void) {
+static bool gpu_graph_cuda_greedy_vec4_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4");
 ```
 
@@ -3758,7 +3758,7 @@ Source: `engines/ds4/ds4.c:19926`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static float metal_graph_cuda_greedy_splitkv_margin_threshold(void) {
+static float gpu_graph_cuda_greedy_splitkv_margin_threshold(void) {
     const char *env = getenv("DS4_CUDA_GREEDY_SPLITKV_MARGIN");
     if (env && env[0]) {
         char *end = NULL;
@@ -3777,10 +3777,10 @@ Source: `engines/ds4/ds4.c:19960`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY", false);
 }
 
-static DS4_MAYBE_UNUSED uint32_t metal_graph_cuda_greedy_max_segment(const char *name) {
+static DS4_MAYBE_UNUSED uint32_t gpu_graph_cuda_greedy_max_segment(const char *name) {
     const char *env = getenv(name);
 ```
 
@@ -3795,11 +3795,11 @@ Source: `engines/ds4/ds4.c:19950`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_TOP2");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TOP2", true);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TOP2", true);
 }
 
-static bool metal_graph_cuda_greedy_splitkv_trust_replay_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY", false);
+static bool gpu_graph_cuda_greedy_splitkv_trust_replay_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY", false);
 ```
 
 ### DS4_CUDA_GREEDY_SPLITKV_TRACE
@@ -3812,7 +3812,7 @@ Source: `engines/ds4/ds4.c:67967`. Unset read: NULL from getenv; the literal con
 
 ```text
         const float margin = top2.value0 - top2.value1;
-        const float threshold = metal_graph_cuda_greedy_splitkv_margin_threshold();
+        const float threshold = gpu_graph_cuda_greedy_splitkv_margin_threshold();
         if (getenv("DS4_CUDA_GREEDY_SPLITKV_TRACE")) {
             fprintf(stderr,
                     "ds4: greedy split-kv margin pos=%u top=%d second=%d margin=%.6f threshold=%.6f\n",
@@ -3830,11 +3830,11 @@ Source: `engines/ds4/ds4.c:19954`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_greedy_splitkv_trust_replay_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY", false);
+static bool gpu_graph_cuda_greedy_splitkv_trust_replay_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TRUST_REPLAY", false);
 }
 
-static bool metal_graph_cuda_greedy_splitkv_pair_replay_requested(void) {
+static bool gpu_graph_cuda_greedy_splitkv_pair_replay_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY");
 ```
 
@@ -3849,11 +3849,11 @@ Source: `engines/ds4/ds4.c:19860`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLIT_TOP1", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLIT_TOP1", false);
 }
 
-static bool metal_graph_cuda_output_fused_top1_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_OUTPUT_FUSED_TOP1", false);
+static bool gpu_graph_cuda_output_fused_top1_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_OUTPUT_FUSED_TOP1", false);
 ```
 
 ### DS4_CUDA_GREEDY_TOP1
@@ -3867,7 +3867,7 @@ Source: `engines/ds4/ds4.c:68395`. Unset read: Wrapper/conditional default: see 
 ```text
             int n_generated = 0;
             const double t_decode0 = now_sec();
-            const bool greedy_top1 = metal_graph_tp_env_flag("DS4_CUDA_GREEDY_TOP1", true);
+            const bool greedy_top1 = gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_TOP1", true);
             int token = ds4_session_argmax(s);
             /* LOOP ACCOUNTING.  MEASURED 2026-08-18: the per-token graph profiler
              * (DS4_METAL_GRAPH_TOKEN_PROFILE) accounts for only 80.1 ms of a 110.3 ms decode token.
@@ -3897,10 +3897,10 @@ Source: `engines/ds4/ds4.c:19882`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_VEC4", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_VEC4", false);
 }
 
-static bool metal_graph_cuda_splitkv_spec_requested(void) {
+static bool gpu_graph_cuda_splitkv_spec_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC");
 ```
 
@@ -3968,7 +3968,7 @@ Source: `engines/ds4/ds4.c:19904`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static float metal_graph_cuda_greedy_vec4_margin_threshold(void) {
+static float gpu_graph_cuda_greedy_vec4_margin_threshold(void) {
     const char *env = getenv("DS4_CUDA_GREEDY_VEC4_MARGIN");
     if (env && env[0]) {
         char *end = NULL;
@@ -3986,7 +3986,7 @@ Source: `engines/ds4/ds4.c:67996`. Unset read: NULL from getenv; the literal con
 
 ```text
         const float margin = top2.value0 - top2.value1;
-        const float threshold = metal_graph_cuda_greedy_vec4_margin_threshold();
+        const float threshold = gpu_graph_cuda_greedy_vec4_margin_threshold();
         if (getenv("DS4_CUDA_GREEDY_VEC4_TRACE")) {
             fprintf(stderr,
                     "ds4: greedy vec4 margin pos=%u top=%d second=%d margin=%.6f threshold=%.6f\n",
@@ -4084,7 +4084,7 @@ DS4_CUDA_INDEXED_SYNC: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:26605`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26607`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t comp_row_bytes = cuda_comp_kv_row_bytes(comp_kv_format, head_dim);
@@ -4102,7 +4102,7 @@ DS4_CUDA_INDEXED_TWOPASS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:26815`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26817`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         n_tokens > 1u && head_dim == 512u && top_k <= 512u &&
@@ -4114,7 +4114,7 @@ Source: `engines/ds4/ds4_cuda.cu:26815`. Unset read: NULL from getenv; the liter
                 "ds4: CUDA indexed attention launch plan kernel=%s comp_format=%u sync=%u "
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:26841`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26843`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -4166,7 +4166,7 @@ Source: `engines/ds4/ds4.c:25768`. Unset read: NULL from getenv; the literal con
 
 ```text
                        DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0)
-                : metal_graph_decode_kv_store(metal_graph_kv(g), raw_cache, raw_cap, raw_row);
+                : gpu_graph_decode_kv_store(gpu_graph_kv(g), raw_cache, raw_cap, raw_row);
             if (!ok && (getenv("DS4_CUDA_KV_CACHE_VERBOSE") != NULL ||
                         getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL)) {
                 fprintf(stderr,
@@ -4210,7 +4210,7 @@ extern "C" int ds4_gpu_dsv4_fp8_kv_quantize_tensor(ds4_gpu_tensor *x, uint32_t n
                     n_tok,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25072`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:25074`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -4222,7 +4222,7 @@ Source: `engines/ds4/ds4_cuda.cu:25072`. Unset read: NULL from getenv; the liter
                 "ds4: CUDA fp8 raw KV store request kv=%p raw=%p raw_cap=%u raw_row=%u head_dim=%u n_rot=%u bytes(kv=%llu raw=%llu)\n",
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25131`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:25133`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         raw_cache->bytes < (uint64_t)raw_cap * head_dim * sizeof(float) ||
@@ -4234,7 +4234,7 @@ Source: `engines/ds4/ds4_cuda.cu:25131`. Unset read: NULL from getenv; the liter
                     (void *)kv,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:26247`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (n_comp && comp_kv->bytes < (uint64_t)n_comp * head_dim * sizeof(float)) ||
@@ -4246,7 +4246,7 @@ Source: `engines/ds4/ds4_cuda.cu:26247`. Unset read: NULL from getenv; the liter
                     "n_tokens=%u pos0=%u n_raw=%u raw_cap=%u raw_start=%u n_comp=%u "
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:26604`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t comp_kv_format = comp_kv_f16;
@@ -4264,7 +4264,7 @@ DS4_CUDA_KV_RAW_STORE_VERBOSE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:25073`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:25075`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -4377,7 +4377,7 @@ Source: `engines/ds4/ds4.c:83889`. Unset read: Wrapper/conditional default: see 
 ```text
     }
     if (prefill->engine->backend == DS4_BACKEND_CUDA)
-        return metal_graph_tp_env_flag("DS4_CUDA_MIXED_PREFILL_DECODE", true) &&
+        return gpu_graph_tp_env_flag("DS4_CUDA_MIXED_PREFILL_DECODE", true) &&
             ds41_sessions_batch_supported(combined, rows + count, prefill->engine);
     return ds4_sessions_eval_batch_metal_supported(combined, rows + count, prefill->engine);
 }
@@ -4389,7 +4389,7 @@ Source: `engines/ds4/ds4.c:88329`. Unset read: Wrapper/conditional default: see 
 ```text
         (uint32_t)prefill_prompt->len - start;
     const bool native_requested =
-        metal_graph_tp_env_flag("DS4_CUDA_MIXED_PREFILL_DECODE", true);
+        gpu_graph_tp_env_flag("DS4_CUDA_MIXED_PREFILL_DECODE", true);
     const bool native_supported =
         native_requested &&
         e->backend == DS4_BACKEND_CUDA &&
@@ -4406,7 +4406,7 @@ Source: `engines/ds4/ds4.c:87832`. Unset read: NULL from getenv; the literal con
 
 ```text
  * must use the serialized public-API fallback. */
-static DS4_MAYBE_UNUSED uint32_t metal_graph_mixed_routed_max_prefill_rows(void) {
+static DS4_MAYBE_UNUSED uint32_t gpu_graph_mixed_routed_max_prefill_rows(void) {
     const char *value = getenv("DS4_CUDA_MIXED_ROUTED_MAX_PREFILL");
     if (!value || !value[0]) return 512u;
     char *end = NULL;
@@ -4570,7 +4570,7 @@ DS4_CUDA_MOE_DIRECT_MIDQ: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34665`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34667`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_direct_midq =
@@ -4588,7 +4588,7 @@ DS4_CUDA_MOE_DOWN_ROW1024: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34636`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t force_q4_down_rowspan =
@@ -4600,7 +4600,7 @@ Source: `engines/ds4/ds4_cuda.cu:34634`. Unset read: NULL from getenv; the liter
             (q4_owned_batch || n_tokens >= 128u || force_q4_down_rowspan) &&
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34651`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_DOWN_ROW512") != NULL ? 512u :
@@ -4618,7 +4618,7 @@ DS4_CUDA_MOE_DOWN_ROW128: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34653`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34655`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             (getenv("DS4_CUDA_MOE_DOWN_ROW2048") != NULL ||
@@ -4636,7 +4636,7 @@ DS4_CUDA_MOE_DOWN_ROW2048: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34635`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34637`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_DOWN_ROW512") != NULL ||
@@ -4648,7 +4648,7 @@ Source: `engines/ds4/ds4_cuda.cu:34635`. Unset read: NULL from getenv; the liter
             getenv("DS4_CUDA_MOE_NO_Q4_DOWN_ROWSPAN") == NULL;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34648`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t down_row_span =
@@ -4660,7 +4660,7 @@ Source: `engines/ds4/ds4_cuda.cu:34648`. Unset read: NULL from getenv; the liter
              getenv("DS4_CUDA_MOE_DOWN_ROW256") != NULL ||
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34651`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34653`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_DOWN_ROW1024") != NULL ? 1024u : 512u;
@@ -4678,7 +4678,7 @@ DS4_CUDA_MOE_DOWN_ROW256: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_down_row2048 = !q4k_path && use_atomic_down && expert_tile_m == 8u &&
@@ -4696,7 +4696,7 @@ DS4_CUDA_MOE_DOWN_ROW512: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34635`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_NO_SMALL_SORTED_PREP") == NULL;
@@ -4708,7 +4708,7 @@ Source: `engines/ds4/ds4_cuda.cu:34633`. Unset read: NULL from getenv; the liter
             q4k_path && use_expert_tiles && expert_tile_m == 8u &&
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34647`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_GATE_ROW1024") != NULL ? 1024u : 512u;
@@ -4726,7 +4726,7 @@ DS4_CUDA_MOE_DOWN_ROW64: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34656`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              getenv("DS4_CUDA_MOE_DOWN_ROW256") != NULL ||
@@ -4744,7 +4744,7 @@ DS4_CUDA_MOE_GATE_ROW1024: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34645`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34647`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t gate_row_span =
@@ -4762,7 +4762,7 @@ DS4_CUDA_MOE_GATE_ROW128: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34618`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34620`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             (getenv("DS4_CUDA_MOE_GATE_ROW2048") != NULL ||
@@ -4780,7 +4780,7 @@ DS4_CUDA_MOE_GATE_ROW2048: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34616`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34618`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_NO_OWNED_SPARSE_BUFFERS") == NULL;
@@ -4792,7 +4792,7 @@ Source: `engines/ds4/ds4_cuda.cu:34616`. Unset read: NULL from getenv; the liter
               getenv("DS4_CUDA_MOE_NO_GATE_ROW2048") == NULL &&
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34646`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_NO_DECODE_LUT_GATE") == NULL;
@@ -4810,7 +4810,7 @@ DS4_CUDA_MOE_GATE_ROW256: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34617`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34619`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_gate_row2048 = use_expert_tiles && expert_tile_m == 8u &&
@@ -4828,7 +4828,7 @@ DS4_CUDA_MOE_MIDQ_SIDECAR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34694`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34696`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             !use_direct_midq && !write_gate_up &&
@@ -4846,7 +4846,7 @@ DS4_CUDA_MOE_NO_DECODE_LUT_GATE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_decode_lut_gate =
@@ -4858,7 +4858,7 @@ Source: `engines/ds4/ds4_cuda.cu:34642`. Unset read: NULL from getenv; the liter
         const uint32_t down_row_span =
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:35698`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:35700`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -4880,7 +4880,7 @@ Source: `engines/ds4/ds4.c:44675`. Unset read: NULL from getenv; the literal con
 
 ```text
     if (!placement || g->quality || g->imatrix || g->image_count ||
-        !metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) ||
+        !gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) ||
         getenv("DS4_CUDA_MOE_NO_DIRECT_DOWN_SUM6")) return false;
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         const ds4_layer_weights *l = &w->layer[il];
@@ -4888,7 +4888,7 @@ Source: `engines/ds4/ds4.c:44675`. Unset read: NULL from getenv; the literal con
             l->ffn_up_exps->type != DS4_TENSOR_IQ2_XXS ||
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34354`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34356`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool small_exact_batch = iq2_path && (use_stream_selected_cache || exact_owned_rows) &&
@@ -4900,7 +4900,7 @@ Source: `engines/ds4/ds4_cuda.cu:34354`. Unset read: NULL from getenv; the liter
      * pass) -> SwiGLU + clamp + router weight -> Q2_K down, treating
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34662`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34664`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_direct_down_sum =
@@ -4930,7 +4930,7 @@ DS4_CUDA_MOE_NO_DIRECT_MIDQ: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34666`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34668`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && use_direct_down_sum && !write_gate_up &&
@@ -4948,7 +4948,7 @@ DS4_CUDA_MOE_NO_DOWN_ROW128: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34658`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34660`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
               getenv("DS4_CUDA_MOE_NO_DOWN_ROW2048") == NULL &&
@@ -4966,7 +4966,7 @@ DS4_CUDA_MOE_NO_DOWN_ROW2048: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34656`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34658`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              getenv("DS4_CUDA_MOE_DOWN_ROW64") != NULL ||
@@ -4984,7 +4984,7 @@ DS4_CUDA_MOE_NO_DOWN_ROW256: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34657`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34659`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              (use_down_tile16 &&
@@ -5002,7 +5002,7 @@ DS4_CUDA_MOE_NO_DOWN_ROW64: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34659`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34661`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
               getenv("DS4_CUDA_MOE_NO_DOWN_ROW256") == NULL &&
@@ -5020,7 +5020,7 @@ DS4_CUDA_MOE_NO_DOWN_TILE16: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34627`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34629`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_MOE_NO_Q4_MMA_TILE16") == NULL;
@@ -5038,7 +5038,7 @@ DS4_CUDA_MOE_NO_EXPERT_TILES: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34573`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34575`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             (owned_filtered ||
@@ -5050,7 +5050,7 @@ Source: `engines/ds4/ds4_cuda.cu:34573`. Unset read: NULL from getenv; the liter
             (owned_filtered || !q4k_path || use_q4_sorted_pairs);
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34580`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34582`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_expert_tiles =
@@ -5068,7 +5068,7 @@ DS4_CUDA_MOE_NO_GATE_ROW128: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34622`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34624`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
               getenv("DS4_CUDA_MOE_NO_GATE_ROW2048") == NULL &&
@@ -5086,7 +5086,7 @@ DS4_CUDA_MOE_NO_GATE_ROW2048: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34620`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34622`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              getenv("DS4_CUDA_MOE_GATE_ROW128") != NULL ||
@@ -5104,7 +5104,7 @@ DS4_CUDA_MOE_NO_GATE_ROW256: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34621`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34623`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              ((q4_owned_batch || n_tokens >= 128u) &&
@@ -5140,7 +5140,7 @@ DS4_CUDA_MOE_NO_MIDQ_SIDECAR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34695`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34697`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             (expert_mid_dim % CUDA_QK_K) == 0u &&
@@ -5158,7 +5158,7 @@ DS4_CUDA_MOE_NO_OWNED_MMQ: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34366`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34368`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * and remapped IDs as the other routed kernels. */
@@ -5176,7 +5176,7 @@ DS4_CUDA_MOE_NO_OWNED_SPARSE_BUFFERS: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34614`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34616`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -5194,7 +5194,7 @@ DS4_CUDA_MOE_NO_P2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34597`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_p2_sorted =
@@ -5230,7 +5230,7 @@ DS4_CUDA_MOE_NO_Q4_DOWN_ROWSPAN: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34639`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34641`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && use_expert_tiles && expert_tile_m == 8u &&
@@ -5248,7 +5248,7 @@ DS4_CUDA_MOE_NO_Q4_DOWN_SLOT3: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34689`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34691`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && use_direct_down_sum && n_expert == 3u &&
@@ -5266,7 +5266,7 @@ DS4_CUDA_MOE_NO_Q4_GATE_H16: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34674`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34676`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && !use_direct_midq && !use_q4_gate_h16r8 &&
@@ -5284,7 +5284,7 @@ DS4_CUDA_MOE_NO_Q4_GATE_H16R8: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34670`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34672`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && !use_direct_midq &&
@@ -5302,7 +5302,7 @@ DS4_CUDA_MOE_NO_Q4_GATE_W32: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34682`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34684`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && !use_direct_midq && !use_q4_gate_h16r8 && !use_q4_gate_h16 &&
@@ -5320,7 +5320,7 @@ DS4_CUDA_MOE_NO_Q4_GATE_W32R16: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34678`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34680`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && !use_direct_midq && !use_q4_gate_h16r8 && !use_q4_gate_h16 &&
@@ -5338,7 +5338,7 @@ DS4_CUDA_MOE_NO_Q4_GATE_W32_NOAUX: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34685`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34687`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_q4_gate_w32_noaux =
@@ -5374,7 +5374,7 @@ DS4_CUDA_MOE_NO_Q4_MMA_TILE16: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34625`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34627`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_q4_mma_tiles16 = q4k_path && use_expert_tiles &&
@@ -5392,7 +5392,7 @@ DS4_CUDA_MOE_NO_Q4_SORTED: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34572`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34574`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             q4k_path && n_tokens > 1u &&
@@ -5410,7 +5410,7 @@ DS4_CUDA_MOE_NO_SMALL_SORTED_PREP: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34631`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             owned_filtered && q4k_path && n_tokens <= 16u && pair_count <= 96u &&
@@ -5434,7 +5434,7 @@ Source: `engines/ds4/ds4.c:43356`. Unset read: NULL from getenv; the literal con
                                     const ds4_layer_weights *l, uint32_t il, int token) {
     if (g->tp_world == 1 && !g->streaming && !g->quality && !g->imatrix && !g->image_count &&
         !g_expert_profile.active && !getenv("DS4_CUDA_MOE_PROFILE") &&
-        !metal_graph_debug_get_config()->prefix && !getenv("DS4COMBO_V41_DUMP") &&
+        !gpu_graph_debug_get_config()->prefix && !getenv("DS4COMBO_V41_DUMP") &&
         !ds41_engram_layer(il) && (ds41_single_hc_graphs_on() || ds41_hc_graph_profile_on()))
         return DS41_MARK(0) && ds41_single_hc_island(g, m, l, il) && DS41_MARK(1) &&
             ds41_attention(g, m, l, il, false) && DS41_MARK(2) &&
@@ -5446,13 +5446,13 @@ Source: `engines/ds4/ds4.c:43366`. Unset read: NULL from getenv; the literal con
     if (g->tp_world != 2 || g->streaming || g->quality || g->imatrix ||
         g->image_count || getenv("DS4_METAL_DISABLE_V41_TP_SHARED_OWNER") ||
         g_expert_profile.active || getenv("DS4_CUDA_MOE_PROFILE") ||
-        metal_graph_debug_get_config()->prefix ||
+        gpu_graph_debug_get_config()->prefix ||
         !ds4_gpu_decode_graphs_supported())
         return ds41_graph_layer(g, m, l, il, token);
     return ds41_decode_island(g, m, l, il, 0) &&
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34556`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34558`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         cuda_block_q8_K *xq = (cuda_block_q8_K *)down->ptr;
@@ -5470,7 +5470,7 @@ DS4_CUDA_MOE_Q4_DOWN_SLOT3: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34688`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34690`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_q4_down_slot3 =
@@ -5488,7 +5488,7 @@ DS4_CUDA_MOE_Q4_GATE_H16: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34673`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34675`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_q4_gate_h16 =
@@ -5506,7 +5506,7 @@ DS4_CUDA_MOE_Q4_GATE_H16R8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34669`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34671`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_q4_gate_h16r8 =
@@ -5524,7 +5524,7 @@ DS4_CUDA_MOE_Q4_GATE_W32R16: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34677`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34679`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t use_q4_gate_w32r16 =
@@ -5542,7 +5542,7 @@ DS4_CUDA_MOE_TILE4: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34574`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34576`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              (getenv("DS4_CUDA_MOE_NO_Q4_SORTED") == NULL &&
@@ -5554,7 +5554,7 @@ Source: `engines/ds4/ds4_cuda.cu:34574`. Unset read: NULL from getenv; the liter
         const uint32_t use_expert_tiles =
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:34589`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34591`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * than the empty slots cost. Large prefill also keeps tile8. */
@@ -5572,7 +5572,7 @@ DS4_CUDA_MOE_TILE8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34590`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34592`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint32_t expert_tile_m =
@@ -5590,7 +5590,7 @@ DS4_CUDA_MOE_WRITE_GATE_UP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34592`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34594`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             (getenv("DS4_CUDA_MOE_TILE8") ? 8u :
@@ -5602,7 +5602,7 @@ Source: `engines/ds4/ds4_cuda.cu:34592`. Unset read: NULL from getenv; the liter
         /* R4 deterministic MoE down ordering.
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:35693`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:35695`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -5614,7 +5614,7 @@ Source: `engines/ds4/ds4_cuda.cu:35693`. Unset read: NULL from getenv; the liter
     if (!q4k_path && !mxfp4_path &&
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:35704`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:35706`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool write_aux =
@@ -5632,7 +5632,7 @@ Opt-in DSV4.1 stored MXFP4 single-token W4A4 MMA experiment. Requires DS4_CUDA_D
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34126`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:34128`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         // W4A4 experiment. FP4 activation rounding changes decode arithmetic.
@@ -5668,7 +5668,7 @@ DS4_CUDA_NO_ATTN_A_TOK2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:27754`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27756`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (grouped_mma_done) {
@@ -5680,7 +5680,7 @@ Source: `engines/ds4/ds4_cuda.cu:27754`. Unset read: NULL from getenv; the liter
                                                                    xq,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:27789`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27791`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                       256u,
@@ -5776,7 +5776,7 @@ DS4_CUDA_NO_CUBLAS_ATTENTION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:26144`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26146`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -5788,7 +5788,7 @@ Source: `engines/ds4/ds4_cuda.cu:26144`. Unset read: NULL from getenv; the liter
         const uint64_t score_bytes = score_count * sizeof(float);
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:27151`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27153`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -5806,7 +5806,7 @@ DS4_CUDA_NO_CUBLAS_ATTENTION_OUTPUT_A: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:27635`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27637`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_cublas_ready &&
@@ -5917,7 +5917,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:85780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        DS4_N_HEAD_DIM != 512u || metal_graph_attn_comp_cache_is_f16() ||
+        DS4_N_HEAD_DIM != 512u || gpu_graph_attn_comp_cache_is_f16() ||
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
         getenv("DS4_CUDA_NO_EXACT_SCORE_SPLIT_DECODE") != NULL ||
         getenv("DS4_CUDA_SPLITKV_DECODE") != NULL ||
@@ -5938,7 +5938,7 @@ Source: `engines/ds4/ds4_cuda.cu:17321`. Unset read: Wrapper/conditional default
     if (!explicit_exact && cuda_splitkv_decode_requested()) return 0;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25985`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25987`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
      * Alternative score kernels and graph/split-KV experiments retain the
@@ -6152,10 +6152,10 @@ Source: `engines/ds4/ds4.c:19874`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_splitkv_requested(void) {
+static bool gpu_graph_cuda_greedy_splitkv_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV", false);
 }
 
 ```
@@ -6182,10 +6182,10 @@ Source: `engines/ds4/ds4.c:19942`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_splitkv_fallback_requested(void) {
+static bool gpu_graph_cuda_greedy_splitkv_fallback_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_FALLBACK");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_cuda_greedy_splitkv_margin_threshold() > 0.0f;
+    return gpu_graph_cuda_greedy_splitkv_margin_threshold() > 0.0f;
 }
 
 ```
@@ -6200,10 +6200,10 @@ Source: `engines/ds4/ds4.c:19958`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_splitkv_pair_replay_requested(void) {
+static bool gpu_graph_cuda_greedy_splitkv_pair_replay_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_PAIR_REPLAY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY", false);
 }
 
 ```
@@ -6218,10 +6218,10 @@ Source: `engines/ds4/ds4.c:19948`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_splitkv_top2_requested(void) {
+static bool gpu_graph_cuda_greedy_splitkv_top2_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV_TOP2");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TOP2", true);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLITKV_TOP2", true);
 }
 
 ```
@@ -6236,10 +6236,10 @@ Source: `engines/ds4/ds4.c:19858`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_split_top1_requested(void) {
+static bool gpu_graph_cuda_greedy_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLIT_TOP1", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_SPLIT_TOP1", false);
 }
 
 ```
@@ -6254,10 +6254,10 @@ Source: `engines/ds4/ds4.c:19880`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_vec4_requested(void) {
+static bool gpu_graph_cuda_greedy_vec4_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_GREEDY_VEC4", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_GREEDY_VEC4", false);
 }
 
 ```
@@ -6284,10 +6284,10 @@ Source: `engines/ds4/ds4.c:19920`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_greedy_vec4_fallback_requested(void) {
+static bool gpu_graph_cuda_greedy_vec4_fallback_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_VEC4_FALLBACK");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_cuda_greedy_vec4_margin_threshold() > 0.0f;
+    return gpu_graph_cuda_greedy_vec4_margin_threshold() > 0.0f;
 }
 
 ```
@@ -6298,7 +6298,7 @@ DS4_CUDA_NO_INDEXED_HEADS8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:26814`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26816`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     use_heads8 =
@@ -6316,7 +6316,7 @@ DS4_CUDA_NO_INDEXED_TOPK_SORT: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:26803`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26805`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -6538,7 +6538,7 @@ DS4_CUDA_NO_PARALLEL_ROUTER_SELECT: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:28534`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28536`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 has_bias && !hash_mode, hash_mode);
@@ -6550,7 +6550,7 @@ Source: `engines/ds4/ds4_cuda.cu:28534`. Unset read: NULL from getenv; the liter
                                                          has_bias && !hash_mode, hash_mode);
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:28539`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28541`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                                          bias, hash, (const float *)logits->ptr, NULL, tok, hash_rows, 1,
@@ -6562,7 +6562,7 @@ Source: `engines/ds4/ds4_cuda.cu:28539`. Unset read: NULL from getenv; the liter
         } else {
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:28590`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28592`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             0, hash_rows, n_tokens, has_bias && !hash_mode, hash_mode);
@@ -6574,7 +6574,7 @@ Source: `engines/ds4/ds4_cuda.cu:28590`. Unset read: NULL from getenv; the liter
                                                                         (float *)probs->ptr,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:28604`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                                                         has_bias && !hash_mode,
@@ -6860,11 +6860,11 @@ Source: `engines/ds4/ds4.c:20007`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_qkv_kv_rope_fuse_requested(void) {
+static bool gpu_graph_cuda_qkv_kv_rope_fuse_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_QKV_KV_ROPE_FUSE");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     if (getenv("DS4_CUDA_DISABLE_QKV_RMS_FUSED") != NULL) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
+    return gpu_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
 }
 ```
 
@@ -6877,8 +6877,8 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:20127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    g->cuda_q_norm_rope_fuse = metal_graph_cuda_q_norm_rope_fuse_requested();
-    g->cuda_qkv_kv_rope_fuse = metal_graph_cuda_qkv_kv_rope_fuse_requested();
+    g->cuda_q_norm_rope_fuse = gpu_graph_cuda_q_norm_rope_fuse_requested();
+    g->cuda_qkv_kv_rope_fuse = gpu_graph_cuda_qkv_kv_rope_fuse_requested();
     g->cuda_qkv_pair = getenv("DS4_CUDA_NO_QKV_PAIR") == NULL;
     g->cuda_tp_attn_out_hc_fuse =
         getenv("DS4_CUDA_TP_ATTN_OUT_HC_FUSE") != NULL &&
@@ -6916,7 +6916,7 @@ Source: `engines/ds4/ds4_cuda.cu:17426`. Unset read: NULL from getenv; the liter
         !use_ldg_scores &&
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25995`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:25997`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_cuda_exact_score_split_dim2 ||
@@ -6974,10 +6974,10 @@ Source: `engines/ds4/ds4.c:19886`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_splitkv_spec_requested(void) {
+static bool gpu_graph_cuda_splitkv_spec_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC", false);
 }
 
 ```
@@ -7004,10 +7004,10 @@ Source: `engines/ds4/ds4.c:19898`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_splitkv_spec_batch_verify_requested(void) {
+static bool gpu_graph_cuda_splitkv_spec_batch_verify_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY", false);
 }
 
 ```
@@ -7022,10 +7022,10 @@ Source: `engines/ds4/ds4.c:19892`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_splitkv_spec_toponly_row0_requested(void) {
+static bool gpu_graph_cuda_splitkv_spec_toponly_row0_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0", false);
 }
 
 ```
@@ -7310,10 +7310,10 @@ Source: `engines/ds4/ds4.c:19868`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_verify_decode2_split_top1_requested(void) {
+static bool gpu_graph_cuda_verify_decode2_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1", false);
 }
 
 ```
@@ -7324,7 +7324,7 @@ DS4_CUDA_NO_WARP_ROUTER_SELECT: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:28533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28535`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 bias, hash, (const float *)logits->ptr, NULL, tok, hash_rows, 1,
@@ -7336,7 +7336,7 @@ Source: `engines/ds4/ds4_cuda.cu:28533`. Unset read: NULL from getenv; the liter
                                                          bias, hash, (const float *)logits->ptr, NULL, tok, hash_rows, 1,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:28589`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28591`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             bias, hash, (const float *)logits->ptr, (const int32_t *)tokens->ptr,
@@ -7366,7 +7366,7 @@ static void cuda_decode_dispatch_env_refresh(void) {
     g_cuda_no_decode_value512 = getenv("DS4_CUDA_NO_DECODE_VALUE512") != NULL;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:26127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26129`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!sinks) return 0;
@@ -7378,7 +7378,7 @@ Source: `engines/ds4/ds4_cuda.cu:26127`. Unset read: NULL from getenv; the liter
                                                                    sinks,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:27134`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27136`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -7436,11 +7436,11 @@ Source: `engines/ds4/ds4.c:19864`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_output_fused_top1_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_OUTPUT_FUSED_TOP1", false);
+static bool gpu_graph_cuda_output_fused_top1_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_OUTPUT_FUSED_TOP1", false);
 }
 
-static bool metal_graph_cuda_verify_decode2_split_top1_requested(void) {
+static bool gpu_graph_cuda_verify_decode2_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1");
 ```
 
@@ -7472,7 +7472,7 @@ Source: `engines/ds4/ds4.c:20022`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_cuda_prefill_pipeline_requested(const ds4_gpu_graph *g) {
+static bool gpu_graph_cuda_prefill_pipeline_requested(const ds4_gpu_graph *g) {
     const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE");
     if (env && env[0]) return strcmp(env, "0") != 0;
     return g && g->cuda_tp_decode;
@@ -7490,7 +7490,7 @@ Source: `engines/ds4/ds4.c:20032`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static uint32_t metal_graph_cuda_prefill_pipeline_microbatch(void) {
+static uint32_t gpu_graph_cuda_prefill_pipeline_microbatch(void) {
     const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE_MB");
     if (env && env[0]) {
         char *end = NULL;
@@ -7508,11 +7508,11 @@ Source: `engines/ds4/ds4.c:20028`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_prefill_pipeline_q8_cache_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_PREFILL_PIPELINE_Q8_CACHE", false);
+static bool gpu_graph_cuda_prefill_pipeline_q8_cache_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_PREFILL_PIPELINE_Q8_CACHE", false);
 }
 
-static uint32_t metal_graph_cuda_prefill_pipeline_microbatch(void) {
+static uint32_t gpu_graph_cuda_prefill_pipeline_microbatch(void) {
     const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE_MB");
 ```
 
@@ -7529,7 +7529,7 @@ Source: `engines/ds4/ds4.c:38265`. Unset read: NULL from getenv; the literal con
 
     const bool sequential = getenv("DS4_CUDA_PREFILL_PIPELINE_SEQUENTIAL") != NULL;
     const bool suppress_q8_cache =
-        !metal_graph_cuda_prefill_pipeline_q8_cache_requested();
+        !gpu_graph_cuda_prefill_pipeline_q8_cache_requested();
     const int saved_q8_cache_suppressed = ds4_gpu_q8_cache_suppressed();
     if (suppress_q8_cache) ds4_gpu_set_q8_cache_suppressed(1);
 ```
@@ -7546,7 +7546,7 @@ Source: `engines/ds4/ds4.c:38312`. Unset read: NULL from getenv; the literal con
                     ds4_gpu_tensor *src = g->batch_cur_hc_by_tier[stages[stage_i].tier];
                     ds4_gpu_tensor *dst = g->batch_cur_hc_by_tier[stages[stage_i + 1u].tier];
                     if (ok && getenv("DS4_CUDA_PREFILL_PIPELINE_SYNC_BOUNDARY") != NULL) {
-                        ok = metal_graph_set_active_tier_no_copy(g, stages[stage_i].tier) &&
+                        ok = gpu_graph_set_active_tier_no_copy(g, stages[stage_i].tier) &&
                              ds4_gpu_synchronize() != 0;
                     }
                     ok = src && dst &&
@@ -7558,7 +7558,7 @@ Source: `engines/ds4/ds4.c:38386`. Unset read: NULL from getenv; the literal con
                     ds4_gpu_tensor *src = g->batch_cur_hc_by_tier[stages[stage_i].tier];
                     ds4_gpu_tensor *dst = g->batch_cur_hc_by_tier[stages[stage_i + 1u].tier];
                     if (ok && getenv("DS4_CUDA_PREFILL_PIPELINE_SYNC_BOUNDARY") != NULL) {
-                        ok = metal_graph_set_active_tier_no_copy(g, stages[stage_i].tier) &&
+                        ok = gpu_graph_set_active_tier_no_copy(g, stages[stage_i].tier) &&
                              ds4_gpu_synchronize() != 0;
                     }
                     ok = src && dst &&
@@ -7624,7 +7624,7 @@ A/B switch for the Q4_K routed-MoE prefill: 1 (default) runs batches of >= 32 ro
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34498`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34500`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int q4k_moe_mmq = -1;
@@ -7642,7 +7642,7 @@ Source: `engines/ds4/ds4_cuda.cu:34498`. Unset read: NULL from getenv; the liter
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34452`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34454`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int q4k_native_half = -1;
@@ -7857,11 +7857,11 @@ Source: `engines/ds4/ds4.c:20010`. Unset read: Wrapper/conditional default: see 
 ```text
     if (no && no[0] && strcmp(no, "0") != 0) return false;
     if (getenv("DS4_CUDA_DISABLE_QKV_RMS_FUSED") != NULL) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
+    return gpu_graph_tp_env_flag("DS4_CUDA_QKV_KV_ROPE_FUSE", true);
 }
 
-static bool metal_graph_cuda_tp_prefill_ffn_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_FFN", true);
+static bool gpu_graph_cuda_tp_prefill_ffn_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_FFN", true);
 ```
 
 ### DS4_CUDA_Q_NORM_ROPE_FUSE
@@ -7874,11 +7874,11 @@ Source: `engines/ds4/ds4.c:20003`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_q_norm_rope_fuse_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
+static bool gpu_graph_cuda_q_norm_rope_fuse_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
 }
 
-static bool metal_graph_cuda_qkv_kv_rope_fuse_requested(void) {
+static bool gpu_graph_cuda_qkv_kv_rope_fuse_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_QKV_KV_ROPE_FUSE");
 ```
 
@@ -8133,11 +8133,11 @@ Source: `engines/ds4/ds4.c:87544`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool alias_attn_pre =
         group_attn_pre &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_ALIAS", true);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_ALIAS", true);
     const bool group_attn_core =
         alias_attn_pre &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_CORE", true) &&
-        metal_graph_session_batch_attn_core_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_CORE", true) &&
+        gpu_graph_session_batch_attn_core_supported(items, count, weights);
 ```
 
 ### DS4_CUDA_SESSION_BATCH_ATTN_CORE
@@ -8151,11 +8151,11 @@ Source: `engines/ds4/ds4.c:87547`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_attn_core =
         alias_attn_pre &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_CORE", true) &&
-        metal_graph_session_batch_attn_core_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_CORE", true) &&
+        gpu_graph_session_batch_attn_core_supported(items, count, weights);
     const bool group_qkv =
         group_attn_core &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
 ```
 
 Source: `engines/ds4/ds4.c:87907`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -8163,8 +8163,8 @@ Source: `engines/ds4/ds4.c:87907`. Unset read: Wrapper/conditional default: see 
 ```text
 
     const bool group_attn_core =
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_CORE", true) &&
-        metal_graph_session_batch_attn_core_supported(
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_CORE", true) &&
+        gpu_graph_session_batch_attn_core_supported(
                 decode_items, decode_count, weights);
     const bool group_attn_post =
         group_attn_core &&
@@ -8181,8 +8181,8 @@ Source: `engines/ds4/ds4.c:87559`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_attn_post =
         group_attn_core &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
-        metal_graph_session_batch_attn_post_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
+        gpu_graph_session_batch_attn_post_supported(items, count, weights);
     bool ok = true;
     if (group_ffn_pre) {
         int32_t *router_tokens = malloc((size_t)count * sizeof(*router_tokens));
@@ -8193,8 +8193,8 @@ Source: `engines/ds4/ds4.c:87912`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_attn_post =
         group_attn_core &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
-        metal_graph_session_batch_attn_post_supported(
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
+        gpu_graph_session_batch_attn_post_supported(
                 decode_items, decode_count, weights);
     const bool group_qkv =
         group_attn_core &&
@@ -8211,11 +8211,11 @@ Source: `engines/ds4/ds4.c:87540`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_attn_pre =
         group_ffn_pre &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_PRE", true) &&
-        metal_graph_session_batch_attn_pre_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_PRE", true) &&
+        gpu_graph_session_batch_attn_pre_supported(items, count, weights);
     const bool alias_attn_pre =
         group_attn_pre &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_ALIAS", true);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_ALIAS", true);
 ```
 
 ### DS4_CUDA_SESSION_BATCH_FFN_PRE
@@ -8229,11 +8229,11 @@ Source: `engines/ds4/ds4.c:87536`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_ffn_pre =
         group_shared_ffn &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_FFN_PRE", true) &&
-        metal_graph_session_batch_ffn_pre_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_FFN_PRE", true) &&
+        gpu_graph_session_batch_ffn_pre_supported(items, count, weights);
     const bool group_attn_pre =
         group_ffn_pre &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_PRE", true) &&
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_PRE", true) &&
 ```
 
 ### DS4_CUDA_SESSION_BATCH_INTERLEAVE
@@ -8251,7 +8251,7 @@ Source: `engines/ds4/ds4.c:88214`. Unset read: NULL from getenv; the literal con
         const bool use_pipeline = !interleave || !interleave[0] ||
                                   strcmp(interleave, "0") != 0;
         if (ok && use_pipeline && first->graph.placement) {
-            ok = metal_graph_encode_session_pipeline_batch(
+            ok = gpu_graph_encode_session_pipeline_batch(
 ```
 
 ### DS4_CUDA_SESSION_BATCH_KV_STORE
@@ -8265,11 +8265,11 @@ Source: `engines/ds4/ds4.c:87555`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_kv_store =
         group_qkv &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
-        metal_graph_session_batch_kv_store_supported(items, count);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
+        gpu_graph_session_batch_kv_store_supported(items, count);
     const bool group_attn_post =
         group_attn_core &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
 ```
 
 Source: `engines/ds4/ds4.c:87922`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -8277,8 +8277,8 @@ Source: `engines/ds4/ds4.c:87922`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_kv_store =
         group_qkv &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
-        metal_graph_session_batch_kv_store_supported(
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
+        gpu_graph_session_batch_kv_store_supported(
                 decode_items, decode_count);
 
     ds4_gpu_graph *g = &prefill_session->graph;
@@ -8295,7 +8295,7 @@ Source: `engines/ds4/ds4.c:44674`. Unset read: Wrapper/conditional default: see 
 ```text
         (!g->streaming && g->tp_world == 2);
     if (!placement || g->quality || g->imatrix || g->image_count ||
-        !metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) ||
+        !gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) ||
         getenv("DS4_CUDA_MOE_NO_DIRECT_DOWN_SUM6")) return false;
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         const ds4_layer_weights *l = &w->layer[il];
@@ -8307,7 +8307,7 @@ Source: `engines/ds4/ds4.c:82442`. Unset read: Wrapper/conditional default: see 
 ```text
         return false;
     const bool cuda = e->backend == DS4_BACKEND_CUDA;
-    if (cuda ? !metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) :
+    if (cuda ? !gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) :
         (e->backend != DS4_BACKEND_METAL || getenv("DS4_METAL_DISABLE_V41_SESSION_BATCH")))
         return false;
     ds41_gpu_graph *graphs[DS4_TP_BATCH_MAX_ROWS];
@@ -8319,11 +8319,11 @@ Source: `engines/ds4/ds4.c:87528`. Unset read: Wrapper/conditional default: see 
 ```text
 
     const bool group_routed_moe =
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) &&
-        metal_graph_session_batch_moe_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) &&
+        gpu_graph_session_batch_moe_supported(items, count, weights);
     const bool group_shared_ffn =
         group_routed_moe &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_SHARED", true) &&
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_SHARED", true) &&
 ```
 
 ### DS4_CUDA_SESSION_BATCH_QKV
@@ -8337,11 +8337,11 @@ Source: `engines/ds4/ds4.c:87551`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_qkv =
         group_attn_core &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
-        metal_graph_session_batch_qkv_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
+        gpu_graph_session_batch_qkv_supported(items, count, weights);
     const bool group_kv_store =
         group_qkv &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
 ```
 
 Source: `engines/ds4/ds4.c:87917`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -8349,8 +8349,8 @@ Source: `engines/ds4/ds4.c:87917`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_qkv =
         group_attn_core &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
-        metal_graph_session_batch_qkv_supported(
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
+        gpu_graph_session_batch_qkv_supported(
                 decode_items, decode_count, weights);
     const bool group_kv_store =
         group_qkv &&
@@ -8367,11 +8367,11 @@ Source: `engines/ds4/ds4.c:87532`. Unset read: Wrapper/conditional default: see 
 ```text
     const bool group_shared_ffn =
         group_routed_moe &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_SHARED", true) &&
-        metal_graph_session_batch_shared_supported(items, count, weights);
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_SHARED", true) &&
+        gpu_graph_session_batch_shared_supported(items, count, weights);
     const bool group_ffn_pre =
         group_shared_ffn &&
-        metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_FFN_PRE", true) &&
+        gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_FFN_PRE", true) &&
 ```
 
 ### DS4_CUDA_SINGLE_GPU_HC_GRAPHS
@@ -8398,7 +8398,7 @@ DS4_CUDA_SPLITKV_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:25617`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25619`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const uint32_t split_cap = DS4_CUDA_SPLITKV_SCORE_CAP;
@@ -8421,11 +8421,11 @@ Source: `engines/ds4/ds4.c:19999`. Unset read: Wrapper/conditional default: see 
 ```text
         }
     }
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_DECODE", false) ? 0u : 512u;
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_DECODE", false) ? 0u : 512u;
 }
 
-static bool metal_graph_cuda_q_norm_rope_fuse_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
+static bool gpu_graph_cuda_q_norm_rope_fuse_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
 ```
 
 Source: `engines/ds4/ds4.c:85781`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -8452,7 +8452,7 @@ static bool cuda_q8_f16_cache_bounded(void) {
     return false;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25603`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25605`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     uint32_t n_score = raw_count + visible_comp;
@@ -8470,7 +8470,7 @@ DS4_CUDA_SPLITKV_GLOBAL_SOFTMAX: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:25638`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25640`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (S > n_score) S = n_score;
@@ -8492,7 +8492,7 @@ Source: `engines/ds4/ds4.c:19990`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static uint32_t metal_graph_cuda_greedy_splitkv_min_score(void) {
+static uint32_t gpu_graph_cuda_greedy_splitkv_min_score(void) {
     const char *env = getenv("DS4_CUDA_SPLITKV_MIN_SCORE");
     if (env && env[0]) {
         char *end = NULL;
@@ -8500,7 +8500,7 @@ static uint32_t metal_graph_cuda_greedy_splitkv_min_score(void) {
         while (end && isspace((unsigned char)*end)) end++;
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:25606`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25608`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const uint32_t scoped_min_score =
@@ -8518,7 +8518,7 @@ DS4_CUDA_SPLITKV_S: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:25627`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25629`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                                 1u, DS4_CUDA_SPLITKV_S_MAX, NULL);
@@ -8541,10 +8541,10 @@ Source: `engines/ds4/ds4.c:19888`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC", false);
 }
 
-static bool metal_graph_cuda_splitkv_spec_toponly_row0_requested(void) {
+static bool gpu_graph_cuda_splitkv_spec_toponly_row0_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0");
 ```
 
@@ -8571,10 +8571,10 @@ Source: `engines/ds4/ds4.c:19900`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_BATCH_VERIFY", false);
 }
 
-static float metal_graph_cuda_greedy_vec4_margin_threshold(void) {
+static float gpu_graph_cuda_greedy_vec4_margin_threshold(void) {
     const char *env = getenv("DS4_CUDA_GREEDY_VEC4_MARGIN");
 ```
 
@@ -8600,7 +8600,7 @@ Source: `engines/ds4/ds4.c:68089`. Unset read: NULL from getenv; the literal con
 
 ```text
     }
-    if (!metal_graph_cuda_splitkv_score_may_engage(&s->graph, start)) {
+    if (!gpu_graph_cuda_splitkv_score_may_engage(&s->graph, start)) {
         if (getenv("DS4_CUDA_SPLITKV_SPEC_LOG")) {
             fprintf(stderr,
                     "ds4: split-kv spec skip pos=%u reason=score-gate\n",
@@ -8682,7 +8682,7 @@ Source: `engines/ds4/ds4.c:68120`. Unset read: NULL from getenv; the literal con
     const bool timing = getenv("DS4_CUDA_SPLITKV_SPEC_TIMING") != NULL;
     const double t0 = timing ? now_sec() : 0.0;
     int draft1 = -1;
-    bool draft_ok = metal_graph_eval_token_raw_swa_top(&s->graph,
+    bool draft_ok = gpu_graph_eval_token_raw_swa_top(&s->graph,
                                                        &e->model,
 ```
 
@@ -8697,10 +8697,10 @@ Source: `engines/ds4/ds4.c:19894`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_TOPONLY_ROW0");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_SPLITKV_SPEC_TOPONLY_ROW0", false);
 }
 
-static bool metal_graph_cuda_splitkv_spec_batch_verify_requested(void) {
+static bool gpu_graph_cuda_splitkv_spec_batch_verify_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_SPLITKV_SPEC_BATCH_VERIFY");
 ```
 
@@ -8710,7 +8710,7 @@ DS4_CUDA_SPLITKV_S_FLOOR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:25620`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25622`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                                 DS4_CUDA_SPLITKV_CHUNK,
@@ -8728,7 +8728,7 @@ DS4_CUDA_SPLITKV_S_MAX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:25623`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4_cuda.cu:25625`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                                   DS4_CUDA_SPLITKV_S_FLOOR,
@@ -8746,7 +8746,7 @@ DS4_CUDA_SSD_PREFETCH_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:37430`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:37432`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -9194,12 +9194,12 @@ Source: `engines/ds4/ds4.c:19772`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_attn_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN", true);
+static bool gpu_graph_cuda_tp_attn_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN", true);
 }
 
-static bool metal_graph_cuda_tp_attn_peer_read_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_PEER_READ", true);
+static bool gpu_graph_cuda_tp_attn_peer_read_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_PEER_READ", true);
 ```
 
 ### DS4_CUDA_TP_ATTN_CACHE_DUP
@@ -9212,12 +9212,12 @@ Source: `engines/ds4/ds4.c:19784`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_attn_cache_dup_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_CACHE_DUP", false);
+static bool gpu_graph_cuda_tp_attn_cache_dup_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_CACHE_DUP", false);
 }
 
-static bool metal_graph_cuda_tp_moe_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE", true);
+static bool gpu_graph_cuda_tp_moe_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE", true);
 ```
 
 ### DS4_CUDA_TP_ATTN_HEADS
@@ -9230,12 +9230,12 @@ Source: `engines/ds4/ds4.c:19780`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_attn_heads_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
+static bool gpu_graph_cuda_tp_attn_heads_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
 }
 
-static bool metal_graph_cuda_tp_attn_cache_dup_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_CACHE_DUP", false);
+static bool gpu_graph_cuda_tp_attn_cache_dup_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_CACHE_DUP", false);
 ```
 
 ### DS4_CUDA_TP_ATTN_OUT_HC_FUSE
@@ -9266,12 +9266,12 @@ Source: `engines/ds4/ds4.c:19776`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_attn_peer_read_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_PEER_READ", true);
+static bool gpu_graph_cuda_tp_attn_peer_read_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_PEER_READ", true);
 }
 
-static bool metal_graph_cuda_tp_attn_heads_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
+static bool gpu_graph_cuda_tp_attn_heads_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
 ```
 
 ### DS4_CUDA_TP_EP_DELAY_REDUCE
@@ -9284,12 +9284,12 @@ Source: `engines/ds4/ds4.c:19800`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_ep_delay_reduce_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
+static bool gpu_graph_cuda_tp_ep_delay_reduce_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
 }
 
-static bool metal_graph_cuda_tp_ep_fused_hc_reduce_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_HC_REDUCE", true);
+static bool gpu_graph_cuda_tp_ep_fused_hc_reduce_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_HC_REDUCE", true);
 ```
 
 ### DS4_CUDA_TP_EP_DIRECT_RETURN
@@ -9302,12 +9302,12 @@ Source: `engines/ds4/ds4.c:19796`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_ep_direct_return_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DIRECT_RETURN", true);
+static bool gpu_graph_cuda_tp_ep_direct_return_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_DIRECT_RETURN", true);
 }
 
-static bool metal_graph_cuda_tp_ep_delay_reduce_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
+static bool gpu_graph_cuda_tp_ep_delay_reduce_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
 ```
 
 ### DS4_CUDA_TP_EP_FUSED_HC_REDUCE
@@ -9320,12 +9320,12 @@ Source: `engines/ds4/ds4.c:19804`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_ep_fused_hc_reduce_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_HC_REDUCE", true);
+static bool gpu_graph_cuda_tp_ep_fused_hc_reduce_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_HC_REDUCE", true);
 }
 
-static DS4_MAYBE_UNUSED bool metal_graph_cuda_tp_ep_fused_shared_mid_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_SHARED_MID", true);
+static DS4_MAYBE_UNUSED bool gpu_graph_cuda_tp_ep_fused_shared_mid_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_SHARED_MID", true);
 ```
 
 ### DS4_CUDA_TP_EP_FUSED_SHARED_MID
@@ -9338,12 +9338,12 @@ Source: `engines/ds4/ds4.c:19808`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static DS4_MAYBE_UNUSED bool metal_graph_cuda_tp_ep_fused_shared_mid_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_SHARED_MID", true);
+static DS4_MAYBE_UNUSED bool gpu_graph_cuda_tp_ep_fused_shared_mid_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_FUSED_SHARED_MID", true);
 }
 
-static DS4_MAYBE_UNUSED bool metal_graph_cuda_tp_ep_balanced_shared_mid_requested(void) {
-    return metal_graph_tp_env_flag(
+static DS4_MAYBE_UNUSED bool gpu_graph_cuda_tp_ep_balanced_shared_mid_requested(void) {
+    return gpu_graph_tp_env_flag(
 ```
 
 ### DS4_CUDA_TP_EP_PACK_EXACT
@@ -9356,12 +9356,12 @@ Source: `engines/ds4/ds4.c:19792`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_ep_pack_exact_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_PACK_EXACT", true);
+static bool gpu_graph_cuda_tp_ep_pack_exact_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_PACK_EXACT", true);
 }
 
-static bool metal_graph_cuda_tp_ep_direct_return_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_DIRECT_RETURN", true);
+static bool gpu_graph_cuda_tp_ep_direct_return_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_DIRECT_RETURN", true);
 ```
 
 ### DS4_CUDA_TP_MOE
@@ -9374,12 +9374,12 @@ Source: `engines/ds4/ds4.c:19788`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_moe_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE", true);
+static bool gpu_graph_cuda_tp_moe_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE", true);
 }
 
-static bool metal_graph_cuda_tp_ep_pack_exact_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_EP_PACK_EXACT", true);
+static bool gpu_graph_cuda_tp_ep_pack_exact_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_PACK_EXACT", true);
 ```
 
 ### DS4_CUDA_TP_MOE_COPY3
@@ -9392,12 +9392,12 @@ Source: `engines/ds4/ds4.c:19830`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_moe_copy3_handoff_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_COPY3", false);
+static bool gpu_graph_cuda_tp_moe_copy3_handoff_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_COPY3", false);
 }
 
-static bool metal_graph_cuda_tp_moe_peer_read_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_READ", false);
+static bool gpu_graph_cuda_tp_moe_peer_read_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_READ", false);
 ```
 
 ### DS4_CUDA_TP_MOE_DELAY_REDUCE
@@ -9410,12 +9410,12 @@ Source: `engines/ds4/ds4.c:19822`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_moe_delay_reduce_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_DELAY_REDUCE", true);
+static bool gpu_graph_cuda_tp_moe_delay_reduce_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_DELAY_REDUCE", true);
 }
 
-static bool metal_graph_cuda_tp_moe_pack_handoff_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PACK", false);
+static bool gpu_graph_cuda_tp_moe_pack_handoff_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_PACK", false);
 ```
 
 ### DS4_CUDA_TP_MOE_PACK
@@ -9428,12 +9428,12 @@ Source: `engines/ds4/ds4.c:19826`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_moe_pack_handoff_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PACK", false);
+static bool gpu_graph_cuda_tp_moe_pack_handoff_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_PACK", false);
 }
 
-static bool metal_graph_cuda_tp_moe_copy3_handoff_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_COPY3", false);
+static bool gpu_graph_cuda_tp_moe_copy3_handoff_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_COPY3", false);
 ```
 
 ### DS4_CUDA_TP_MOE_PEER_READ
@@ -9446,12 +9446,12 @@ Source: `engines/ds4/ds4.c:19834`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_moe_peer_read_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_READ", false);
+static bool gpu_graph_cuda_tp_moe_peer_read_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_READ", false);
 }
 
-static bool metal_graph_cuda_tp_moe_peer_router_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_ROUTER", false);
+static bool gpu_graph_cuda_tp_moe_peer_router_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_ROUTER", false);
 ```
 
 ### DS4_CUDA_TP_MOE_PEER_ROUTER
@@ -9464,12 +9464,12 @@ Source: `engines/ds4/ds4.c:19838`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_moe_peer_router_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_ROUTER", false);
+static bool gpu_graph_cuda_tp_moe_peer_router_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_PEER_ROUTER", false);
 }
 
-static bool metal_graph_cuda_tp_shared_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED", false);
+static bool gpu_graph_cuda_tp_shared_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_SHARED", false);
 ```
 
 ### DS4_CUDA_TP_OUTPUT
@@ -9482,11 +9482,11 @@ Source: `engines/ds4/ds4.c:19854`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_output_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_OUTPUT", true);
+static bool gpu_graph_cuda_tp_output_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_OUTPUT", true);
 }
 
-static bool metal_graph_cuda_greedy_split_top1_requested(void) {
+static bool gpu_graph_cuda_greedy_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
 ```
 
@@ -9524,7 +9524,7 @@ Source: `engines/ds4/ds4.c:142`. Unset read: NULL from getenv; the literal consu
 
 ```text
 
-static uint32_t metal_graph_cuda_tp_output_requested_ways(void) {
+static uint32_t gpu_graph_cuda_tp_output_requested_ways(void) {
     const char *env = getenv("DS4_CUDA_TP_OUTPUT_WAYS");
     if (!env || !env[0]) return 8;
     char *end = NULL;
@@ -9554,11 +9554,11 @@ Source: `engines/ds4/ds4.c:20018`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_prefill_attn_output_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_ATTN_OUTPUT", true);
+static bool gpu_graph_cuda_tp_prefill_attn_output_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_ATTN_OUTPUT", true);
 }
 
-static bool metal_graph_cuda_prefill_pipeline_requested(const ds4_gpu_graph *g) {
+static bool gpu_graph_cuda_prefill_pipeline_requested(const ds4_gpu_graph *g) {
     const char *env = getenv("DS4_CUDA_PREFILL_PIPELINE");
 ```
 
@@ -9572,12 +9572,12 @@ Source: `engines/ds4/ds4.c:20014`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_prefill_ffn_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_FFN", true);
+static bool gpu_graph_cuda_tp_prefill_ffn_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_FFN", true);
 }
 
-static bool metal_graph_cuda_tp_prefill_attn_output_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_ATTN_OUTPUT", true);
+static bool gpu_graph_cuda_tp_prefill_attn_output_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_PREFILL_ATTN_OUTPUT", true);
 ```
 
 ### DS4_CUDA_TP_Q
@@ -9590,12 +9590,12 @@ Source: `engines/ds4/ds4.c:19850`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_q_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_Q", false);
+static bool gpu_graph_cuda_tp_q_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_Q", false);
 }
 
-static bool metal_graph_cuda_tp_output_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_OUTPUT", true);
+static bool gpu_graph_cuda_tp_output_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_OUTPUT", true);
 ```
 
 ### DS4_CUDA_TP_SHARED
@@ -9608,12 +9608,12 @@ Source: `engines/ds4/ds4.c:19842`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_shared_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED", false);
+static bool gpu_graph_cuda_tp_shared_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_SHARED", false);
 }
 
-static bool metal_graph_cuda_tp_shared_fold_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED_FOLD", true);
+static bool gpu_graph_cuda_tp_shared_fold_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_SHARED_FOLD", true);
 ```
 
 ### DS4_CUDA_TP_SHARED_FOLD
@@ -9626,12 +9626,12 @@ Source: `engines/ds4/ds4.c:19846`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_cuda_tp_shared_fold_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_SHARED_FOLD", true);
+static bool gpu_graph_cuda_tp_shared_fold_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_SHARED_FOLD", true);
 }
 
-static bool metal_graph_cuda_tp_q_requested(void) {
-    return metal_graph_tp_env_flag("DS4_CUDA_TP_Q", false);
+static bool gpu_graph_cuda_tp_q_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_Q", false);
 ```
 
 ### DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1
@@ -9645,10 +9645,10 @@ Source: `engines/ds4/ds4.c:19870`. Unset read: Wrapper/conditional default: see 
 ```text
     const char *no = getenv("DS4_CUDA_NO_VERIFY_DECODE2_SPLIT_TOP1");
     if (no && no[0] && strcmp(no, "0") != 0) return false;
-    return metal_graph_tp_env_flag("DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1", false);
+    return gpu_graph_tp_env_flag("DS4_CUDA_VERIFY_DECODE2_SPLIT_TOP1", false);
 }
 
-static bool metal_graph_cuda_greedy_splitkv_requested(void) {
+static bool gpu_graph_cuda_greedy_splitkv_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLITKV");
 ```
 
@@ -9946,7 +9946,7 @@ DS4_CUDA_WINDOW_ATTENTION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:26128`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (n_tokens > 1 && head_dim == 512 &&
@@ -9958,7 +9958,7 @@ Source: `engines/ds4/ds4_cuda.cu:26128`. Unset read: NULL from getenv; the liter
                                                                    (const float *)q->ptr,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:26417`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:26419`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!use_comp_mask && n_tokens > 1 && head_dim == 512 &&
@@ -9970,7 +9970,7 @@ Source: `engines/ds4/ds4_cuda.cu:26417`. Unset read: NULL from getenv; the liter
                                                                    (const float *)q->ptr,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:27135`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:27137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!use_comp_mask && n_tokens > 1 && head_dim == 512 &&
@@ -10036,8 +10036,8 @@ Source: `engines/ds4/ds4.c:62128`. Unset read: NULL from getenv; the literal con
      *     If it somehow fails here, decode still builds it lazily exactly as before.
      * Opt out with DS4_DISABLE_EAGER_DECODE_MAP=1 if it ever needs to be A/B'd against the old timing. */
     if (ok && getenv("DS4_DISABLE_EAGER_DECODE_MAP") == NULL &&
-        metal_graph_stream_decode_static_map_enabled() &&
-        metal_graph_stream_decode_static_map_state_cache_enabled() &&
+        gpu_graph_stream_decode_static_map_enabled() &&
+        gpu_graph_stream_decode_static_map_state_cache_enabled() &&
         !g.streaming_static_decode_map_current) {
         const double t_map0 = now_sec();
 ```
@@ -10554,18 +10554,18 @@ Source: `engines/ds4/ds4.c:36396`. Unset read: NULL from getenv; the literal con
         getenv("DS4_DSPARK_DISABLE_FINAL_OUTPUT_ALIAS") != NULL) {
         ok = ds4_gpu_tensor_copy(g->dspark_stage_output_hc,
                                   0,
-                                  metal_graph_batch_next_hc(g),
+                                  gpu_graph_batch_next_hc(g),
                                   0,
 ```
 
 Source: `engines/ds4/ds4.c:36643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static ds4_gpu_tensor *metal_graph_dspark_final_output_hc(const ds4_gpu_graph *g) {
+static ds4_gpu_tensor *gpu_graph_dspark_final_output_hc(const ds4_gpu_graph *g) {
     if (!g) return NULL;
     if (getenv("DS4_DSPARK_DISABLE_FINAL_OUTPUT_ALIAS") == NULL &&
-        metal_graph_batch_next_hc(g)) {
-        return metal_graph_batch_next_hc(g);
+        gpu_graph_batch_next_hc(g)) {
+        return gpu_graph_batch_next_hc(g);
     }
     return g->dspark_stage_output_hc;
 ```
@@ -10615,7 +10615,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:39527`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static bool metal_graph_dspark_verify_selected_profile_enabled(void) {
+static bool gpu_graph_dspark_verify_selected_profile_enabled(void) {
     return getenv("DS4_DSPARK_VERIFY_SELECTED_PROFILE") != NULL &&
            getenv("DS4_DSPARK_DISABLE_VERIFY_SELECTED_PROFILE") == NULL;
 }
@@ -10656,7 +10656,7 @@ Source: `engines/ds4/ds4.c:39674`. Unset read: NULL from getenv; the literal con
     if (ok && getenv("DS4_DSPARK_EXPERT_OVERLAP")) {
         /* Diagnostic: distinct routed experts selected by the block's rows
          * in the last layer (bounds the gain of a multi-row expert kernel). */
-        const int32_t *sel = ds4_gpu_tensor_contents(metal_graph_batch_router_selected(g));
+        const int32_t *sel = ds4_gpu_tensor_contents(gpu_graph_batch_router_selected(g));
         if (sel) {
 ```
 
@@ -11029,7 +11029,7 @@ Source: `engines/ds4/ds4.c:35942`. Unset read: NULL from getenv; the literal con
     const bool seed_trace = seed_trace_v != 0;
     if (seed_trace) fprintf(stderr, "ds4: DIAG seedbody begin=%d\n", (int)ok);
     if (ok) {
-        ok = metal_graph_eval_dspark_stage0_batch(g,
+        ok = gpu_graph_eval_dspark_stage0_batch(g,
 ```
 
 Source: `engines/ds4/ds4.c:73572`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -11168,9 +11168,9 @@ Source: `engines/ds4/ds4.c:36027`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_dspark_stage_profile_enabled(uint32_t stage) {
+static bool gpu_graph_dspark_stage_profile_enabled(uint32_t stage) {
     return getenv("DS4_DSPARK_STAGE_PROFILE") != NULL &&
-           metal_graph_profile_layer_env_match("DS4_DSPARK_STAGE_PROFILE_STAGE",
+           gpu_graph_profile_layer_env_match("DS4_DSPARK_STAGE_PROFILE_STAGE",
                                                stage);
 }
 
@@ -11185,13 +11185,13 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:36028`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_dspark_stage_profile_enabled(uint32_t stage) {
+static bool gpu_graph_dspark_stage_profile_enabled(uint32_t stage) {
     return getenv("DS4_DSPARK_STAGE_PROFILE") != NULL &&
-           metal_graph_profile_layer_env_match("DS4_DSPARK_STAGE_PROFILE_STAGE",
+           gpu_graph_profile_layer_env_match("DS4_DSPARK_STAGE_PROFILE_STAGE",
                                                stage);
 }
 
-static bool metal_graph_dspark_stage_profile_boundary(
+static bool gpu_graph_dspark_stage_profile_boundary(
 ```
 
 ### DS4_DSPARK_STATS
@@ -11294,7 +11294,7 @@ Source: `engines/ds4/ds4.c:39526`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_dspark_verify_selected_profile_enabled(void) {
+static bool gpu_graph_dspark_verify_selected_profile_enabled(void) {
     return getenv("DS4_DSPARK_VERIFY_SELECTED_PROFILE") != NULL &&
            getenv("DS4_DSPARK_DISABLE_VERIFY_SELECTED_PROFILE") == NULL;
 }
@@ -11530,7 +11530,7 @@ Packed FP4 decode check: 1 relayouts the selected kernel-native FP4 expert slots
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:34022`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:34024`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -11602,7 +11602,7 @@ DS4_GLM_ATTN_NO_LORA_VEC2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:39875`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:39877`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (range_tok2 && n_selected < 512u) {
@@ -11614,7 +11614,7 @@ Source: `engines/ds4/ds4_cuda.cu:39875`. Unset read: NULL from getenv; the liter
         const dim3 grid(n_head, 2u, 1u);
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:40045`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:40047`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                        "glm staged decode value launch");
@@ -11632,7 +11632,7 @@ DS4_GLM_ATTN_NO_SCORE_VEC2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:39864`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:39866`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!vw) return 0;
@@ -11650,7 +11650,7 @@ DS4_GLM_ATTN_NO_STAGED_DECODE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:39913`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:39915`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -11956,7 +11956,7 @@ DS4_GLM_MOE_EXPERT_MAJOR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42215`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         n_tokens >= 128u && !getenv("DS4_GLM_MOE_NO_EXPERT_TILE8");
@@ -11974,7 +11974,7 @@ DS4_GLM_MOE_NO_DOWN_TILE8_EXACT: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42268`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42270`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         mid_work,
@@ -11992,7 +11992,7 @@ DS4_GLM_MOE_NO_EXPERT_TILE8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42211`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static ds4_gpu_tensor *down_terms_scratch[DS4_MAX_GPUS] = {0};
@@ -12010,7 +12010,7 @@ DS4_GLM_MOE_NO_LOCAL_BATCH_IO: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42182`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42184`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *out_work = (float *)out->ptr;
@@ -12028,7 +12028,7 @@ DS4_GLM_MOE_SCALAR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42394`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42396`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 up_expert_bytes, up_row_bytes,
@@ -12040,7 +12040,7 @@ Source: `engines/ds4/ds4_cuda.cu:42394`. Unset read: NULL from getenv; the liter
                 (const cuda_block_q8_K *)xq_scratch[dev]->ptr,
 ```
 
-Source: `engines/ds4/ds4_cuda.cu:42421`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42423`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -12058,7 +12058,7 @@ DS4_GLM_MOE_SCRATCH_TIER0: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42158`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42160`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static ds4_gpu_tensor *midq_scratch[DS4_MAX_GPUS] = {0};
@@ -12076,7 +12076,7 @@ DS4_GLM_MTP_NO_ATTN_TOK2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:39867`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:39869`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool range_tok2 =
@@ -12094,7 +12094,7 @@ DS4_GLM_MTP_NO_MOE_TOK2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42380`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42382`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (n_tokens == 2u &&
@@ -12112,7 +12112,7 @@ DS4_GLM_MTP_NO_SHARED_TOK2: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:43476`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:43478`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (n_tok == 2 && (in_dim & 31u) == 0u &&
@@ -12220,7 +12220,7 @@ DS4_GLM_ROUTER_SCALAR: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:42640`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:42642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             model_map, bias_offset, bb, logical_tier, "glm_exp_probs_b");
@@ -12238,7 +12238,7 @@ DS4_GLM_SHARED_SPLIT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:43509`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:43511`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -12262,7 +12262,7 @@ Source: `engines/ds4/ds4.c:49031`. Unset read: NULL from getenv; the literal con
     if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP",
                               "DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP") ||
         getenv("DS4_GLM_STREAMING_DECODE_FULL_LAYER_MAP") != NULL) {
-        return metal_graph_stream_map_layer(model, weights, il);
+        return gpu_graph_stream_map_layer(model, weights, il);
     }
     if (weights && il < DS4_N_LAYER &&
         glm_stream_resident_decode_layer_enabled(&weights->layer[il], il)) {
@@ -12448,7 +12448,7 @@ DS4_GLM_VALUE_NO_TILE16: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:43079`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:43081`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             model_map, weight_offset, wbytes, logical_tier, "glm_v_b");
@@ -12588,14 +12588,14 @@ Source: `engines/ds4/ds4.c:20133`. Unset read: NULL from getenv; the literal con
     g->decode_stage_profile = getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL;
     g->decode_index_stage_profile = getenv("DS4_METAL_INDEXER_STAGE_PROFILE") != NULL;
     g->output_stage_profile = getenv("DS4_METAL_OUTPUT_STAGE_PROFILE") != NULL;
-    const bool enable_splitkv_spec = metal_graph_cuda_splitkv_spec_requested();
+    const bool enable_splitkv_spec = gpu_graph_cuda_splitkv_spec_requested();
     const bool enable_splitkv_batch_verify =
 ```
 
 Source: `engines/ds4/ds4.c:25769`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-                : metal_graph_decode_kv_store(metal_graph_kv(g), raw_cache, raw_cap, raw_row);
+                : gpu_graph_decode_kv_store(gpu_graph_kv(g), raw_cache, raw_cap, raw_row);
             if (!ok && (getenv("DS4_CUDA_KV_CACHE_VERBOSE") != NULL ||
                         getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL)) {
                 fprintf(stderr,
@@ -12637,12 +12637,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23049`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_attn_out_hc(void) {
+static bool gpu_graph_use_reference_attn_out_hc(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_ATTN_OUT_HC_FUSION", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_ATTN_OUT_HC_FUSION", &cache);
 }
 
-static bool metal_graph_decode_hc_pre(
+static bool gpu_graph_decode_hc_pre(
         ds4_gpu_tensor       *out,
 ```
 
@@ -12655,7 +12655,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23029`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    if (metal_graph_use_reference_hc_norm_decode()) return false;
+    if (gpu_graph_use_reference_hc_norm_decode()) return false;
     if (cache == -1) {
         const char *disable = getenv("DS4_METAL_DISABLE_BATCH_HC_NORM_FUSION");
         if (disable && disable[0] && strcmp(disable, "0") != 0) {
@@ -12673,12 +12673,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23017`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_compressor_pair_proj(void) {
+static bool gpu_graph_use_reference_compressor_pair_proj(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_COMPRESSOR_PAIR_PROJ", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_COMPRESSOR_PAIR_PROJ", &cache);
 }
 
-static bool metal_graph_use_reference_hc_norm_decode(void) {
+static bool gpu_graph_use_reference_hc_norm_decode(void) {
     static int cache = -1;
 ```
 
@@ -12703,12 +12703,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:22997`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_hc_decode(void) {
+static bool gpu_graph_use_reference_hc_decode(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_HC_FUSION", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_HC_FUSION", &cache);
 }
 
-static bool metal_graph_use_reference_kv_decode(void) {
+static bool gpu_graph_use_reference_kv_decode(void) {
     static int cache = -1;
 ```
 
@@ -12721,12 +12721,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23022`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_hc_norm_decode(void) {
+static bool gpu_graph_use_reference_hc_norm_decode(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_HC_NORM_FUSION", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_HC_NORM_FUSION", &cache);
 }
 
-static bool metal_graph_enable_batch_hc_norm_fusion(void) {
+static bool gpu_graph_enable_batch_hc_norm_fusion(void) {
     static int cache = -1;
 ```
 
@@ -12762,7 +12762,7 @@ Source: `engines/ds4/ds4.c:23580`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_DISABLE_IQ2_SELECTED_SHARED_OVERLAP") == NULL;
 }
 
-static bool metal_graph_use_iq2_selected_async_load(const ds4_gpu_graph *g) {
+static bool gpu_graph_use_iq2_selected_async_load(const ds4_gpu_graph *g) {
     return g &&
 ```
 
@@ -12775,12 +12775,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23002`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_kv_decode(void) {
+static bool gpu_graph_use_reference_kv_decode(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_KV_FUSION", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_KV_FUSION", &cache);
 }
 
-static bool metal_graph_use_reference_qkv_norm(void) {
+static bool gpu_graph_use_reference_qkv_norm(void) {
     static int cache = -1;
 ```
 
@@ -12822,7 +12822,7 @@ Source: `engines/ds4/ds4.c:23738`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS") == NULL;
 }
 
-static bool metal_graph_streaming_expert_cache_seed_layer_expected(
+static bool gpu_graph_streaming_expert_cache_seed_layer_expected(
         const ds4_gpu_graph     *g,
 ```
 
@@ -12866,7 +12866,7 @@ Source: `engines/ds4/ds4.c:25839`. Unset read: NULL from getenv; the literal con
 
 ```text
         if (ok && quad_store == 0 && ratio == 4u &&
-            !metal_graph_use_reference_compressor_pair_proj() &&
+            !gpu_graph_use_reference_compressor_pair_proj() &&
             getenv("DS4_METAL_DISABLE_PRE_M5_COMPRESSOR_QUAD_STORE") == NULL &&
             (ds4_gpu_device_is_pre_m5_apple_silicon() ||
              ds4_gpu_device_is_m5_apple_silicon()) &&
@@ -12926,7 +12926,7 @@ Source: `engines/ds4/ds4.c:25291`. Unset read: NULL from getenv; the literal con
 
 ```text
             layer->hc_attn_fn->type == DS4_TENSOR_F16 &&
-            !metal_graph_use_reference_hc_decode() &&
+            !gpu_graph_use_reference_hc_decode() &&
             getenv("DS4_METAL_DISABLE_PRE_M5_HC_NORM_MIX_FUSE") == NULL &&
             (ds4_gpu_device_is_pre_m5_apple_silicon() ||
              ds4_gpu_device_is_m5_apple_silicon()) &&
@@ -12938,7 +12938,7 @@ Source: `engines/ds4/ds4.c:26869`. Unset read: NULL from getenv; the literal con
 
 ```text
             layer->hc_ffn_fn->type == DS4_TENSOR_F16 &&
-            !metal_graph_use_reference_hc_decode() &&
+            !gpu_graph_use_reference_hc_decode() &&
             getenv("DS4_METAL_DISABLE_PRE_M5_HC_NORM_MIX_FUSE") == NULL &&
             (ds4_gpu_device_is_pre_m5_apple_silicon() ||
              ds4_gpu_device_is_m5_apple_silicon()) &&
@@ -12955,13 +12955,13 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:25739`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        !metal_graph_use_reference_kv_decode() &&
+        !gpu_graph_use_reference_kv_decode() &&
         !resume_after_kv_store &&
         getenv("DS4_METAL_DISABLE_PRE_M5_KV_ROPE_FP8_FUSE") == NULL &&
         ds4_gpu_device_is_pre_m5_apple_silicon() &&
         ds4_gpu_kv_rope_fp8_fuse_available() != 0;
     if (ok && !tp_ablate_kv && !kv_rope_fused && !fuse_kv_rope_store) {
-        ok = ds4_gpu_rope_tail_tensor(metal_graph_kv(g), 1,
+        ok = ds4_gpu_rope_tail_tensor(gpu_graph_kv(g), 1,
 ```
 
 ### DS4_METAL_DISABLE_PRE_M5_Q2_DECODE_SPLIT2_32
@@ -12980,7 +12980,7 @@ Source: `engines/ds4/ds4.c:25598`. Unset read: NULL from getenv; the literal con
 
 ```text
                 raw_row < raw_cap &&
-                phase == METAL_DECODE_LAYER_FULL &&
+                phase == GPU_DECODE_LAYER_FULL &&
                 getenv("DS4_METAL_DISABLE_PRE_M5_QKV_NORM_KV_STORE_FUSE") == NULL &&
                 (ds4_gpu_device_is_pre_m5_apple_silicon() ||
                  ds4_gpu_device_is_m5_apple_silicon()) &&
@@ -13016,7 +13016,7 @@ Source: `engines/ds4/ds4.c:23605`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
+static bool gpu_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
     if (getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") != NULL ||
         getenv("DS4_METAL_DISABLE_Q4_EXPERT_TABLE") != NULL) {
         return false;
@@ -13027,13 +13027,13 @@ static bool metal_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
 Source: `engines/ds4/ds4.c:23671`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-           (metal_graph_use_pro_q4_expert_table_auto(g) ||
+           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
             getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
            getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
            getenv("DS4_METAL_DISABLE_Q4_EXPERT_TABLE") == NULL;
 }
 
-static bool metal_graph_decode_q4_selected_slots_expected(
+static bool gpu_graph_decode_q4_selected_slots_expected(
 ```
 
 ### DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_PRELOAD
@@ -13050,7 +13050,7 @@ Source: `engines/ds4/ds4.c:72584`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_PRELOAD") != NULL) {
         return true;
     }
-    if (!metal_graph_q4_non_streaming_opt_in_enabled()) {
+    if (!gpu_graph_q4_non_streaming_opt_in_enabled()) {
         return true;
 ```
 
@@ -13063,7 +13063,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static bool metal_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
+static bool gpu_graph_use_pro_q4_expert_table_auto(const ds4_gpu_graph *g) {
     if (getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") != NULL ||
         getenv("DS4_METAL_DISABLE_Q4_EXPERT_TABLE") != NULL) {
         return false;
@@ -13080,7 +13080,7 @@ Source: `engines/ds4/ds4.c:23672`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_DISABLE_Q4_EXPERT_TABLE") == NULL;
 }
 
-static bool metal_graph_decode_q4_selected_slots_expected(
+static bool gpu_graph_decode_q4_selected_slots_expected(
         const ds4_gpu_graph     *g,
 ```
 
@@ -13111,12 +13111,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23007`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_qkv_norm(void) {
+static bool gpu_graph_use_reference_qkv_norm(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_QKV_NORM_FUSION", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_QKV_NORM_FUSION", &cache);
 }
 
-static bool metal_graph_use_reference_qkv_pair_proj(void) {
+static bool gpu_graph_use_reference_qkv_pair_proj(void) {
     static int cache = -1;
 ```
 
@@ -13129,12 +13129,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23012`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_qkv_pair_proj(void) {
+static bool gpu_graph_use_reference_qkv_pair_proj(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_QKV_PAIR_PROJ", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_QKV_PAIR_PROJ", &cache);
 }
 
-static bool metal_graph_use_reference_compressor_pair_proj(void) {
+static bool gpu_graph_use_reference_compressor_pair_proj(void) {
     static int cache = -1;
 ```
 
@@ -13177,12 +13177,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23044`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_reference_shared_down_hc(void) {
+static bool gpu_graph_use_reference_shared_down_hc(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_DISABLE_SHARED_DOWN_HC_FUSION", &cache);
+    return gpu_graph_env_flag("DS4_METAL_DISABLE_SHARED_DOWN_HC_FUSION", &cache);
 }
 
-static bool metal_graph_use_reference_attn_out_hc(void) {
+static bool gpu_graph_use_reference_attn_out_hc(void) {
     static int cache = -1;
 ```
 
@@ -13201,7 +13201,7 @@ Source: `engines/ds4/ds4.c:20132`. Unset read: NULL from getenv; the literal con
     g->decode_stage_profile = getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL;
     g->decode_index_stage_profile = getenv("DS4_METAL_INDEXER_STAGE_PROFILE") != NULL;
     g->output_stage_profile = getenv("DS4_METAL_OUTPUT_STAGE_PROFILE") != NULL;
-    const bool enable_splitkv_spec = metal_graph_cuda_splitkv_spec_requested();
+    const bool enable_splitkv_spec = gpu_graph_cuda_splitkv_spec_requested();
 ```
 
 ### DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE
@@ -13231,12 +13231,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23523`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static bool metal_graph_use_streaming_iq2_cpu_router(void) {
+static bool gpu_graph_use_streaming_iq2_cpu_router(void) {
     return getenv("DS4_METAL_ENABLE_STREAMING_IQ2_CPU_ROUTER") != NULL &&
            getenv("DS4_METAL_DISABLE_STREAMING_IQ2_CPU_ROUTER") == NULL;
 }
 
-static bool metal_graph_use_q4_selected_shared_overlap(
+static bool gpu_graph_use_q4_selected_shared_overlap(
         const ds4_gpu_graph *g) {
 ```
 
@@ -13314,7 +13314,7 @@ Source: `engines/ds4/ds4.c:24215`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_DISABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY") == NULL;
 }
 
-static bool metal_graph_decode_selected_readahead_override(
+static bool gpu_graph_decode_selected_readahead_override(
         ds4_gpu_graph            *g,
 ```
 
@@ -13333,7 +13333,7 @@ Source: `engines/ds4/ds4.c:23579`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_DISABLE_IQ2_SELECTED_SHARED_OVERLAP") == NULL;
 }
 
-static bool metal_graph_use_iq2_selected_async_load(const ds4_gpu_graph *g) {
+static bool gpu_graph_use_iq2_selected_async_load(const ds4_gpu_graph *g) {
 ```
 
 ### DS4_METAL_DISABLE_STREAMING_STATIC_LOCK
@@ -13363,7 +13363,7 @@ Source: `engines/ds4/ds4.c:33521`. Unset read: NULL from getenv; the literal con
     const bool cuda_tp_owned_batch_moe =
         g->cuda_tp_ep && g->cuda_tp_prefill_ffn;
     if (ok && cuda_tp_owned_batch_moe) {
-        ok = metal_graph_encode_mixed_routed_rows(
+        ok = gpu_graph_encode_mixed_routed_rows(
 ```
 
 ### DS4_METAL_DISABLE_TP_DECODE_SPLIT_FLUSH
@@ -14006,7 +14006,7 @@ Source: `engines/ds4/ds4.c:82443`. Unset read: NULL from getenv; the literal con
 
 ```text
     const bool cuda = e->backend == DS4_BACKEND_CUDA;
-    if (cuda ? !metal_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) :
+    if (cuda ? !gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) :
         (e->backend != DS4_BACKEND_METAL || getenv("DS4_METAL_DISABLE_V41_SESSION_BATCH")))
         return false;
     ds41_gpu_graph *graphs[DS4_TP_BATCH_MAX_ROWS];
@@ -14081,7 +14081,7 @@ Source: `engines/ds4/ds4.c:43365`. Unset read: NULL from getenv; the literal con
     if (g->tp_world != 2 || g->streaming || g->quality || g->imatrix ||
         g->image_count || getenv("DS4_METAL_DISABLE_V41_TP_SHARED_OWNER") ||
         g_expert_profile.active || getenv("DS4_CUDA_MOE_PROFILE") ||
-        metal_graph_debug_get_config()->prefix ||
+        gpu_graph_debug_get_config()->prefix ||
         !ds4_gpu_decode_graphs_supported())
         return ds41_graph_layer(g, m, l, il, token);
 ```
@@ -14095,7 +14095,7 @@ Source: `engines/ds4/ds4.c:43906`. Unset read: NULL from getenv; the literal con
     for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
         const ds4_layer_weights *l = &w->layer[il];
         if (layer_resident)
-            ok = metal_graph_stream_map_layer(m, w, il) && ds4_gpu_begin_commands();
+            ok = gpu_graph_stream_map_layer(m, w, il) && ds4_gpu_begin_commands();
 ```
 
 Source: `engines/ds4/ds4.c:44712`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -14215,7 +14215,7 @@ Source: `engines/ds4/ds4.c:62167`. Unset read: NULL from getenv; the literal con
     if (dump_prefill_logits && dump_prefill_logits[0]) {
         if (!write_f32_binary_file(dump_prefill_logits, logits, DS4_N_VOCAB)) {
             free(logits);
-            metal_graph_free(&g);
+            gpu_graph_free(&g);
 ```
 
 ### DS4_METAL_ENABLE_BATCH_HC_NORM_FUSION
@@ -14268,7 +14268,7 @@ Source: `engines/ds4/ds4.c:23566`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_ADDRESS_AUTO") != NULL;
 }
 
-static bool metal_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
+static bool gpu_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
     if (!g) return false;
 ```
 
@@ -14299,7 +14299,7 @@ Source: `engines/ds4/ds4.c:23565`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_ADDRESS_AUTO") != NULL;
 }
 
-static bool metal_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
+static bool gpu_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
 ```
 
 Source: `engines/ds4/ds4.c:23610`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -14335,7 +14335,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static bool metal_graph_q4_non_streaming_opt_in_enabled(void) {
+static bool gpu_graph_q4_non_streaming_opt_in_enabled(void) {
     return getenv("DS4_METAL_ENABLE_Q4_SELECTED_EXPERT_VIEWS") != NULL ||
            getenv("DS4_METAL_ENABLE_PRO_Q4_SELECTED_EXPERT_VIEWS") != NULL ||
            getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL ||
@@ -14396,7 +14396,7 @@ Source: `engines/ds4/ds4.c:23670`. Unset read: NULL from getenv; the literal con
 
 ```text
                                   "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           (metal_graph_use_pro_q4_expert_table_auto(g) ||
+           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
             getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
            getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
            getenv("DS4_METAL_DISABLE_Q4_EXPERT_TABLE") == NULL;
@@ -14426,7 +14426,7 @@ Source: `engines/ds4/ds4.c:23561`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_q4_non_streaming_opt_in_enabled(void) {
+static bool gpu_graph_q4_non_streaming_opt_in_enabled(void) {
     return getenv("DS4_METAL_ENABLE_Q4_SELECTED_EXPERT_VIEWS") != NULL ||
            getenv("DS4_METAL_ENABLE_PRO_Q4_SELECTED_EXPERT_VIEWS") != NULL ||
            getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL ||
@@ -14444,12 +14444,12 @@ Source: `engines/ds4/ds4.c:23522`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-static bool metal_graph_use_streaming_iq2_cpu_router(void) {
+static bool gpu_graph_use_streaming_iq2_cpu_router(void) {
     return getenv("DS4_METAL_ENABLE_STREAMING_IQ2_CPU_ROUTER") != NULL &&
            getenv("DS4_METAL_DISABLE_STREAMING_IQ2_CPU_ROUTER") == NULL;
 }
 
-static bool metal_graph_use_q4_selected_shared_overlap(
+static bool gpu_graph_use_q4_selected_shared_overlap(
 ```
 
 ### DS4_METAL_ENABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY
@@ -14467,7 +14467,7 @@ Source: `engines/ds4/ds4.c:24214`. Unset read: NULL from getenv; the literal con
            getenv("DS4_METAL_DISABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY") == NULL;
 }
 
-static bool metal_graph_decode_selected_readahead_override(
+static bool gpu_graph_decode_selected_readahead_override(
 ```
 
 ### DS4_METAL_ENABLE_V41_ROWS_ATTENTION
@@ -14570,7 +14570,7 @@ Source: `engines/ds4/ds4.c:85779`. Unset read: NULL from getenv; the literal con
 
 ```text
         count > (int)DS4_GPU_ATTENTION_DECODE_BATCH_MAX ||
-        DS4_N_HEAD_DIM != 512u || metal_graph_attn_comp_cache_is_f16() ||
+        DS4_N_HEAD_DIM != 512u || gpu_graph_attn_comp_cache_is_f16() ||
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
         getenv("DS4_CUDA_NO_EXACT_SCORE_SPLIT_DECODE") != NULL ||
         getenv("DS4_CUDA_SPLITKV_DECODE") != NULL ||
@@ -14582,7 +14582,7 @@ Source: `engines/ds4/ds4.c:85919`. Unset read: NULL from getenv; the literal con
 
 ```text
         count > (int)DS4_GPU_ATTENTION_DECODE_BATCH_MAX ||
-        DS4_N_HEAD_KV != 1u || metal_graph_use_reference_qkv_norm() ||
+        DS4_N_HEAD_KV != 1u || gpu_graph_use_reference_qkv_norm() ||
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL) {
         return false;
     }
@@ -14594,12 +14594,12 @@ Source: `engines/ds4/ds4.c:87863`. Unset read: NULL from getenv; the literal con
 
 ```text
         (start % g->prefill_cap) + prefill_rows > g->prefill_cap ||
-        metal_graph_directional_steering_ffn_enabled(g) ||
+        gpu_graph_directional_steering_ffn_enabled(g) ||
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
         getenv("DS4_METAL_LAYER_STAGE_PROFILE") != NULL) {
         return false;
     }
-    if (!metal_graph_mixed_workspace_compatible(g, batch_graph)) return false;
+    if (!gpu_graph_mixed_workspace_compatible(g, batch_graph)) return false;
 ```
 
 ### DS4_METAL_GRAPH_PREFILL_PROFILE
@@ -14617,7 +14617,7 @@ Source: `engines/ds4/ds4.c:38263`. Unset read: NULL from getenv; the literal con
 
     const bool sequential = getenv("DS4_CUDA_PREFILL_PIPELINE_SEQUENTIAL") != NULL;
     const bool suppress_q8_cache =
-        !metal_graph_cuda_prefill_pipeline_q8_cache_requested();
+        !gpu_graph_cuda_prefill_pipeline_q8_cache_requested();
 ```
 
 Source: `engines/ds4/ds4.c:44282`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -14690,7 +14690,7 @@ Source: `engines/ds4/ds4.c:62494`. Unset read: NULL from getenv; the literal con
 
 ```text
 
-    /* Env override (matches metal_graph_raw_cap_for_context behavior). */
+    /* Env override (matches gpu_graph_raw_cap_for_context behavior). */
     const char *env = getenv("DS4_METAL_GRAPH_RAW_CAP");
     if (env && env[0]) {
         char *endp = NULL;
@@ -14803,7 +14803,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:29811`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    bool ok = metal_graph_alloc(&g, weights, &weights->layer[0]);
+    bool ok = gpu_graph_alloc(&g, weights, &weights->layer[0]);
     g.quality = quality;
     const bool trace_layers = getenv("DS4_METAL_GRAPH_TRACE_LAYERS") != NULL;
     if (trace_layers && ok) {
@@ -14839,12 +14839,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23093`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_hc_norm_fusion_check_enabled(void) {
+static bool gpu_graph_hc_norm_fusion_check_enabled(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_HC_NORM_FUSION_CHECK", &cache);
+    return gpu_graph_env_flag("DS4_METAL_HC_NORM_FUSION_CHECK", &cache);
 }
 
-static float metal_graph_hc_norm_fusion_check_tolerance(void) {
+static float gpu_graph_hc_norm_fusion_check_tolerance(void) {
     static int initialized;
 ```
 
@@ -14879,9 +14879,9 @@ Source: `engines/ds4/ds4.c:20134`. Unset read: NULL from getenv; the literal con
     g->decode_stage_profile = getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL;
     g->decode_index_stage_profile = getenv("DS4_METAL_INDEXER_STAGE_PROFILE") != NULL;
     g->output_stage_profile = getenv("DS4_METAL_OUTPUT_STAGE_PROFILE") != NULL;
-    const bool enable_splitkv_spec = metal_graph_cuda_splitkv_spec_requested();
+    const bool enable_splitkv_spec = gpu_graph_cuda_splitkv_spec_requested();
     const bool enable_splitkv_batch_verify =
-        enable_splitkv_spec && metal_graph_cuda_splitkv_spec_batch_verify_requested();
+        enable_splitkv_spec && gpu_graph_cuda_splitkv_spec_batch_verify_requested();
 ```
 
 Source: `engines/ds4/ds4.c:25802`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -14917,13 +14917,13 @@ Source: `engines/ds4/ds4.c:83916`. Unset read: NULL from getenv; the literal con
 Source: `engines/ds4/ds4.c:87864`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        metal_graph_directional_steering_ffn_enabled(g) ||
+        gpu_graph_directional_steering_ffn_enabled(g) ||
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
         getenv("DS4_METAL_LAYER_STAGE_PROFILE") != NULL) {
         return false;
     }
-    if (!metal_graph_mixed_workspace_compatible(g, batch_graph)) return false;
-    if (!metal_graph_session_batch_moe_supported(
+    if (!gpu_graph_mixed_workspace_compatible(g, batch_graph)) return false;
+    if (!gpu_graph_session_batch_moe_supported(
 ```
 
 ### DS4_METAL_MEMORY_REPORT
@@ -15034,9 +15034,9 @@ Source: `engines/ds4/ds4.c:20135`. Unset read: NULL from getenv; the literal con
     g->decode_stage_profile = getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL;
     g->decode_index_stage_profile = getenv("DS4_METAL_INDEXER_STAGE_PROFILE") != NULL;
     g->output_stage_profile = getenv("DS4_METAL_OUTPUT_STAGE_PROFILE") != NULL;
-    const bool enable_splitkv_spec = metal_graph_cuda_splitkv_spec_requested();
+    const bool enable_splitkv_spec = gpu_graph_cuda_splitkv_spec_requested();
     const bool enable_splitkv_batch_verify =
-        enable_splitkv_spec && metal_graph_cuda_splitkv_spec_batch_verify_requested();
+        enable_splitkv_spec && gpu_graph_cuda_splitkv_spec_batch_verify_requested();
     const bool enable_spec_logits = enable_mtp || enable_splitkv_batch_verify;
 ```
 
@@ -15067,12 +15067,12 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23518`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static bool metal_graph_use_pro_q4_cpu_router(void) {
+static bool gpu_graph_use_pro_q4_cpu_router(void) {
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_PRO_Q4_CPU_ROUTER", &cache);
+    return gpu_graph_env_flag("DS4_METAL_PRO_Q4_CPU_ROUTER", &cache);
 }
 
-static bool metal_graph_use_streaming_iq2_cpu_router(void) {
+static bool gpu_graph_use_streaming_iq2_cpu_router(void) {
     return getenv("DS4_METAL_ENABLE_STREAMING_IQ2_CPU_ROUTER") != NULL &&
 ```
 
@@ -15123,10 +15123,10 @@ Source: `engines/ds4/ds4.c:23546`. Unset read: Wrapper/conditional default: see 
 ```text
 #endif
     static int cache = -1;
-    return metal_graph_env_flag("DS4_METAL_Q4_SELECTED_OVERLAP_SHARED", &cache);
+    return gpu_graph_env_flag("DS4_METAL_Q4_SELECTED_OVERLAP_SHARED", &cache);
 }
 
-static bool metal_graph_use_cuda_selected_shared_overlap(const ds4_gpu_graph *g) {
+static bool gpu_graph_use_cuda_selected_shared_overlap(const ds4_gpu_graph *g) {
 #if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
 ```
 
@@ -15144,7 +15144,7 @@ Source: `engines/ds4/ds4.c:25172`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_Q8_MV_NSG") == NULL &&
         fuse_shared_gate_up &&
         layer->ffn_down_shexp->type == DS4_TENSOR_Q8_0 &&
-        !keep_ffn_out && !metal_graph_use_reference_shared_down_hc() &&
+        !keep_ffn_out && !gpu_graph_use_reference_shared_down_hc() &&
         layer->ffn_gate_inp->type == DS4_TENSOR_F16 &&
 ```
 
@@ -15157,7 +15157,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:40110`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static uint32_t metal_graph_resume_prefill_min_tokens(void) {
+static uint32_t gpu_graph_resume_prefill_min_tokens(void) {
 #ifndef DS4_ROCM_BUILD
     const char *env = getenv("DS4_METAL_RESUME_PREFILL_MIN");
     if (env && env[0]) {
@@ -15210,7 +15210,7 @@ Source: `engines/ds4/ds4.c:83371`. Unset read: NULL from getenv; the literal con
     const char *enabled = getenv("DS4_METAL_SESSION_BATCH_QKV");
     if ((enabled && enabled[0] && strcmp(enabled, "0") == 0) ||
         !items || count < 2 || !e || e->tp.active ||
-        metal_graph_use_reference_qkv_norm()) {
+        gpu_graph_use_reference_qkv_norm()) {
         return false;
 ```
 
@@ -15229,7 +15229,7 @@ Source: `engines/ds4/ds4.c:83321`. Unset read: NULL from getenv; the literal con
     if ((enabled && enabled[0] && strcmp(enabled, "0") == 0) ||
         !items || count < 2 || !e || e->tp.active ||
         e->support_kind != DS4_SUPPORT_NONE ||
-        metal_graph_use_reference_shared_down_hc() ||
+        gpu_graph_use_reference_shared_down_hc() ||
 ```
 
 ### DS4_METAL_STREAMING_IQ2_CPU_ROUTER_PROFILE
@@ -15247,7 +15247,7 @@ Source: `engines/ds4/ds4.c:24140`. Unset read: NULL from getenv; the literal con
     const double t0 = profile ? now_sec() : 0.0;
     if (ds4_gpu_end_commands() == 0) return false;
     const double t_sync = profile ? now_sec() : 0.0;
-    if (ds4_gpu_tensor_read(metal_graph_ffn_norm(g),
+    if (ds4_gpu_tensor_read(gpu_graph_ffn_norm(g),
 ```
 
 ### DS4_METAL_STREAMING_SELECTED_READAHEAD_PROFILE
@@ -15565,7 +15565,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:27503`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        !metal_graph_decode_cpu_router_applicable(g, layer) &&
+        !gpu_graph_decode_cpu_router_applicable(g, layer) &&
         layer->ffn_gate_tid2eid == NULL &&
         getenv("DS4_MOE_REPLAY_SELECTED_IDS") == NULL &&
         (q4_selected_shared_overlap ||
@@ -15577,7 +15577,7 @@ Source: `engines/ds4/ds4.c:27503`. Unset read: NULL from getenv; the literal con
 Source: `engines/ds4/ds4.c:27524`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        !metal_graph_decode_cpu_router_applicable(g, layer) &&
+        !gpu_graph_decode_cpu_router_applicable(g, layer) &&
         layer->ffn_gate_tid2eid == NULL &&
         getenv("DS4_MOE_REPLAY_SELECTED_IDS") == NULL;
     const bool cuda_stream_selected_load =
@@ -15589,11 +15589,11 @@ Source: `engines/ds4/ds4.c:27524`. Unset read: NULL from getenv; the literal con
 Source: `engines/ds4/ds4.c:27532`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        metal_graph_decode_cuda_selected_slots_expected(g, layer) &&
+        gpu_graph_decode_cuda_selected_slots_expected(g, layer) &&
         layer->ffn_gate_tid2eid == NULL &&
         getenv("DS4_MOE_REPLAY_SELECTED_IDS") == NULL;
     if (cuda_stream_selected_load) {
-        ok = metal_graph_decode_cuda_selected_load(g,
+        ok = gpu_graph_decode_cuda_selected_load(g,
                                                    model,
                                                    layer,
 ```
@@ -16219,7 +16219,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:18599`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-static uint64_t metal_graph_prefill_execution_floor_bytes(void) {
+static uint64_t gpu_graph_prefill_execution_floor_bytes(void) {
     uint64_t execution_floor = 4ull * 1073741824ull;
     const char *fenv = getenv("DS4_PREFILL_EDGE_EXECUTION_FLOOR_GB");
     if (fenv && fenv[0]) {
@@ -17071,7 +17071,7 @@ Source: `engines/ds4/ds4.c:23719`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
 }
 
-static bool metal_graph_decode_mxfp4_selected_slots_expected(
+static bool gpu_graph_decode_mxfp4_selected_slots_expected(
 ```
 
 ### DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE
@@ -17107,7 +17107,7 @@ Source: `engines/ds4/ds4.c:23700`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS");
 }
 
-static bool metal_graph_decode_iq2_selected_slots_expected(
+static bool gpu_graph_decode_iq2_selected_slots_expected(
 ```
 
 ### DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION
@@ -17159,7 +17159,7 @@ Source: `engines/ds4/ds4.c:23667`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
            !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
                                   "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           (metal_graph_use_pro_q4_expert_table_auto(g) ||
+           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
             getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
            getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
 ```
@@ -17251,7 +17251,7 @@ Source: `engines/ds4/ds4.c:23854`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_EXPERT_HOTLIST");
 }
 
-static bool metal_graph_streaming_expert_hotlist_add(
+static bool gpu_graph_streaming_expert_hotlist_add(
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE
@@ -17305,7 +17305,7 @@ Source: `engines/ds4/ds4.c:20807`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED");
 }
 
-static bool metal_graph_stream_decode_static_map_enabled(void) {
+static bool gpu_graph_stream_decode_static_map_enabled(void) {
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR
@@ -17341,7 +17341,7 @@ Source: `engines/ds4/ds4.c:21061`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
 }
 
-static uint32_t metal_graph_stream_prefill_batch_selected_addr_auto_max(void) {
+static uint32_t gpu_graph_stream_prefill_batch_selected_addr_auto_max(void) {
 ```
 
 Source: `engines/ds4/ds4.c:22232`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -17383,7 +17383,7 @@ Source: `engines/ds4/ds4.c:21029`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
 }
 
-static bool metal_graph_stream_prefill_layer_readahead_enabled(
+static bool gpu_graph_stream_prefill_layer_readahead_enabled(
 ```
 
 Source: `engines/ds4/ds4.c:22241`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -17450,7 +17450,7 @@ Source: `engines/ds4/ds4.c:22210`. Unset read: Wrapper/conditional default: see 
 
 ```text
         if (g) {
-            if (!metal_graph_stream_prefill_layer_pread_enabled(g)) return true;
+            if (!gpu_graph_stream_prefill_layer_pread_enabled(g)) return true;
         } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
                                          "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") ||
                    glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
@@ -17485,7 +17485,7 @@ Source: `engines/ds4/ds4.c:21041`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
 }
 
-static bool metal_graph_stream_prefill_layer_pread_enabled(
+static bool gpu_graph_stream_prefill_layer_pread_enabled(
 ```
 
 Source: `engines/ds4/ds4.c:21051`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -17497,7 +17497,7 @@ Source: `engines/ds4/ds4.c:21051`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
 }
 
-static bool metal_graph_stream_prefill_layer_madvise_enabled(
+static bool gpu_graph_stream_prefill_layer_madvise_enabled(
 ```
 
 Source: `engines/ds4/ds4.c:21059`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -17540,7 +17540,7 @@ Source: `engines/ds4/ds4.c:22230`. Unset read: Wrapper/conditional default: see 
 
 ```text
         if (g) {
-            if (!metal_graph_stream_prefill_layer_madvise_enabled(g)) return true;
+            if (!gpu_graph_stream_prefill_layer_madvise_enabled(g)) return true;
         } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
                                          "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") ||
                    glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
@@ -17659,7 +17659,7 @@ Source: `engines/ds4/ds4.c:21019`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE");
 }
 
-static bool metal_graph_stream_prefill_layer_pagein_enabled(
+static bool gpu_graph_stream_prefill_layer_pagein_enabled(
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN
@@ -17677,7 +17677,7 @@ Source: `engines/ds4/ds4.c:21009`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN");
 }
 
-static bool metal_graph_stream_prefill_selected_madvise_enabled(
+static bool gpu_graph_stream_prefill_selected_madvise_enabled(
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE
@@ -17695,7 +17695,7 @@ Source: `engines/ds4/ds4.c:21498`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE");
 }
 
-static void metal_graph_stream_prefill_selected_profile_reset(
+static void gpu_graph_stream_prefill_selected_profile_reset(
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD
@@ -17713,7 +17713,7 @@ Source: `engines/ds4/ds4.c:22550`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
 }
 
-static bool metal_graph_stream_prefill_selected_readahead_shared_enabled(
+static bool gpu_graph_stream_prefill_selected_readahead_shared_enabled(
 ```
 
 Source: `engines/ds4/ds4.c:22562`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -17725,7 +17725,7 @@ Source: `engines/ds4/ds4.c:22562`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
 }
 
-static uint32_t metal_graph_stream_prefill_selected_readahead_gap(void) {
+static uint32_t gpu_graph_stream_prefill_selected_readahead_gap(void) {
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED
@@ -17761,7 +17761,7 @@ Source: `engines/ds4/ds4.c:20800`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_DISABLE_STREAMING_READAHEAD");
 }
 
-static bool metal_graph_stream_madvise_willneed_enabled(void) {
+static bool gpu_graph_stream_madvise_willneed_enabled(void) {
 ```
 
 ### DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD
@@ -17792,7 +17792,7 @@ Source: `engines/ds4/ds4.c:20812`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_stream_decode_static_map_enabled(void) {
+static bool gpu_graph_stream_decode_static_map_enabled(void) {
     if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP",
                               "DS4_METAL_DISABLE_STREAMING_STATIC_DECODE_MAP")) {
         return false;
@@ -17810,12 +17810,12 @@ Source: `engines/ds4/ds4.c:20825`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_stream_decode_static_map_state_cache_enabled(void) {
+static bool gpu_graph_stream_decode_static_map_state_cache_enabled(void) {
     return !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE",
                                   "DS4_METAL_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE");
 }
 
-static bool metal_graph_stream_decode_layer_batch_enabled(
+static bool gpu_graph_stream_decode_layer_batch_enabled(
 ```
 
 ### DS4_ROCM_DSPARK_FAST
@@ -17900,7 +17900,7 @@ Source: `engines/ds4/ds4.c:20805`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_stream_madvise_willneed_enabled(void) {
+static bool gpu_graph_stream_madvise_willneed_enabled(void) {
     return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED",
                                  "DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED") &&
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED",
@@ -17935,7 +17935,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:23823`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static uint32_t metal_graph_streaming_prefill_cache_seed_k(const ds4_gpu_graph *g) {
+static uint32_t gpu_graph_streaming_prefill_cache_seed_k(const ds4_gpu_graph *g) {
     const bool enabled =
         glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED",
                               "DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED");
@@ -17978,7 +17978,7 @@ Source: `engines/ds4/ds4.c:22239`. Unset read: Wrapper/conditional default: see 
 
 ```text
         if (g) {
-            if (!metal_graph_stream_prefill_layer_pagein_enabled(g)) return true;
+            if (!gpu_graph_stream_prefill_layer_pagein_enabled(g)) return true;
         } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
                                           "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") ||
                    glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
@@ -18020,7 +18020,7 @@ Source: `engines/ds4/ds4.c:22219`. Unset read: Wrapper/conditional default: see 
 
 ```text
         if (g) {
-            if (!metal_graph_stream_prefill_layer_readahead_enabled(g)) return true;
+            if (!gpu_graph_stream_prefill_layer_readahead_enabled(g)) return true;
         } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
                                           "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
                    glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
@@ -18134,7 +18134,7 @@ Source: `engines/ds4/ds4.c:20798`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_stream_readahead_enabled(void) {
+static bool gpu_graph_stream_readahead_enabled(void) {
     return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_READAHEAD",
                                  "DS4_METAL_ENABLE_STREAMING_READAHEAD") &&
            !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_READAHEAD",
@@ -18324,7 +18324,7 @@ Source: `engines/ds4/ds4.c:49029`. Unset read: Wrapper/conditional default: see 
     if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP",
                               "DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP") ||
         getenv("DS4_GLM_STREAMING_DECODE_FULL_LAYER_MAP") != NULL) {
-        return metal_graph_stream_map_layer(model, weights, il);
+        return gpu_graph_stream_map_layer(model, weights, il);
     }
 ```
 
@@ -18443,7 +18443,7 @@ Source: `engines/ds4/ds4.c:19672`. Unset read: Wrapper/conditional default: see 
         uint32_t          pos) {
     const char *prefix = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_PREFIX",
                                              "DS4_METAL_GRAPH_DUMP_PREFIX");
-    if (!t || n_f16 == 0 || !metal_graph_debug_wants(name, il, pos)) return;
+    if (!t || n_f16 == 0 || !gpu_graph_debug_wants(name, il, pos)) return;
 
     if (ds4_gpu_synchronize() == 0) {
 ```
@@ -18457,7 +18457,7 @@ Source: `engines/ds4/ds4.c:20842`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_GRAPH_DUMP_PREFIX");
 }
 
-static void metal_graph_stream_readahead_range_impl(
+static void gpu_graph_stream_readahead_range_impl(
 ```
 
 ### DS4_ROCM_GRAPH_DUMP_TRACE
@@ -18470,12 +18470,12 @@ Source: `engines/ds4/ds4.c:19639`. Unset read: Wrapper/conditional default: see 
 
 ```text
         uint32_t          pos) {
-    const char *prefix = metal_graph_debug_prefix_for(name, il, pos);
+    const char *prefix = gpu_graph_debug_prefix_for(name, il, pos);
     if (glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_TRACE",
                               "DS4_METAL_GRAPH_DUMP_TRACE"))
         fprintf(stderr, "ds4: dump? name=%s il=%u pos=%u t=%p n=%llu wants=%d\n",
                 name, il, pos, (void *)t, (unsigned long long)n_f32,
-                metal_graph_debug_wants(name, il, pos));
+                gpu_graph_debug_wants(name, il, pos));
 ```
 
 ### DS4_ROCM_GRAPH_PREFILL_PROFILE
@@ -18581,7 +18581,7 @@ Source: `engines/ds4/ds4.c:31299`. Unset read: Wrapper/conditional default: see 
     const bool index_stage_profile =
         glm_graph_env_present("DS4_ROCM_INDEXER_STAGE_PROFILE",
                               "DS4_METAL_INDEXER_STAGE_PROFILE");
-    const bool layer_stage_profile = metal_graph_layer_stage_profile_enabled(il);
+    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);
     const bool q_stage_profile =
         glm_graph_env_present("DS4_ROCM_Q_STAGE_PROFILE",
 ```
@@ -18637,7 +18637,7 @@ Source: `engines/ds4/ds4.c:23665`. Unset read: Wrapper/conditional default: see 
                                   "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
            !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
                                   "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           (metal_graph_use_pro_q4_expert_table_auto(g) ||
+           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
 ```
 
 Source: `engines/ds4/ds4.c:23696`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
@@ -18685,7 +18685,7 @@ Scope: ds4. Class: advanced.
 Source: `engines/ds4/ds4.c:31303`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    const bool layer_stage_profile = metal_graph_layer_stage_profile_enabled(il);
+    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);
     const bool q_stage_profile =
         glm_graph_env_present("DS4_ROCM_Q_STAGE_PROFILE",
                               "DS4_METAL_Q_STAGE_PROFILE");
@@ -18902,7 +18902,7 @@ Source: `engines/ds4/ds4.c:21905`. Unset read: Wrapper/conditional default: see 
 
 ```text
 
-static bool metal_graph_stream_prefill_layer_pagein_overlap_enabled(void) {
+static bool gpu_graph_stream_prefill_layer_pagein_overlap_enabled(void) {
     return !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP",
                                   "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP") &&
            !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
@@ -18996,7 +18996,7 @@ Source: `engines/ds4/ds4.c:22653`. Unset read: Wrapper/conditional default: see 
         glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE",
                               "DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE");
     const double t0 = profile ? now_sec() : 0.0;
-    bool ok = ds4_gpu_tensor_read(metal_graph_batch_router_selected(g),
+    bool ok = ds4_gpu_tensor_read(gpu_graph_batch_router_selected(g),
                                   0,
 ```
 
@@ -19213,7 +19213,7 @@ Source: `engines/ds4/ds4.c:62083`. Unset read: NULL from getenv; the literal con
 
     const double t_prefill0 = now_sec();
     if (g.prefill_cap < (uint32_t)prompt->len) {
-        ok = metal_graph_prefill_chunked(&g, model, weights, prompt,
+        ok = gpu_graph_prefill_chunked(&g, model, weights, prompt,
 ```
 
 ### DS4_TP_ABLATE
@@ -23826,7 +23826,7 @@ Diagnostic only: log the router-bias decisions taken inside ds4-decode.dll.
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:28459`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28461`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -23862,7 +23862,7 @@ ds4-decode.dll multi-row MoE: most unique experts gathered per group (16-384, de
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:33757`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:33759`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -24630,7 +24630,7 @@ Max-speed cache-affinity routing: share of the storage-miss penalty a RAM-tier e
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4_cuda.cu:28391`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4_cuda.cu:28393`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * boolean residency). Selection only; combine weights stay the original probabilities. */

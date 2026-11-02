@@ -22,16 +22,6 @@ typedef uint32_t ggml_half2;
 #define GGML_COMMON_AGGR_S data
 
 #define GGML_COMMON_DECL
-#elif defined(GGML_COMMON_DECL_METAL)
-#include <metal_stdlib>
-
-typedef half  ggml_half;
-typedef half2 ggml_half2;
-
-#define GGML_COMMON_AGGR_U
-#define GGML_COMMON_AGGR_S
-
-#define GGML_COMMON_DECL
 #elif defined(GGML_COMMON_DECL_CUDA)
 #if defined(GGML_COMMON_DECL_MUSA)
 #include <musa_fp16.h>
@@ -467,13 +457,6 @@ static_assert(sizeof(block_iq4_xs) == sizeof(ggml_half) + sizeof(uint16_t) + QK_
 #include <cstdint>
 
 #define GGML_TABLE_BEGIN(type, name, size) static const type name[size] = {
-#define GGML_TABLE_END() };
-
-#define GGML_COMMON_IMPL
-#elif defined(GGML_COMMON_IMPL_METAL)
-#include <metal_stdlib>
-
-#define GGML_TABLE_BEGIN(type, name, size) static const constant type name[size] = {
 #define GGML_TABLE_END() };
 
 #define GGML_COMMON_IMPL

@@ -25043,14 +25043,16 @@ extern "C" int ds4_gpu_rope_tail_decode_rows_tensor(
             ext_factor, attn_factor, beta_fast, beta_slow);
     return cuda_ok(cudaGetLastError(), "rope tail decode rows launch");
 }
-/* [merge 2026-08-16] ds4_gpu_kv_rope_fp8_fuse_available() is defined ONLY in ds4_metal.m, yet ds4.c
- * declares it unguarded (line ~20085) and calls it at ~22541 / ~22681 / ~22887. Those call sites are
- * NOT compiled out on Windows, so ds4.obj carries an unresolved reference and the link fails.
- * (Its three siblings -- decode_attn_rope_fuse_available/_used/set_decode_attn_rope_fuse -- are
- * equally Metal-only but their call sites ARE compiled out, which is why only this one errors.)
+/* ds4.c declares ds4_gpu_kv_rope_fp8_fuse_available() unguarded and calls it at
+ * three sites, but the fused fp8 KV+RoPE path it reports on was only ever
+ * implemented in the Mac engine's ds4_metal.m, which this fork does not ship.
+ * Its three siblings (decode_attn_rope_fuse_available/_used/
+ * set_decode_attn_rope_fuse) are equally unimplemented and their call sites
+ * compile away.
  *
- * Returning 0 is the honest answer: the fused fp8 KV+RoPE path is a Metal optimisation with no CUDA
- * implementation, so "not available" is exactly true, and the caller takes its unfused path. */
+ * Returning 0 is the honest answer: there is no fused fp8 KV+RoPE path in the
+ * CUDA engine, so "not available" is exactly true and the caller takes its
+ * unfused path. */
 extern "C" int ds4_gpu_kv_rope_fp8_fuse_available(void) {
     return 0;
 }
