@@ -201,6 +201,12 @@ if (GGML_CUDA)
                  PATHS ${CUDAToolkit_LIBRARY_DIR} NO_DEFAULT_PATH)
 endif()
 
+# io_uring. The same file compiles the ring reader whenever liburing.h is present,
+# so the library has to be on the link line; without it the fetcher's pread
+# readers still build, but a header-only install would leave the ring
+# references unresolved. Resolved by name because there is no imported target.
+find_library(LLAMA_URING_LIBRARY uring)
+
 add_subdirectory(src)
 
 # Independent offline qualification target: no model loader, common HTTP
@@ -314,5 +320,8 @@ if(GGML_CUDA AND NOT BUILD_SHARED_LIBS)
     # fail at dlopen instead of at link time.
     if (LLAMA_CUFILE_LIBRARY)
         target_link_libraries(slstack-weight-fetcher PRIVATE ${LLAMA_CUFILE_LIBRARY})
+    endif()
+    if (LLAMA_URING_LIBRARY)
+        target_link_libraries(slstack-weight-fetcher PRIVATE ${LLAMA_URING_LIBRARY})
     endif()
 endif()

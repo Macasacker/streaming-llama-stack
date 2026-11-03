@@ -214,6 +214,9 @@ endif()
 
 # Weight fetcher transports: GPUDirect Storage (cuFile) when the GDS driver is present,
 # io_uring or threaded pread otherwise. There is no DirectStorage path on Linux.
+if (LLAMA_URING_LIBRARY)
+    target_link_libraries(llama PRIVATE ${LLAMA_URING_LIBRARY})
+endif()
 if (GGML_CUDA)
     find_package(CUDAToolkit QUIET)
     if (CUDAToolkit_FOUND)

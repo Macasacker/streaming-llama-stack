@@ -40,6 +40,9 @@ target_link_libraries(llama-dsv41-prefill PRIVATE ggml-base ggml-cpu ggml-cuda C
 if (LLAMA_CUFILE_LIBRARY)
     target_link_libraries(llama-dsv41-prefill PRIVATE ${LLAMA_CUFILE_LIBRARY})
 endif()
+if (LLAMA_URING_LIBRARY)
+    target_link_libraries(llama-dsv41-prefill PRIVATE ${LLAMA_URING_LIBRARY})
+endif()
 
 # Default-off diagnostics. The immutable owner manifest separately pins the
 # changed capture sources; this optional value names their original base only.

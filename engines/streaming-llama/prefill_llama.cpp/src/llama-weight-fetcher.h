@@ -418,6 +418,10 @@ WF_API wf_layer_stage wf_get_layer_stage(wf_context * wf, int layer_idx);
 // Get the effective transfer mode (after AUTO resolution).
 WF_API wf_transfer_mode wf_get_effective_mode(wf_context * wf);
 
+// Which reader the pipeline started: "io_uring", "pread", or "none" before a
+// fetcher exists. Diagnostic only; it names the engine, not its queue depth.
+WF_API const char * wf_get_io_engine(const wf_context * wf);
+
 // Query CUDA VRAM usage. Returns false if CUDA not available.
 // free_bytes and total_bytes are set on success.
 WF_API bool wf_cuda_get_vram_info(size_t * free_bytes, size_t * total_bytes);

@@ -387,15 +387,14 @@ struct wf_context {
     std::vector<std::thread>      io_threads;
     std::atomic<bool>             io_shutdown{false};
 
-#ifdef WF_HAS_IO_URING
-    struct io_uring               ring;
-    bool                          ring_init = false;
-#endif
+    // Which reader the worker threads run: io_uring rings when the kernel
+    // offers one, synchronous pread otherwise.
+    bool                          use_io_uring = false;
 
-    // Fallback: request queue for platforms without native async I/O
-    std::deque<wf_io_chunk *>     io_fallback_queue;
-    std::mutex                    io_fallback_mutex;
-    std::condition_variable       io_fallback_cv;
+    // Reader queue: chunks waiting to be submitted.
+    std::deque<wf_io_chunk *>     io_chunk_queue;
+    std::mutex                    io_queue_mutex;
+    std::condition_variable       io_queue_cv;
 
     // Pipeline scheduler thread
     std::thread                   pipeline_thread;
@@ -875,11 +874,15 @@ static void wf_cache_insert_layer(wf_context * wf, int layer_idx) {
 // ---------------------------------------------------------------------------
 
 static bool wf_open_file(wf_file_handle * fh, const char * path, bool direct_io) {
-    int oflags = O_RDONLY;
-#ifdef O_DIRECT
-    if (direct_io) oflags |= O_DIRECT;
-#endif
-    fh->fd = open(path, oflags);
+    // Unbuffered reads on Linux require the offset, the length and the buffer to
+    // all be multiples of the device's block size.  GGUF tensor data is aligned
+    // to general.alignment (32 bytes by default), so the chunks this pipeline
+    // builds would fail with EINVAL and complete with zero bytes.  Reads are
+    // therefore buffered; the aligned variant is Phase 3 follow-up work.
+    if (direct_io) {
+        WF_LOG("unbuffered reads are not implemented on this platform; reading %s buffered", path);
+    }
+    fh->fd = open(path, O_RDONLY);
     if (fh->fd < 0) {
         WF_ERR("failed to open %s (errno %d)", path, errno);
         return false;
@@ -898,71 +901,221 @@ static void wf_close_file(wf_file_handle * fh) {
 }
 
 // ---------------------------------------------------------------------------
-// IOCP-based async I/O (Windows)
+// Async reader
 //
-// Each ReadFile call submits a 512KiB chunk with an OVERLAPPED struct.
-// Multiple chunks are in flight simultaneously (queue depth = io_queue_depth
-// per thread × io_threads).  Completions arrive on the IOCP and are
-// processed by worker threads that update per-layer atomic counters.
+// Chunks reach the reader threads through one queue.  Each thread owns an
+// io_uring ring and keeps io_queue_depth reads in flight on it, with the chunk
+// pointer as the completion's user_data; completions update the per-layer
+// counters the pipeline polls.  Where io_uring is not available - no kernel
+// support, or a policy that blocks it - the same queue is served by synchronous
+// pread workers, so the pipeline is unchanged either way.
 // ---------------------------------------------------------------------------
 
+// One chunk's read finished: account it, wake the pipeline if its layer is now
+// complete, and hand the chunk back to the pool.
+static void wf_complete_chunk(wf_context * wf, wf_io_chunk * chunk, ssize_t res, int thread_id) {
+    const size_t bytes_read = res > 0 ? (size_t) res : 0;
+    if (res < 0) {
+        WF_ERR("read failed: layer %d span %d offset %llu: errno %d",
+               chunk->layer_idx, chunk->span_idx,
+               (unsigned long long) chunk->file_offset, (int) -res);
+    }
 
-// Fallback: threaded pread workers for Linux (until io_uring is wired up)
-static void wf_fallback_worker(wf_context * wf, int thread_id) {
+    int il = chunk->layer_idx;
+    if (il >= 0 && il < (int) wf->io_trackers.size()) {
+        auto & tracker = wf->io_trackers[il];
+        tracker.bytes_done.fetch_add(bytes_read, std::memory_order_relaxed);
+        const int done = tracker.completed.fetch_add(1, std::memory_order_acq_rel) + 1;
+        tracker.outstanding.fetch_sub(1, std::memory_order_relaxed);
+
+        if (done == tracker.total_chunks.load(std::memory_order_relaxed)) {
+            auto t_done = std::chrono::high_resolution_clock::now();
+            float total_ms = std::chrono::duration<float, std::milli>(t_done - tracker.t_start).count();
+            const size_t total_bytes = tracker.bytes_done.load();
+
+            WF_TRACE(wf, "reader[%d]: layer %d complete: %zu bytes in %.2fms (%.2f GB/s)",
+                     thread_id, il, total_bytes, total_ms,
+                     total_bytes / (total_ms / 1000.0) / (1024.0 * 1024.0 * 1024.0));
+
+            wf->layers[il].nvme_read_ms = total_ms;
+            wf->pipeline_cv.notify_one();
+        }
+    }
+
+    // Atomic stats - no mutex on the hot path
+    wf->stat_bytes_read_nvme.fetch_add(bytes_read, std::memory_order_relaxed);
+    wf->stat_io_ops.fetch_add(1, std::memory_order_relaxed);
+
+    WF_TRACE(wf, "reader[%d]: layer %d span %d: %zu bytes at offset %llu",
+             thread_id, il, chunk->span_idx, bytes_read,
+             (unsigned long long) chunk->file_offset);
+
+    if (chunk->pooled) {
+        wf->chunk_pool.release(chunk);
+    } else {
+        delete chunk;
+    }
+}
+
+// Take up to `max` queued chunks without waiting.
+static size_t wf_take_chunks(wf_context * wf, std::vector<wf_io_chunk *> & out, size_t max) {
+    std::lock_guard<std::mutex> lock(wf->io_queue_mutex);
+    while (out.size() < max && !wf->io_chunk_queue.empty()) {
+        out.push_back(wf->io_chunk_queue.front());
+        wf->io_chunk_queue.pop_front();
+    }
+    return out.size();
+}
+
+// Baseline reader: one pread per chunk, queue depth 1 per thread.  Used when
+// io_uring is unavailable, and as the comparison the io_uring gain is measured
+// against.
+static void wf_pread_worker(wf_context * wf, int thread_id) {
+    std::vector<wf_io_chunk *> batch;
     while (!wf->io_shutdown.load(std::memory_order_relaxed)) {
-        wf_io_chunk * chunk = nullptr;
-
-        {
-            std::unique_lock<std::mutex> lock(wf->io_fallback_mutex);
-            wf->io_fallback_cv.wait(lock, [&] {
-                return !wf->io_fallback_queue.empty() || wf->io_shutdown.load();
+        batch.clear();
+        if (wf_take_chunks(wf, batch, 1) == 0) {
+            std::unique_lock<std::mutex> lock(wf->io_queue_mutex);
+            wf->io_queue_cv.wait(lock, [&] {
+                return !wf->io_chunk_queue.empty() || wf->io_shutdown.load();
             });
-            if (wf->io_shutdown.load() && wf->io_fallback_queue.empty()) return;
-
-            chunk = wf->io_fallback_queue.front();
-            wf->io_fallback_queue.pop_front();
+            if (wf->io_shutdown.load() && wf->io_chunk_queue.empty()) return;
+            continue;
         }
+        wf_file_handle * fh = &wf->files[batch[0]->file_idx];
+        ssize_t n = pread(fh->fd, batch[0]->dest, batch[0]->nbytes, batch[0]->file_offset);
+        wf_complete_chunk(wf, batch[0], n >= 0 ? n : (ssize_t) -errno, thread_id);
+    }
 
-        if (!chunk) continue;
-
-        // Use stored file_idx and file_offset directly (no reverse-engineering)
-        wf_file_handle * fh = &wf->files[chunk->file_idx];
-        ssize_t n = pread(fh->fd, chunk->dest, chunk->nbytes, chunk->file_offset);
-        size_t bytes_read = (n > 0) ? (size_t)n : 0;
-
-        // Update per-layer tracker (lock-free)
-        int il = chunk->layer_idx;
-        if (il >= 0 && il < (int)wf->io_trackers.size()) {
-            auto & tracker = wf->io_trackers[il];
-            tracker.bytes_done.fetch_add(bytes_read, std::memory_order_relaxed);
-            int done = tracker.completed.fetch_add(1, std::memory_order_acq_rel) + 1;
-            tracker.outstanding.fetch_sub(1, std::memory_order_relaxed);
-
-            if (done == tracker.total_chunks.load(std::memory_order_relaxed)) {
-                auto t_done = std::chrono::high_resolution_clock::now();
-                wf->layers[il].nvme_read_ms = std::chrono::duration<float, std::milli>(
-                    t_done - tracker.t_start).count();
-                wf->pipeline_cv.notify_one();
-            }
-        }
-
-        // Atomic stats — no mutex on hot path
-        wf->stat_bytes_read_nvme.fetch_add(bytes_read, std::memory_order_relaxed);
-        wf->stat_io_ops.fetch_add(1, std::memory_order_relaxed);
-
-        WF_TRACE(wf, "fallback_worker[%d]: layer %d span %d: %zu bytes at offset %llu",
-                 thread_id, il, chunk->span_idx, bytes_read,
-                 (unsigned long long)chunk->file_offset);
-
-        // Return chunk to pool (or delete if overflow)
-        if (chunk->pooled) {
-            wf->chunk_pool.release(chunk);
-        } else {
-            delete chunk;
+    // Shutdown drains what is still queued, so every layer's completion counter
+    // reaches its total and nobody waits on a layer that will never finish.
+    for (;;) {
+        batch.clear();
+        if (wf_take_chunks(wf, batch, 32) == 0) return;
+        for (auto * chunk : batch) {
+            wf_file_handle * fh = &wf->files[chunk->file_idx];
+            ssize_t n = pread(fh->fd, chunk->dest, chunk->nbytes, chunk->file_offset);
+            wf_complete_chunk(wf, chunk, n >= 0 ? n : (ssize_t) -errno, thread_id);
         }
     }
 }
 
+#ifdef WF_HAS_IO_URING
+// Probe once per fetcher, so the threads are started on a reader the kernel
+// actually accepts rather than discovering it inside a worker.
+static bool wf_io_uring_available(void) {
+    struct io_uring probe;
+    if (io_uring_queue_init(64, &probe, 0) != 0) {
+        return false;
+    }
+    io_uring_queue_exit(&probe);
+    return true;
+}
+
+static void wf_io_uring_worker(wf_context * wf, int thread_id) {
+    const int qd = std::max(1, wf->params.io_queue_depth);
+    struct io_uring ring;
+    if (io_uring_queue_init((unsigned) std::max(64, qd * 4), &ring, 0) != 0) {
+        WF_ERR("io_uring_queue_init failed on reader %d (errno %d); this thread reads with pread",
+               thread_id, errno);
+        wf_pread_worker(wf, thread_id);
+        return;
+    }
+
+    // Registered files: the SQE carries the index instead of taking a reference
+    // on the fd per operation.  Optional - a kernel that refuses it still reads.
+    std::vector<int> fds;
+    for (auto & fh : wf->files) fds.push_back(fh.fd);
+    const bool fixed_files = !fds.empty() && io_uring_register_files(&ring, fds.data(), (int) fds.size()) == 0;
+
+    int inflight = 0;
+    std::vector<wf_io_chunk *> batch;
+    for (;;) {
+        const bool exiting = wf->io_shutdown.load(std::memory_order_relaxed);
+
+        // Top the ring up to this thread's queue depth.
+        batch.clear();
+        wf_take_chunks(wf, batch, (size_t) (qd - inflight));
+        size_t taken = 0;
+        for (auto * chunk : batch) {
+            struct io_uring_sqe * sqe = io_uring_get_sqe(&ring);
+            if (!sqe) break;
+            io_uring_prep_read(sqe, fixed_files ? chunk->file_idx : wf->files[chunk->file_idx].fd,
+                               chunk->dest, (unsigned) chunk->nbytes, chunk->file_offset);
+            io_uring_sqe_set_data(sqe, chunk);
+            if (fixed_files) sqe->flags |= IOSQE_FIXED_FILE;
+            inflight++;
+            taken++;
+        }
+        if (taken < batch.size()) {
+            // The SQ ring had no room for every chunk.  Put the rest back rather
+            // than dropping them: an unsubmitted chunk never completes, and the
+            // pipeline waits on that layer's completion count.
+            std::lock_guard<std::mutex> lock(wf->io_queue_mutex);
+            wf->io_chunk_queue.insert(wf->io_chunk_queue.begin(), batch.begin() + taken, batch.end());
+        }
+        if (inflight) io_uring_submit(&ring);
+
+        if (inflight > 0) {
+            struct io_uring_cqe * cqe = nullptr;
+            if (io_uring_wait_cqe(&ring, &cqe) != 0) {
+                WF_ERR("io_uring_wait_cqe failed on reader %d", thread_id);
+                break;
+            }
+            unsigned seen = 0;
+            do {
+                auto * chunk = static_cast<wf_io_chunk *>(io_uring_cqe_get_data(cqe));
+                if (chunk) wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+                io_uring_cqe_seen(&ring, cqe);
+                seen++;
+            } while (seen < (unsigned) inflight && io_uring_peek_cqe(&ring, &cqe) == 0);
+            inflight -= (int) seen;
+            continue;
+        }
+
+        // Nothing queued and nothing in flight: wait for work, or leave.
+        if (exiting) break;
+        std::unique_lock<std::mutex> lock(wf->io_queue_mutex);
+        wf->io_queue_cv.wait_for(lock, std::chrono::milliseconds(100), [&] {
+            return !wf->io_chunk_queue.empty() || wf->io_shutdown.load();
+        });
+    }
+
+    // Every submitted read completes; the pipeline waits on those counters.
+    while (inflight > 0) {
+        struct io_uring_cqe * cqe = nullptr;
+        if (io_uring_wait_cqe(&ring, &cqe) != 0) break;
+        auto * chunk = static_cast<wf_io_chunk *>(io_uring_cqe_get_data(cqe));
+        if (chunk) wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+        io_uring_cqe_seen(&ring, cqe);
+        inflight--;
+    }
+    io_uring_queue_exit(&ring);
+}
+#endif  // WF_HAS_IO_URING
+
+
+#ifdef WF_HAS_IO_URING
+// Pick the reader for this fetcher.  LLAMA_WF_IO_URING=0 forces the pread
+// baseline, so the two readers can be measured against each other on the same
+// file and the same geometry (Phase 8 item 3).
+static bool wf_io_uring_wanted(void) {
+    const char * want = std::getenv("LLAMA_WF_IO_URING");
+    return !(want && want[0] == '0');
+}
+#endif
+
+// One reader thread: io_uring when the fetcher selected it, pread otherwise.
+// The io_uring worker falls back to pread itself if its own ring cannot start.
+static void wf_io_worker(wf_context * wf, int thread_id) {
+#ifdef WF_HAS_IO_URING
+    if (wf->use_io_uring) {
+        wf_io_uring_worker(wf, thread_id);
+        return;
+    }
+#endif
+    wf_pread_worker(wf, thread_id);
+}
 
 // ---------------------------------------------------------------------------
 // Pipeline scheduler
@@ -1101,13 +1254,13 @@ static int wf_submit_layer_reads(wf_context * wf, int layer_idx, void * dest_buf
     tracker.total_chunks.store(total_chunks);
     tracker.outstanding.store(total_chunks);
 
-    // Submit all chunks to fallback queue in one lock acquisition
+    // Hand the layer's chunks to the reader threads in one lock acquisition
     if (!batch_chunks.empty()) {
-        std::lock_guard<std::mutex> lock(wf->io_fallback_mutex);
+        std::lock_guard<std::mutex> lock(wf->io_queue_mutex);
         for (auto * c : batch_chunks) {
-            wf->io_fallback_queue.push_back(c);
+            wf->io_chunk_queue.push_back(c);
         }
-        wf->io_fallback_cv.notify_all();  // wake all workers at once
+        wf->io_queue_cv.notify_all();  // wake all readers at once
     }
 
     WF_TRACE(wf, "submit_layer_reads: layer %d: %d chunks submitted (%zu bytes, block=%zuKiB)",
@@ -1870,16 +2023,22 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
                pool_size, chunks_per_layer, params->prefetch_depth);
     }
 
-    // -- Create I/O completion infrastructure and worker threads (not needed for DirectStorage) --
+    // -- Create the reader queue and the reader threads --
     if (!is_dstorage) {
         wf->io_shutdown.store(false);
         int n_io = std::max(1, params->io_threads);
-
-        for (int i = 0; i < n_io; i++) {
-            wf->io_threads.emplace_back(wf_fallback_worker, wf, i);
+#ifdef WF_HAS_IO_URING
+        wf->use_io_uring = wf_io_uring_wanted() && wf_io_uring_available();
+        if (wf_io_uring_wanted() && !wf->use_io_uring) {
+            WF_LOG("io_uring is not available here; reading with pread");
         }
-        WF_LOG("started %d I/O fallback workers (block=%zuKiB)",
-               n_io, params->io_block_size / 1024);
+#endif
+        for (int i = 0; i < n_io; i++) {
+            wf->io_threads.emplace_back(wf_io_worker, wf, i);
+        }
+        WF_LOG("started %d %s readers (QD=%d each, block=%zuKiB)",
+               n_io, wf->use_io_uring ? "io_uring" : "pread",
+               std::max(1, params->io_queue_depth), params->io_block_size / 1024);
     } // !is_dstorage
 
     // -- GDS setup --
@@ -2546,10 +2705,10 @@ void wf_stop(wf_context * wf) {
     }
 
 
-    // Stop I/O threads
+    // Stop reader threads
     wf->io_shutdown.store(true);
 
-    wf->io_fallback_cv.notify_all();
+    wf->io_queue_cv.notify_all();
 
     for (auto & t : wf->io_threads) {
         if (t.joinable()) t.join();
@@ -3052,6 +3211,11 @@ wf_layer_stage wf_get_layer_stage(wf_context * wf, int layer_idx) {
 wf_transfer_mode wf_get_effective_mode(wf_context * wf) {
     if (!wf) return WF_MODE_MMAP;
     return wf->effective_mode;
+}
+
+const char * wf_get_io_engine(const wf_context * wf) {
+    if (!wf) return "none";
+    return wf->use_io_uring ? "io_uring" : "pread";
 }
 
 bool wf_get_layer_file_range(wf_context * wf, int layer_idx,
