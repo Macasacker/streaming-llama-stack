@@ -24492,17 +24492,17 @@ typedef struct gpu_graph_selected_async_load {
     int32_t                   selected_ids[DS4_MAX_EXPERT_USED];
 } gpu_graph_selected_async_load;
 
-static pthread_mutex_t g_metal_graph_selected_async_load_mutex =
+static pthread_mutex_t g_gpu_graph_selected_async_load_mutex =
     PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t g_metal_graph_selected_async_load_cond =
+static pthread_cond_t g_gpu_graph_selected_async_load_cond =
     PTHREAD_COND_INITIALIZER;
-static pthread_cond_t g_metal_graph_selected_async_load_done_cond =
+static pthread_cond_t g_gpu_graph_selected_async_load_done_cond =
     PTHREAD_COND_INITIALIZER;
-static pthread_t g_metal_graph_selected_async_load_thread;
-static bool g_metal_graph_selected_async_load_thread_started = false;
-static bool g_metal_graph_selected_async_load_has_job = false;
-static bool g_metal_graph_selected_async_load_done = false;
-static gpu_graph_selected_async_load g_metal_graph_selected_async_load_job;
+static pthread_t g_gpu_graph_selected_async_load_thread;
+static bool g_gpu_graph_selected_async_load_thread_started = false;
+static bool g_gpu_graph_selected_async_load_has_job = false;
+static bool g_gpu_graph_selected_async_load_done = false;
+static gpu_graph_selected_async_load g_gpu_graph_selected_async_load_job;
 
 static void gpu_graph_selected_async_load_run(
         gpu_graph_selected_async_load *job) {
@@ -24570,46 +24570,46 @@ static void gpu_graph_selected_async_load_run(
 static void *gpu_graph_selected_async_load_worker_main(void *arg) {
     (void)arg;
     for (;;) {
-        pthread_mutex_lock(&g_metal_graph_selected_async_load_mutex);
-        while (!g_metal_graph_selected_async_load_has_job) {
-            pthread_cond_wait(&g_metal_graph_selected_async_load_cond,
-                              &g_metal_graph_selected_async_load_mutex);
+        pthread_mutex_lock(&g_gpu_graph_selected_async_load_mutex);
+        while (!g_gpu_graph_selected_async_load_has_job) {
+            pthread_cond_wait(&g_gpu_graph_selected_async_load_cond,
+                              &g_gpu_graph_selected_async_load_mutex);
         }
         gpu_graph_selected_async_load job =
-            g_metal_graph_selected_async_load_job;
-        pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+            g_gpu_graph_selected_async_load_job;
+        pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
 
         gpu_graph_selected_async_load_run(&job);
 
-        pthread_mutex_lock(&g_metal_graph_selected_async_load_mutex);
-        g_metal_graph_selected_async_load_job = job;
-        g_metal_graph_selected_async_load_has_job = false;
-        g_metal_graph_selected_async_load_done = true;
-        pthread_cond_signal(&g_metal_graph_selected_async_load_done_cond);
-        pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+        pthread_mutex_lock(&g_gpu_graph_selected_async_load_mutex);
+        g_gpu_graph_selected_async_load_job = job;
+        g_gpu_graph_selected_async_load_has_job = false;
+        g_gpu_graph_selected_async_load_done = true;
+        pthread_cond_signal(&g_gpu_graph_selected_async_load_done_cond);
+        pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
     }
     return NULL;
 }
 
 static bool gpu_graph_selected_async_load_ensure_worker(void) {
-    pthread_mutex_lock(&g_metal_graph_selected_async_load_mutex);
-    if (g_metal_graph_selected_async_load_thread_started) {
-        pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+    pthread_mutex_lock(&g_gpu_graph_selected_async_load_mutex);
+    if (g_gpu_graph_selected_async_load_thread_started) {
+        pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
         return true;
     }
-    const int rc = pthread_create(&g_metal_graph_selected_async_load_thread,
+    const int rc = pthread_create(&g_gpu_graph_selected_async_load_thread,
                                   NULL,
                                   gpu_graph_selected_async_load_worker_main,
                                   NULL);
     if (rc != 0) {
-        pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+        pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
         fprintf(stderr,
                 "ds4: failed to start Metal streaming async selected load worker: %s\n",
                 strerror(rc));
         return false;
     }
-    g_metal_graph_selected_async_load_thread_started = true;
-    pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+    g_gpu_graph_selected_async_load_thread_started = true;
+    pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
     return true;
 }
 
@@ -24633,17 +24633,17 @@ static DS4_MAYBE_UNUSED bool gpu_graph_selected_async_load_start_tensor(
     job->gate_expert_bytes = gate_expert_bytes;
     job->down_expert_bytes = down_expert_bytes;
 
-    pthread_mutex_lock(&g_metal_graph_selected_async_load_mutex);
-    if (g_metal_graph_selected_async_load_has_job ||
-        g_metal_graph_selected_async_load_done) {
-        pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+    pthread_mutex_lock(&g_gpu_graph_selected_async_load_mutex);
+    if (g_gpu_graph_selected_async_load_has_job ||
+        g_gpu_graph_selected_async_load_done) {
+        pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
         return false;
     }
-    g_metal_graph_selected_async_load_job = *job;
-    g_metal_graph_selected_async_load_job.ok = false;
-    g_metal_graph_selected_async_load_has_job = true;
-    pthread_cond_signal(&g_metal_graph_selected_async_load_cond);
-    pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+    g_gpu_graph_selected_async_load_job = *job;
+    g_gpu_graph_selected_async_load_job.ok = false;
+    g_gpu_graph_selected_async_load_has_job = true;
+    pthread_cond_signal(&g_gpu_graph_selected_async_load_cond);
+    pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
     job->active = true;
     return true;
 }
@@ -24671,14 +24671,14 @@ static DS4_MAYBE_UNUSED bool gpu_graph_selected_async_load_start(
 static bool gpu_graph_selected_async_load_finish(
         gpu_graph_selected_async_load *job) {
     if (!job || !job->active) return false;
-    pthread_mutex_lock(&g_metal_graph_selected_async_load_mutex);
-    while (!g_metal_graph_selected_async_load_done) {
-        pthread_cond_wait(&g_metal_graph_selected_async_load_done_cond,
-                          &g_metal_graph_selected_async_load_mutex);
+    pthread_mutex_lock(&g_gpu_graph_selected_async_load_mutex);
+    while (!g_gpu_graph_selected_async_load_done) {
+        pthread_cond_wait(&g_gpu_graph_selected_async_load_done_cond,
+                          &g_gpu_graph_selected_async_load_mutex);
     }
-    *job = g_metal_graph_selected_async_load_job;
-    g_metal_graph_selected_async_load_done = false;
-    pthread_mutex_unlock(&g_metal_graph_selected_async_load_mutex);
+    *job = g_gpu_graph_selected_async_load_job;
+    g_gpu_graph_selected_async_load_done = false;
+    pthread_mutex_unlock(&g_gpu_graph_selected_async_load_mutex);
     job->active = false;
     if (!job->ok) return false;
     return ds4_gpu_routed_moe_set_selected_override(job->selected_ids,
@@ -59390,7 +59390,7 @@ glm53_attention_done:
 #undef DS4_GLM_FT_FAIL
 }
 
-static int glm_metal_first_token_logits(
+static int glm_gpu_first_token_logits(
         const ds4_model   *model,
         const ds4_weights *weights,
         int                token,
@@ -59812,7 +59812,7 @@ static int glm_metal_first_token_logits(
     return ok ? 0 : 1;
 }
 
-static DS4_MAYBE_UNUSED int generate_glm_metal_first_token(
+static DS4_MAYBE_UNUSED int generate_glm_gpu_first_token(
         const ds4_model   * model,
         const ds4_vocab   * vocab,
         const ds4_weights * weights,
@@ -59842,7 +59842,7 @@ static DS4_MAYBE_UNUSED int generate_glm_metal_first_token(
 
     float *logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(logits[0]));
     const double t0 = now_sec();
-    const int rc = glm_metal_first_token_logits(model, weights, prompt->v[0], logits);
+    const int rc = glm_gpu_first_token_logits(model, weights, prompt->v[0], logits);
     const double t1 = now_sec();
     if (rc != 0) {
         free(logits);
@@ -59866,7 +59866,7 @@ static DS4_MAYBE_UNUSED int generate_glm_metal_first_token(
     return 0;
 }
 
-static int generate_glm_metal_argmax(
+static int generate_glm_gpu_argmax(
         const ds4_model   * model,
         const ds4_vocab   * vocab,
         const ds4_weights * weights,
@@ -61838,7 +61838,7 @@ static bool qwen4_graph_mtp_step(ds4_qwen4_gpu_graph *g, const ds4_model *m, con
     return qwen4_graph_mtp_steps(g, m, w, row, &next_token, 1u, idx, want_logits, logits_out, draft_out);
 }
 
-static int generate_qwen4_metal_argmax(
+static int generate_qwen4_gpu_argmax(
         const ds4_model   * model,
         const ds4_vocab   * vocab,
         const ds4_weights * weights,
@@ -61923,7 +61923,7 @@ static int generate_qwen4_metal_argmax(
 /* Metal generation entry point.  The model runs as one local whole-graph
  * pipeline: graph prefill followed by graph decode steps.  Streaming PRO may
  * use decode-style prefill for short prompts. */
-static int generate_metal_graph_raw_swa(
+static int generate_gpu_graph_raw_swa(
         const ds4_model   * model,
         const ds4_vocab   * vocab,
         const ds4_weights * weights,
@@ -61954,7 +61954,7 @@ static int generate_metal_graph_raw_swa(
     }
 #ifdef DS4_HAS_QWEN4_GPU
     if (ds4_model_is_qwen4()) {
-        return generate_qwen4_metal_argmax(model, vocab, weights, prompt, n_predict, ctx_size,
+        return generate_qwen4_gpu_argmax(model, vocab, weights, prompt, n_predict, ctx_size,
                                            directional_steering_file,
                                            directional_steering_attn, directional_steering_ffn,
                                            emit, done, emit_ud, progress, progress_ud);
@@ -61971,7 +61971,7 @@ static int generate_metal_graph_raw_swa(
                     "GLM uses graph-selected prefill chunks\n");
             return 1;
         }
-        return generate_glm_metal_argmax(model,
+        return generate_glm_gpu_argmax(model,
                                          vocab,
                                          weights,
                                          prompt,
@@ -62133,7 +62133,7 @@ static int generate_metal_graph_raw_swa(
      * work chased - is spent in THIS loop, outside the forward pass, and nothing had ever measured it.
      * The candidates are all right here: a host-side argmax over the whole 129k-entry vocabulary, the
      * stop-token check, and the emit callback.
-     * NOTE this is the loop that --ssd-streaming actually runs (generate_metal_graph_raw_swa).  An earlier
+     * NOTE this is the loop that --ssd-streaming actually runs (generate_gpu_graph_raw_swa).  An earlier
      * version of this patch instrumented the visually identical loop in ds4_engine_generate_argmax's
      * multi_tier branch, which never executes on this path - the binary marker was present and the code
      * still never ran.  "The patch is in the artifact" and "the patch runs" are different claims.
@@ -68239,7 +68239,7 @@ int ds4_engine_generate_argmax(
             ds4_session_free(s);
             return rc;
         }
-        return generate_metal_graph_raw_swa(model, vocab, weights, prompt,
+        return generate_gpu_graph_raw_swa(model, vocab, weights, prompt,
                                             n_predict, ctx_size, e->quality,
                                             e->ssd_streaming,
                                             e->ssd_streaming_cold,
@@ -68268,7 +68268,7 @@ int ds4_engine_generate_argmax(
                                 emit, done, emit_ud, progress, progress_ud);
 }
 
-static int glm_metal_compare_f32(
+static int glm_gpu_compare_f32(
         const char  *name,
         const float *cpu,
         const float *gpu,
@@ -68296,7 +68296,7 @@ static int glm_metal_compare_f32(
     return 1;
 }
 
-static int glm_metal_compare_i32_list(
+static int glm_gpu_compare_i32_list(
         const char    *name,
         const int     *cpu,
         const int32_t *gpu,
@@ -68320,7 +68320,7 @@ static int glm_metal_compare_i32_list(
 }
 
 #ifndef DS4_NO_GPU
-static void glm_metal_q8_diag_fill_input(float *x, uint64_t n_tok, uint64_t in_dim) {
+static void glm_gpu_q8_diag_fill_input(float *x, uint64_t n_tok, uint64_t in_dim) {
     for (uint64_t t = 0; t < n_tok; t++) {
         for (uint64_t i = 0; i < in_dim; i++) {
             uint32_t s = (uint32_t)(0x9e3779b9u ^ (uint32_t)(t * 0x85ebca6bu) ^
@@ -68337,7 +68337,7 @@ static void glm_metal_q8_diag_fill_input(float *x, uint64_t n_tok, uint64_t in_d
     }
 }
 
-static void glm_metal_q8_diag_reference(
+static void glm_gpu_q8_diag_reference(
         float            *out,
         const ds4_model  *model,
         const ds4_tensor *w,
@@ -68352,7 +68352,7 @@ static void glm_metal_q8_diag_reference(
     }
 }
 
-static int glm_metal_graph_test_q8_prefill_one(
+static int glm_gpu_graph_test_q8_prefill_one(
         ds4_engine       *e,
         const char       *name,
         const ds4_tensor *w,
@@ -68417,8 +68417,8 @@ static int glm_metal_graph_test_q8_prefill_one(
                     n_tok);
         }
         if (case_ok) {
-            glm_metal_q8_diag_fill_input(x_host, n_tok, in_dim);
-            glm_metal_q8_diag_reference(cpu_out, model, w, x_host, n_tok);
+            glm_gpu_q8_diag_fill_input(x_host, n_tok, in_dim);
+            glm_gpu_q8_diag_reference(cpu_out, model, w, x_host, n_tok);
             case_ok = ds4_gpu_tensor_write(x_gpu, 0, x_host, x_bytes) != 0;
         }
         if (case_ok) {
@@ -68435,7 +68435,7 @@ static int glm_metal_graph_test_q8_prefill_one(
             case_ok = ds4_gpu_tensor_read(out_gpu, 0, gpu_out, out_bytes) != 0;
         }
         if (case_ok) {
-            case_ok = glm_metal_compare_f32(label,
+            case_ok = glm_gpu_compare_f32(label,
                                             cpu_out,
                                             gpu_out,
                                             (uint32_t)((uint64_t)n_tok * out_dim),
@@ -68457,7 +68457,7 @@ static int glm_metal_graph_test_q8_prefill_one(
     return ok || !strict;
 }
 
-static int glm_metal_graph_test_q8_prefill(
+static int glm_gpu_graph_test_q8_prefill(
         ds4_engine              *e,
         const ds4_layer_weights *layer) {
     return 1;
@@ -68474,7 +68474,7 @@ static int glm_metal_graph_test_q8_prefill(
 
 #define DS4_GLM_Q8_DIAG_ONE(label, tensor)                                      \
     do {                                                                        \
-        if (!glm_metal_graph_test_q8_prefill_one(e, label, tensor, strict)) {   \
+        if (!glm_gpu_graph_test_q8_prefill_one(e, label, tensor, strict)) {   \
             ok = 0;                                                             \
             if (strict) goto done;                                              \
         }                                                                       \
@@ -68501,7 +68501,7 @@ done:
     return strict ? ok : 1;
 }
 
-static int glm_metal_graph_test_multitok_attention(
+static int glm_gpu_graph_test_multitok_attention(
         ds4_engine              *e,
         const ds4_tokens        *prompt,
         const ds4_layer_weights *layer) {
@@ -68786,7 +68786,7 @@ static int glm_metal_graph_test_multitok_attention(
     if (ok) ok = ds4_gpu_tensor_read(attn_out, 0, gpu_attn, emb_bytes) != 0;
     if (ok) {
         printf("  layer0_multitok_attention: tokens=%u\n", n_tok);
-        ok = glm_metal_compare_f32("layer0_multitok_attention",
+        ok = glm_gpu_compare_f32("layer0_multitok_attention",
                                    cpu_attn,
                                    gpu_attn,
                                    (uint32_t)((uint64_t)n_tok * DS4_N_EMBD),
@@ -68822,7 +68822,7 @@ static int glm_metal_graph_test_multitok_attention(
  * attention).  The pos-0-only diagnostics cannot see position-dependent
  * decode bugs; this one can.
  */
-static int glm_metal_graph_test_decode_attention(
+static int glm_gpu_graph_test_decode_attention(
         ds4_engine              *e,
         const ds4_tokens        *prompt,
         const ds4_layer_weights *layer) {
@@ -69093,7 +69093,7 @@ static int glm_metal_graph_test_decode_attention(
                                      (uint64_t)DS4_N_EMBD * sizeof(float)) != 0;
     if (ok) {
         printf("  layer0_decode_attention: tokens=%u pos=%u\n", n_tok, pos);
-        ok = glm_metal_compare_f32("layer0_decode_attention",
+        ok = glm_gpu_compare_f32("layer0_decode_attention",
                                    cpu_attn + (uint64_t)pos * DS4_N_EMBD,
                                    gpu_attn,
                                    DS4_N_EMBD,
@@ -69125,7 +69125,7 @@ static int glm_metal_graph_test_decode_attention(
     return ok;
 }
 
-static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
+static int glm_gpu_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
     if (!prompt || prompt->len <= 0) {
         fprintf(stderr, "ds4: GLM Metal graph test requires a non-empty prompt\n");
         return 1;
@@ -69363,7 +69363,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
             printf(" text=%.*s", (int)s.len, s.ptr);
         }
         printf("\n");
-        ok = glm_metal_compare_f32("embedding_q8_0", cpu_emb, gpu_read,
+        ok = glm_gpu_compare_f32("embedding_q8_0", cpu_emb, gpu_read,
                                    DS4_N_EMBD, 1.0e-3f);
     }
 
@@ -69403,12 +69403,12 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
     if (ok) ok = ds4_gpu_add_tensor(next, after_attn, ffn_out, DS4_N_EMBD);
     if (ok) ok = ds4_gpu_tensor_read(next, 0, gpu_read, emb_bytes);
     if (ok) {
-        ok = glm_metal_compare_f32("layer0_hidden", cpu_layer, gpu_read,
+        ok = glm_gpu_compare_f32("layer0_hidden", cpu_layer, gpu_read,
                                    DS4_N_EMBD, 5.0e-2f);
     }
-    if (ok) ok = glm_metal_graph_test_multitok_attention(e, prompt, layer);
-    if (ok) ok = glm_metal_graph_test_decode_attention(e, prompt, layer);
-    if (ok) ok = glm_metal_graph_test_q8_prefill(e, layer);
+    if (ok) ok = glm_gpu_graph_test_multitok_attention(e, prompt, layer);
+    if (ok) ok = glm_gpu_graph_test_decode_attention(e, prompt, layer);
+    if (ok) ok = glm_gpu_graph_test_q8_prefill(e, layer);
 
     if (ok) {
         memcpy(cpu_cur, cpu_emb, emb_bytes);
@@ -69450,7 +69450,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
                                      gpu_router_logits,
                                      (uint64_t)DS4_N_EXPERT * sizeof(gpu_router_logits[0])) != 0;
     if (ok) {
-        ok = glm_metal_compare_f32(label_router_logits,
+        ok = glm_gpu_compare_f32(label_router_logits,
                                    cpu_router_logits,
                                    gpu_router_logits,
                                    DS4_N_EXPERT,
@@ -69475,13 +69475,13 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
                                      gpu_router_weights,
                                      (uint64_t)DS4_N_EXPERT_USED * sizeof(gpu_router_weights[0])) != 0;
     if (ok) {
-        ok = glm_metal_compare_i32_list(label_router_selected,
+        ok = glm_gpu_compare_i32_list(label_router_selected,
                                         cpu_router_selected,
                                         gpu_router_selected,
                                         DS4_N_EXPERT_USED);
     }
     if (ok) {
-        ok = glm_metal_compare_f32(label_router_weights,
+        ok = glm_gpu_compare_f32(label_router_weights,
                                    cpu_router_weights,
                                    gpu_router_weights,
                                    DS4_N_EXPERT_USED,
@@ -69559,7 +69559,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
     }
     if (ok) ok = ds4_gpu_tensor_read(ffn_out, 0, gpu_read, emb_bytes) != 0;
     if (ok) {
-        ok = glm_metal_compare_f32(label_routed_moe,
+        ok = glm_gpu_compare_f32(label_routed_moe,
                                    cpu_sparse_moe,
                                    gpu_read,
                                    DS4_N_EMBD,
@@ -69596,7 +69596,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
                                             1);
     if (ok) ok = ds4_gpu_tensor_read(next, 0, gpu_read, emb_bytes) != 0;
     if (ok) {
-        ok = glm_metal_compare_f32(label_shared_expert,
+        ok = glm_gpu_compare_f32(label_shared_expert,
                                    cpu_sparse_shared,
                                    gpu_read,
                                    DS4_N_EMBD,
@@ -69605,7 +69605,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
     if (ok) ok = ds4_gpu_add_tensor(after_attn, ffn_out, next, DS4_N_EMBD);
     if (ok) ok = ds4_gpu_tensor_read(after_attn, 0, gpu_read, emb_bytes) != 0;
     if (ok) {
-        ok = glm_metal_compare_f32(label_sparse_ffn,
+        ok = glm_gpu_compare_f32(label_sparse_ffn,
                                    cpu_sparse_ffn,
                                    gpu_read,
                                    DS4_N_EMBD,
@@ -69884,7 +69884,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
     }
     if (ok) ok = ds4_gpu_tensor_read(cur, 0, gpu_full_hidden, emb_bytes) != 0;
     if (ok) {
-        ok = glm_metal_compare_f32("all_layers_hidden",
+        ok = glm_gpu_compare_f32("all_layers_hidden",
                                    cpu_full_hidden,
                                    gpu_full_hidden,
                                    DS4_N_EMBD,
@@ -69904,7 +69904,7 @@ static int glm_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
                                             1);
     if (ok) ok = ds4_gpu_tensor_read(logits, 0, gpu_logits, logits_bytes) != 0;
     if (ok) {
-        ok = glm_metal_compare_f32("first_token_logits",
+        ok = glm_gpu_compare_f32("first_token_logits",
                                    cpu_logits,
                                    gpu_logits,
                                    DS4_N_VOCAB,
@@ -69961,7 +69961,7 @@ static bool engine_legacy_graph_test_supported(ds4_engine *e) {
     return false;
 }
 
-int ds4_engine_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
+int ds4_engine_gpu_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
     if (!engine_legacy_graph_test_supported(e)) return 1;
 #ifndef DS4_NO_GPU
     if (!e->gpu_ready) {
@@ -69970,7 +69970,7 @@ int ds4_engine_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
         return 1;
     }
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA) {
-        return glm_metal_graph_test(e, prompt);
+        return glm_gpu_graph_test(e, prompt);
     }
     return gpu_graph_decode_test(&e->model, &e->weights, prompt, e->quality);
 #else
@@ -69981,7 +69981,7 @@ int ds4_engine_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt) {
 #endif
 }
 
-int ds4_engine_metal_graph_full_test(ds4_engine *e, const ds4_tokens *prompt) {
+int ds4_engine_gpu_graph_full_test(ds4_engine *e, const ds4_tokens *prompt) {
     if (!engine_legacy_graph_test_supported(e)) return 1;
 #ifndef DS4_NO_GPU
     if (!e->gpu_ready) {
@@ -69998,7 +69998,7 @@ int ds4_engine_metal_graph_full_test(ds4_engine *e, const ds4_tokens *prompt) {
 #endif
 }
 
-int ds4_engine_metal_graph_prompt_test(ds4_engine *e, const ds4_tokens *prompt, int ctx_size) {
+int ds4_engine_gpu_graph_prompt_test(ds4_engine *e, const ds4_tokens *prompt, int ctx_size) {
     if (!engine_legacy_graph_test_supported(e)) return 1;
 #ifndef DS4_NO_GPU
     if (!e->gpu_ready) {

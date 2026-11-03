@@ -1235,17 +1235,17 @@ static int run_generation(ds4_engine *engine, const cli_config *cfg) {
 
     int rc = 0;
     if (cfg->gen.gpu_graph_test) {
-        rc = ds4_engine_metal_graph_test(engine, &prompt);
+        rc = ds4_engine_gpu_graph_test(engine, &prompt);
         ds4_tokens_free(&prompt);
         return rc;
     }
     if (cfg->gen.gpu_graph_full_test) {
-        rc = ds4_engine_metal_graph_full_test(engine, &prompt);
+        rc = ds4_engine_gpu_graph_full_test(engine, &prompt);
         ds4_tokens_free(&prompt);
         return rc;
     }
     if (cfg->gen.gpu_graph_prompt_test) {
-        rc = ds4_engine_metal_graph_prompt_test(engine, &prompt, cfg->gen.ctx_size);
+        rc = ds4_engine_gpu_graph_prompt_test(engine, &prompt, cfg->gen.ctx_size);
         ds4_tokens_free(&prompt);
         return rc;
     }
