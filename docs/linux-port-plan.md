@@ -311,22 +311,30 @@ tools   54 refs: dsv41-prefill/main.cpp (windows.h, bcrypt.h, dxgi1_4.h), produc
        live-session.inc, carry-copy-bench.cpp, decode-receiver/main.cpp, server/*, mtmd/*
 ```
 
-1. Implement `wf_io_uring_worker` to replace the IOCP workers and the `pread` fallback pool at
-   `llama-weight-fetcher.cpp:1205`. `WF_MODE_AUTO` prefers GDS only when cuFile reports support.
-2. Delete `llama-wf-gpu-ring.inl` and the DStorage interop paths. Drop the
+1. Open. Implement `wf_io_uring_worker` to replace the IOCP workers and the `pread` fallback pool
+   at `llama-weight-fetcher.cpp:1205`. `WF_MODE_AUTO` prefers GDS only when cuFile reports support.
+2. Open. Delete `llama-wf-gpu-ring.inl` and the DStorage interop paths. Drop the
    `--ds-gpu-ring-slots` producer option rather than faking it.
-3. Port `llama-dsv41-engram-prefetch.cpp` to io_uring with 1 MiB extents at QD64, and measure it
-   against the `pread` baseline separately. That change is what took 76.2 s to 43.2 s.
-4. Replace the provider lease and the two Windows throws in `llama-dsv41-weights.cpp`.
-5. Replace `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`.
-6. Replace BCrypt SHA-256 in `tools/dsv41-prefill/main.cpp` and `src/boundary-capture.cpp` with
-   OpenSSL EVP or a vendored SHA-256. The producer binds its own executable SHA.
-7. Remove DXGI and Windows includes in the producer, `mtmd` and `server`.
-8. Also delete the Mac path `tools/dsv41-prefill/mac/`.
-9. Add `llama-dsv41-prefill` to the targets in `build.sh` and run
-   `build/llama/bin/llama-dsv41-prefill --check-native-profiles`.
+3. Open. Port `llama-dsv41-engram-prefetch.cpp` to io_uring with 1 MiB extents at QD64, and measure
+   it against the `pread` baseline separately. That change is what took 76.2 s to 43.2 s.
+4. Open. Replace the provider lease and the Windows throws in `llama-dsv41-weights.cpp` - eight of
+   them remain on Linux, and they are what still stops a prefill (`:632`, `:924`, `:1001`, `:1164`,
+   `:1283`, `:1323`, `:1399`, `:1517`).
+5. Open. Replace `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`. This is
+   the locked-memory decision (`mlock` needs an `RLIMIT_MEMLOCK` or cgroup allowance) and it also
+   gates the decode library's host-cache path.
+6. Done (3.1c). BCrypt SHA-256 in `tools/dsv41-prefill/main.cpp` became
+   `dsv41_boundary::sha256_native`, whose portable state branch `src/boundary-capture.cpp` already
+   had and the producer already links. No OpenSSL, no vendored hasher. The Windows-only replay
+   diagnostics in `boundary-capture.cpp` stay inert.
+7. Half done. `tools/dsv41-prefill` is free of DXGI and Windows includes (3.1c, 3.1d).
+   `mtmd`, `server` and `decode-receiver` still carry theirs.
+8. Done (3.1c). `tools/dsv41-prefill/mac/` deleted; nothing referenced it.
+9. Done (3.1b, 3.1c). `build.sh` names `llama-dsv41-prefill` and
+   `build/llama/bin/llama-dsv41-prefill --check-native-profiles` passes on Linux.
 
-Gate: the producer links, passes the profile preflight, and completes a 262K prefill.
+Gate: the producer links, passes the profile preflight, and completes a 262K prefill. The first two
+are met; the third needs a qualified GGUF on this box.
 
 ## Phase 4: prune ggml backends
 
@@ -608,27 +616,115 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     Gate met: `llama-server --version` prints `found 1 CUDA devices: NVIDIA GeForce RTX 5090,
     compute capability 12.0, VMM: yes` while Strata holds the VRAM.
 
-3.1 Streaming producer on Linux. Remaining work, and it is a port rather than a sweep.
-    `tools/dsv41-prefill/main.cpp` is 1,163 lines behind
-    `#if defined(_WIN32) && defined(GGML_USE_CUDA)` with a two-line refusal in the `#else`, so
-    `llama-dsv41-prefill` links but prints "Offline V4.1 producer requires the opt-in Windows CUDA
-    build" - `--check-native-profiles` included. Inside it: `windows.h`, `bcrypt.h` (the SHA-256
-    the producer uses to bind its own executable), `dxgi1_4.h` (VRAM reporting), `CreateFileW`,
-    and the sweep orchestration. Then `engines/streaming-llama/prefill_llama.cpp`: implement
-    `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`, delete
-    `llama-wf-gpu-ring.inl` and the DStorage interop and the `--ds-gpu-ring-slots` option, port
-    `llama-dsv41-engram-prefetch.cpp` (108 Win32 refs), replace the provider lease and the two
-    throws in `llama-dsv41-weights.cpp` (`:923`, `:1000`), replace `llama-dsv41-locked-ram.h` and
-    the carry lease, replace BCrypt SHA-256 with OpenSSL EVP in `tools/dsv41-prefill/main.cpp` and
-    `src/boundary-capture.cpp`, drop DXGI/Windows includes in the producer, `mtmd` and `server`.
-    Gate: the producer CLI runs `--check-native-profiles`. A 262K prefill needs weights.
+3.1c The offline producer compiles and runs on Linux. Done (`3fc4f64`).
+    `tools/dsv41-prefill/main.cpp`'s 1,163-line body, all of it behind
+    `#if defined(_WIN32) && defined(GGML_USE_CUDA)` with a two-line refusal in the `#else`, is now
+    one body guarded only by `GGML_USE_CUDA`: the guard was platform code around platform-neutral
+    work (sweep orchestration, admission, receipt publication, the session protocol), so it is a
+    port rather than a collapse - nothing inside had ever been compiled here. Its Win32 primitives
+    moved to `tools/dsv41-prefill/producer-platform.inc`, included after the producer's own policy
+    helpers (`require`, `stop`, the bounded constants) and before `live-session.inc` so both see it
+    in the same namespace. Two small headers come with it: `producer-wire.h` (the private session
+    pipe handle plus write-every-byte-or-fail) and `producer-platform.h` (`argument`, `path_text`,
+    `native_path`: the single place paths and argv become UTF-8 text, replacing the now-deprecated
+    `std::filesystem::u8path` here).
+    Files that had to come along, because `main.cpp` includes them inside that body:
+    `live-session.inc` (880 lines: session pipes, NVML/DXGI, the decode library, two diagnostic
+    writers), `producer-abort.h`, `combo-base.inc`, `studio-generation.h`, `studio-vision.h`, and
+    `src/llama-dsv41-host-memory.h`, whose entire namespace sat inside `#if defined(_WIN32)` with
+    no Linux branch at all - `main.cpp` and `llama-dsv41-sweep.cpp:502` were the only readers.
+    Substitutions, per the Phase 2 table: `open`/`read`/`write`/`fsync` with `O_EXCL` for the
+    exclusive-new admission and `O_NOFOLLOW` where a reparse point was refused; identity from
+    `fstat` (`st_dev`, `st_ino`, `st_size`, `st_mtime`, `st_nlink==1`, `S_ISREG`); the no-replace
+    publication is `renameat2(RENAME_NOREPLACE)`, which fails `EEXIST` exactly as
+    `ReplaceIfExists=FALSE` did; `fstatfs` refuses network and RAM-backed filesystems in place of
+    `GetDriveTypeW`+`QueryDosDeviceW`; `fstatvfs` for free bytes; SHA-256 is
+    `dsv41_boundary::sha256_native`, whose portable branch the boundary-capture TU already carries
+    and the producer already links (no OpenSSL, no vendored hasher); host memory is
+    MemAvailable/VmRSS+VmPeak/cgroup v2 `memory.max`+`memory.current`, the same sources
+    `engines/ds4/ds4_host_memory.c` uses, with the paging guard sampling swap; NVML through
+    `dlopen("libnvidia-ml.so.1")`; `sigaction` for SIGINT/SIGTERM in place of
+    `SetConsoleCtrlHandler`, and SIGSEGV/SIGBUS/SIGFPE/SIGILL with `SA_RESETHAND` in place of the
+    SEH filter (kind `signal`).
+    Behaviour changes, all deliberate: `--carry-storage hybrid` no longer demands a `D:` overflow
+    path (no drive letters), keeping native experts plus the explicit 1GiB disk reserve on a fixed
+    local volume; Linux has neither share modes nor a fixed/removable indicator, so identity
+    rechecks around every file operation stand in for the first and remote/RAM-backed volumes are
+    refused by type; a host with no configured swap reports 0 paging bytes, so that guard stands
+    down instead of failing the run; the carry-resume RAM floor in `llama-dsv41-sweep.cpp` was
+    `#ifdef _WIN32` and is live now, so Linux refuses a resume that would cross a floor it never
+    checked; `begin()` sets no process-memory limit (`RLIMIT_AS` would break CUDA's address-space
+    reservations), which keeps the locked-memory risk open and now names its call site; and the
+    receipt's identity fields keep their names and units, so nothing downstream changes shape -
+    `volume_serial_u64` is `st_dev`, `file_id_le_hex` is the 8-byte `st_ino` little-endian with the
+    high eight zero, `mtime_filetime_ticks` is `st_mtime` in FILETIME ticks.
+    Also here: `tools/dsv41-prefill/mac/ds4_native_session_transport.inc` deleted (item 8, nothing
+    referenced it), and refusal/usage text that named Windows, Mac or IoRing says what is true here.
+    Gate met: `cmake --build build/llama` builds every target with no new warnings,
+    `llama-dsv41-prefill --check-native-profiles` prints
+    `PASS: delivered native-half and rounded expert profiles,4096-row resource policies; no
+    GPU/model initialized` and exits 0, `--help` prints the usage, and no argument reaches the stub
+    refusal. The env table regenerated with no variable name added or dropped (only sites moved),
+    release_check is 0 findings, and the Python suite is unchanged at 584/6/5 with the same names.
+    Proof beyond compiling, since this tree has no test target for the producer: a scratch program
+    against the producer's own `boundary-capture.cpp.o` runs 44 checks over the ported layer
+    (volume admission, exclusive-new refusal, bounded-write refusal, FILETIME/inode identity, the
+    read-only rehash, `read_small`, no-replace publication including the occupied-target refusal and
+    the retained pending file, symlink refusal, ancestor pinning, the free-byte budget,
+    `exclusive_writer`, environment/pid/executable, `ram_admission`, SIGINT latching, the abort
+    file, and `dlopen` of `ds4-decode.so` binding all 8 required and 10 optional `ds4x_*` entry
+    points). And the real binary was driven end to end with a throwaway 1 MiB model, a copy receipt
+    and four LE32 tokens: it bound its own executable SHA, admitted the wire/carry/cache plans,
+    created the payload and pending receipt, admitted host memory from `/proc`, enumerated the
+    RTX 5090, and refused on the device ordinal and then on the VRAM reserve - leaving
+    `status: failed` in the retained pending receipt, whose payload identity matches `stat`. Strata
+    held the GPU throughout.
+
+3.1d The producer's Windows arms deleted. Done (`6fc8cac`). 3.1c kept the Win32 code as the
+    reference the port was written against; the fork's scope says delete it, chunks 2.1/2.2a
+    deleted rather than split in `engines/ds4`, and the reference is now in git and in `3fc4f64`.
+    `collapse_conditionals.py --tokens _WIN32,windows.h,Win32,DStorage,IoRing,DXGI,BCrypt,NOMINMAX`
+    collapsed every remaining guard to the branch this build compiles: 368 lines gone across eight
+    files, zero insertions, nothing BLOCKED. Proven on the preprocessed text with comments stripped,
+    so only code is compared: `main.cpp`, `producer-platform.h`, `producer-wire.h`,
+    `producer-abort.h`, `studio-generation.h`, `combo-base.inc` and `llama-dsv41-sweep.cpp` have
+    **0 changed code lines**; `live-session.inc` and `producer-platform.inc` lose only
+    `shared_video_memory_usage()`, which reported the WDDM non-local segment that Linux has no twin
+    for (its `vram_shared_usage` field left the `LLAMADECODE_VRAM_HEADROOM` line, which now prints
+    `device_total`/`device_used`); `llama-dsv41-host-memory.h` changes only its paging stop reason,
+    which now says "swap growth limit 256 MB" while the receipt's `pagefile_growth_peak_bytes` field
+    name stays. Comment text naming `CreateFileW`, `BCrypt`, `GetDriveTypeW`, `DXGI` or
+    `LoadLibraryExW` is deliberate provenance, including the three comments that record the Windows
+    guarantees Linux does not provide (share modes, fixed-vs-removable media, the Job Object
+    process-memory limit). `tools/dsv41-prefill/carry-copy-bench.cpp`, an 89-line Windows-only
+    DirectStorage copy bench no build rule compiled, is deleted with them.
+    Gate met: the whole producer tree builds with the two pre-existing `-Wmisleading-indentation`
+    warnings only, `--check-native-profiles` passes, the 44-check selftest passes, the receipt smoke
+    still binds its own SHA and still refuses on the VRAM reserve, the env table loses no name,
+    release_check is 0 findings, and the Python suite is unchanged.
+    `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`
+    returns nothing. The Phase 2 gate does not hold for the rest of the producer tree yet: 25 files
+    under `src/`, 6 under `common/`, 4 under `tools/mtmd`, 3 under `tools/server`,
+    `tools/decode-receiver`, and the non-CUDA ggml backends still carry Win32 conditionals.
+
+3.1 Streaming producer on Linux. What is left of Phase 3 is still a port, not a sweep.
+    `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`; delete
+    `llama-wf-gpu-ring.inl`, the DStorage interop and the `--ds-gpu-ring-slots` option; port
+    `llama-dsv41-engram-prefetch.cpp`; replace the provider lease and the eight Linux refusals in
+    `src/llama-dsv41-weights.cpp` (`:632`, `:924`, `:1001`, `:1164`, `:1283`, `:1323`, `:1399`,
+    `:1517`), which are what still stop a prefill; replace `llama-dsv41-locked-ram.h` and the carry
+    lease; then the Win32 host code in `mtmd`, `server` and `decode-receiver`.
+    Gate: a 262K prefill, which needs a qualified GGUF on this box (see the machine facts).
     Two findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
     file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk 5.1's
     `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; and the live Linux read
     path is the `pread` worker pool, which `WF_HAS_IO_URING` already declares a ring for.
 
-3.2 Producer decode library wiring: `dlopen`/`dlsym` for `ds4-decode.so` in place of
-    `LoadLibraryW`/`GetProcAddress`, and `make cuda-decode` producing it.
+3.2 Producer decode library wiring. Done as part of 3.1c, because `live-session.inc` is part of
+    `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable in place of
+    `LoadLibraryExW`/`GetProcAddress`, with `make cuda-decode` producing it. Verified without a
+    model by the selftest's `open_decode_library()` check: all 8 required and all 10 optional
+    `ds4x_*` exports bind. A live session against weights is still unrun.
 
 4.1 ggml backend prune: keep CUDA + CPU; delete Vulkan, SYCL, Hexagon, KleidiAI, RPC, AMX, Metal
     in `ggml-bench`, and the corresponding options in `ggml/CMakeLists.txt`.
@@ -693,15 +789,21 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunks 2.2c/2.2d and 3.1b with the commands above, with `--exclude-dir=build`
-(the port's own scratch trees and object files now live under `build/`, which is gitignored but
-matched the greps as first written): 1,107 Apple/MLX references repo-wide and 774 Windows ones -
-both figures include this plan's own quoted grep patterns and the inherited measurement history in
-`docs/`, so they read higher than the code alone. Inside `engines/ds4` the code-identifier gate
+Counts, re-counted after chunks 2.2c/2.2d, 3.1b, 3.1c and 3.1d with the commands above, adding
+`--exclude-dir=build --exclude-dir=.git` (the port's own scratch trees and object files now live
+under `build/`, which is gitignored but matched the greps as first written; the engine's own
+binaries, `*.o`, `ds4-decode.so` and the `__pycache__` directories match too, so these totals read
+higher than the source alone): 1,107 Apple/MLX references repo-wide, unchanged by the producer work,
+and 700 Windows ones - down from 774, the drop being `tools/dsv41-prefill` (chunk 3.1d) and the
+comments chunk 3.1c reworded. Both figures also include this plan's own quoted grep patterns and the
+inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 269 Apple/Metal
 matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
-comment). Re-count before trusting any of these numbers.
+comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`: 0. The rest of
+the producer tree is still Windows-shaped: 25 files under `src/`, 6 under `common/`, 4 under
+`tools/mtmd`, 3 under `tools/server`, plus `tools/decode-receiver` and the ggml backends Phase 4
+deletes. Re-count before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.

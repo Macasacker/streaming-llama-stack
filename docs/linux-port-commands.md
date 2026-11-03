@@ -92,7 +92,76 @@ cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 
 # The producer links and runs. llama-server initialises CUDA even with Strata holding the VRAM.
 ./build/llama/bin/llama-server --version      # prints "found 1 CUDA devices: ... compute capability 12.0"
-./build/llama/bin/llama-dsv41-prefill --help  # exits 2: main() is still the non-Windows stub
+./build/llama/bin/llama-dsv41-prefill --help  # prints the usage: chunk 3.1c ported main.cpp
+./build/llama/bin/llama-dsv41-prefill --check-native-profiles
+# PASS: delivered native-half and rounded expert profiles,4096-row resource policies; no GPU/model
+./build/llama/bin/llama-dsv41-prefill         # exit 1; the abort line names the parse refusal
+# No Win32 code left in the producer CLI directory (chunk 3.1d).
+grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" \
+  engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill   # 0 hits
+```
+
+### The producer's platform layer, with no test target to run
+
+The producer CLI has no cmake test target, so chunk 3.1c proved its ported
+file/hash/identity/VRAM layer with a program compiled by hand. Its source is committed
+at `docs/evidence/platform-selftest.cpp`; copy it into `build/` to run it. It needs only
+the boundary-capture object the producer already builds and two small ggml libs - no
+CUDA, no model, no GPU:
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+cp docs/evidence/platform-selftest.cpp build/
+cp engines/ds4/ds4-decode.so build/          # the loader check resolves it beside the selftest
+g++ -std=gnu++17 -O1 -I$llama/tools/dsv41-prefill -I$llama/src -I$llama/ggml/src \
+    -I$llama/ggml/include -I$llama/vendor -o build/platform-selftest \
+    build/platform-selftest.cpp \
+    build/llama/tools/dsv41-prefill/CMakeFiles/llama-dsv41-prefill.dir/__/__/src/boundary-capture.cpp.o \
+    build/llama/ggml/src/libggml-base.a build/llama/ggml/src/libggml-cpu.a -lpthread -ldl
+./build/platform-selftest                    # 44 checks, "SELFTEST PASSED: 0 failure(s)"
+CUDA_VISIBLE_DEVICES=$(nvidia-smi --query-gpu=uuid --format=csv,noheader) \
+  ./build/platform-selftest | grep nvml      # NVML total/used, matching nvidia-smi
+```
+
+It covers volume admission (ext4 passes, `/tmp` on tmpfs is refused), the exclusive-new
+output, bounded writes, the read-only rehash, `read_small`, no-replace publication,
+symlink refusal, ancestor pinning, the free-byte budget, `exclusive_writer`,
+`/proc/self/exe`, `getpid`, `set_environment`, `ram_admission`, SIGINT latching, the
+abort file, and `dlopen` of `ds4-decode.so` binding every `ds4x_*` entry point.
+
+### Driving the real producer with no model
+
+A throwaway 1 MiB file, a copy receipt naming it and four LE32 tokens take the CLI
+through its whole front half - its own executable SHA, the receipt, the sweep/wire/cache/carry
+plans, the output volume budget, host-memory admission, CUDA enumeration - and it then
+refuses at the VRAM reserve. Reaching that check costs a CUDA context (~160 MB), which
+does not disturb Strata's 30 GiB.
+
+```bash
+python3 - <<'SNIPPET'
+import os,struct,hashlib,json
+root=os.path.abspath("build/smoke"); os.makedirs(root+"/out",exist_ok=True)
+model=root+"/model.gguf"
+open(model,"wb").write(bytes(1<<20)); st=os.stat(model)
+open(root+"/copy-receipt.json","w").write(json.dumps({"receipts":{"model.gguf":{
+  "sha256":hashlib.sha256(open(model,"rb").read()).hexdigest(),
+  "final_identity":{"dev":st.st_dev,"ino":st.st_ino,"size":st.st_size,"mtime_ns":st.st_mtime_ns}}}}))
+with open(root+"/tokens.le32","wb") as f:
+    for t in (1,2,3,4): f.write(struct.pack("<I",t))
+SNIPPET
+sha=$(sha256sum build/llama/bin/llama-dsv41-prefill | cut -d" " -f1)
+./build/llama/bin/llama-dsv41-prefill \
+  --model "$PWD/build/smoke/model.gguf" --copy-receipt "$PWD/build/smoke/copy-receipt.json" \
+  --tokens-le32 "$PWD/build/smoke/tokens.le32" --cuda-device 0 --context 8192 --build-sha "$sha" \
+  --provider-device-bytes 1073741824 --provider-host-bytes 1073741824 \
+  --cache-bytes 4294967296 --graph-bytes 268435456 \
+  --job-device-bytes 4294967296 --job-host-bytes 17179869184 --gpu-reserve-bytes 1073741824 \
+  --carry "$PWD/build/smoke/out/carry.bin" --carry-file-bytes 4294967296 --carry-host-bytes 4294967296 \
+  --carry-outstanding-bytes 0 --output-outstanding-bytes 0 \
+  --payload "$PWD/build/smoke/out/payload.bin" --receipt "$PWD/build/smoke/out/receipt.json"
+# exit 1: "Selected GPU free bytes do not exceed the explicit reserve".
+# out/payload.bin stays 0 bytes and out/receipt.json.pending-<pid>-<ticks> holds the failed
+# receipt, whose payload_actual_identity is that file's st_dev, st_ino and st_mtime.
 ```
 
 ## Gates that fail today, and why
