@@ -219,6 +219,11 @@ if (GGML_CUDA)
     if (CUDAToolkit_FOUND)
         target_include_directories(llama PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
         target_link_libraries(llama PRIVATE CUDA::cudart)
+        # The cuFile symbols are resolved by the top-level `LLAMA_CUFILE_LIBRARY`
+        # lookup; static consumers inherit this link line.
+        if (LLAMA_CUFILE_LIBRARY)
+            target_link_libraries(llama PRIVATE ${LLAMA_CUFILE_LIBRARY})
+        endif()
     endif()
 endif()
 

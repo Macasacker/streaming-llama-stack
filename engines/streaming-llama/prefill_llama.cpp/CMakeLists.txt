@@ -189,6 +189,18 @@ endif()
 # build the library
 #
 
+# GPUDirect Storage. `src/llama-weight-fetcher.cpp` compiles the cuFile route
+# whenever the CUDA toolkit ships cufile.h, so the library has to be on the link
+# line when it is installed. On a host without the nvidia-fs driver
+# cuFileDriverOpen fails at runtime and the fetcher keeps the io_uring/pread
+# route, which is why linking it is not gated on the driver. FindCUDAToolkit has
+# no CUDA::cufile target, so the library is resolved by name.
+if (GGML_CUDA)
+    find_package(CUDAToolkit QUIET)
+    find_library(LLAMA_CUFILE_LIBRARY cufile
+                 PATHS ${CUDAToolkit_LIBRARY_DIR} NO_DEFAULT_PATH)
+endif()
+
 add_subdirectory(src)
 
 # Independent offline qualification target: no model loader, common HTTP
@@ -298,4 +310,9 @@ if(GGML_CUDA AND NOT BUILD_SHARED_LIBS)
     add_library(slstack-weight-fetcher SHARED tools/slstack-weight-fetcher.cpp)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(slstack-weight-fetcher PRIVATE llama ggml-cuda CUDA::cudart)
+    # A shared library would otherwise leave the cuFile references unresolved and
+    # fail at dlopen instead of at link time.
+    if (LLAMA_CUFILE_LIBRARY)
+        target_link_libraries(slstack-weight-fetcher PRIVATE ${LLAMA_CUFILE_LIBRARY})
+    endif()
 endif()

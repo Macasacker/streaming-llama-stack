@@ -10,6 +10,7 @@ extern "C" uint64_t ggml_backend_cuda_dsv41_stream_topk_queued(void){return dsv4
 #    include <cub/cub.cuh>
 #    if (CCCL_MAJOR_VERSION >= 3 && CCCL_MINOR_VERSION >= 2)
 #        define CUB_TOP_K_AVAILABLE
+#        include <cuda/iterator>
 using namespace cub;
 #    endif  // CCCL_MAJOR_VERSION >= 3 && CCCL_MINOR_VERSION >= 2
 #endif      // GGML_CUDA_USE_CUB

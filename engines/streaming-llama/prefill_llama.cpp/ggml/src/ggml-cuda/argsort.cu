@@ -12,6 +12,7 @@ extern "C" uint64_t ggml_backend_cuda_dsv41_topk_radix_queued(void) {
 #    include <cub/cub.cuh>
 #    if (CCCL_MAJOR_VERSION >= 3 && CCCL_MINOR_VERSION >= 1)
 #        define STRIDED_ITERATOR_AVAILABLE
+#        include <cuda/iterator>
 #    endif
 using namespace cub;
 #endif  // GGML_CUDA_USE_CUB

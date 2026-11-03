@@ -37,6 +37,9 @@ target_include_directories(llama-dsv41-prefill PRIVATE "${DSV41_SOURCE_DIR}" "${
 # These are the actual production units, not CPU/provider stubs. Avoid pulling
 # the unrelated full llama model registry/common/chat toolchain into this CLI.
 target_link_libraries(llama-dsv41-prefill PRIVATE ggml-base ggml-cpu ggml-cuda CUDA::cudart Threads::Threads)
+if (LLAMA_CUFILE_LIBRARY)
+    target_link_libraries(llama-dsv41-prefill PRIVATE ${LLAMA_CUFILE_LIBRARY})
+endif()
 
 # Default-off diagnostics. The immutable owner manifest separately pins the
 # changed capture sources; this optional value names their original base only.

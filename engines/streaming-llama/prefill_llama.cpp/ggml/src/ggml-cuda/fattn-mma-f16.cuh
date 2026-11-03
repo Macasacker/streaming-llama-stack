@@ -1606,6 +1606,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
                 }
             }
             if constexpr (use_f32_acc) {
+#if defined(LLAMA_FA_VKQ_F32_ACC) && defined(TURING_MMA_AVAILABLE)
                 // FIX 2026-05-13: same per-col-parity rescale as the earlier site.
                 const float s_even = KQ_max_scale[0];
                 const float s_odd  = KQ_max_scale[1];
@@ -1620,6 +1621,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
                         }
                     }
                 }
+#endif
             }
         }
 #elif defined(AMD_WMMA_AVAILABLE)
@@ -1805,6 +1807,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
             for (int k1 = 0; k1 < nbatch_combine; k1 += T_C_VKQ::J) {
                 const int i_acc = (k00 + k1)/T_C_VKQ::J;
                 if constexpr (use_f32_acc) {
+#if defined(LLAMA_FA_VKQ_F32_ACC) && defined(TURING_MMA_AVAILABLE)
                     // FIX 2026-05-13: f32 N-slice writeback.
                     // VKQ_C is half2 representing 16x16 D. Per thread, x[l] holds half-col
                     // pair at (row get_i(l), cols get_j(l)*2 + 0,1). Layouts:
@@ -1825,6 +1828,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
                             __float2half(T.x[sub + 0]),
                             __float2half(T.x[sub + 1]));
                     }
+#endif
                 } else {
 #pragma unroll
                     for (int l = 0; l < T_C_VKQ::ne; ++l) {
