@@ -26,10 +26,18 @@ code.
     python3 scripts/port/collapse_conditionals.py \
         --tokens __APPLE__,TARGET_OS,__MACH__,GGML_COMMON_DECL_METAL,GGML_COMMON_IMPL_METAL \
         --apply engines/ds4/ds4.c
+    python3 scripts/port/collapse_conditionals.py --tokens DS4_HAS_QWEN4_METAL \
+        --never-defined DS4_HAS_QWEN4_METAL --apply engines/ds4/ds4.c
 
-Chunk 2.1 used the first form, 2.2a the second. Anything it prints as `BLOCKED` needs a human: those
-were cases like `#if defined(_WIN32) / #elif defined(POSIX_MADV_DONTNEED)`, where the live branch is
-the `#elif` and the guard has to be rewritten rather than removed.
+`--never-defined` names macros this build does not define, so a bare `#ifdef MACRO` with an `#else`
+can be collapsed. Without it such a macro is unknown, and unknown means leave it alone: an earlier
+version treated an unknown in-scope macro as LIVE and deleted the *live* `#else` branch, which is
+how chunk 2.2c's first run turned a Linux `mm_min = 8` into the Metal `64`. Check the diff after
+any collapse anyway - `git diff --stat` should show deletions only.
+
+Anything it prints as `BLOCKED` needs a human: those were cases like `#if defined(_WIN32) /
+#elif defined(POSIX_MADV_DONTNEED)`, where the live branch is the `#elif` and the guard has to be
+rewritten rather than removed.
 
 ## preprocess_equiv.py
 
@@ -38,10 +46,18 @@ leaves macros and comments, so dead branches vanish from both sides and the diff
 changes. Pass `--rename-file` when the sweep was a rename, so the "before" text gets the same rename
 and cancels out; anything left in the diff is then a genuine change.
 
-    git show HEAD:engines/ds4/ds4.c > /tmp/before.c
-    python3 scripts/port/preprocess_equiv.py --cc gcc /tmp/before.c engines/ds4/ds4.c
-    python3 scripts/port/preprocess_equiv.py --cc gcc --rename-file /tmp/rename.json \
-        /tmp/before.c engines/ds4/ds4.c
+    git show HEAD:engines/ds4/ds4.c > build/before.c
+    python3 scripts/port/preprocess_equiv.py --cc gcc --include engines/ds4 build/before.c engines/ds4/ds4.c
+    python3 scripts/port/preprocess_equiv.py --cc gcc --include engines/ds4 \
+        --rename-file build/rename.json build/before.c engines/ds4/ds4.c
+
+Pass `--include` or the before file cannot resolve its own `#include` lines and the comparison
+means nothing (it reads as a few hundred live lines). Write the before file somewhere the includes
+resolve from - `build/` is gitignored; `/tmp` on this box is not dependable.
+
+A fold-to-a-constant edit is outside what this tool can show: deleting lines shifts every position,
+so the diff is noise. Review the insertions instead - `git diff -U0 <file> | grep '^+[^+]'` - and
+check separately that each `== DEAD` term became false and each `!= DEAD` term became true.
 
 For `.cu` files use `--cc /opt/cuda/bin/nvcc`; nvcc fully expands macros, so `__LINE__` values
 inside trace messages show up as differences and are expected to move when lines are deleted.

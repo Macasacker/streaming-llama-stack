@@ -248,10 +248,23 @@ Known gaps carried forward, not hidden:
 - `--ds-read-parts` is parsed but refused on Linux; `DS4_DS_READ_PARTS` is the only way to set the
   transport's span count. Making the flag call `ds4_ds_configure_read_parts` before the transport is
   initialised is a small, separate change.
-- `./ds4 --help` still advertises `--metal`, `--backend metal`, `--metal-graph-test`,
-  `--metal-graph-full-test`, `--metal-graph-prompt-test`, `--ssd-streaming-full-layers` (GLM Metal)
-  and `--expert-profile` (Metal-only), plus `--rocm`, which has no hardware here. They parse today
-  and fail later; chunk 2.2c decides whether to remove or refuse them.
+- `./ds4 --help` no longer names Metal (chunk 2.2c). What it still advertises without hardware or
+  an implementation here: `--rocm` (an alias for CUDA, no AMD device on this box),
+  `--ssd-streaming-full-layers` (parses, then is ignored because
+  `ds4_backend_supports_glm_streaming_full_layers()` is false), `--expert-profile` (parses, then
+  refused with "not implemented in this build"), and `--imatrix-*` (refused while parsing, before
+  the model is opened). `--gpu-graph-test`, `--gpu-graph-full-test` and `--gpu-graph-prompt-test`
+  are now genuinely reachable; none has been run, because they need a model file.
+- Four engine subsystems are inert after chunk 2.2c rather than deleted, because deleting them
+  would have cascaded through live code: the routed-expert locality profiler
+  (`ds4_expert_profile_init` has no caller), sequential imatrix collection
+  (`ds4_engine_collect_sequential_imatrix`, `imatrix_read_text_file`), the mixed prefill/decode
+  command epoch (`ds4_sessions_eval_batch_with_prefill_gpu`), and the Pro-Q4 expert-table preload
+  (its CUDA helpers keep other callers). All four are marked `DS4_MAYBE_UNUSED` and are the shape a
+  port would reuse. Two more things went quiet with no message: `e->share_session_prefill_workspace`
+  (the Qwen3.8 shared transient arena was the deleted backend's policy) and the engine's
+  `glm_session_count` / `glm_session_graph_bytes` bookkeeping, whose only reader was
+  `ds4_engine_glm_graph_budget`.
 - `engines/ds4-win`, `engines/ds4-mac` and `engines/ds4-peer` are deleted (chunk 1.8 settled by
   1.10a); `engines/` holds `ds4` and `streaming-llama` only.
 
@@ -275,8 +288,12 @@ Substitutions:
 | `linenoise_win32.c` | POSIX `linenoise.c` |
 | `ds4_tp_win32.c`, `ds4_distributed_win32.c` | pthreads and sockets |
 
-Gate: `grep -rn "_WIN32\|windows.h\|Win32\|DStorage\|IoRing\|__APPLE__\|TARGET_OS\|Metal" engines/`
-returns nothing.
+Gate: `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/` returns nothing except
+the three vendored hits, and no code identifier or CLI surface names Metal. The gate as first
+written also grepped for `Metal`, which cannot pass: the owner kept the 215 `DS4_METAL_*`
+environment names in chunk 2.2b because they are documented in `docs/VARIABLES.md` and named in
+`docs/macdecode-r6/r6-controls.json`. What is left for those names to sit in is comment text and
+the inert expert-profile subsystem's own messages - chunk 2.2e below.
 
 ## Phase 3: weight fetcher and producer
 
@@ -517,22 +534,96 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     -fdirectives-only -P` of each changed file before and after - with the same rename applied to
     the "before" text - is byte-identical.
 
-2.2c The Metal backend itself. Open, and it is a behaviour decision, not a rename. `--metal`,
-    `--backend metal`, `--metal-graph-test`, `--metal-graph-full-test`, `--metal-graph-prompt-test`
-    and the 46 `DS4_BACKEND_METAL` sites are still in the engine, so `--metal` parses, is selected,
-    and then fails at engine open. Nothing in `slstack`, `scripts` or the presets passes `--metal`.
-    Either delete the backend (enum, branches, flags, help lines) or make the parser refuse it with
-    a message and leave the dead branches for chunk 6.1. The help text still advertises `--rocm`
-    too, which is the same shape and has no hardware here.
+2.2c The Metal backend itself. Done (`dcb5666`). Option (a): the backend is deleted, not refused.
+    1,573 lines removed and 106 added across ds4.c, ds4_cli.c, ds4_help.c, ds4_server.c,
+    ds4_agent.c, ds4_bench.c, ds4_eval.c, ds4_tp.c and the `ds4_backend` enum. `--metal` and
+    `--backend metal` are gone from all five binaries, so they now read `unknown option` instead of
+    parsing, being selected and failing at engine open. Two behaviour changes are deliberate:
+    `--metal-graph-test`, `--metal-graph-full-test` and `--metal-graph-prompt-test` became
+    `--gpu-graph-*` and stopped forcing the backend, which makes the three CUDA graph self-tests
+    reachable for the first time (their bodies call `gpu_graph_*_test`, but the flag set
+    `DS4_BACKEND_METAL` and the engine refused at open); and `--imatrix-dataset` / `--imatrix-out`
+    now refuse while parsing rather than after loading the model. Deleted with the enum value: the
+    46 backend tests, 10 `#ifdef DS4_HAS_QWEN4_METAL` blocks (never defined, 1,030 lines),
+    `ds4_sessions_eval_batch_metal_supported` and `..._with_prefill_metal_supported` with the two
+    call branches they gated, `ds4_engine_glm_graph_budget`, `model_warm_weights_sharded`, the
+    `iogpu.wired_limit_mb` residency block, the Pro-Q4 expert-table preload body, the server's
+    `qwen4_batch_mtp` field, and the Metal imatrix collection body. Kept inert and marked
+    `DS4_MAYBE_UNUSED`: `ds4_engine_collect_sequential_imatrix`, `imatrix_read_text_file`,
+    `ds4_sessions_eval_batch_with_prefill_gpu`, `ds4_expert_profile_init`.
+    Two scaffolding bugs surfaced here and are fixed in the same commit:
+    `collapse_conditionals.py` collapsed an in-scope macro of *unknown* value to LIVE, which
+    deletes the live `#else` and keeps the dead branch (its first run on ds4.c turned the Linux
+    `mm_min = 8` into the Metal `64`; reverted), and `preprocess_equiv.py` wrote the before file's
+    *path* into its temp file unless `--rename-file` was given, so every no-rename equivalence
+    check compared garbage. The tool now takes `--never-defined` for macros this build does not
+    define.
+    Gate: `grep -rn "DS4_BACKEND_METAL" engines/ds4` returns 0, the CUDA warning profile is
+    identical to a worktree at the parent commit (26 occurrences), the host gates pass, help prints
+    no Metal, and `envvars.json` lost no variable name (every `DS4_METAL_*` read deleted there has
+    another reader left). `--rocm` is untouched: it is an alias for CUDA, and the ROCm branches
+    belong to 6.1.
 
-3.1 Streaming producer on Linux. `engines/streaming-llama/prefill_llama.cpp`: implement
+2.2d Metal-era identifiers with a leading underscore. Done (`4940201`). Chunk 2.2b's rename used
+    word boundaries, and `_` is a word character, so `glm_metal_*`, `g_metal_graph_*`,
+    `generate_metal_graph_raw_swa`, `qwen4_metal_argmax` and the exported
+    `ds4_engine_metal_graph_*` survived its gate. 92 occurrences renamed to the `gpu_*` forms.
+    Proven inert: `preprocess_equiv.py --rename-file` with the same map is byte-identical for
+    ds4.c, ds4.h and ds4_cli.c. One `ds4_metal.m` mention stays in a `ds4_cuda.cu` comment as
+    inherited provenance.
+
+2.2e Metal words in comments and in the inert subsystem's messages. Open. 310 case-insensitive
+    `metal` mentions remain in `engines/ds4` outside `DS4_METAL_*`, about 190 of them inside quoted
+    strings, mostly in the expert-locality profiler that chunk 2.2c left inert. Rewording them is
+    text work with no behaviour attached; it does not need the equivalence tool, but it does need
+    the env-table regeneration because lines move.
+
+3.1a Producer translation units compile with GCC. Done (`3bc184a`, `0265129`). cmake already
+    configured; compiling did not. Two includes still named the engine tree deleted in 1.10a
+    (`../../../ds4-win/...` in `src/llama-dsv41-weights.h`, `../../../../ds4-win/...` in
+    `tools/dsv41-prefill/studio-generation.h`); 38 declarations in `ggml/include` were
+    `extern "C" GGML_API ...` where the macro already expands to `extern`, which MSVC accepts and
+    GCC rejects (in `ggml-cuda.h` the redundant prefix is gone, in the twelve `ggml-dsv41-*.h`
+    headers the group is wrapped in `extern "C" { }` so the C linkage and the visibility attribute
+    both survive); a `std::string == json` comparison that C++20 stops compiling because nlohmann
+    3.12 swaps its hidden friends for member operators; `std::min(uint64_t, unsigned long long)`
+    on LP64; and one missing `#include <cmath>` in `src/llama-hparams.h` that accounted for eleven
+    of the failures. Gate: `-fsyntax-only` over all 295 C++ units of the project, zero errors.
+
+3.1b The producer links. Done (`7973c20`). `cmake --build build/llama` with the flags `build.sh` passes produces `llama-server`,
+    `llama-export-lora`, `libslstack-weight-fetcher.so` and `llama-dsv41-prefill`. What the CUDA
+    side needed: `<cstring>` in `ggml/src/ggml-cuda/common.cuh` (it calls `std::strcmp`),
+    `<cuda/iterator>` in `argsort.cu` and `top-k.cu` under the same CCCL version guards that use
+    `cuda::make_strided_iterator` and `cuda::discard_iterator`, and the two `VKQ_C_f32` reads in
+    `fattn-mma-f16.cuh` moved inside the `LLAMA_FA_VKQ_F32_ACC` guard that declares the array -
+    nvcc resolves a non-dependent name even in a discarded `if constexpr`, and that macro is
+    commented off, so 22 template instances plus `fattn.cu` and `flash-attn-sparse.cu` failed.
+    `src/llama-weight-fetcher.cpp` compiles the cuFile route whenever `cufile.h` exists and nothing
+    linked it: `FindCUDAToolkit` has no `CUDA::cufile` target on CUDA 13.4, so the library is
+    resolved by name into `LLAMA_CUFILE_LIBRARY` and linked into `llama`, the producer target and
+    the fetcher `.so`. Linking it is not gated on the `nvidia-fs` driver - `cuFileDriverOpen`
+    reports the missing driver at runtime and `WF_MODE_AUTO` keeps the io_uring/pread route.
+    Gate met: `llama-server --version` prints `found 1 CUDA devices: NVIDIA GeForce RTX 5090,
+    compute capability 12.0, VMM: yes` while Strata holds the VRAM.
+
+3.1 Streaming producer on Linux. Remaining work, and it is a port rather than a sweep.
+    `tools/dsv41-prefill/main.cpp` is 1,163 lines behind
+    `#if defined(_WIN32) && defined(GGML_USE_CUDA)` with a two-line refusal in the `#else`, so
+    `llama-dsv41-prefill` links but prints "Offline V4.1 producer requires the opt-in Windows CUDA
+    build" - `--check-native-profiles` included. Inside it: `windows.h`, `bcrypt.h` (the SHA-256
+    the producer uses to bind its own executable), `dxgi1_4.h` (VRAM reporting), `CreateFileW`,
+    and the sweep orchestration. Then `engines/streaming-llama/prefill_llama.cpp`: implement
     `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`, delete
     `llama-wf-gpu-ring.inl` and the DStorage interop and the `--ds-gpu-ring-slots` option, port
     `llama-dsv41-engram-prefetch.cpp` (108 Win32 refs), replace the provider lease and the two
     throws in `llama-dsv41-weights.cpp` (`:923`, `:1000`), replace `llama-dsv41-locked-ram.h` and
     the carry lease, replace BCrypt SHA-256 with OpenSSL EVP in `tools/dsv41-prefill/main.cpp` and
     `src/boundary-capture.cpp`, drop DXGI/Windows includes in the producer, `mtmd` and `server`.
-    Gate: the producer links and passes `--check-native-profiles`. A 262K prefill needs weights.
+    Gate: the producer CLI runs `--check-native-profiles`. A 262K prefill needs weights.
+    Two findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
+    file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk 5.1's
+    `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; and the live Linux read
+    path is the `pread` worker pool, which `WF_HAS_IO_URING` already declares a ring for.
 
 3.2 Producer decode library wiring: `dlopen`/`dlsym` for `ds4-decode.so` in place of
     `LoadLibraryW`/`GetProcAddress`, and `make cuda-decode` producing it.
@@ -570,18 +661,22 @@ Costs that could exceed expectations:
 - Losing decode for Kimi, GLM, MiniMax and Step. That is a feature removal, not a port, so settle
   decision 2 first.
 
-## Machine facts checked on this box (2026-10-30)
+## Machine facts checked on this box (re-checked 2026-11-03)
 
-Arch Linux, kernel 7.2.11-arch1-1, RTX 5090, driver 615.78, CUDA 13.4 at `/opt/cuda` (not
-`/usr/local/cuda`), nvcc 13.4 with `sm_120`/`sm_121`, cmake 4.4.5, ninja 1.13.2,
-`/usr/include/liburing.h` present, Python 3.14.8, ext4 on one NVMe with 793 GB free, 30 GB RAM.
-`nvidia-fs` is not installed, so GDS is unavailable; io_uring is the route.
+Arch Linux, kernel 7.2.14-arch1-1, RTX 5090 32 GiB (driver 615.78.08), CUDA 13.4 at `/opt/cuda`
+(not `/usr/local/cuda`), nvcc 13.4 with `sm_120`/`sm_121`, cmake 4.4.5, ninja 1.13.2,
+`/usr/include/liburing.h` present, `/opt/cuda/lib64/libcufile.so` present, Python 3.14.9, ext4 on
+one NVMe with 359 GB free, 93 GB RAM (the 30 GB figure in earlier notes is stale; the box has more),
+16 cores.
+
+`nvidia-fs` is not installed, so GDS is unavailable at runtime even though the toolkit library
+links; io_uring is the route.
 
 Two things limit what a gate can prove here:
 
-- The GPU is occupied by another process (`strata`, 29.3 GiB of 32 GiB VRAM) and RAM is at
-  22 GiB used, ~7.8 GiB available. Compile gates run; anything that allocates VRAM or mlocks
-  large buffers will contend with it.
+- The GPU is occupied by another process (`strata`, ~30 GiB of 32 GiB VRAM, and its pid changes
+  between sessions). Compile and link gates run - `llama-server --version` initialised CUDA while
+  it was up - but anything that allocates VRAM or mlocks large buffers will contend with it.
 - No DeepSeek V4 weights exist locally. Phase 3 and Phase 8 gates cannot run until a qualified
   GGUF is present.
 
@@ -596,14 +691,15 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunk 2.2b with the commands above: 3,998 Apple/MLX references repo-wide,
-441 of them inside `engines/ds4` - none matched by the code-identifier gate, which returns 0 there;
-what remains is the 215 `DS4_METAL_*` environment names kept on purpose, plus Metal and Apple words
-in comments, help text and the Metal backend surface (chunk 2.2c). Windows references: 755
-repo-wide, 3 first-party `engines/ds4` hits, all three vendored files
-(`external/nlohmann/json.hpp` x2, the `linenoise.c` comment). Both counts include this plan's own
-quoted grep patterns, so they read higher than the code alone. Re-count before trusting any of
-these numbers.
+Counts, re-counted after chunks 2.2c/2.2d and 3.1b with the commands above, with `--exclude-dir=build`
+(the port's own scratch trees and object files now live under `build/`, which is gitignored but
+matched the greps as first written): 1,107 Apple/MLX references repo-wide and 774 Windows ones -
+both figures include this plan's own quoted grep patterns and the inherited measurement history in
+`docs/`, so they read higher than the code alone. Inside `engines/ds4` the code-identifier gate
+(`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 269 Apple/Metal
+matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
+Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
+comment). Re-count before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.

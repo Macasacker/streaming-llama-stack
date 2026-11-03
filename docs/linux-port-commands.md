@@ -28,6 +28,31 @@ make -C engines/ds4 cpu -j4
 library, compiled a second time with `-DDS4_EXTERNAL_DECODE=1`). It links `ds4_ext.o`,
 `ds4_cuda_ext.o` and `ds4_host_memory_ext.o` rather than the engine's own objects.
 
+### The streaming producer (chunk 3.1)
+
+`build.sh llama` configures and builds it. The CUTLASS checkout it clones is pinned to
+`ad7b2f5e84fcfa124cb02b91d5bd26d238c0459e`, and `libcufile.so` from `/opt/cuda` is linked when
+present (the GDS driver is not installed here, so `cuFileDriverOpen` fails at runtime and the
+fetcher stays on its `pread` workers).
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+mkdir -p build/cutlass-v3.9.2 build/llama/bin
+test -f build/cutlass-v3.9.2/include/cutlass/gemm/warp/mma_tensor_op_fast_f32.h ||
+  git clone --quiet --depth 1 --branch v3.9.2 https://github.com/NVIDIA/cutlass build/cutlass-v3.9.2
+cmake -G Ninja -S "$llama" -B build/llama \
+  -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DLLAMA_CURL=OFF \
+  -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_OPENSSL=OFF \
+  -DCMAKE_CUDA_ARCHITECTURES=120a -DGGML_BACKEND_DL=OFF -DBUILD_SHARED_LIBS=OFF \
+  -DLLAMA_DSV41_OFFLINE_PRODUCER=ON -DLLAMA_DSV41_NATIVE_HALF_PROFILES=ON \
+  -DLLAMA_DSV41_JSON_INCLUDE_DIR="$llama/vendor" \
+  -DGGML_CUDA_DSV41_SPLIT_F32=ON -DGGML_CUDA_CUTLASS_PATH="$PWD/build/cutlass-v3.9.2"
+cmake --build build/llama -j4 -- -k 0     # -k 0: collect every failure in one pass
+```
+
+Use `build/` for scratch logs, not `/tmp`: this box cleared `/tmp` mid-session once and took a
+build log and a configure directory with it.
+
 ## Gates that pass today
 
 ```bash
@@ -51,14 +76,23 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
 
-# No Metal-named identifiers left in the engine. The DS4_METAL_* environment names are kept on
-# purpose and cannot match: `_` is a word character, so \bMETAL_ does not match DS4_METAL_FOO.
+# No Metal-named identifiers or backend left in the engine. The DS4_METAL_* environment names are
+# kept on purpose and cannot match: `_` is a word character, so \bMETAL_ does not match DS4_METAL_FOO.
 grep -rn "\bmetal_\|\bMETAL_" engines/ds4 \
   --include=*.c --include=*.cpp --include=*.h --include=*.hpp \
   --include=*.cu --include=*.cuh --include=*.inc
-# 0 hits
+# 0 hits (chunk 2.2d caught the names with a leading underscore, e.g. glm_metal_)
+grep -rn "DS4_BACKEND_METAL" engines/ds4 \
+  --include=*.c --include=*.h --include=*.cu --include=*.cuh --include=*.inc
+# 0 hits (chunk 2.2c)
 
 cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
+./ds4 --metal -m /nonexistent                 # ds4: unknown option: --metal
+./ds4 --gpu-graph-test -m /nonexistent        # reaches engine open; the CUDA graph self-test
+
+# The producer links and runs. llama-server initialises CUDA even with Strata holding the VRAM.
+./build/llama/bin/llama-server --version      # prints "found 1 CUDA devices: ... compute capability 12.0"
+./build/llama/bin/llama-dsv41-prefill --help  # exits 2: main() is still the non-Windows stub
 ```
 
 ## Gates that fail today, and why
