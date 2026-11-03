@@ -10,25 +10,25 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-Phase 3's producer CLI is now Linux: it compiles, links, runs, and has no Win32 code left in its own
-directory. What remains of Phase 3 is deeper in the tree, and it is a port, not a sweep. In the
-order worth doing:
+Phase 3's producer CLI and its weight fetcher are now Linux: the CLI compiles, links, runs, and
+the fetcher reads through io_uring rings with no Win32 code in its file. What remains of Phase 3 is
+deeper in the tree, and it is a port, not a sweep. In the order worth doing:
 
-1. **Chunk 3.1e - `wf_io_uring_worker`.** `llama-weight-fetcher.cpp` declares a `struct io_uring
-   ring` under `WF_HAS_IO_URING` and defines it whenever `<liburing.h>` exists, but the live Linux
-   reader is still the `pread` worker pool at `llama-weight-fetcher.cpp:1205`. It is measurable
-   without model weights: the transport self-test in `engines/ds4/ds4_batch_io.cpp` byte-compares
-   batched io_uring reads against `pread` on a throwaway file, and the same shape works for the
-   producer. Deleting `llama-wf-gpu-ring.inl`, the DStorage interop and the `--ds-gpu-ring-slots`
-   producer option belongs to the same chunk (Phase 3 items 1 and 2), and `main.cpp` parses that
-   option today.
-2. **Chunk 3.1f - the weight provider, and then the prefill works.** `src/llama-dsv41-weights.cpp`
+1. **Chunk 3.1f - the weight provider, and then the prefill works.** `src/llama-dsv41-weights.cpp`
    refuses on Linux at eight sites (`:632`, `:924`, `:1001`, `:1164`, `:1283`, `:1323`, `:1399`,
    `:1517`): the physical file lease (`implementation::identity()`), `inspect`, `create_pipeline`,
    the three early/whole-prompt Engram IoRing loaders, the expert cache and the RAM host cache.
-   These are what still stop a prefill after the CLI itself runs. `llama-dsv41-locked-ram.h` and the
-   carry lease in `llama-dsv41-carry.cpp` are the same family, and they need the locked-memory
-   decision below before they can be written. `llama-dsv41-engram-prefetch.cpp` is Phase 3 item 3.
+   These are what still stop a prefill after the CLI itself runs. `create_pipeline` asks the
+   fetcher for `wf_create_required_dstorage`, which refuses here, and the provider's extent paths
+   call `wf_fetch_extents_direct` / `wf_ready_direct_bank`, whose Linux arms `return false` - so
+   3.1f decides whether those become io_uring reads against the fetcher's ring or go away. Note
+   that `params.ds_submit_threads` has no reader in the fetcher any more, so `--ds-submit-threads`
+   is admission-only. `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp` are
+   the same family, and they need the locked-memory decision below before they can be written.
+2. **Chunk 3.1g - `llama-dsv41-engram-prefetch.cpp` (Phase 3 item 3).** io_uring with 1 MiB extents
+   at QD64, measured against the `pread` baseline; that change is what took 76.2 s to 43.2 s on the
+   Windows machine. `LLAMA_WF_IO_URING=0` now selects the fetcher's pread baseline, which is the
+   comparison Phase 8 item 3 asks for.
 3. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
    `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
    profiler. No behaviour attached; regenerate the env table because lines move.
@@ -45,8 +45,9 @@ verified by the selftest; a live session against weights is not, and cannot be h
 
 `git log --oneline` from `58ff877` forward is the port, chunk by chunk; `docs/linux-port-plan.md`
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
-`7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), plus the plan/handoff
-commits. `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
+`7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44`
+(3.1e), plus the plan/handoff commits. `git status -sb` shows no `[ahead N]` after pushing; check
+it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
 reports 0 findings, so commits need no `--no-verify` (`core.hooksPath` runs it as a pre-commit
@@ -54,12 +55,16 @@ hook). Python suite: **584 tests, 6 failures, 5 errors** (fork baseline 585 / 6 
 failing *names* are the plan's list - `test_combo_process` (3), `test_journal_recovery_flags`,
 `test_single_liveness`, `test_shared_guard_adapter` (Windows-only guard and producer paths),
 `test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco` (missing `cosmos_windows` module),
-`test_h3_video_delivery` (video gate). Two process tests flip between runs
-(`test_hold_yield.py`'s `test_real_owned_child_stops_on_kit11_hold` and `test_combo_single_stop.py`'s
-`test_disconnect_inside_reasoning_then_next_turn_appends_only`), so compare names, not counts.
-Chunk 5.1 and 8.1 own the survivors.
+`test_h3_video_delivery` (video gate). Process tests flip between runs - the parent commit's full
+run showed 7 failures / 6 errors, and the two extra names
+(`test_actual_shared_guard_executes_the_nested_command`,
+`test_native_startup_accepts_lora_before_help_without_loading_weights`) pass when their file is run
+alone. Compare the set of names, never the counts. Chunk 5.1 and 8.1 own the survivors.
 
-Nothing verified so far is a performance result. No supported model weights exist on this box.
+Nothing verified so far is a performance result for a model. The only measurement is the fetcher's
+host read comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring 24 ms vs pread 32 ms for 64 MiB
+across 218 ops, four threads at QD8, one NVMe, cold cache) - it isolates the reader, not a prefill.
+No supported model weights exist on this box.
 
 ## Constraints on this box
 
@@ -95,6 +100,9 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   this build does not define. Its `BLOCKED` output is the manual work. Chunk 3.1d ran it with
   `--tokens _WIN32,windows.h,Win32,DStorage,IoRing,DXGI,BCrypt,NOMINMAX` over the producer CLI files
   and reported 0 blocked, 368 deletions, 0 insertions.
+  **A macro listed in `--never-defined` must also be listed in `--tokens`.** A node is only
+  considered when its first condition names a token in scope, so 3.1e's first run pinned
+  `WF_HAS_DSTORAGE` false but left 2,146 dead lines untouched because that name was never in scope.
 - `preprocess_equiv.py` compares `git show HEAD:<path>` against the working file with conditionals
   resolved and macros untouched. **It used to write the before file's *path* into its temp file
   unless `--rename-file` was passed**, so every no-rename check compared garbage; fixed in 2.2c.
@@ -103,14 +111,17 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   several), and `lang` is inferred from the suffix, so `.h` files are preprocessed as C - pass
   `--cc g++ --extra "... -x c++"` or every `<filesystem>`/`<atomic>` include fails.
 - A chunk that also edits comments (3.1d reworded provenance comments) makes the positional diff
-  noise: one changed line near the top shifts everything. Compare the **code** lines only - preprocess
-  both sides, drop lines starting with `//`, and diff with `difflib.unified_diff(..., n=0)`. On
-  3.1d that showed 0 changed code lines in seven of the ten files, and named exactly the three
-  intended edits in the others. For a file whose own include block moved (producer-platform.inc),
-  compare the *multiset* of code lines instead of positions.
-- Warning-profile comparison: `git worktree add build/wt-base HEAD`, build the same object list in
-  both trees, diff the warning texts with line numbers stripped. 2.2c: 26 vs 26 occurrences, 25
-  distinct texts, none new. Renames should differ only in the renamed symbol's own warnings.
+  noise: one changed line near the top shifts everything. `scripts/port/code_line_diff.py` compares
+  the **code** lines only - it preprocesses both sides with the build's own `-I` and `-D` flags,
+  drops comment-only and blank lines, and diffs with no context. 3.1e used it to show 47 / 11 / 4 / 7
+  changed lines in the four files it touched, every one an intended fold or a dead field, and 0 for
+  a pure deletion. For a file whose own include block moved (producer-platform.inc), compare the
+  *multiset* of code lines instead of positions.
+- Warning-profile comparison: `git worktree add build/wt-base HEAD` then
+  `scripts/port/warning_profile.py build/wt-base .`, which compiles the same TU list in both trees
+  with the same commands and prints the texts with line numbers stripped. 2.2c: 26 vs 26 occurrences
+  in the engine; 3.1e: 27 vs 27, 18 distinct, none added or removed. Renames should differ only in
+  the renamed symbol's own warnings.
 - A chunk that folds a constant (`backend == METAL` is false here) is *not* covered by
   `preprocess_equiv`: the line delta shifts everything and the positional diff is noise. Review
   `git diff -U0 <file> | grep '^+[^+]'` - the insertions - line by line instead, and check
@@ -118,10 +129,11 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 - Sweep inputs a later session may need to re-run are committed under `docs/evidence/` -
   `rename-2.2d.json` is chunk 2.2d's rename map, `platform-selftest.cpp` is chunk 3.1c's
-  platform-layer program (copy it to `build/` and compile it; `docs/linux-port-commands.md` has the
-  exact `g++` line and the no-model producer smoke recipe). Anything written under `build/` is
-  scratch and is not in git; chunk 2.2b's map was never saved, so its rename is only reconstructable
-  from its commit message.
+  platform-layer program, and `wf-io-selftest.cpp` is chunk 3.1e's reader program (io_uring against
+  the pread baseline, byte-compared through the real `wf_*` pipeline). Copy them to `build/` and
+  compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
+  smoke recipe. Anything written under `build/` is scratch and is not in git; chunk 2.2b's map was
+  never saved, so its rename is only reconstructable from its commit message.
 - When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
   but give it the equivalence commands as evidence. The 2.1 review produced three findings quoting
   text that was not in the working tree (it read the diff base rather than the tree), yet its second
@@ -131,31 +143,36 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 ## Behaviour changes landed this session
 
-- The producer CLI (`llama-dsv41-prefill`) runs on Linux instead of refusing: its whole body is
-  guarded by `GGML_USE_CUDA` alone, and its Win32 primitives are POSIX (see 3.1c/3.1d in the plan).
-  `--check-native-profiles` prints PASS and exits 0; `--help` prints the usage; every other
-  invocation parses, admits, and reaches the CUDA admission checks.
-- Receipt identity fields are unchanged in name and unit, and now carry POSIX values:
-  `volume_serial_u64` = `st_dev`, `file_id_le_hex` = the 8-byte `st_ino` little-endian with the high
-  eight zero, `mtime_filetime_ticks` = `st_mtime` in FILETIME ticks. The paging receipt field
-  `pagefile_growth_peak_bytes` keeps its name; its stop reason now says "swap growth limit 256 MB".
-- `--carry-storage hybrid` no longer requires a `D:` overflow path (no drive letters here); it keeps
-  native experts and the explicit 1 GiB disk reserve, on a volume that must now pass `fstatfs`:
-  NFS, CIFS/SMB/SMB2, FUSE, 9P, AFS, OCFS2, GFS2, NCP, tmpfs, ramfs and devtmpfs are refused, an
-  unknown local type is accepted. Removable media cannot be told from fixed on Linux.
-- Cancellation is SIGINT/SIGTERM (Ctrl+C/Ctrl+Break/Ctrl+close had no twin); an unhandled
-  SIGSEGV/SIGBUS/SIGFPE/SIGILL reports `kind=signal` on the session pipe and then lets the original
-  disposition take the crash path (`SA_RESETHAND`), which is what `EXCEPTION_CONTINUE_SEARCH` did.
-- The carry-resume RAM floor in `llama-dsv41-sweep.cpp` was `#ifdef _WIN32` and is live, so Linux
-  now refuses a resume that would cross the floor it previously ignored.
-- `llama_dsv41_host_memory::begin()` sets no process-memory limit on Linux: `RLIMIT_AS` would break
-  CUDA's address-space reservations, and a cgroup `memory.max` is the launcher's scope (Phase 5).
-  `private_limit` stays a reported ceiling and the 4 Hz watchdog is the guard.
-- The `LLAMADECODE_VRAM_HEADROOM` line dropped `vram_shared_usage` (no shared segment on Linux) and
-  renamed `dxgi_local_budget`/`dxgi_local_usage` to `device_total`/`device_used`; `LLAMADECODE_L2_OFFER`
-  renamed `dxgi_budget`/`dxgi_usage` to `local_budget`/`local_usage`. These are stderr diagnostics.
-- Deleted: `tools/dsv41-prefill/mac/ds4_native_session_transport.inc` (nothing referenced it) and
-  `tools/dsv41-prefill/carry-copy-bench.cpp` (Windows-only DirectStorage bench, no build rule).
+Chunk 3.1c/3.1d's behaviour changes (the CLI running on Linux, the POSIX receipt identity fields,
+`--carry-storage hybrid` without a drive letter, SIGINT/SIGTERM cancellation, the live carry-resume
+RAM floor, no process-memory limit in `host_memory::begin()`, the two `LLAMADECODE_*` diagnostic
+lines) are recorded in the plan's own entries for those chunks. This session's:
+
+- The weight fetcher reads with **io_uring**: one ring per reader thread, `io_queue_depth` reads in
+  flight each, registered fds where the kernel accepts them. The `pread` workers remain as the
+  baseline and run whenever `io_uring_queue_init` fails. `wf_get_io_engine()` (new export) names
+  which one a fetcher started, and `LLAMA_WF_IO_URING=0` forces the baseline - the one new
+  documented env row, added so Phase 8 item 3's isolated comparison is possible.
+- `WF_MODE_AUTO` no longer picks GDS because `cufile.h` exists. It calls `cuFileDriverOpen()` while
+  resolving the mode and prefers GDS only if the driver reports support; on this box (no
+  `nvidia-fs`) AUTO now resolves to `DIRECT_IO` at once instead of choosing GDS and falling back at
+  pipeline start.
+- `io_direct` no longer opens `O_DIRECT`, and says so once per file. Linux requires offset, length
+  and buffer to be block-aligned; GGUF tensor offsets are multiples of `general.alignment` (32 by
+  default), so the chunked reads would have failed `EINVAL` and completed with **zero bytes** while
+  still counting as done - silently wrong weights. Reads are buffered. The aligned variant (a second
+  fd, 4 KiB-aligned offsets, a bounce for the unaligned head) is open follow-up work, the same
+  deferral Phase 1 recorded for the engine transport.
+- `--ds-gpu-ring-slots` is gone: it is now an unknown producer option (parse refusal), the receipt
+  no longer reports `ds_gpu_ring_slots`, and `wf_params` lost that field. Anything that mirrors
+  `wf_params` by field order is stale - notably
+  `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py`, which Phase 6 deletes anyway.
+- The fetcher's strict extent-fetch entry points (`wf_fetch_extents_direct`, `wf_ready_direct_bank`,
+  `wf_fetch_ready_extents`, `wf_wait_ready_extents`, `wf_create_required_dstorage`) keep their Linux
+  refusals; `wf_persist_shutdown()` still returns 1. Chunk 3.1f decides what they become.
+- `liburing` is now linked (`find_library(LLAMA_URING_LIBRARY uring)` into `llama`, the producer and
+  the fetcher `.so`), because `WF_HAS_IO_URING` is decided by `__has_include(<liburing.h>)` and
+  nothing used to link the library.
 - Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
   `slstack-weight-fetcher.dll`, and `scripts/build_combo_runtime.py` builds a preset named
   "RTX: ULTRA prefill -> ds4-win decode". Those are 5.1/7.1. Note for 5.1:
@@ -201,6 +218,23 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 - `libnvidia-ml.so.1` is present (`/usr/lib`) and is `dlopen`ed, not linked. NVML only answers when
   `CUDA_VISIBLE_DEVICES` holds a `GPU-...` UUID; with it unset the free/total reads return false and
   the L2 offer is 0, exactly as on Windows.
+- The fetcher's reader has two rules that are easy to break again. A chunk taken off the queue and
+  never submitted never completes, and the pipeline waits on that layer's completion counter - so a
+  full SQ ring puts the remainder back on the queue, and `wf_stop` drains the queue and the
+  in-flight reads before joining. And `IOSQE_FIXED_FILE` means the SQE's `fd` field is the
+  *registered index*, not a descriptor; registration is optional, so both paths must stay wired.
+- `WF_HAS_IO_URING` comes from `__has_include(<liburing.h>)`, so liburing must be on the link line
+  (`LLAMA_URING_LIBRARY`, resolved in the top-level `CMakeLists.txt` and linked into `llama`, the
+  producer and the fetcher `.so`). A header-only install would fail at link, not at run time.
+- A **new** env read is not enough for the docs: `envdocs --refresh-defaults` only fills evidence for
+  rows that exist. Add the row to `envvars.json` by hand first (keys `var`, `flag`, `default`,
+  `code_default`, `classification`, `scopes`, `doc`, `reads`), then refresh, then
+  `python3 -B -m slstack.envdocs --check`. Without the row it raises
+  `Environment reference has missing or invalid rows`. `LLAMA_WF_IO_URING` is the model.
+- `git commit --amend` only reaches HEAD. A wrong number in an earlier chunk's message is worth
+  fixing - stash, then `GIT_SEQUENCE_EDITOR="sed -i '1s/^pick /reword /'" GIT_EDITOR=<script that
+  copies the corrected message to $1> git rebase -i HEAD~2`. The trees must match afterwards
+  (`git diff --stat <old-head> <new-head>` should be empty).
 - nvcc rejects a bare `-fPIC`; use `-Xcompiler -fPIC`. A shared library needs every linked object
   `-fPIC` once it contains TLS (`__thread`).
 - CUDA 13.4 / CCCL 3 facts: `nvcc` at `/opt/cuda/bin/nvcc`, libs in `/opt/cuda/lib` and
@@ -232,9 +266,12 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 - `adversarial-code-review` after a deletion or rename chunk, with the `scripts/port/` equivalence
   commands handed to the reviewer as evidence (see the method section for what it caught last time).
-- `add-unit-test` for extending `engines/ds4/tests/test_batch_io.cpp` or `test_decode_library.cpp`,
-  and for any io_uring worker added in chunk 3.1e.
-- `code-design` / `code-reviewer` when porting the weight provider lease and the io_uring worker.
+- `add-unit-test` for extending `engines/ds4/tests/test_batch_io.cpp` or `test_decode_library.cpp`.
+  The producer's reader is covered by `docs/evidence/wf-io-selftest.cpp`, compiled by hand, because
+  the producer has no test target.
+- `code-design` / `code-reviewer` when porting the weight provider lease and the carry lease
+  (chunk 3.1f), and `adversarial-code-review` after it: that chunk changes admission, not just
+  text.
 - `web-research` for liburing, CCCL 3 / libcudacxx header changes, or llama.cpp cmake details.
 - `unslop` / `writing-style` on docs and commit messages.
 - `handoff` again when this session runs out of context - update this file, don't replace it with

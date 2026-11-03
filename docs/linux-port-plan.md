@@ -311,10 +311,14 @@ tools   54 refs: dsv41-prefill/main.cpp (windows.h, bcrypt.h, dxgi1_4.h), produc
        live-session.inc, carry-copy-bench.cpp, decode-receiver/main.cpp, server/*, mtmd/*
 ```
 
-1. Open. Implement `wf_io_uring_worker` to replace the IOCP workers and the `pread` fallback pool
-   at `llama-weight-fetcher.cpp:1205`. `WF_MODE_AUTO` prefers GDS only when cuFile reports support.
-2. Open. Delete `llama-wf-gpu-ring.inl` and the DStorage interop paths. Drop the
-   `--ds-gpu-ring-slots` producer option rather than faking it.
+1. Done (3.1e). `wf_io_uring_worker` replaced the IOCP workers and the `pread` pool at
+   `llama-weight-fetcher.cpp:1205`: one ring per reader thread, `io_queue_depth` reads in
+   flight on each, registered fds where the kernel accepts them, and the `pread` workers kept
+   as the baseline when it does not (`LLAMA_WF_IO_URING=0`). `WF_MODE_AUTO` now calls
+   `cuFileDriverOpen()` while resolving the mode and prefers GDS only when cuFile reports
+   support, instead of choosing GDS because `cufile.h` exists.
+2. Done (3.1e). `llama-wf-gpu-ring.inl`, the DStorage interop and the `ds_gpu_ring_slots`
+   parameter deleted; `--ds-gpu-ring-slots` is gone from the producer rather than faked.
 3. Open. Port `llama-dsv41-engram-prefetch.cpp` to io_uring with 1 MiB extents at QD64, and measure
    it against the `pread` baseline separately. That change is what took 76.2 s to 43.2 s.
 4. Open. Replace the provider lease and the Windows throws in `llama-dsv41-weights.cpp` - eight of
@@ -708,18 +712,72 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     under `src/`, 6 under `common/`, 4 under `tools/mtmd`, 3 under `tools/server`,
     `tools/decode-receiver`, and the non-CUDA ggml backends still carry Win32 conditionals.
 
+3.1e The weight fetcher's Windows arms deleted, and io_uring wired. Done (`0ffe3ce`, `ff6bb44`).
+    Phase 3 items 1 and 2, in `src/llama-weight-fetcher.cpp` - the last producer TU carrying
+    Win32 host code (53 hits, 3,702 lines of them the DirectStorage/D3D12 interop: the wave
+    planner, the fence waits, the adapter-LUID match, the placed-quarter probe, the ring
+    scheduler).
+    (1/2) `collapse_conditionals.py --tokens
+    _WIN32,windows.h,Win32,DStorage,IoRing,IOCP,LLAMA_DIRECTSTORAGE,WF_HAS_DSTORAGE
+    --never-defined WF_HAS_DSTORAGE,LLAMA_DIRECTSTORAGE` - nothing BLOCKED, file down from
+    6,790 lines to 3,149 with that sweep, and to 3,313 after the reader below. A macro in
+    `--never-defined` must also be in `--tokens`: a node is only considered when its condition
+    names a token in scope, and the first run left 2,146
+    dead lines because `WF_HAS_DSTORAGE` was pinned false but not in scope. What survives is
+    the refusal Linux already made: `wf_create_required_dstorage()` says "Required
+    DirectStorage is not compiled in", the extent-fetch entry points keep `return false`,
+    `wf_persist_shutdown()` keeps returning 1. `llama-wf-gpu-ring.inl` deleted with the
+    `ds_gpu_ring_slots` parameter and the `--ds-gpu-ring-slots` producer option, so the
+    receipt no longer reports that field, and `llama_wf_bounded::exact_two_buffer_profile`
+    went with its only caller. Proven on the preprocessed code lines: 47 / 11 / 4 / 7 changed
+    in the fetcher, the provider, the sweep and the CLI, every one an intended fold or a dead
+    field; the 3,702 deleted lines never appear in the "before" text, which is the point.
+    `WF_MODE_AUTO` behaviour change: it called `cuFileDriverOpen()` only after choosing GDS,
+    so this box picked GDS on the strength of `cufile.h` and fell back at pipeline start. It
+    now probes while resolving the mode and prefers GDS only if the driver reports support.
+    (2/2) the reader. One `io_uring` ring per reader thread, `io_queue_depth` reads in flight
+    on each, the chunk pointer as `user_data`, registered files where the kernel accepts them
+    (`IOSQE_FIXED_FILE`), and completions accounted by one `wf_complete_chunk` shared with the
+    `pread` baseline. Chunks the SQ ring cannot take are put back on the queue - an
+    unsubmitted chunk never completes, and the pipeline waits on that layer's counter. Both
+    readers drain the queue and their in-flight reads at `wf_stop` for the same reason.
+    `WF_HAS_IO_URING` is decided by `__has_include(<liburing.h>)`, so the library is now on
+    the link line: `find_library(LLAMA_URING_LIBRARY uring)` linked into `llama`, the producer
+    and the fetcher `.so`, exactly as `LLAMA_CUFILE_LIBRARY` is.
+    Deliberate behaviour changes: `io_direct` no longer opens `O_DIRECT` - Linux requires the
+    offset, length and buffer all to be block-aligned, GGUF tensor data is aligned to
+    `general.alignment` (32 bytes by default), and the chunked reads would fail `EINVAL` and
+    complete with zero bytes; reads are buffered, and the aligned variant is follow-up work.
+    `LLAMA_WF_IO_URING=0` forces the pread baseline (new documented row) so the gain can be
+    isolated, and `wf_get_io_engine()` reports which reader a fetcher started.
+    Gate met: the producer targets build with the pre-change warning profile (27 occurrences,
+    18 distinct texts, none added or removed, compiled in a worktree at the parent commit with
+    the same commands); `docs/evidence/wf-io-selftest.cpp` drives the real `wf_*` pipeline over
+    a 64 MiB throwaway file and byte-compares what each reader stages against the file, then
+    reports both: 63 checks pass, and over three cold rounds io_uring reads the 64 MiB in
+    ~24 ms against the baseline's ~32 ms (x1.34-x1.38), the same 218 ops and the same bytes; `--check-native-profiles` still PASSes,
+    the 44-check platform selftest passes, the receipt smoke still refuses at the VRAM
+    reserve, and `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP"` over
+    `src/llama-weight-fetcher.{cpp,h}` returns nothing. `envvars.json` is 2,234 rows: the same
+    names plus `LLAMA_WF_IO_URING`, `release_check` 0 findings. Nothing here is a bandwidth
+    result for a real model; the fetcher has still never read weights.
+
 3.1 Streaming producer on Linux. What is left of Phase 3 is still a port, not a sweep.
-    `wf_io_uring_worker` beside the `pread` pool at `llama-weight-fetcher.cpp:1205`; delete
-    `llama-wf-gpu-ring.inl`, the DStorage interop and the `--ds-gpu-ring-slots` option; port
-    `llama-dsv41-engram-prefetch.cpp`; replace the provider lease and the eight Linux refusals in
-    `src/llama-dsv41-weights.cpp` (`:632`, `:924`, `:1001`, `:1164`, `:1283`, `:1323`, `:1399`,
-    `:1517`), which are what still stop a prefill; replace `llama-dsv41-locked-ram.h` and the carry
-    lease; then the Win32 host code in `mtmd`, `server` and `decode-receiver`.
+    Port `llama-dsv41-engram-prefetch.cpp`; replace the provider lease and the eight Linux
+    refusals in `src/llama-dsv41-weights.cpp` (`:632`, `:924`, `:1001`, `:1164`, `:1283`,
+    `:1323`, `:1399`, `:1517`), which are what still stop a prefill; replace
+    `llama-dsv41-locked-ram.h` and the carry lease; then the Win32 host code in `mtmd`,
+    `server` and `decode-receiver`.
     Gate: a 262K prefill, which needs a qualified GGUF on this box (see the machine facts).
-    Two findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
-    file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk 5.1's
-    `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; and the live Linux read
-    path is the `pread` worker pool, which `WF_HAS_IO_URING` already declares a ring for.
+    Findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
+    file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk
+    5.1's `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; the fetcher is
+    now io_uring-backed and Win32-free (3.1e), but its `wf_fetch_extents_direct` family still
+    refuses, so the provider's extent paths have no Linux transport until 3.1f decides whether
+    they become io_uring reads or go away; `params.ds_submit_threads` no longer has a reader in
+    the fetcher, so the producer's `--ds-submit-threads` is admission-only; and
+    `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py` mirrors `wf_params` by ctypes
+    field order, which the ring deletion shifted - that module is Phase 6's to delete.
 
 3.2 Producer decode library wiring. Done as part of 3.1c, because `live-session.inc` is part of
     `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable in place of
@@ -801,10 +859,11 @@ inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifi
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 269 Apple/Metal
 matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
-comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`: 0. The rest of
-the producer tree is still Windows-shaped: 25 files under `src/`, 6 under `common/`, 4 under
-`tools/mtmd`, 3 under `tools/server`, plus `tools/decode-receiver` and the ggml backends Phase 4
-deletes. Re-count before trusting any of these numbers.
+comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill` and in
+`src/llama-weight-fetcher.{cpp,h}`: 0 (chunks 3.1d and 3.1e). The repo-wide pattern above now
+counts 645. The rest of the producer tree is still Windows-shaped: 21 files under `src/`, 6 under
+`common/`, 4 under `tools/mtmd`, 3 under `tools/server`, 1 under `tools/decode-receiver`, plus the
+ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.

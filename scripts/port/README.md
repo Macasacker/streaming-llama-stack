@@ -62,9 +62,35 @@ check separately that each `== DEAD` term became false and each `!= DEAD` term b
 For `.cu` files use `--cc /opt/cuda/bin/nvcc`; nvcc fully expands macros, so `__LINE__` values
 inside trace messages show up as differences and are expected to move when lines are deleted.
 
-The other regression check for a mechanical sweep is a warning profile: `git worktree add /tmp/base
-HEAD`, build the same object list in both trees, and compare the warning texts with the line numbers
-stripped. A rename should differ only in the renamed symbol's own warnings.
+## code_line_diff.py
+
+`preprocess_equiv`'s diff counts comments, so a chunk that also rewords a comment near the top of
+a file shifts every later line and the diff reads as noise. This tool preprocesses both sides the
+same way, drops comment-only and blank lines, and diffs with no context: a deletion sweep then
+reports 0 changed code lines apart from the edits it intended, and a port reports only the regions
+it rewrote. It takes the include directories and `-D` flags from a configured build's
+`compile_commands.json` (default `build/llama/compile_commands.json`), keyed on the TU's basename:
+
+    git show HEAD:engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp > build/before.cpp
+    python3 scripts/port/code_line_diff.py --cuda-include /opt/cuda/include \
+        --include engines/streaming-llama/prefill_llama.cpp/src build/before.cpp \
+        engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp llama-weight-fetcher.cpp
+
+Pass `--cuda-include` when the TU has `__has_include(<cuda_runtime.h>)` blocks, and `--include` for
+a tool directory the file includes from. Without the build's `-D` flags the CUDA regions vanish from
+both sides and the comparison proves less than it looks like it does.
+
+## warning_profile.py
+
+The other regression check for a mechanical sweep, scripted: compile the same TU list in two trees
+with the same commands and print the warning texts with file, line and column stripped. A deletion
+should differ in nothing; a rename should differ only in the renamed symbol's own warnings.
+
+    git worktree add build/wt-base HEAD
+    python3 scripts/port/warning_profile.py build/wt-base .
+
+`--list` names the TUs; the default is the producer's six. The throwaway objects go to `build/`,
+which is scratch and gitignored.
 
 ## rename_identifiers.py
 

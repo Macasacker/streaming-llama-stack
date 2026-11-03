@@ -96,9 +96,12 @@ cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 ./build/llama/bin/llama-dsv41-prefill --check-native-profiles
 # PASS: delivered native-half and rounded expert profiles,4096-row resource policies; no GPU/model
 ./build/llama/bin/llama-dsv41-prefill         # exit 1; the abort line names the parse refusal
-# No Win32 code left in the producer CLI directory (chunk 3.1d).
-grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" \
-  engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill   # 0 hits
+# No Win32 code left in the producer CLI directory (chunk 3.1d) or in the weight fetcher
+# (chunk 3.1e).
+grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
+  engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h   # 0 hits
 ```
 
 ### The producer's platform layer, with no test target to run
@@ -128,6 +131,33 @@ output, bounded writes, the read-only rehash, `read_small`, no-replace publicati
 symlink refusal, ancestor pinning, the free-byte budget, `exclusive_writer`,
 `/proc/self/exe`, `getpid`, `set_environment`, `ram_admission`, SIGINT latching, the
 abort file, and `dlopen` of `ds4-decode.so` binding every `ds4x_*` entry point.
+
+### The weight fetcher's io_uring reader, against the pread baseline
+
+Chunk 3.1e replaced the fetcher's `pread` worker pool with one io_uring ring per reader
+thread. Its program is committed at `docs/evidence/wf-io-selftest.cpp`; it drives the real
+`wf_*` pipeline over a 64 MiB throwaway file, byte-compares what each reader stages into the
+GPU buffers against the file, and prints both readers' times. It needs a CUDA context (~160 MB)
+and a few MB of device buffers, so it runs while Strata holds the rest of the VRAM. No model.
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+cp docs/evidence/wf-io-selftest.cpp build/
+g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I/opt/cuda/include -o build/wf-io-selftest \
+    build/wf-io-selftest.cpp \
+    build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o \
+    build/llama/ggml/src/libggml.a build/llama/ggml/src/libggml-cpu.a build/llama/ggml/src/libggml-base.a \
+    build/llama/ggml/src/ggml-cuda/libggml-cuda.a \
+    -L/opt/cuda/lib64 -lcufile -lcudart -lcublas -lcublasLt -lcuda -luring -lpthread -ldl
+./build/wf-io-selftest            # 63 checks, "SELFTEST PASSED: 0 failure(s)"
+LLAMA_WF_IO_URING=0 ./build/wf-io-selftest   # same checks on the pread baseline
+```
+
+The last run prints, on this box, `io_uring : best of 3 cold rounds, ~24 ms ... pread : ~32 ms
+... x1.34`. `LLAMA_WF_IO_URING=0` is the only way to select the baseline; the fetcher
+otherwise uses io_uring whenever `io_uring_queue_init` succeeds. Reads are buffered: `O_DIRECT`
+is not implemented, because GGUF tensor offsets are multiples of `general.alignment` (32 bytes by
+default) and Linux would reject the unaligned chunked reads with `EINVAL`.
 
 ### Driving the real producer with no model
 
