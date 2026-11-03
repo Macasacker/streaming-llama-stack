@@ -712,11 +712,14 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     under `src/`, 6 under `common/`, 4 under `tools/mtmd`, 3 under `tools/server`,
     `tools/decode-receiver`, and the non-CUDA ggml backends still carry Win32 conditionals.
 
-3.1e The weight fetcher's Windows arms deleted, and io_uring wired. Done (`0ffe3ce`, `ff6bb44`).
-    Phase 3 items 1 and 2, in `src/llama-weight-fetcher.cpp` - the last producer TU carrying
-    Win32 host code (53 hits, 3,702 lines of them the DirectStorage/D3D12 interop: the wave
-    planner, the fence waits, the adapter-LUID match, the placed-quarter probe, the ring
-    scheduler).
+3.1e The weight fetcher's Windows arms deleted, and io_uring wired. Done (`0ffe3ce`, `ff6bb44`,
+    plus `1325655`, the hardening follow-up). Phase 3 items 1 and 2, in `src/llama-weight-fetcher.cpp` - the
+    largest producer TU still carrying Win32 host code (53 hits, 3,702 lines of them the
+    DirectStorage/D3D12 interop: the wave planner, the fence waits, the adapter-LUID match, the
+    placed-quarter probe, the ring scheduler). `llama-dsv41-engram-prefetch.cpp` (95 hits),
+    `llama-mmap.cpp` (18), `llama-dsv41-weights.cpp` (17), `llama-token-stream.cpp` (15),
+    `llama-tb-transport.cpp` (13) and `llama-dsv41-carry.cpp` (13) are still Windows-shaped and
+    belong to 3.1f/3.1g.
     (1/2) `collapse_conditionals.py --tokens
     _WIN32,windows.h,Win32,DStorage,IoRing,IOCP,LLAMA_DIRECTSTORAGE,WF_HAS_DSTORAGE
     --never-defined WF_HAS_DSTORAGE,LLAMA_DIRECTSTORAGE` - nothing BLOCKED, file down from
@@ -754,13 +757,43 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     18 distinct texts, none added or removed, compiled in a worktree at the parent commit with
     the same commands); `docs/evidence/wf-io-selftest.cpp` drives the real `wf_*` pipeline over
     a 64 MiB throwaway file and byte-compares what each reader stages against the file, then
-    reports both: 63 checks pass, and over three cold rounds io_uring reads the 64 MiB in
-    ~24 ms against the baseline's ~32 ms (x1.34-x1.38), the same 218 ops and the same bytes; `--check-native-profiles` still PASSes,
+    reports both. 139 checks pass, and over three cold rounds the whole pass takes, in one run,
+
+        4 threads (ring QD8 vs one pread per thread): io_uring 19.6 ms, pread 19.7 ms -> x1.00
+        1 thread  (ring QD8 vs one pread per thread): io_uring 21.4 ms, pread 33.6 ms -> x1.57
+
+    Four threads is the pipeline's shape and there the readers are a wash (x1.00-x1.01) - four
+    `pread` threads already keep the NVMe busy. What the rings add is queue depth per thread, which
+    is the one-thread row: x1.57 to x1.82 across runs. Do not quote `wf_get_stats`'s
+    `total_nvme_read_ms` for this: it sums each layer's own submit-to-last-completion window, and
+    layers overlap, so it double-counts and reads x1.37 where the wall clock reads x1.00. It is a
+    per-layer latency metric, not a bandwidth number.
+    `--check-native-profiles` still PASSes,
     the 44-check platform selftest passes, the receipt smoke still refuses at the VRAM
-    reserve, and `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP"` over
-    `src/llama-weight-fetcher.{cpp,h}` returns nothing. `envvars.json` is 2,234 rows: the same
+    reserve, and `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP"` over the fetcher
+    and the producer CLI returns nothing once comment lines are dropped
+    (`| grep -vE ":[0-9]+:\s*//"`). The two hits that survive are `tools/dsv41-prefill/
+    producer-platform.inc` lines 5 and 22, provenance comments naming the Win32 layer that file was
+    ported from - chunk 3.1d's "returns nothing" was written without that filter and was wrong as
+    printed.
+    `envvars.json` is 2,234 rows: the same
     names plus `LLAMA_WF_IO_URING`, `release_check` 0 findings. Nothing here is a bandwidth
     result for a real model; the fetcher has still never read weights.
+
+    The hardening follow-up came from reviewing the chunk. A read that delivered fewer bytes than it
+    asked for counted as completed - the same hazard the O_DIRECT refusal exists to avoid, still live
+    for a short read or a truncated file - and `wf_register_layer` checked span bounds only on the
+    strict DirectStorage path. Now a negative completion, and a short read of bytes the file does
+    hold, set the sticky transfer failure; `wf_register_layer` refuses a span running past its file's
+    size in every mode; `wf_wait_layer_gpu` returns nullptr once the fetcher has failed, so a refused
+    registration cannot hand compute a buffer holding whatever staging had before (it did: a probe
+    with an 8 KiB span at `size-1024` returned the buffer pointer); and the ring worker keeps the
+    chunks it submitted in an outstanding list, so a failed `io_uring_submit` or `io_uring_wait_cqe`
+    drains what the kernel already completed and accounts the rest as failed reads instead of leaving
+    a layer's counter below its total - the pipeline polls with timeouts, so that was a `progress=NO`
+    spin rather than a hang. A probe with `sigaction` flags 0 (what the producer installs) showed
+    `io_uring_wait_cqe` does not return `-EINTR` on this kernel: it blocked through a 20 s timeout,
+    so that path is defensive rather than a bug fixed.
 
 3.1 Streaming producer on Linux. What is left of Phase 3 is still a port, not a sweep.
     Port `llama-dsv41-engram-prefetch.cpp`; replace the provider lease and the eight Linux

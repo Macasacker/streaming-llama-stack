@@ -45,8 +45,7 @@ verified by the selftest; a live session against weights is not, and cannot be h
 
 `git log --oneline` from `58ff877` forward is the port, chunk by chunk; `docs/linux-port-plan.md`
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
-`7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44`
-(3.1e), plus the plan/handoff commits. `git status -sb` shows no `[ahead N]` after pushing; check
+`7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` + `1325655` (3.1e), plus the plan/handoff commits. `git status -sb` shows no `[ahead N]` after pushing; check
 it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
@@ -152,7 +151,12 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
   flight each, registered fds where the kernel accepts them. The `pread` workers remain as the
   baseline and run whenever `io_uring_queue_init` fails. `wf_get_io_engine()` (new export) names
   which one a fetcher started, and `LLAMA_WF_IO_URING=0` forces the baseline - the one new
-  documented env row, added so Phase 8 item 3's isolated comparison is possible.
+  documented env row, added so Phase 8 item 3's isolated comparison is possible. Measured honestly
+  (`docs/evidence/wf-io-selftest.cpp`, whole-pass wall clock, best of three cold rounds): **x1.00**
+  at four threads, where four `pread` threads already saturate the device, and **x1.57** at one
+  thread, which is what the rings actually add - queue depth per thread. Do not quote
+  `wf_get_stats`'s `total_nvme_read_ms` for a comparison: it sums each layer's own read window and
+  layers overlap, so it reads x1.37 where the wall clock reads x1.00.
 - `WF_MODE_AUTO` no longer picks GDS because `cufile.h` exists. It calls `cuFileDriverOpen()` while
   resolving the mode and prefers GDS only if the driver reports support; on this box (no
   `nvidia-fs`) AUTO now resolves to `DIRECT_IO` at once instead of choosing GDS and falling back at
@@ -170,6 +174,12 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
 - The fetcher's strict extent-fetch entry points (`wf_fetch_extents_direct`, `wf_ready_direct_bank`,
   `wf_fetch_ready_extents`, `wf_wait_ready_extents`, `wf_create_required_dstorage`) keep their Linux
   refusals; `wf_persist_shutdown()` still returns 1. Chunk 3.1f decides what they become.
+- A failed read is now fatal instead of silent: a negative completion, or a short read of bytes the
+  file does hold, sets the sticky transfer failure; `wf_register_layer` refuses a span running past
+  its file's size in **every** mode (it checked them only on the strict DirectStorage path); and
+  `wf_wait_layer_gpu` returns nullptr once the fetcher has failed. Before this a refused
+  registration still handed compute the GPU buffer pointer, and a short read counted as a completed
+  chunk, so the pipeline uploaded uninitialised staging as weights.
 - `liburing` is now linked (`find_library(LLAMA_URING_LIBRARY uring)` into `llama`, the producer and
   the fetcher `.so`), because `WF_HAS_IO_URING` is decided by `__has_include(<liburing.h>)` and
   nothing used to link the library.
@@ -181,6 +191,24 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
   to stage.
 
 ## Gotchas
+
+- The producer builds the fetcher **twice**: `tools/dsv41-prefill` compiles its own copy of
+  `src/llama-weight-fetcher.cpp` into the CLI, and `src/` compiles it into `libllama.a`. A manually
+  linked selftest uses `build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o`, which
+  `ninja -C build/llama llama-dsv41-prefill` does **not** rebuild - so it silently links a stale
+  object and proves nothing about your edit. Run `ninja -C build/llama src/libllama.a` first.
+- A chunk the reader never accounts does not hang the pipeline: the scheduler polls
+  `wf_layer_io_done` with a timeout, so it spins reporting `progress=NO` with the RAM buffers stuck
+  `in_use`, and `wf_stop` still joins. That makes a dropped chunk look like a stall, not a deadlock
+  - account every chunk on every exit path.
+- `io_uring_wait_cqe` does not return `-EINTR` here: a probe blocking it while a `sigaction`
+  handler with `flags=0` (what the producer installs) fires showed no escape, so liburing retries.
+  The error paths are defensive, not a live bug.
+- `adversarial-code-review` on 3.1e earned its keep: it caught the inflated gain metric and the
+  short-read accounting, both of which I had asserted were handled. Run it before declaring a chunk
+  done, and re-verify its claims - one of its findings (the "24 checks" count) was against text I
+  had already corrected, and its "last producer TU carrying Win32" phrasing was mine and was wrong:
+  `llama-dsv41-engram-prefetch.cpp` still carries 95 hits.
 
 - Regenerate the env table in the same commit as any engine source edit:
   `python3 -B -m slstack.envdocs --refresh-defaults` then `python3 -B -m slstack.envdocs`. Any line

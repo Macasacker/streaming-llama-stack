@@ -34745,11 +34745,11 @@
     ],
     "doc": "LLAMA_DSV4_WF_CKSUM: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2880"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2979"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2880",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2979",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static const char * wf_cksum_path = std::getenv(\"LLAMA_DSV4_WF_CKSUM\");",
         "consumer": "    // every other layer-selective mechanism; the surviving gap is upload fidelity of specific\n    // layers' spans. Same-run comparison: hash the uploaded GPU bytes AND the mmap source bytes.\n    static const char * wf_cksum_path = std::getenv(\"LLAMA_DSV4_WF_CKSUM\");\n    if (!wf->required_dstorage && wf_cksum_path && wf_cksum_path[0]) {\n        static std::mutex cksum_mutex;\n        static std::set<std::pair<int, std::string>> done_set;\n        std::lock_guard<std::mutex> lk(cksum_mutex);"
@@ -43545,7 +43545,7 @@
     "doc": "LLAMA_WF_DS_DIRECT: advanced engine setting; built-in default retained",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1649",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1805"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1879"
     ],
     "code_defaults": [
       {
@@ -43555,7 +43555,7 @@
         "consumer": "    // D3D12-heap compute buffer, allocated inside wf_create/wf_dstorage_init. We must NOT cudaMalloc one here\n    // (would waste 8.5GB + be clobbered); instead we wrap the WF heap ptr as gpu_buf_a AFTER wf_create below.\n    const char * ds_direct_env = std::getenv(\"LLAMA_WF_DS_DIRECT\");\n    const char * wf_env_chk     = std::getenv(\"LLAMA_PREFILL_WF\");\n    const bool wf_on_chk        = wf_env_chk && wf_env_chk[0] && std::strcmp(wf_env_chk, \"0\") != 0;\n    // DS-direct is a WF-only feature: only defer the alloc when the WF path is actually requested,\n    // otherwise gpu_buf_a would be left null with no WF to provide the heap."
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1805",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1879",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = std::getenv(\"LLAMA_WF_DS_DIRECT\");",
         "consumer": "    // R3 DS-DIRECT gate (default-off == today's exact behavior). Set BEFORE any mode-specific init.\n    {\n        const char * e = std::getenv(\"LLAMA_WF_DS_DIRECT\");\n        wf->ds_direct_mode = params->ds_compute_direct||(e && e[0] && e[0] != '0');\n        if (wf->ds_direct_mode) WF_LOG(\"DS-DIRECT mode ENABLED (LLAMA_WF_DS_DIRECT): permanent ping-pong heaps, no staging tier\");\n    }\n    wf->layers.resize(params->n_layers);"
@@ -43616,7 +43616,7 @@
     ],
     "doc": "OPUS22 experiment, unset by default (about layer/1000 bytes per DirectStorage request, clamped 512 KiB..32 MiB). 2, 4, 8, 16 or 32 fixes the request size in MiB for planning and the strict profile checks alike. Same bytes and destinations.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1783",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1857",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-wf-bounded-policy.h:30"
     ],
     "allowed_values": [
@@ -43628,7 +43628,7 @@
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1783",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1857",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (std::getenv(\"LLAMA_WF_DS_REQUEST_MIB\")) WF_ERR(\"[dsv41-dstorage-config] request_bytes=%zu typed_setting=1\", params->io_block_size);",
         "consumer": "    }\n\n    if (std::getenv(\"LLAMA_WF_DS_REQUEST_MIB\")) WF_ERR(\"[dsv41-dstorage-config] request_bytes=%zu typed_setting=1\", params->io_block_size);\n    // Typed profile admission happens before context/factory/heap allocation.\n    // Ambient tuning still refuses in strict mode; the caller uses explicit\n    // source-pinned settings rather than inheriting unbounded environment knobs.\n    if ((params->ds_staging_limit_bytes || params->ds_async_drain) &&"
@@ -43745,11 +43745,11 @@
     ],
     "doc": "LLAMA_WF_EXPERT_PREFETCH: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1459"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1533"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1459",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1533",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * gate = std::getenv(\"LLAMA_WF_EXPERT_PREFETCH\");",
         "consumer": "    wf->expert_prefetch_initialized = true;\n    if (wf->required_dstorage) return;\n    const char * gate = std::getenv(\"LLAMA_WF_EXPERT_PREFETCH\");\n    if (!(gate && gate[0] && gate[0] != '0')) return;\n    if (wf->params.moe_mode != WF_MOE_FETCH_ACTIVE) {\n        WF_ERR(\"warning: LLAMA_WF_EXPERT_PREFETCH requires WF_MOE_FETCH_ACTIVE; disabling\");\n        return;"
@@ -43997,11 +43997,11 @@
     ],
     "doc": "LLAMA_WF_IO_URING: 0 forces the weight fetcher's synchronous pread baseline, so the io_uring reader's gain can be measured against it on the same file. Any other value, including unset, keeps io_uring when the kernel offers a ring.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1103"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1177"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1103",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1177",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * want = std::getenv(\"LLAMA_WF_IO_URING\");",
         "consumer": "// file and the same geometry (Phase 8 item 3).\nstatic bool wf_io_uring_wanted(void) {\n    const char * want = std::getenv(\"LLAMA_WF_IO_URING\");\n    return !(want && want[0] == '0');\n}\n#endif\n"
@@ -44119,11 +44119,11 @@
     ],
     "doc": "LLAMA_WF_LOCKFREE_READY: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2925"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3024"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2925",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3024",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * v = std::getenv(\"LLAMA_WF_LOCKFREE_READY\");",
         "consumer": "static bool wf_lockfree_ready_enabled() {\n    static const bool e = []() {\n        const char * v = std::getenv(\"LLAMA_WF_LOCKFREE_READY\");\n        return v && v[0] && v[0] != '0';\n    }();\n    return e;\n}"
@@ -44246,11 +44246,11 @@
     ],
     "doc": "LLAMA_WF_PREFETCH_PCT: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1948"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2022"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1948",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2022",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * pf_env = std::getenv(\"LLAMA_WF_PREFETCH_PCT\");",
         "consumer": "    // Set desired size here; actual allocation happens in wf_allocate_prefetch().\n    {\n        const char * pf_env = std::getenv(\"LLAMA_WF_PREFETCH_PCT\");\n        int pf_pct = (pf_env && pf_env[0]) ? std::atoi(pf_env) : 50;\n        if (pf_pct < 0) pf_pct = 0;\n        if (pf_pct > 100) pf_pct = 100;\n        if (pf_pct > 0 && !wf->ds_direct_mode) {  // relay path for all configs (direct path has MoE corruption)"
@@ -44326,11 +44326,11 @@
     ],
     "doc": "LLAMA_WF_SPAN_DUMP: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2255"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2351"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2255",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2351",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = std::getenv(\"LLAMA_WF_SPAN_DUMP\");",
         "consumer": "    // placement uses padded gpu_offsets \u2014 any overhang is silently dropped/under-copied.\n    static const int span_dump_il = []() {\n        const char * e = std::getenv(\"LLAMA_WF_SPAN_DUMP\");\n        return (e && e[0] != '\\0') ? atoi(e) : -1;\n    }();\n    if (layer_idx == span_dump_il) {\n        fprintf(stderr, \"[wf] SPAN_DUMP layer %d: n_spans=%d total_bytes=%zu padded_extent=%zu overhang=%lld\\n\","

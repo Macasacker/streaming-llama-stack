@@ -97,11 +97,13 @@ cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 # PASS: delivered native-half and rounded expert profiles,4096-row resource policies; no GPU/model
 ./build/llama/bin/llama-dsv41-prefill         # exit 1; the abort line names the parse refusal
 # No Win32 code left in the producer CLI directory (chunk 3.1d) or in the weight fetcher
-# (chunk 3.1e).
+# (chunk 3.1e). Drop comment lines: the two survivors are provenance comments in
+# producer-platform.inc that name the Win32 layer it was ported from.
 grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
   engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill \
   engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp \
-  engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h   # 0 hits
+  engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h | grep -vE ":[0-9]+:\s*//"
+# 0 hits
 ```
 
 ### The producer's platform layer, with no test target to run
@@ -137,27 +139,43 @@ abort file, and `dlopen` of `ds4-decode.so` binding every `ds4x_*` entry point.
 Chunk 3.1e replaced the fetcher's `pread` worker pool with one io_uring ring per reader
 thread. Its program is committed at `docs/evidence/wf-io-selftest.cpp`; it drives the real
 `wf_*` pipeline over a 64 MiB throwaway file, byte-compares what each reader stages into the
-GPU buffers against the file, and prints both readers' times. It needs a CUDA context (~160 MB)
-and a few MB of device buffers, so it runs while Strata holds the rest of the VRAM. No model.
+GPU buffers against the file, checks that a span running past the file's end fails the fetcher
+instead of reading zeros, and prints both readers at two queue geometries. It needs a CUDA
+context (~160 MB) and a few MB of device buffers, so it runs while Strata holds the rest of the
+VRAM. No model.
 
 ```bash
 llama=engines/streaming-llama/prefill_llama.cpp
-cp docs/evidence/wf-io-selftest.cpp build/
+ninja -C build/llama src/libllama.a      # the object below is only rebuilt by this target
+mkdir -p build && cp docs/evidence/wf-io-selftest.cpp build/
 g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I/opt/cuda/include -o build/wf-io-selftest \
     build/wf-io-selftest.cpp \
     build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o \
     build/llama/ggml/src/libggml.a build/llama/ggml/src/libggml-cpu.a build/llama/ggml/src/libggml-base.a \
     build/llama/ggml/src/ggml-cuda/libggml-cuda.a \
     -L/opt/cuda/lib64 -lcufile -lcudart -lcublas -lcublasLt -lcuda -luring -lpthread -ldl
-./build/wf-io-selftest            # 63 checks, "SELFTEST PASSED: 0 failure(s)"
-LLAMA_WF_IO_URING=0 ./build/wf-io-selftest   # same checks on the pread baseline
+./build/wf-io-selftest            # 139 checks, "SELFTEST PASSED: 0 failure(s)"
 ```
 
-The last run prints, on this box, `io_uring : best of 3 cold rounds, ~24 ms ... pread : ~32 ms
-... x1.34`. `LLAMA_WF_IO_URING=0` is the only way to select the baseline; the fetcher
-otherwise uses io_uring whenever `io_uring_queue_init` succeeds. Reads are buffered: `O_DIRECT`
-is not implemented, because GGUF tensor offsets are multiples of `general.alignment` (32 bytes by
-default) and Linux would reject the unaligned chunked reads with `EINVAL`.
+Build the object first: `ninja -C build/llama llama-dsv41-prefill` compiles its own copy of the
+fetcher under `tools/`, and the link above reads the one under `src/`, so skipping that step links
+a stale object and the run says nothing about your edit.
+
+What it prints here, whole-pass wall clock, best of three cold rounds:
+
+```text
+info 4 threads io_uring wall 19.6 ms / window sum 23.9 ms | pread wall 19.7 ms / window sum 32.6 ms | wall x1.00, window x1.37
+info 1 thread  io_uring wall 21.4 ms / window sum 36.3 ms | pread wall 33.6 ms / window sum 58.8 ms | wall x1.57, window x1.62
+```
+
+Quote the wall clock. `total_nvme_read_ms` is the sum of each layer's own read window and layers
+overlap, so it double-counts; four `pread` threads already saturate the device, and the ring's
+actual advantage is queue depth per thread, which is the one-thread row.
+
+`LLAMA_WF_IO_URING=0` is the only way to select the baseline; the fetcher otherwise uses io_uring
+whenever `io_uring_queue_init` succeeds. Reads are buffered: `O_DIRECT` is not implemented, because
+GGUF tensor offsets are multiples of `general.alignment` (32 bytes by default) and Linux would
+reject the unaligned chunked reads with `EINVAL`.
 
 ### Driving the real producer with no model
 

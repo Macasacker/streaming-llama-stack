@@ -913,12 +913,30 @@ static void wf_close_file(wf_file_handle * fh) {
 
 // One chunk's read finished: account it, wake the pipeline if its layer is now
 // complete, and hand the chunk back to the pool.
+//
+// A chunk that did not deliver what it asked for is a fatal transfer, not a
+// completed one.  The bytes beyond the short read stay whatever the staging
+// buffer held, and the pipeline would upload them to the GPU as weights.
 static void wf_complete_chunk(wf_context * wf, wf_io_chunk * chunk, ssize_t res, int thread_id) {
     const size_t bytes_read = res > 0 ? (size_t) res : 0;
+    // A rounded chunk may legitimately end past EOF (io_direct rounds a chunk up
+    // to 4 KiB), so only a short read of bytes the file actually holds is a
+    // failure.
+    const size_t file_bytes = chunk->file_idx >= 0 && chunk->file_idx < (int) wf->files.size()
+                              ? wf->files[chunk->file_idx].file_size : 0;
+    const bool wanted_bytes_exist = chunk->file_offset + chunk->nbytes <= file_bytes;
+    const bool short_read = res >= 0 && wanted_bytes_exist && bytes_read < chunk->nbytes;
+
     if (res < 0) {
         WF_ERR("read failed: layer %d span %d offset %llu: errno %d",
                chunk->layer_idx, chunk->span_idx,
                (unsigned long long) chunk->file_offset, (int) -res);
+        wf->ds_failed.store(true, std::memory_order_release);
+    } else if (short_read) {
+        WF_ERR("short read: layer %d span %d offset %llu: %zd of %zu bytes, file ends at %zu",
+               chunk->layer_idx, chunk->span_idx, (unsigned long long) chunk->file_offset,
+               res, chunk->nbytes, file_bytes);
+        wf->ds_failed.store(true, std::memory_order_release);
     }
 
     int il = chunk->layer_idx;
@@ -1030,6 +1048,42 @@ static void wf_io_uring_worker(wf_context * wf, int thread_id) {
 
     int inflight = 0;
     std::vector<wf_io_chunk *> batch;
+    // Every chunk submitted but not yet completed.  The loop normally empties it
+    // through completions; the error paths below empty it by accounting the
+    // chunk as a failed read, because the pipeline waits on that layer's
+    // completion count and a chunk that is never accounted never wakes it.
+    std::vector<wf_io_chunk *> outstanding;
+
+    auto forget = [&](wf_io_chunk * chunk) {
+        for (size_t i = 0; i < outstanding.size(); i++) {
+            if (outstanding[i] == chunk) {
+                outstanding[i] = outstanding.back();
+                outstanding.pop_back();
+                return;
+            }
+        }
+    };
+
+    // Drain completions the kernel already has, then account whatever is still
+    // outstanding as a failed read.
+    auto settle = [&](const char * why) {
+        if (why) WF_ERR("io_uring reader %d: %s", thread_id, why);
+        wf->ds_failed.store(true, std::memory_order_release);
+        struct io_uring_cqe * cqe = nullptr;
+        while (outstanding.size() && io_uring_peek_cqe(&ring, &cqe) == 0) {
+            auto * chunk = static_cast<wf_io_chunk *>(io_uring_cqe_get_data(cqe));
+            if (chunk) {
+                wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+                forget(chunk);
+                inflight--;
+            }
+            io_uring_cqe_seen(&ring, cqe);
+        }
+        for (auto * chunk : outstanding) wf_complete_chunk(wf, chunk, (ssize_t) -EIO, thread_id);
+        outstanding.clear();
+        inflight = 0;
+    };
+
     for (;;) {
         const bool exiting = wf->io_shutdown.load(std::memory_order_relaxed);
 
@@ -1044,6 +1098,7 @@ static void wf_io_uring_worker(wf_context * wf, int thread_id) {
                                chunk->dest, (unsigned) chunk->nbytes, chunk->file_offset);
             io_uring_sqe_set_data(sqe, chunk);
             if (fixed_files) sqe->flags |= IOSQE_FIXED_FILE;
+            outstanding.push_back(chunk);
             inflight++;
             taken++;
         }
@@ -1054,18 +1109,30 @@ static void wf_io_uring_worker(wf_context * wf, int thread_id) {
             std::lock_guard<std::mutex> lock(wf->io_queue_mutex);
             wf->io_chunk_queue.insert(wf->io_chunk_queue.begin(), batch.begin() + taken, batch.end());
         }
-        if (inflight) io_uring_submit(&ring);
+        if (inflight) {
+            const int submitted = io_uring_submit(&ring);
+            // A short submit is not an error: the remaining SQEs are still in the
+            // ring and a later iteration submits them again.
+            if (submitted < 0) {
+                settle("io_uring_submit failed");
+                break;
+            }
+        }
 
         if (inflight > 0) {
             struct io_uring_cqe * cqe = nullptr;
-            if (io_uring_wait_cqe(&ring, &cqe) != 0) {
-                WF_ERR("io_uring_wait_cqe failed on reader %d", thread_id);
+            const int waited = io_uring_wait_cqe(&ring, &cqe);
+            if (waited != 0) {
+                settle("io_uring_wait_cqe failed");
                 break;
             }
             unsigned seen = 0;
             do {
                 auto * chunk = static_cast<wf_io_chunk *>(io_uring_cqe_get_data(cqe));
-                if (chunk) wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+                if (chunk) {
+                    wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+                    forget(chunk);
+                }
                 io_uring_cqe_seen(&ring, cqe);
                 seen++;
             } while (seen < (unsigned) inflight && io_uring_peek_cqe(&ring, &cqe) == 0);
@@ -1084,12 +1151,19 @@ static void wf_io_uring_worker(wf_context * wf, int thread_id) {
     // Every submitted read completes; the pipeline waits on those counters.
     while (inflight > 0) {
         struct io_uring_cqe * cqe = nullptr;
-        if (io_uring_wait_cqe(&ring, &cqe) != 0) break;
+        if (io_uring_wait_cqe(&ring, &cqe) != 0) {
+            settle("final drain failed");
+            break;
+        }
         auto * chunk = static_cast<wf_io_chunk *>(io_uring_cqe_get_data(cqe));
-        if (chunk) wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+        if (chunk) {
+            wf_complete_chunk(wf, chunk, cqe->res, thread_id);
+            forget(chunk);
+        }
         io_uring_cqe_seen(&ring, cqe);
         inflight--;
     }
+    if (!outstanding.empty()) settle("reader left with unaccounted chunks");
     io_uring_queue_exit(&ring);
 }
 #endif  // WF_HAS_IO_URING
@@ -2222,6 +2296,28 @@ void wf_register_layer(wf_context * wf, int layer_idx,
     }
 
     auto & layer = wf->layers[layer_idx];
+
+    // Every mode reads through these spans, so the file bounds are checked here
+    // rather than only in the strict profile.  A span past EOF would read zero
+    // bytes, complete, and be uploaded to the GPU as weights.
+    for (int i = 0; i < n_spans; i++) {
+        const auto & src = spans[i];
+        if (src.mmap_addr || src.nbytes == 0) continue;
+        if (src.file_idx < 0 || src.file_idx >= (int) wf->files.size()) {
+            WF_ERR("register layer %d span %d: file index %d out of range (%zu files)",
+                   layer_idx, i, src.file_idx, wf->files.size());
+            wf->ds_failed.store(true, std::memory_order_release);
+            return;
+        }
+        const size_t file_bytes = wf->files[src.file_idx].file_size;
+        if (src.file_offset > file_bytes || src.nbytes > file_bytes - src.file_offset) {
+            WF_ERR("register layer %d span %d: %zu bytes at offset %llu end past file size %zu",
+                   layer_idx, i, src.nbytes, (unsigned long long) src.file_offset, file_bytes);
+            wf->ds_failed.store(true, std::memory_order_release);
+            return;
+        }
+    }
+
     layer.total_bytes = total_bytes;
     layer.spans.resize(n_spans);
 
@@ -2369,6 +2465,9 @@ void wf_request_layer(wf_context * wf, int layer_idx) {
 void * wf_wait_layer_gpu(wf_context * wf, int layer_idx) {
     if (!wf || layer_idx < 0 || layer_idx >= (int)wf->layers.size()) return nullptr;
 
+    // A failed transfer, or a layer whose registration was refused, must never
+    // hand compute a buffer: the bytes in it are whatever staging held before.
+    if (wf->ds_failed.load(std::memory_order_acquire)) return nullptr;
 
     auto & layer = wf->layers[layer_idx];
 
