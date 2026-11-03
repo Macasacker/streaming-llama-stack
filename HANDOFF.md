@@ -97,7 +97,11 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   `git diff -U0 <file> | grep '^+[^+]'` - the insertions - line by line instead, and check
   separately that every `== DEAD` term became false and every `!= DEAD` term became true.
 
-When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
+- Sweep inputs a later session may need to re-run are committed under `docs/evidence/` -
+  `rename-2.2d.json` is chunk 2.2d's rename map. Anything written under `build/` is scratch and is
+  not in git; chunk 2.2b's map was never saved, so its rename is only reconstructable from its
+  commit message.
+- When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
 but give it the equivalence commands as evidence. The 2.1 review produced three findings quoting
 text that was not in the working tree (it read the diff base rather than the tree), yet its second
 pass caught three real problems in what the commit *claimed*. Reviewers check claims, not just code:

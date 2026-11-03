@@ -1,0 +1,42 @@
+{
+  "exact": [
+    [
+      "ds4_engine_metal_graph_test",
+      "ds4_engine_gpu_graph_test"
+    ],
+    [
+      "ds4_engine_metal_graph_full_test",
+      "ds4_engine_gpu_graph_full_test"
+    ],
+    [
+      "ds4_engine_metal_graph_prompt_test",
+      "ds4_engine_gpu_graph_prompt_test"
+    ]
+  ],
+  "prefix": [
+    [
+      "glm_metal_",
+      "glm_gpu_"
+    ],
+    [
+      "g_metal_graph_",
+      "g_gpu_graph_"
+    ],
+    [
+      "generate_metal_graph_",
+      "generate_gpu_graph_"
+    ],
+    [
+      "qwen4_metal_",
+      "qwen4_gpu_"
+    ],
+    [
+      "generate_glm_metal_",
+      "generate_glm_gpu_"
+    ],
+    [
+      "generate_qwen4_metal_",
+      "generate_qwen4_gpu_"
+    ]
+  ]
+}

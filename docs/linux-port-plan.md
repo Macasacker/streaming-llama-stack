@@ -567,7 +567,9 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
 2.2d Metal-era identifiers with a leading underscore. Done (`4940201`). Chunk 2.2b's rename used
     word boundaries, and `_` is a word character, so `glm_metal_*`, `g_metal_graph_*`,
     `generate_metal_graph_raw_swa`, `qwen4_metal_argmax` and the exported
-    `ds4_engine_metal_graph_*` survived its gate. 92 occurrences renamed to the `gpu_*` forms.
+    `ds4_engine_metal_graph_*` survived its gate. 92 occurrences renamed to the `gpu_*` forms,
+    through the map kept at `docs/evidence/rename-2.2d.json` - rename inputs belong in the repo,
+    because `build/` is scratch and `/tmp` is not dependable here.
     Proven inert: `preprocess_equiv.py --rename-file` with the same map is byte-identical for
     ds4.c, ds4.h and ds4_cli.c. One `ds4_metal.m` mention stays in a `ds4_cuda.cu` comment as
     inherited provenance.
