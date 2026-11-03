@@ -800,8 +800,8 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `io_uring_wait_cqe` does not return `-EINTR` on this kernel: it blocked through a 20 s timeout,
     so that path is defensive rather than a bug fixed.
 
-3.1f The weight provider's lease, pipeline and named extents. Done (`3afcd91`, `1e4cf01`, and the
-    review follow-up). Phase 3 items 4 and the extent half of 5. The decision the chunk was asked to
+3.1f The weight provider's lease, pipeline and named extents. Done (`3afcd91`, `1e4cf01`,
+    `38765aa`). Phase 3 items 4 and the extent half of 5. The decision the chunk was asked to
     make - do `wf_fetch_extents_direct` and `wf_ready_direct_bank` become io_uring reads or go away -
     came out as reads: an extent batch is split into parts, read through io_uring (or the `pread`
     baseline) into a pinned window of four 8 MiB slots, and uploaded into the named bank. With a
@@ -841,7 +841,18 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     export list. `wf_extent_fetch_stats`'s submit/fence/verify fields stay 0 and say so, so the
     `LLAMADECODE_DS4X_TOKEN` line keeps its shape.
 
-    What the review of this chunk caught, and what it did not: `io_uring_wait_cqe()` does not flush
+    The third commit is the review's one real catch plus the lease's missing ancestor pin: both
+    io_uring readers now wait through `io_uring_submit_and_wait()` (see the flush probe below),
+    ancestors are held as descriptors and rebound to their names by `identity()`, the model and row
+    descriptors open with `openat()` on the pinned parent, `inspect()` takes the lease before it
+    asks about the device (which is what makes `docs/evidence/provider-lease-selftest.cpp` - 14
+    checks, no backend - possible), and `params.prefetch_depth=3` is named rather than inherited
+    because a stage landing in bank `id%2` depends on the relay being ahead in bank assignment.
+    `build/bank-parity.cpp` (scratch) checks that order and reports no mismatch at the named depth
+    and at depth 1; the decode acquire order is not covered there and is the first thing to probe
+    when a GPU has headroom.
+
+    What the review caught, and what it did not: `io_uring_wait_cqe()` does not flush
     the submission queue on this kernel and liburing 2.15, and `io_uring_submit()` can return 0
     without being an error, so both io_uring readers now wait through `io_uring_submit_and_wait()`
     - `docs/evidence/uring-flush-probe.cpp` demonstrates the two halves of that claim. The review's

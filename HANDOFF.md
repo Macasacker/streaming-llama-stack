@@ -33,7 +33,7 @@ qualified GGUF. In the order worth doing:
    `llama-dsv41-carry.cpp`** (Phase 3 item 5). They are the same family, and neither can be written
    before the decision below: `mlock` of a pinned tier needs an `RLIMIT_MEMLOCK` or a cgroup
    allowance, and `host_memory::begin()` deliberately does not solve it.
-3. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
+4. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
    `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
    profiler. No behaviour attached; regenerate the env table because lines move.
 
@@ -63,10 +63,12 @@ failing *names* are the plan's list - `test_combo_process` (3), `test_journal_re
 and `test_real_owned_child_stops_on_kit11_hold` pass or fail depending on the run. Compare the set
 of names, never the counts. Chunk 5.1 and 8.1 own the survivors.
 
-Three hand-compiled programs cover what has no test target, all passing on this tree:
+Five hand-compiled programs cover what has no test target, all passing on this tree:
 `docs/evidence/platform-selftest.cpp` (44 checks, the producer's file/hash/VRAM layer),
 `docs/evidence/wf-io-selftest.cpp` (139 checks, the fetcher's relay through the real `wf_*`
-pipeline), and `docs/evidence/wf-extent-selftest.cpp` (32 checks, the strict extent reader).
+pipeline), `docs/evidence/wf-extent-selftest.cpp` (33 checks, the strict extent reader),
+`docs/evidence/provider-lease-selftest.cpp` (14 checks, the provider's lease through `inspect()`
+with no backend), and `docs/evidence/uring-flush-probe.cpp` (3 checks, the io_uring flush rule).
 `docs/linux-port-commands.md` has the exact compile lines.
 
 Nothing verified so far is a performance result for a model. The measurements are the fetcher's
@@ -143,7 +145,9 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   `rename-2.2d.json` is chunk 2.2d's rename map, `platform-selftest.cpp` is chunk 3.1c's
   platform-layer program, `wf-io-selftest.cpp` is chunk 3.1e's reader program (io_uring against the
   pread baseline, byte-compared through the real `wf_*` pipeline), `wf-extent-selftest.cpp` is chunk
-  3.1f's extent reader, and `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait
+  3.1f's extent reader (33 checks, including a seven-part batch against four slots),
+  `provider-lease-selftest.cpp` is 3.1f's lease program (14 checks through the public `inspect()`
+  with no backend), and `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait
   rule. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
   smoke recipe. Anything written under `build/` is scratch and is not in git; chunk 2.2b's map was
   never saved, so its rename is only reconstructable from its commit message.
