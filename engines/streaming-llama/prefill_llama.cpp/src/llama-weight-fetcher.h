@@ -34,14 +34,8 @@
 #include <cstddef>
 #include <cstdint>
 
-// DLL export/import decoration for shared library builds
-#if defined(_WIN32) && !defined(WF_STATIC)
-#  if defined(LLAMA_BUILD)
-#    define WF_API __declspec(dllexport)
-#  else
-#    define WF_API __declspec(dllimport)
-#  endif
-#elif defined(__GNUC__) && __GNUC__ >= 4
+// Visibility decoration for shared library builds
+#if defined(__GNUC__) && __GNUC__ >= 4
 #  define WF_API __attribute__((visibility("default")))
 #else
 #  define WF_API
@@ -63,10 +57,10 @@ typedef struct wf_context wf_context;
 // Transfer backend — how weights move from storage to GPU
 typedef enum {
     WF_MODE_MMAP       = 0,   // legacy: read from mmap'd region (current behaviour)
-    WF_MODE_DIRECT_IO  = 1,   // async direct I/O: NVMe → RAM → pinned → GPU
-    WF_MODE_GDS        = 2,   // GPUDirect Storage: NVMe → GPU (requires GDS driver, Linux)
-    WF_MODE_DSTORAGE   = 3,   // Microsoft DirectStorage: NVMe → GPU via D3D12 (Windows)
-    WF_MODE_AUTO       = 4,   // try DSTORAGE/GDS, fall back to DIRECT_IO, then MMAP
+    WF_MODE_DIRECT_IO  = 1,   // async reader: NVMe → RAM → pinned → GPU
+    WF_MODE_GDS        = 2,   // GPUDirect Storage: NVMe → GPU (requires the nvidia-fs driver)
+    WF_MODE_DSTORAGE   = 3,   // retired: Microsoft DirectStorage, refused on this build
+    WF_MODE_AUTO       = 4,   // GDS when cuFile reports support, else DIRECT_IO, else MMAP
 } wf_transfer_mode;
 
 // MoE expert fetch strategy
@@ -106,7 +100,7 @@ typedef struct {
     size_t  io_block_size;                // read block size (default: 512 * 1024 = 512KiB)
     int     io_queue_depth;              // async I/O queue depth per thread (default: 4)
     int     io_threads;                  // number of I/O reader threads (default: 8)
-    bool    io_direct;                   // use O_DIRECT / FILE_FLAG_NO_BUFFERING (default: true)
+    bool    io_direct;                   // request unbuffered reads (default: true)
 
     // ---- Pipeline geometry ----
     int     prefetch_depth;              // layers to prefetch ahead (default: 3)
@@ -134,7 +128,6 @@ typedef struct {
     // ---- Misc ----
     int     n_layers;                    // total model layers
     bool    trace;                       // emit per-operation timing to stderr
-    uint32_t ds_gpu_ring_slots;           //0 off; strict one-shot TEST2, full pass queued upfront
     bool ds_zero_padding_only;           // explicit verified full-span direct fill; default false
     bool ds_compute_direct;              // explicit strict dual-use compute heaps; no relay
 } wf_params;
@@ -163,7 +156,6 @@ static inline wf_params wf_params_default(void) {
     p.ds_staging_limit_bytes = 0;
     p.ds_async_drain = false;
     p.ds_submit_threads = 0;
-    p.ds_gpu_ring_slots = 0;
     p.ds_compute_direct = false;
     p.ds_zero_padding_only = false;
     p.n_sublayers      = 1;
@@ -199,14 +191,9 @@ typedef struct {
 // Returns NULL on failure.
 WF_API wf_context * wf_create(const wf_params * params);
 
-// Explicit opt-in for callers whose host-memory admission cannot tolerate a
-// whole-layer pinned fallback. Requires mode DSTORAGE, a CUDA backend, exact
-// CUDA/D3D12 adapter identity, and every requested split file. Returns NULL
-// before fallback allocations if DS is unavailable or initialization fails.
-// Experimental alternate heaps, persistent/global staging, extracted-layer
-// files and optional expert caches are rejected, not silently inherited.
-// Like wf_create's DS path, compute buffers must subsequently be supplied with
-// wf_set_gpu_buf_ptr(). This does not qualify a model or admit VRAM by itself.
+// Explicit opt-in for callers that require the Windows DirectStorage path. This
+// build does not compile DirectStorage, so it refuses before any allocation and
+// never falls back to unadmitted heaps or caches.
 WF_API wf_context * wf_create_required_dstorage(const wf_params * params);
 // Sticky fatal transfer/registration/synchronization status. Required callers
 // must check after void registration, upload waits and release boundaries.
@@ -215,8 +202,8 @@ WF_API bool wf_has_failed(const wf_context * wf);
 // Destroy the pipeline, free all resources, join threads.
 WF_API void wf_destroy(wf_context * wf);
 
-// DS4COMBO: release the process-global DirectStorage/D3D12 cache (staging, files,
-// DS factory, D3D12 device). Call only after every wf_context is destroyed. 1 = released.
+// Release the process-global transfer cache. There is none on this build, so
+// this always reports 1. Call only after every wf_context is destroyed.
 WF_API int wf_persist_shutdown(const char * why);
 
 // ---------------------------------------------------------------------------
@@ -239,8 +226,8 @@ WF_API void wf_register_layer(wf_context *         wf,
 // Start the pipeline — begins prefetching from layer 0.
 // Call after all layers are registered.
 WF_API void wf_start(wf_context * wf);
-// LLAMADECODE_ENGRAM_EARLY=pause: DirectStorage transfers of stages >=
-// first_held_stage stay pending until released with INT_MAX (the default).
+// LLAMADECODE_ENGRAM_EARLY=pause: transfers of stages >= first_held_stage stay
+// pending until released with INT_MAX (the default).
 WF_API void wf_hold_from(wf_context * wf, int first_held_stage);
 
 // reverse-ds: start a BACKWARD pass — streams layers N-1..0 for full-DMA-speed training backward streaming.
@@ -294,19 +281,20 @@ WF_API void wf_stop(wf_context * wf);
 // Only relevant when moe_mode == WF_MOE_FETCH_ACTIVE.
 // Must be called BEFORE wf_wait_layer_gpu() for that layer.
 // expert_ids: array of active expert indices, n_active: count.
-// LLAMADECODE B1b: a persistent stage occupies its own bank region that no other
+// B1b: a persistent stage occupies its own bank region that no other
 // stage of this fetcher writes. After its first complete transfer it is served
-// from VRAM (no DMA) for the rest of this fetcher's lifetime. Required DS only.
+// from VRAM (no DMA) for the rest of this fetcher's lifetime. Requires the
+// retired DirectStorage path, so it refuses on this build.
 // Per-pass omission, set only while stopped. No IO, lease or compute credit.
 WF_API bool wf_set_layer_skipped(wf_context * wf, int layer_idx, bool skipped);
 WF_API bool wf_set_layer_persistent(wf_context * wf, int layer_idx, bool persistent);
-// LLAMADECODE B2: synchronously fetch explicit file extents into a direct compute
-// bank (required DS, two-bank direct profile). Serialized with the pipeline's DMA
-// (one DS submission in flight); the caller's CUDA stream waits on the DS fence
-// before any consumer. The caller owns the bank region (it must not overlap any
-// pipeline stage written later in the same pass).
+// B2: synchronously fetch explicit file extents into a direct compute
+// bank (retired DirectStorage profile). Serialized with the pipeline's DMA
+// (one submission in flight); the caller's CUDA stream waits on the transfer
+// fence before any consumer. The caller owns the bank region (it must not
+// overlap any pipeline stage written later in the same pass).
 typedef struct { uint64_t file_offset; uint64_t bank_offset; uint64_t nbytes; int file_idx; } wf_extent;
-WF_API // LLAMADECODE: cumulative expert-miss fetch split: submit, DS fence, verify, CUDA fence (ms).
+WF_API // LLAMADECODE: cumulative expert-miss fetch split: submit, fence, verify, CUDA fence (ms).
 void wf_extent_fetch_stats(double * out4, uint64_t * requests, uint64_t * batches);
 bool wf_fetch_extents_direct(wf_context * wf, int bank, const wf_extent * extents, int n,
                                     void * cuda_stream, uint64_t * bytes, double * milliseconds);
@@ -405,7 +393,7 @@ typedef struct {
 
 // Get cumulative stats since wf_create() or last wf_reset_stats().
 WF_API void wf_get_stats(wf_context * wf, wf_stats * stats);
-// Completed strict DirectStorage transfer: actual requested file bytes and
+// Completed strict-profile transfer: actual requested file bytes and
 // submit-to-visible-compute-buffer wall time (includes enqueue, fences and D2D).
 // No filesystem cache or model arithmetic is touched by this snapshot.
 WF_API bool wf_get_required_layer_fetch(wf_context * wf, int layer,
@@ -440,8 +428,9 @@ WF_API size_t wf_get_gpu_buf_capacity(wf_context * wf);
 WF_API void * wf_get_gpu_buf_ptr(wf_context * wf, int buf_idx);
 WF_API void   wf_set_gpu_buf_ptr(wf_context * wf, int buf_idx, void * ptr);
 
-// R3 DS-direct: CUDA device index the WF resolved (for ggml_backend_cuda_buffer_from_ptr), and whether
-// DS-direct mode is ACTUALLY active (false if it was requested but fell back to legacy on heap-alloc failure).
+// R3: CUDA device index the WF resolved (for ggml_backend_cuda_buffer_from_ptr), and whether
+// direct compute banks were requested (always false while the DirectStorage path
+// is refused).
 WF_API int    wf_get_cuda_device_index(wf_context * wf);
 WF_API bool   wf_is_ds_direct(wf_context * wf);
 
@@ -470,10 +459,6 @@ WF_API const char * wf_get_model_path(wf_context * wf);
 // when processing multiple ubatches per layer.
 WF_API void wf_set_layer_major_mode(wf_context * wf, bool enabled);
 WF_API bool wf_get_layer_major_mode(wf_context * wf);
-
-// ---------------------------------------------------------------------------
-// DirectStorage interop — expose DS handles for external RAM queues
-// ---------------------------------------------------------------------------
 
 #ifdef __cplusplus
 }

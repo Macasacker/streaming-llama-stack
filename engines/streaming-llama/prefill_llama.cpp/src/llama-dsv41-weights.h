@@ -51,7 +51,6 @@ public:
         std::vector<int32_t> engram_early_tokens,engram_early_tail;
         bool zero_padding_only=false;
         uint32_t ds_submit_threads=0;
-        uint32_t ds_gpu_ring_slots=0;
         // LLAMADECODE B1: 82-stage decode layout (embedding, then per layer a
         // dense stage and a routed-expert stage, then the head). Only the
         // routed experts' bytes are fetched. Switched at a pass boundary.

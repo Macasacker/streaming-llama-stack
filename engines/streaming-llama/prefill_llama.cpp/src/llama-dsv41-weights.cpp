@@ -845,8 +845,8 @@ struct llama_dsv41_weight_provider::implementation {
         // can add one request beyond ceil(tensor_bytes/io_block). Include
         // vector capacity growth plus temporary old/new allocations; the SDK
         // assertion above pins the conservative request+index byte bound.
-        const uint64_t stride=options.ds_gpu_ring_slots?((staging/2)&~uint64_t(65535)):staging;
-        require(stride>0,"GPU ring staging stride refused");
+        const uint64_t stride=staging;
+        require(stride>0,"Fetch staging stride must be non-zero");
         uint64_t requests=0,waves=0;
         for(const auto&s:stages){waves=add(waves,(s.bytes+stride-1)/stride);
             for(const auto&e:s.entries){const uint64_t bytes=ggml_nbytes(e.t);
@@ -861,7 +861,6 @@ struct llama_dsv41_weight_provider::implementation {
         require(requests<=UINT64_MAX/(4*512)&&waves<=UINT64_MAX/512,"V4.1 DS request metadata budget overflow");
         planned.host_bytes=add(metadata_allowance+factory_allowance,add(requests*(4*512),waves*512));
         if(tail_prefetch)planned.host_bytes=add(planned.host_bytes,8*mib); // one worker stack + bounded hint metadata
-        if(options.ds_gpu_ring_slots)planned.host_bytes=add(planned.host_bytes,128*mib);
         if(options.zero_padding_only)planned.host_bytes=add(planned.host_bytes,mib); // bounded8192-span complement/request metadata
         if(options.engram_prefetch_host_bytes){
             require(options.engram_prefetch_tokens&&options.engram_prefetch_tokens<=1048576,
@@ -930,12 +929,11 @@ bool llama_dsv41_weight_provider::inspect(const config&options,std::string&error
              (options.buffers==2&&options.staging_limit_bytes==llama_wf_bounded::profile_staging_bytes))),
         "Unsupported explicit physical fetch profile");
     require(options.admitted_host_bytes>=metadata_allowance,"Bounded native metadata inspection was not admitted");
-    require(!options.ds_gpu_ring_slots||(options.ds_gpu_ring_slots==2&&options.buffers==2&&options.auto_request_size&&options.async_staging_drain&&options.staging_limit_bytes==1500*mib),"GPU ring requires explicit native two-buffer profile");
     require(options.ds_submit_threads==0||options.ds_submit_threads==1||options.ds_submit_threads==2||options.ds_submit_threads==4,
         "DirectStorage submit threads must be explicit0/1/2/4");
     require(!options.zero_padding_only||options.compute_direct,"Padding-only zero requires explicit direct compute heaps");
-    require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size&&!options.ds_gpu_ring_slots),
-        "Direct compute requires two typed async banks without a ring");
+    require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size),
+        "Direct compute requires two typed async banks");
     require(!std::getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY"),"Unified CUDA memory is outside strict physical weight admission (including env value zero)");
     require(ggml_backend_is_cuda(options.backend),"V4.1 physical provider requires an actual CUDA backend");
     require(options.verified_sha256.size()==64&&options.verified_sha256.find_first_not_of("0123456789abcdef")==std::string::npos&&options.verified_file_bytes>0,"Completed file SHA256/identity receipt required");
@@ -1005,16 +1003,15 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
     p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
     require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2&&
-        !p->options.ds_gpu_ring_slots&&!p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
+        !p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
     const char*ledger=std::getenv("LLAMADECODE_BYTE_LEDGER");p->byte_ledger=ledger&&!std::strcmp(ledger,"1");
-    require(!p->lazy_prefill||(p->options.compute_direct&&!p->options.ds_gpu_ring_slots&&!p->options.zero_padding_only),
-        "Routed prefill requires direct compute banks without GPU ring or padding-only mode");
+    require(!p->lazy_prefill||(p->options.compute_direct&&!p->options.zero_padding_only),
+        "Routed prefill requires direct compute banks without padding-only mode");
     wf_params params=wf_params_default();params.model_path=p->options.model_path.c_str();params.gpu_backend=p->options.backend;params.mode=WF_MODE_DSTORAGE;
     params.n_layers=int(p->stage_count());params.n_gpu_buffers=int(p->options.buffers);params.max_layer_bytes=p->planned.maximum_stage_bytes;params.n_ram_buffers=0;
     params.io_block_size=size_t(p->planned.request_bytes);params.ds_staging_limit_bytes=size_t(p->options.staging_limit_bytes);
     params.ds_async_drain=p->options.async_staging_drain;
     params.ds_submit_threads=p->options.ds_submit_threads;
-    params.ds_gpu_ring_slots=p->options.ds_gpu_ring_slots;
     params.ds_compute_direct=p->options.compute_direct;
     params.ds_zero_padding_only=p->options.zero_padding_only;
     p->fetcher=wf_create_required_dstorage(&params);require(p->fetcher,"Required original weight DirectStorage initialization failed");
@@ -1029,7 +1026,7 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     }
     for(uint32_t i=0;i<p->stage_count();++i){std::vector<wf_weight_span>spans;p->spans_for(p->stage_at(i),spans);wf_register_layer(p->fetcher,int(i),spans.data(),int(spans.size()),p->stage_at(i).bytes);}
     if(p->options.yoco_encoder_only){
-        require(!p->decode_layout&&!p->options.ds_gpu_ring_slots,"YOCO requires non-ring prefill streaming");
+        require(!p->decode_layout,"YOCO encoder requires the prefill streaming layout");
         for(uint32_t i=22;i<42;++i)require(wf_set_layer_skipped(p->fetcher,int(i),true),"YOCO fetch omission refused");
     }
     if(p->decode_layout){
@@ -1051,22 +1048,22 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
         if(p->options.compute_direct)
             std::fprintf(stderr,"LLAMADECODE_PREFILL_LAYOUT banks=%zu streaming_banks=%u persistent_stages=0 expert_pool_bound=0\n",p->buffers.size(),p->options.buffers);
     }
-    require(!wf_has_failed(p->fetcher),"Original layer registration failed");p->identity();if(p->options.ds_gpu_ring_slots)wf_set_layer_major_mode(p->fetcher,true);p->apply_pause("cold_wf_start");wf_start(p->fetcher);
+    require(!wf_has_failed(p->fetcher),"Original layer registration failed");p->identity();p->apply_pause("cold_wf_start");wf_start(p->fetcher);
     require(!wf_has_failed(p->fetcher),"Original DirectStorage pipeline startup failed");p->mark_weight_stream(true);
 #endif
 }
 bool llama_dsv41_weight_provider::open(const config&options,std::string&error){return inspect(options,error)&&allocate(error);}
 bool llama_dsv41_weight_provider::restart_prompt(const config&options,std::string&error){return p->guard([&]{
-    require(p->allocated&&!p->device_suspended&&!p->leased&&p->next==p->stage_count()&&!p->options.ds_gpu_ring_slots,"Only a fully released non-ring resident provider pass can restart");
+    require(p->allocated&&!p->device_suspended&&!p->leased&&p->next==p->stage_count(),"Only a fully released resident provider pass can restart");
     auto binding=[](const config&v){return std::tie(v.model_path,v.verified_file_bytes,v.verified_volume,v.verified_mtime_ns,v.verified_file_id,
         v.verified_sha256,v.backend,v.admitted_device_bytes,v.admitted_host_bytes,v.buffers,v.staging_limit_bytes,v.auto_request_size,
-        v.async_staging_drain,v.compute_direct,v.zero_padding_only,v.engram_prefetch_host_bytes,v.ds_submit_threads,v.ds_gpu_ring_slots);};
+        v.async_staging_drain,v.compute_direct,v.zero_padding_only,v.engram_prefetch_host_bytes,v.ds_submit_threads);};
     require(binding(options)==binding(p->options),"Persistent provider cannot change model/backend/geometry/admission");
     require(!options.engram_prefetch_host_bytes||(options.engram_prefetch_tokens&&
         4ull*1024*1024+uint64_t(options.engram_prefetch_tokens)*48*(4+264)<=options.engram_prefetch_host_bytes),"Restarted prompt exceeds admitted immutable row-cache capacity");
     p->join_tail();p->tail.reset();
     p->identity();wf_stop(p->fetcher);wf_quiesce(p->fetcher);p->mark_weight_stream(false);require(!wf_has_failed(p->fetcher),"Completed provider could not quiesce before request reuse");
-    require(!options.yoco_encoder_only||(!options.decode_layout&&!options.ds_gpu_ring_slots),"YOCO encoder cannot use decode/ring fetch layout");
+    require(!options.yoco_encoder_only||!options.decode_layout,"YOCO encoder cannot use the decode fetch layout");
     if(!p->decode_layout && options.decode_layout==p->decode_layout && options.yoco_encoder_only!=p->options.yoco_encoder_only)
         for(uint32_t i=22;i<42;++i)require(wf_set_layer_skipped(p->fetcher,int(i),options.yoco_encoder_only),"YOCO pass fetch mask change refused");
     p->options.yoco_encoder_only=options.yoco_encoder_only;

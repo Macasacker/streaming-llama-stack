@@ -709,7 +709,7 @@ CUDA module loading policy; backend admission accounts for the selected policy.
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:148`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:147`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Forced EAGER was measured slower (43K ABAB, 2026-10-25: L0 first-tile stall +26.8/+7.8 s)
@@ -1141,7 +1141,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
         require(boundary.bytes()<=actual,"Boundary outputs escaped actual graph admission");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:619`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:614`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         report["resident_hidden_storage"]=options.resident_bf16?"BF16 after validated existing BF16 boundary; layer0 input unchanged F32":"F32";
@@ -1219,7 +1219,7 @@ DS4PERF_STDERR_BUFFER_BYTES: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:152`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:151`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     try{
@@ -8998,7 +8998,7 @@ Expert-count upper bound for the host cache. On the single engine it optionally 
 
 Scope: ds4, rtx-llama. Class: preset.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1503`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1500`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     require(p->pool_max_stride[0]==p->pool_max_stride[1],"RAM expert gate/up geometry mismatch");
@@ -11379,18 +11379,6 @@ Source: `engines/ds4/ds4_batch_io.cpp:824`. Unset read: NULL from getenv; the li
 DirectStorage request split for each expert read: default 8 parts; 0 or 1 disables splitting, 2..64 selects the part count.
 
 Scope: ds4, rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:6667`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    // split into read_parts equal 4 KiB-unit subreads.
-    static const uint32_t read_parts = [] {
-        const char * e = std::getenv("DS4_DS_READ_PARTS");
-        const long v = e && *e ? std::strtol(e, nullptr, 10) : 8;
-        const uint32_t p = (uint32_t) (v <= 1 ? 1 : std::min<long>(v, 64));
-        fprintf(stderr, "LLAMADECODE_MISS_READ_PARTS read_parts=%u source=%s\n", p, e && *e ? "DS4_DS_READ_PARTS" : "ds4-default");
-        return p;
-```
 
 ### DS4_DS_SELFTEST
 
@@ -19414,7 +19402,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:311
         require(!options.admitted_prefetch_device_bytes||(options.admitted_pinned_device_bytes&&options.reuse_graph&&!options.reuse_layer_graph&&
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:251`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         expert.admitted_pool_bytes=expert_options?number("--expert-workspace-bytes"):0;
@@ -19426,7 +19414,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:
             using namespace llama_dsv41_native_columns_resource_proof;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:368`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:367`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if(fold_plan.tail){std::fprintf(stderr,"LLAMADECODE_PREFILL_FOLD_TAIL tokens=%zu primary_sweep_tokens=%u remainder=%u capacity=%u fold_cap=%u folded_last=%u sweep_tokens=%s\n",
@@ -19438,7 +19426,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:
         const bool live=args.count("--session-stdio")&&args.at("--session-stdio")=="1";
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:767`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:762`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint64_t warm_cublas=0;
@@ -20332,7 +20320,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:615`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:610`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool streamed_graph_support=streamed_graphs&&std::string(streamed_graphs)=="1";
@@ -20386,11 +20374,11 @@ GGML_CUDA_ENABLE_UNIFIED_MEMORY: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:939`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:937`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size&&!options.ds_gpu_ring_slots),
-        "Direct compute requires two typed async banks without a ring");
+    require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size),
+        "Direct compute requires two typed async banks");
     require(!std::getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY"),"Unified CUDA memory is outside strict physical weight admission (including env value zero)");
     require(ggml_backend_is_cuda(options.backend),"V4.1 physical provider requires an actual CUDA backend");
     require(options.verified_sha256.size()==64&&options.verified_sha256.find_first_not_of("0123456789abcdef")==std::string::npos&&options.verified_file_bytes>0,"Completed file SHA256/identity receipt required");
@@ -23406,14 +23394,14 @@ Diagnostic per-tensor file extents and byte counts for every acquired weight sta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1009`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1007`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2&&
-        !p->options.ds_gpu_ring_slots&&!p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
+        !p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
     const char*ledger=std::getenv("LLAMADECODE_BYTE_LEDGER");p->byte_ledger=ledger&&!std::strcmp(ledger,"1");
-    require(!p->lazy_prefill||(p->options.compute_direct&&!p->options.ds_gpu_ring_slots&&!p->options.zero_padding_only),
-        "Routed prefill requires direct compute banks without GPU ring or padding-only mode");
+    require(!p->lazy_prefill||(p->options.compute_direct&&!p->options.zero_padding_only),
+        "Routed prefill requires direct compute banks without padding-only mode");
     wf_params params=wf_params_default();params.model_path=p->options.model_path.c_str();params.gpu_backend=p->options.backend;params.mode=WF_MODE_DSTORAGE;
     params.n_layers=int(p->stage_count());params.n_gpu_buffers=int(p->options.buffers);params.max_layer_bytes=p->planned.maximum_stage_bytes;params.n_ram_buffers=0;
 ```
@@ -23460,7 +23448,7 @@ Opt-in exact next-layer routed-tail hint. Default0. When1, one worker predicts a
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:944`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:942`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char*device=ggml_backend_dev_description(ggml_backend_get_device(options.backend));
@@ -23544,7 +23532,7 @@ static void compact_fixed(llama_dsv41_fixed_storage&f,uint64_t admitted_hidden){
 #ifdef GGML_USE_CUDA
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:721`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:716`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const char *carry_loan=std::getenv("LLAMADECODE_SINGLEPASS_VRAM");
@@ -23717,18 +23705,6 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-sess
 DirectStorage heap residency control; preserve backend admission requirements.
 
 Scope: ds4, rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2637`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        }
-        WF_ERR("DS4PERF_DIRECT_HEAPS buffers=%zu compute_capacity=%zu staging_bytes=0 persistent_provider_owned=1",wf->ds_compute_banks.size(),buf_size);
-        {const char*resident=std::getenv("LLAMADECODE_DS_HEAP_RESIDENT");
-         if(resident&&resident[0]=='1'&&!resident[1]){std::vector<ID3D12Heap*>heaps;for(auto&bank:wf->ds_compute_banks)if(bank.heap)heaps.push_back(bank.heap);
-             wf_make_compute_heaps_resident(wf,heaps);}}
-    }else if (wf->ds_direct_mode) {
-        // Prefetch heap sized to the full layer (single D2D). If VRAM-tight, LLAMA_WF_DS_PREFETCH_PCT can shrink it.
-```
 
 ### LLAMADECODE_ENGRAM_BATCH
 
@@ -24102,7 +24078,7 @@ Single-engine locked RAM expert tier after VRAM L1/L2. 0 disables; auto uses adm
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1484`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     p->host=api;if(api2&&api2->payload&&api2->store_host){p->host2=*api2;p->host_v2=true;}if(p->host_slots)return;
@@ -24258,7 +24234,7 @@ Optional single-engine VRAM L2 slot upper bound. Useful for reproducible tier co
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1525`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1522`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t slot_bytes=p->pool_max_stride[0]+p->pool_max_stride[1]+p->pool_max_stride[2];
@@ -24366,25 +24342,13 @@ Debug only: 1 fills unrouted expert bytes with 0xFF to prove they are never read
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3403`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-            // does not write (unrouted experts and padding) becomes 0xFF, i.e. NaN
-            // F16 block scales, so any read of unrouted data turns the logits NaN.
-            static const bool poison=[]{const char*e=std::getenv("LLAMADECODE_POISON_UNROUTED");return e&&e[0]=='1'&&!e[1];}();
-            std::vector<llama_wf_zero_gaps::interval>owned,gaps;owned.reserve(layer.spans.size());
-            for(const auto&span:layer.spans)if(!poison||!span.is_expert||wf_span_is_active_expert(wf,layer,span))owned.push_back({span.gpu_offset,span.nbytes});
-            std::string reason;
-            if(!llama_wf_zero_gaps::plan(layer.total_bytes,owned,gaps,reason)){WF_ERR("Required DirectStorage routed-stage zero refused: %s",reason.c_str());wf->ds_failed.store(true);return false;}
-```
-
 ### LLAMADECODE_PREFILL_ROUTED
 
 Router-driven prefill expert reads: 0 off, 1 all layers, tail layers21-39. The single-engine launcher selects1 automatically for ULTRA prompts through2048 rows and tail with yoco_keep2541; larger full-layer passes retain overlapped eager reads. Explicit overrides win.
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1004`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1002`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #else
@@ -24393,7 +24357,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1
     require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
     p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
     require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2&&
-        !p->options.ds_gpu_ring_slots&&!p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
+        !p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
 ```
 
 ### LLAMADECODE_RAM_ROUTE_COST
@@ -24474,7 +24438,7 @@ Borrow unused growable-cache physical reservation for prefill carry, within the 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:719`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:714`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             options.fixed->tokens=reserved_chunk;options.fixed->tile=options.carry.max_tile_tokens;options.fixed->context=options.context;
@@ -28824,7 +28788,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:612`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:607`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         require(!args.count("--resident-hidden-bf16")||args.at("--resident-hidden-bf16")=="0"||args.at("--resident-hidden-bf16")=="1","resident-hidden-bf16 requires0/1");
@@ -28896,7 +28860,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:550
                 const bool flashinfer_reserve=llama_dsv41_flashinfer::requested()&&options.pair_ffn&&f.tile==ggml_dsv41_flashinfer::batch_tokens()&&
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:416`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:415`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool flashinfer_reserve=llama_dsv41_flashinfer::requested()&&pair_ffn&&
@@ -28944,7 +28908,7 @@ Producer prefill: Engram table read start policy; built-in default retained.
 
 Scope: rtx-llama, rtx-producer. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:832`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:827`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // load (7.9 s at 43K) left a 7.4 s join wait and prefill fell to 1,052 tok/s,
@@ -28992,7 +28956,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:733
         if(p->options.images){
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1178`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1175`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if(!llama_dsv41_engram_early_enabled()||p->options.engram_early_tokens.empty())return;
@@ -29004,7 +28968,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1
     const auto&tokens=p->options.engram_early_tokens;const auto&tail=p->options.engram_early_tail;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1207`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1204`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 bool llama_dsv41_weight_provider::start_engram_append(const std::vector<int32_t>&tokens,llama_dsv41::engram_history initial,double gap_s,std::string&error){return p->guard([&]{
@@ -29016,7 +28980,7 @@ bool llama_dsv41_weight_provider::start_engram_append(const std::vector<int32_t>
     require(overlap&&std::strcmp(overlap,"1")==0,"LLAMADECODE_ENGRAM_EARLY requires LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP=1 (per-table adoption)");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1228`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1225`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 bool llama_dsv41_weight_provider::prepare_engram_prompt(const std::vector<int32_t>&tokens,const std::function<bool()>&stop,std::string&error,llama_dsv41::engram_history initial,const uint8_t* text_mask){return p->guard([&]{
@@ -29028,7 +28992,7 @@ bool llama_dsv41_weight_provider::prepare_engram_prompt(const std::vector<int32_
     if(p->whole_covers(tokens)&&!text_mask){
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:793`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:788`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // DS4COMBO producer-warm: the prompt's tokens are known now, so its
@@ -29040,7 +29004,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:
                 std::vector<int32_t> tail;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:833`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:828`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // against 1,238 tok/s with the ordinary layer-0 overlapped load. Opt-in only.
@@ -29334,7 +29298,7 @@ bool index_f32_cublas_enabled(){
 bool query_source(uint32_t layer){return layer==2||layer==8||layer==14||layer==20||layer==24||layer==28||layer==32||layer==36;}
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:232`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:231`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             args.count("--index-cublas-device-bytes")&&integer(args.at("--index-cublas-device-bytes"))>=64ull*1024*1024),
@@ -29562,7 +29526,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
         const auto native_repack_before=native_ffn?ggml_backend_cuda_dsv41_runtime_fp4_repacks_queued():0;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:415`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:414`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const uint64_t backend_reserve=args.count("--backend-temporary-reserve-bytes")?number("--backend-temporary-reserve-bytes"):gib;
@@ -31074,7 +31038,7 @@ LLAMA_DSV4_WF_CKSUM: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:6213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2719`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // every other layer-selective mechanism; the surviving gap is upload fidelity of specific
@@ -31146,18 +31110,6 @@ LLAMA_DS_FACTORY_STAGING_MB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama, studio. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2525`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    {
-        uint64_t factory_staging_mb = 256;
-        const char * factory_stg_env = std::getenv("LLAMA_DS_FACTORY_STAGING_MB");
-        if (factory_stg_env && factory_stg_env[0]) {
-            int mb = std::atoi(factory_stg_env);
-            if (mb > 0) {
-                factory_staging_mb = (uint64_t) mb;
-```
-
 Source: `vendor/studio/studio/moss_image.py:192`. Unset read: Assigned by the runtime; see literal consumer.
 
 ```text
@@ -31175,30 +31127,6 @@ def generate_one(root, request, *, streaming, precision='bf16', cache=None, eage
 LLAMA_DS_STAGING_MB: advanced engine setting; built-in default retained
 
 Scope: image, rtx-llama, studio, video. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2234`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    }
-    uint64_t max_size = (uint64_t) 3500 * 1024 * 1024;
-    const char * e = std::getenv("LLAMA_DS_STAGING_MB");
-    if (e && e[0]) {
-        const int mb = std::atoi(e);
-        if (mb > 0) max_size = (uint64_t) mb * 1024 * 1024;
-    }
-```
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2660`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    if (!wf->ds_direct_mode) {
-        // LLAMA_DS_STAGING_MB: override staging buffer size (default 3500 MB)
-        const char * stg_env = std::getenv("LLAMA_DS_STAGING_MB");
-        if (stg_env && stg_env[0]) {
-            WF_LOG("DS staging size override: %s MB", stg_env);
-        }
-        uint64_t stg_size = wf_dstorage_requested_staging_size(buf_size,wf->params);
-```
 
 Source: `vendor/engines/cosmos_windows/weight_streaming/minimax_h3_backend.py:396`. Unset read: '1300'.
 
@@ -36648,30 +36576,6 @@ LLAMA_PREFILL_LAYER_DIR: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-        // Check for per-layer extracted files (LLAMA_PREFILL_LAYER_DIR env var)
-        const char * layer_dir_env = std::getenv("LLAMA_PREFILL_LAYER_DIR");
-        if (layer_dir_env && layer_dir_env[0]) {
-            int n_layers = (int)wf->layers.size();
-            wf->ds_layer_files.resize(n_layers, nullptr);
-            int opened = 0;
-```
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3174`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-            char layer_path[512];
-            snprintf(layer_path, sizeof(layer_path), "%s/layer_%03d.bin",
-                     std::getenv("LLAMA_PREFILL_LAYER_DIR"), il);
-            BY_HANDLE_FILE_INFORMATION fi;
-            HANDLE hf = CreateFileA(layer_path, GENERIC_READ, FILE_SHARE_READ,
-                                    NULL, OPEN_EXISTING, 0, NULL);
-            uint64_t file_size = layer.total_bytes;
-```
-
 ### LLAMA_PREFILL_LAYER_MAJOR
 
 LLAMA_PREFILL_LAYER_MAJOR: advanced engine setting; built-in default retained
@@ -39186,18 +39090,6 @@ LLAMA_WF_ASYNC_DRAIN: advanced engine setting; built-in default retained
 
 Scope: image, rtx-llama, video. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3373`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    // without the OP_PROFILE crutch -> ~685 @20k. Forces copy_stream on.
-    static const bool requested_async_drain = []() {
-        const char * e = std::getenv("LLAMA_WF_ASYNC_DRAIN");
-        return e && e[0] != '\0' && e[0] != '0';
-    }();
-    const bool use_copy_stream = wf->required_dstorage ? wf->params.ds_async_drain : requested_copy_stream;
-    const bool async_drain = wf->required_dstorage ? wf->params.ds_async_drain : requested_async_drain;
-```
-
 Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:10`. Unset read: '1'.
 
 ```text
@@ -39306,7 +39198,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
     // otherwise gpu_buf_a would be left null with no WF to provide the heap.
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:4502`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // R3 DS-DIRECT gate (default-off == today's exact behavior). Set BEFORE any mode-specific init.
@@ -39324,35 +39216,11 @@ LLAMA_WF_DS_DIRECT_DIAG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:5524`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                return nullptr;
-            }
-            static const bool dsd_diag = [](){ const char*e=std::getenv("LLAMA_WF_DS_DIRECT_DIAG"); return e&&e[0]&&e[0]!='0'; }();
-            if (dsd_diag && layer_idx <= 1) {
-                const uint64_t QSZ = wf->ds_quarter_size;
-                uint64_t req0off = (!wf->ds_waves[layer_idx].empty() && !wf->ds_waves[layer_idx][0].reqs.empty())
-                                   ? wf->ds_waves[layer_idx][0].reqs[0].Destination.Buffer.Offset : (uint64_t)-1;
-```
-
 ### LLAMA_WF_DS_FACTORY_STAGING_MIB
 
 OPUS22 experiment, default 256. DirectStorage factory staging size in MiB for the strict DSV4.1 producer; 512 stays inside the existing 512 MiB per-tier factory allowance, other values refuse. Same requests and bytes.
 
 Scope: rtx-llama. Class: qualified.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2536`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        // 512 MiB stays inside the producer's existing 512 MiB per-tier
-        // factory allowance on both host and device; larger values refuse.
-        if (const char * typed = std::getenv("LLAMA_WF_DS_FACTORY_STAGING_MIB"); typed && typed[0]) {
-            if (std::strcmp(typed, "256") && std::strcmp(typed, "512")) {
-                WF_ERR("LLAMA_WF_DS_FACTORY_STAGING_MIB must be 256 or 512 (the admitted factory allowance)");
-                return false;
-            }
-```
 
 ### LLAMA_WF_DS_PREFETCH_PCT
 
@@ -39360,25 +39228,13 @@ LLAMA_WF_DS_PREFETCH_PCT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        // Prefetch heap sized to the full layer (single D2D). If VRAM-tight, LLAMA_WF_DS_PREFETCH_PCT can shrink it.
-        uint64_t pf_bytes = buf_size;
-        const char * pfp = std::getenv("LLAMA_WF_DS_PREFETCH_PCT");
-        if (pfp && pfp[0]) { int pct = std::atoi(pfp); if (pct >= 10 && pct <= 100) pf_bytes = (buf_size * (uint64_t)pct) / 100; }
-        if (!wf_allocate_prefetch_heap(wf, pf_bytes)) {
-            WF_ERR("DS-direct: prefetch heap allocation FAILED; falling back to legacy staging path");
-            wf->ds_direct_mode = false;
-```
-
 ### LLAMA_WF_DS_REQUEST_MIB
 
 OPUS22 experiment, unset by default (about layer/1000 bytes per DirectStorage request, clamped 512 KiB..32 MiB). 2, 4, 8, 16 or 32 fixes the request size in MiB for planning and the strict profile checks alike. Same bytes and destinations.
 
 Scope: rtx-llama. Class: qualified.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:4474`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1630`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -39393,8 +39249,8 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:
 Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-wf-bounded-policy.h:30`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    // clamp. Planning and both strict profile checks read this one function,
-    // so they stay consistent. Same bytes and destinations, different split.
+    // and the strict profile check read this one function, so they stay
+    // consistent. Same bytes and destinations, different split.
     if (const char * fixed = std::getenv("LLAMA_WF_DS_REQUEST_MIB"); fixed && fixed[0]) {
         for (const char * allowed : {"2", "4", "8", "16", "32"})
             if (!std::strcmp(fixed, allowed)) return size_t(std::strtoul(fixed, nullptr, 10)) * size_t(mib);
@@ -39408,35 +39264,11 @@ OPUS22 experiment, unset by default (DirectStorage chooses its submit threads). 
 
 Scope: rtx-llama. Class: qualified.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2481`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    // heuristic): the existing TEST submit-thread profile selected by
-    // setting when the launcher passes none. Same requests and bytes.
-    if(!wf->params.ds_submit_threads){const char*e=std::getenv("LLAMA_WF_DS_SUBMIT_THREADS");
-        if(e&&e[0]){if(std::strcmp(e,"1")&&std::strcmp(e,"2")&&std::strcmp(e,"4")){WF_ERR("LLAMA_WF_DS_SUBMIT_THREADS must be 1, 2 or 4");return false;}
-            wf->params.ds_submit_threads=uint32_t(e[0]-'0');}}
-    if(wf->params.ds_submit_threads){
-        if(!wf->required_dstorage||(wf->params.ds_submit_threads!=1&&wf->params.ds_submit_threads!=2&&wf->params.ds_submit_threads!=4)){
-```
-
 ### LLAMA_WF_DS_USE_COPY_STREAM
 
 LLAMA_WF_DS_USE_COPY_STREAM: advanced engine setting; built-in default retained
 
 Scope: image, rtx-llama, video. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3363`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    // alternative; it didn't fix the bottleneck (see commit bb4ae84b).
-    static const bool requested_copy_stream = []() {
-        const char * e = std::getenv("LLAMA_WF_DS_USE_COPY_STREAM");
-        return e && e[0] != '\0' && e[0] != '0';
-    }();
-    // LLAMA_WF_ASYNC_DRAIN=1: async D2D on copy_stream + gate the NEXT wave's DS
-    // read on a drain event (single-staging-safe — fixes the reuse race WITHOUT
-```
 
 Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:11`. Unset read: '1'.
 
@@ -39468,7 +39300,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6912`. 
         char * end = nullptr;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:732`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:585`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     wf->expert_cache_initialized = true;
@@ -39486,7 +39318,7 @@ LLAMA_WF_EXPERT_CACHE_RAM_MB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:733`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:586`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (wf->required_dstorage) return;
@@ -39504,7 +39336,7 @@ LLAMA_WF_EXPERT_PREFETCH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3826`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1306`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     wf->expert_prefetch_initialized = true;
@@ -39522,35 +39354,11 @@ LLAMA_WF_EXPERT_PREFETCH_DIST: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3841`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    }
-    wf->expert_prefetch_n = wf_env_positive_int("LLAMA_WF_EXPERT_PREFETCH_N", 0);
-    wf->expert_prefetch_dist = wf_env_positive_int("LLAMA_WF_EXPERT_PREFETCH_DIST", 2);
-    wf->expert_prefetch_ema.resize(wf->layers.size());
-    wf->expert_prefetch_last_active.assign(wf->layers.size(), 0);
-    for (int il = 0; il < (int) wf->layers.size(); ++il) {
-        int max_expert = -1;
-```
-
 ### LLAMA_WF_EXPERT_PREFETCH_N
 
 LLAMA_WF_EXPERT_PREFETCH_N: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3840`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        return;
-    }
-    wf->expert_prefetch_n = wf_env_positive_int("LLAMA_WF_EXPERT_PREFETCH_N", 0);
-    wf->expert_prefetch_dist = wf_env_positive_int("LLAMA_WF_EXPERT_PREFETCH_DIST", 2);
-    wf->expert_prefetch_ema.resize(wf->layers.size());
-    wf->expert_prefetch_last_active.assign(wf->layers.size(), 0);
-    for (int il = 0; il < (int) wf->layers.size(); ++il) {
-```
 
 ### LLAMA_WF_EXPERT_SLAB
 
@@ -39882,7 +39690,7 @@ LLAMA_WF_LOCKFREE_READY: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:6258`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2764`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool wf_lockfree_ready_enabled() {
@@ -39899,18 +39707,6 @@ static bool wf_lockfree_ready_enabled() {
 LLAMA_WF_M3_DIAG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:5466`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-        // [2026-07-28 M3 wf=1 DIAG] LLAMA_WF_M3_DIAG=1: localize the single-buffer garble.
-        static const bool wf1_diag = []() { const char * e = std::getenv("LLAMA_WF_M3_DIAG"); return e && e[0] && e[0] != '0'; }();
-        static std::vector<unsigned long long> g_wf1_hash;   // post-fill hash per layer (sync path is single-threaded)
-        static std::vector<char>               g_wf1_have;
-        static int                             g_wf1_last_layer = -1;  // last layer this single buffer held (metadata layer_idx gets reset)
-        auto wf1_hash_buf = [](void * buf, size_t tb) -> unsigned long long {
-```
 
 ### LLAMA_WF_MODE
 
@@ -39954,35 +39750,11 @@ LLAMA_WF_PERSIST_FACTORY: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2508`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    {
-        static IDStorageFactory * g_ds_factory_keepalive = nullptr;
-        const char * pf_env = std::getenv("LLAMA_WF_PERSIST_FACTORY");
-        const bool persist_factory = pf_env && pf_env[0] && pf_env[0] != '0';
-        if (persist_factory && !g_ds_factory_keepalive && wf->ds_factory) {
-            wf->ds_factory->AddRef();
-            g_ds_factory_keepalive = wf->ds_factory;
-```
-
 ### LLAMA_WF_PERSIST_INFRA
 
 LLAMA_WF_PERSIST_INFRA: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2222`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-static bool wf_persist_infra_enabled() {
-    const char * e = std::getenv("LLAMA_WF_PERSIST_INFRA");
-    // A same-sized D3D12 external-memory re-import can recycle the just-freed
-    // CUDA VA while its old driver-side association is still stale. Keep the
-    // complete staging quartet alive by default; explicit 0 is diagnostic-only.
-    return !(e && e[0] && e[0] == '0');
-```
 
 ### LLAMA_WF_PREFETCH_DEPTH
 
@@ -40008,7 +39780,7 @@ LLAMA_WF_PREFETCH_PCT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:4660`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1795`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Set desired size here; actual allocation happens in wf_allocate_prefetch().
@@ -40062,25 +39834,13 @@ LLAMA_WF_RELAY_LARGE_LAYER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:5576`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-                   // for A/B. Root-cause: sol-xhigh a0e284dc.
-                   && !wf->required_dstorage
-                   && ([]{ static const bool relay = []{ const char * v = std::getenv("LLAMA_WF_RELAY_LARGE_LAYER"); return v && v[0] == '1'; }(); return relay; }())) {
-            wf1_path = "relay";
-            size_t half = std::min(wf->prefetch_buf_size, layer.total_bytes);
-
-            // Zero the compute buffer — needed for MATRIX_ROW_PADDING.
-```
-
 ### LLAMA_WF_SPAN_DUMP
 
 LLAMA_WF_SPAN_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:5137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2094`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // placement uses padded gpu_offsets — any overhang is silently dropped/under-copied.
@@ -40098,35 +39858,11 @@ LLAMA_WF_TEST_DS_PLACED: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1762`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-static void wf_selftest_ds_placed(wf_context * wf) {
-#if defined(WF_HAS_CUDA) && defined(WF_HAS_DSTORAGE)
-    const char * e = std::getenv("LLAMA_WF_TEST_DS_PLACED");
-    if (!(e && e[0] && e[0] != '0')) return;
-    static bool done = false; if (done) return; done = true;
-    if (!wf->d3d_device || !wf->ds_queue) { fprintf(stderr, "*** DSPLACED_TEST: no device/queue\n"); fflush(stderr); return; }
-    IDStorageFile * src = nullptr;
-```
-
 ### LLAMA_WF_TEST_DUAL_BUF
 
 LLAMA_WF_TEST_DUAL_BUF: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1664`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-static void wf_selftest_dual_buffer(ID3D12Device * dev) {
-#if defined(WF_HAS_CUDA) && defined(WF_HAS_DSTORAGE)
-    const char * e = std::getenv("LLAMA_WF_TEST_DUAL_BUF");
-    if (!(e && e[0] && e[0] != '0')) return;
-    static bool done = false; if (done) return; done = true;
-
-    const uint64_t SZ = (uint64_t)5 * 1024 * 1024 * 1024;          // 5 GB -> spans the 4GB boundary
-```
 
 ### LLAMA_WF_TEST_DUAL_HEAPS
 
@@ -40134,35 +39870,11 @@ LLAMA_WF_TEST_DUAL_HEAPS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2005`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-static void wf_selftest_dual_heaps(wf_context * wf) {
-#if defined(WF_HAS_CUDA) && defined(WF_HAS_DSTORAGE)
-    const char * e = std::getenv("LLAMA_WF_TEST_DUAL_HEAPS");
-    if (!(e && e[0] && e[0] != '0')) return;
-    static bool done = false; if (done) return; done = true;
-    if (!wf->d3d_device) { fprintf(stderr, "*** DUALHEAP_TEST: no device\n"); fflush(stderr); return; }
-    const uint64_t BUF = (uint64_t)8580 * 1024 * 1024;   // ~8.58GB (Kimi max layer)
-```
-
 ### LLAMA_WF_WARM_INTEROP
 
 LLAMA_WF_WARM_INTEROP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
-
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2979`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-static void wf_warm_ds_interop(wf_context * wf) {
-#if defined(WF_HAS_CUDA) && defined(WF_HAS_DSTORAGE)
-    const char * e = std::getenv("LLAMA_WF_WARM_INTEROP");
-    if (e && e[0] == '0') return;                 // A/B opt-out: byte-identical to prior behavior
-    if (!wf || !wf->ds_initialized || !wf->ds_queue || !wf->ds_fence || !wf->ds_ext_sem) return;
-
-    const bool   direct = wf->ds_direct_mode;
-```
 
 ### LLGUIDANCE_LOG_LEVEL
 

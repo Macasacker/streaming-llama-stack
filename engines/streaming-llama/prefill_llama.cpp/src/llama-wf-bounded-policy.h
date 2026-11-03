@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 // Shared adapter arithmetic. It creates no factory, buffer, queue or environment
-// override. Physical admission and actual DirectStorage qualification are separate.
+// override. Physical admission and actual transfer qualification are separate.
 namespace llama_wf_bounded {
 constexpr uint64_t mib=1024ull*1024;
 constexpr uint64_t profile_staging_bytes=1500*mib;
@@ -24,9 +24,9 @@ inline uint64_t align(uint64_t value,uint64_t alignment) {
 }
 inline size_t auto_io_block(size_t maximum_layer_bytes) {
     // OPUS22 LLAMA_WF_DS_REQUEST_MIB=2|4|8|16|32 (unset = the policy below):
-    // a fixed DirectStorage request size inside the same 512KiB..32MiB
-    // clamp. Planning and both strict profile checks read this one function,
-    // so they stay consistent. Same bytes and destinations, different split.
+    // a fixed read request size inside the same 512KiB..32MiB clamp. Planning
+    // and the strict profile check read this one function, so they stay
+    // consistent. Same bytes and destinations, different split.
     if (const char * fixed = std::getenv("LLAMA_WF_DS_REQUEST_MIB"); fixed && fixed[0]) {
         for (const char * allowed : {"2", "4", "8", "16", "32"})
             if (!std::strcmp(fixed, allowed)) return size_t(std::strtoul(fixed, nullptr, 10)) * size_t(mib);
@@ -51,14 +51,7 @@ inline plan make(uint64_t maximum_stage_bytes,uint32_t buffers,uint64_t staging_
     if(compute>UINT64_MAX/buffers)throw std::overflow_error("Weight fetch buffer multiplication");
     return {buffers,compute,staging,add(compute*buffers,staging),auto_io_block(size_t(maximum_stage_bytes))};
 }
-inline bool exact_two_buffer_profile(uint64_t maximum_stage_bytes,uint32_t buffers,
-                                     uint64_t staging_limit,size_t request_bytes) {
-    return maximum_stage_bytes&&maximum_stage_bytes<=SIZE_MAX&&buffers==2&&
-           staging_limit==profile_staging_bytes&&request_bytes==auto_io_block(size_t(maximum_stage_bytes));
-}
-// Imported CUDA views alias the D3D allocation. CUDA's free-byte query
-// double-counts those views on this WDDM driver; NVML and bounded allocation/
-// canary tests establish the physical charge without disabling admission.
+// Imported CUDA views alias the shared compute allocation.
 inline uint64_t shared_heap_physical_bytes(uint64_t compute_bytes,uint32_t buffers) {
     if(!compute_bytes||buffers<1||buffers>2)throw std::invalid_argument("Shared compute heap geometry");
     const uint64_t heap=align(compute_bytes,256*mib);

@@ -313,9 +313,9 @@ bool llama_dsv41_sweep::open(const llama_dsv41_weight_provider::config &input_we
             llama_dsv41_expert_profile::native(options.expert)&&options.admitted_pinned_device_bytes>=64ull*1024*1024),
             "Direct pinned RAM requires native experts, admitted RAM bank and separate64MiB device ceiling");
         require(!options.admitted_prefetch_device_bytes||(options.admitted_pinned_device_bytes&&options.reuse_graph&&!options.reuse_layer_graph&&
-            (!options.admitted_index_device_bytes||options.pair_ffn||options.fixed)&&!weights.ds_gpu_ring_slots&&
+            (!options.admitted_index_device_bytes||options.pair_ffn||options.fixed)&&
             uint64_t(options.carry.max_tile_tokens)*81936+65536<=options.admitted_prefetch_device_bytes),
-            "Copy overlap requires separately admitted GPU tile, pinned RAM, allocator mode1, original indexer and legacy fetch profile");
+            "Copy overlap requires separately admitted GPU tile, pinned RAM, allocator mode1 and original indexer");
         require(options.context&&options.context<=1048576&&options.carry.tokens&&
             options.carry.tokens<options.context,"V4.1 sweep must retain room for the next native decode token");
         require(weights.backend!=nullptr,"V4.1 sweep requires an admitted real compute backend");
