@@ -668,6 +668,7 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     release_check is 0 findings, and the Python suite is unchanged at 584/6/5 with the same names.
     Proof beyond compiling, since this tree has no test target for the producer: a scratch program
     against the producer's own `boundary-capture.cpp.o` runs 44 checks over the ported layer
+    (`3fc4f64`'s message says 45; the program prints 44 `ok` lines and that is the real count)
     (volume admission, exclusive-new refusal, bounded-write refusal, FILETIME/inode identity, the
     read-only rehash, `read_small`, no-replace publication including the occupied-target refusal and
     the retained pending file, symlink refusal, ancestor pinning, the free-byte budget,
