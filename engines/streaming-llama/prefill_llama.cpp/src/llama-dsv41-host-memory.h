@@ -2,11 +2,11 @@
 // Physical host residency and system commitment are independent budgets. A
 // caller supplies its complete bounded host/device plan before CUDA starts.
 //
-// The policy below is the same on both platforms; only the measurements and the
-// process limit differ. Windows reads GlobalMemoryStatusEx, GetPerformanceInfo
-// and GetProcessMemoryInfo and caps the job with a Job Object; Linux reads
-// /proc/meminfo, /proc/self/status and the cgroup v2 memory controller, and has
-// no process-memory limit to set (see begin()).
+// Measurements come from /proc/meminfo, /proc/self/status and the cgroup v2
+// memory controller; the paging guard samples swap. The Windows producer read
+// GlobalMemoryStatusEx, GetPerformanceInfo and GetProcessMemoryInfo and capped
+// the job with a Job Object - there is no process-memory limit to set here, so
+// begin() keeps the ceiling as a reported figure only.
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -15,18 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
-#if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#ifndef PSAPI_VERSION
-#define PSAPI_VERSION 2
-#endif
-#include <psapi.h>
-#else
 #include <thread>
-#endif
 
 namespace llama_dsv41_host_memory {
 constexpr uint64_t reserve = UINT64_C(512) << 20;
@@ -37,28 +26,9 @@ struct state {
 inline uint64_t private_limit = 0;
 inline uint64_t runtime_min_free_bytes = UINT64_C(512) << 20;
 // Set once admission succeeds; also the guard against changing the floor after
-// admission. A Job Object handle on Windows, a latch here.
-#if defined(_WIN32)
-inline HANDLE job = nullptr;
-#else
+// admission.
 inline std::atomic<bool> job{false};
-#endif
 
-#if defined(_WIN32)
-inline bool read(state &s) {
-    MEMORYSTATUSEX m{}; m.dwLength = sizeof(m);
-    PERFORMANCE_INFORMATION p{}; p.cb = sizeof(p);
-    PROCESS_MEMORY_COUNTERS_EX c{}; c.cb = sizeof(c);
-    if (!GlobalMemoryStatusEx(&m) || !GetPerformanceInfo(&p, sizeof(p)) ||
-        !GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&c, sizeof(c))) return false;
-    s = {m.ullAvailPhys, m.ullTotalPhys, uint64_t(p.CommitTotal) * p.PageSize,
-        uint64_t(p.CommitLimit) * p.PageSize, c.PrivateUsage, c.PeakPagefileUsage};
-    return true;
-}
-inline void emit(const char *text, size_t bytes) {
-    DWORD done; WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, DWORD(bytes), &done, nullptr);
-}
-#else
 // kB-scale field of a procfs line, in bytes.
 inline uint64_t proc_field(const char *path, const char *field, uint64_t scale) {
     FILE *f = std::fopen(path, "r");
@@ -142,7 +112,6 @@ inline void emit(const char *text, size_t bytes) {
     std::fwrite(text, 1, bytes, stderr);
     std::fflush(stderr);
 }
-#endif
 
 inline bool fits(const state &s, uint64_t host, uint64_t device) {
     if (s.available < reserve || host > s.available - reserve ||
@@ -197,7 +166,7 @@ inline void stop_reason(char *text, size_t capacity) {
         (unsigned long long)stopped_available.load(), double(runtime_min_free_bytes) / double(UINT64_C(1) << 30),
         (unsigned long long)runtime_min_free_bytes);
     else if (memory_query_failed.load()) std::snprintf(text, capacity, "Producer stopped: physical RAM query failed while runtime floor enabled");
-    else std::snprintf(text, capacity, "Producer stopped: paging detected or paging query failed (pagefile growth limit 256 MB)");
+    else std::snprintf(text, capacity, "Producer stopped: paging detected or paging query failed (swap growth limit 256 MB)");
 }
 // Pure verdicts (tests/dsv41_host_memory_paging.cpp).
 inline uint64_t paging_growth(uint64_t baseline, uint64_t now) { return now > baseline ? now - baseline : 0; }
@@ -205,21 +174,9 @@ inline bool paging_exceeded(uint64_t baseline, uint64_t now, uint64_t limit = pa
     return paging_growth(baseline, now) > limit;
 }
 inline bool low_memory(const state &s) { return !fits(s, 0, 0); }
-#if defined(_WIN32)
-// Global pagefile bytes in use (EnumPageFilesW TotalInUse pages; same source as
-// studio.job_paging.paging_bytes). Private commitment is not paging.
-inline BOOL CALLBACK pagefile_visit(LPVOID context, PENUM_PAGE_FILE_INFORMATION info, LPCWSTR) {
-    *static_cast<uint64_t *>(context) += uint64_t(info->TotalInUse); return TRUE;
-}
-inline bool pagefile_in_use(uint64_t &bytes) {
-    uint64_t pages = 0; SYSTEM_INFO si{}; GetSystemInfo(&si);
-    if (!EnumPageFilesW(pagefile_visit, &pages)) return false;
-    bytes = pages * uint64_t(si.dwPageSize); return true;
-}
-#else
-// Swap bytes in use: the system-wide paging figure the Windows pagefile count
-// corresponds to. A host with no configured swap reports 0, which can never
-// grow, so the guard stands down rather than failing the run.
+// Swap bytes in use: the system-wide paging figure (the old pagefile count).
+// A host with no configured swap reports 0, which can never grow, so the guard
+// stands down rather than failing the run.
 inline bool pagefile_in_use(uint64_t &bytes) {
     FILE *f = std::fopen("/proc/meminfo", "r");
     if (!f) return false;
@@ -234,7 +191,6 @@ inline bool pagefile_in_use(uint64_t &bytes) {
     bytes = (total > free ? total - free : 0) * UINT64_C(1024);
     return true;
 }
-#endif
 inline void report_paging(const char *event, uint64_t baseline, uint64_t now) {
     std::fprintf(stderr, "DSV41_HOST_MEMORY_%s pagefile_in_use_bytes=%llu baseline_bytes=%llu growth_bytes=%llu limit_bytes=%llu low_memory_events=%llu\n",
         event, (unsigned long long)now, (unsigned long long)baseline, (unsigned long long)paging_growth(baseline, now),
@@ -268,41 +224,6 @@ inline bool live() {
     if (paging_exceeded(base, now)) { report_paging("PAGING_STOP", base, now); paging_stop.store(true); return false; }
     return true;
 }
-#if defined(_WIN32)
-// Samples RAM and paging at 4 Hz. It only flags the stop: the producer stops
-// gracefully at its next boundary (should_stop); never a TerminateProcess.
-inline DWORD WINAPI watch(void *) {
-    for (;;) {
-        Sleep(250);
-        if (!live()) return 78;
-    }
-}
-inline bool begin(uint64_t host, uint64_t device) {
-    // Single-threaded before CUDA/producer workers; no restart or cap changes.
-    if (job) return false;
-    state s;
-    if (!read(s)) { report("QUERY_FAILED", s); return false; }
-    if (!fits(s, host, device)) { report("REFUSED_PLAN", s, host, device); return false; }
-    if (!set_paging_baseline()) { report("PAGING_QUERY_FAILED", s, host, device); return false; }
-    const uint64_t increment = s.commit_limit - reserve - s.commit;
-    if (increment > UINT64_MAX - s.private_bytes) return false;
-    private_limit = s.private_bytes + increment;
-    HANDLE next = CreateJobObjectW(nullptr, nullptr);
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limit{};
-    limit.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY;
-    limit.ProcessMemoryLimit = SIZE_T(private_limit);
-    if (!next || !SetInformationJobObject(next, JobObjectExtendedLimitInformation, &limit, sizeof(limit)) ||
-        !AssignProcessToJobObject(next, GetCurrentProcess())) {
-        if (next) CloseHandle(next);
-        report("REFUSED_JOB", s, host, device); return false;
-    }
-    job = next; // Process-lifetime nested Job; outer owner retains kill-on-close.
-    HANDLE thread = CreateThread(nullptr, 65536, watch, nullptr, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
-    if (!thread) { report("REFUSED_WATCHDOG", s, host, device); return false; }
-    CloseHandle(thread); report("ADMITTED", s, host, device);
-    return true;
-}
-#else
 inline void watch() {
     for (;;) {
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -328,5 +249,4 @@ inline bool begin(uint64_t host, uint64_t device) {
     report("ADMITTED", s, host, device);
     return true;
 }
-#endif
 }

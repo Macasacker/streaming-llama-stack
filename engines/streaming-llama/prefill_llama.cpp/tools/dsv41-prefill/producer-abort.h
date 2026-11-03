@@ -6,8 +6,8 @@
 // kinds: exception (std::exception on the session thread, including a worker
 // failure marshalled to it), bad_alloc, unknown_exception, terminate (an
 // exception escaped a thread: std::terminate), abort (abort() with no exception),
-// seh (an unhandled structured exception: access violation, stack overflow, ...),
-// signal (the POSIX twin of seh: SIGSEGV, SIGBUS, SIGFPE, SIGILL).
+// signal (an unhandled fatal signal: SIGSEGV, SIGBUS, SIGFPE, SIGILL - what the
+// Windows build reported as seh for an access violation or stack overflow).
 // The reply and the reason line are built without heap allocation into fixed
 // buffers, so they still go out under bad_alloc or from the crash handlers.
 #include "producer-wire.h"
@@ -21,10 +21,8 @@
 #include <exception>
 #include <new>
 #include <string>
-#if !defined(_WIN32)
 #include <sys/syscall.h>
 #include <unistd.h>
-#endif
 
 namespace producer_abort {
 
@@ -53,11 +51,7 @@ inline size_t escape(char *out, size_t cap, const char *in) {
 
 // The crashing thread's identity, for the reason line only.
 inline unsigned long thread_id() {
-#if defined(_WIN32)
-    return (unsigned long)GetCurrentThreadId();
-#else
     return (unsigned long)syscall(SYS_gettid);
-#endif
 }
 
 // Bind the reply to the session pipe (after session_output.bind()).
@@ -114,30 +108,15 @@ inline void report_current(const char *context = nullptr, const char *kind_overr
     report(kind_override ? kind_override : kind, reason);
 }
 
-#if defined(_WIN32)
-// Last-chance handlers: an exception escaping any thread (std::terminate) or an
-// unhandled structured exception still leaves the reason line and the reply.
-inline LONG WINAPI unhandled(EXCEPTION_POINTERS *info) {
-    char reason[256];
-    const DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
-    const void *address = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionAddress : nullptr;
-    std::snprintf(reason, sizeof reason, "unhandled structured exception 0x%08lX at %p (thread %lu)", (unsigned long)code, address,
-                  thread_id());
-    report("seh", reason, code);
-    return EXCEPTION_CONTINUE_SEARCH;   // the normal crash path (WER, exit code) continues
-}
-#else
-// The POSIX twin of the structured-exception filter. The reply goes out first;
-// SA_RESETHAND restores the original disposition on entry, so the signal that
-// is raised again after this handler returns takes the normal crash path
-// (exit status, core dump) exactly as EXCEPTION_CONTINUE_SEARCH does.
+// The crash filter. The reply goes out first; SA_RESETHAND restores the original
+// disposition on entry, so the signal raised again after this handler returns
+// takes the normal crash path (exit status, core dump) rather than looping.
 inline void unhandled_signal(int number) {
     char reason[256];
     std::snprintf(reason, sizeof reason, "unhandled signal %d (thread %lu)", number, thread_id());
     report("signal", reason, uint32_t(number));
     raise(number);
 }
-#endif
 inline void terminate_handler() {
     char context[64];
     std::snprintf(context, sizeof context, "std::terminate on thread %lu", thread_id());
@@ -146,9 +125,9 @@ inline void terminate_handler() {
     } else report("terminate", context);
     std::abort();
 }
-// std::set_terminate is per thread on MSVC, so an exception escaping a worker
-// thread reaches abort() through the default handler: SIGABRT (process-wide)
-// reports it, with the escaping exception's text when it is still current.
+// An exception escaping a worker thread reaches abort() through the default
+// handler, so SIGABRT (process-wide) reports it too, with the escaping
+// exception's text while it is still current.
 inline void abort_signal(int) {
     char context[64];
     std::snprintf(context, sizeof context, "abort() on thread %lu", thread_id());
@@ -157,9 +136,6 @@ inline void abort_signal(int) {
     } else report("abort", context);
 }
 inline void install() {
-#if defined(_WIN32)
-    SetUnhandledExceptionFilter(unhandled);
-#else
     const int fatal[]{SIGSEGV, SIGBUS, SIGFPE, SIGILL};
     for(const int number:fatal){
         struct sigaction action{};
@@ -168,7 +144,6 @@ inline void install() {
         action.sa_flags=SA_RESETHAND;      // one report, then the original disposition
         sigaction(number,&action,nullptr);
     }
-#endif
     std::set_terminate(terminate_handler);
     std::signal(SIGABRT, abort_signal);
 }

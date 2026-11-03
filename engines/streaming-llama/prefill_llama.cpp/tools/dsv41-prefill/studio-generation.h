@@ -7,16 +7,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
-#if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#endif
 extern "C" int slstack_sample_logits(const float*,int,float,int,float,float,uint64_t*);
 
 struct studio_generation {
@@ -55,13 +48,6 @@ struct studio_generation {
         try{
             // Reading a fresh descriptor each time is what lets the parent
             // replace the control file atomically while generation is reading.
-#if defined(_WIN32)
-            HANDLE f=CreateFileW(control.c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
-                nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
-            check(f!=INVALID_HANDLE_VALUE,"Cannot read live generation control");
-            char bytes[16384];DWORD got=0;const DWORD size=GetFileSize(f,nullptr);
-            const bool ok=size>0&&size<sizeof(bytes)&&ReadFile(f,bytes,size,&got,nullptr)&&got==size;CloseHandle(f);
-#else
             const int f=open(control.c_str(),O_RDONLY|O_CLOEXEC);
             check(f>=0,"Cannot read live generation control");
             struct stat st{};
@@ -70,7 +56,6 @@ struct studio_generation {
             const bool ok=size>0&&uint64_t(size)<sizeof(bytes)&&::read(f,bytes,size_t(size))==size;
             close(f);
             const size_t got=ok?size_t(size):0;
-#endif
             check(ok,"Live generation control exceeds 16 KiB or is truncated");
             auto next=json::parse(bytes,bytes+got);validate(next);
             if(settings.is_null()||next.at("revision")>=settings.at("revision"))settings=std::move(next);
@@ -129,17 +114,13 @@ struct studio_generation {
         auto state=k;state["revision"]=revision;state["phase"]=ds4_quality_phase_names[phase()];state["position"]=position;
         auto dst=control;dst+=std::string(".applied.json");auto tmp=dst;tmp+=std::string(".tmp");
         {std::ofstream f(tmp,std::ios::binary|std::ios::trunc);f<<state.dump();}
-#if defined(_WIN32)
-        MoveFileExW(tmp.c_str(),dst.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
-#else
-        // Best-effort like the Windows call: a lost diagnostic file must not
-        // fail the decode operation that published it. fsync first, so the
-        // replace is durable the way MOVEFILE_WRITE_THROUGH made it.
+        // Best-effort: a lost diagnostic file must not fail the decode operation
+        // that published it. fsync before the rename so a completed replace is
+        // durable, as MOVEFILE_WRITE_THROUGH made the old one.
         if(const int fd=open(tmp.c_str(),O_RDONLY|O_CLOEXEC);fd>=0){
             (void)fsync(fd);close(fd);
             if(std::rename(tmp.c_str(),dst.c_str())!=0)std::fprintf(stderr,"LLAMADECODE_GENERATION_APPLIED_FAILED path=%s\n",dst.string().c_str());
         } else std::fprintf(stderr,"LLAMADECODE_GENERATION_APPLIED_FAILED path=%s\n",tmp.string().c_str());
-#endif
     }
     int sample(const std::vector<float>&logits,uint32_t position){
         refresh();const auto k=knobs();report(position,k);

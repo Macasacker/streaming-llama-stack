@@ -78,10 +78,9 @@ uint64_t integer(const std::string&s){
 uint64_t exact_u64(const json&v){require(v.is_number_unsigned(),"Receipt field is not an exact unsigned integer (floating-point receipts are rejected)");return v.get<uint64_t>();}
 }
 
-// The file, digest, identity, RAM, VRAM, environment and cancellation layer:
-// Win32 primitives beside their POSIX twins, in this same namespace. It needs
-// require(), stop(), add() and the bounded constants above, so stop() is
-// declared here and defined below the include.
+// The file, digest, identity, RAM, VRAM, environment and cancellation layer, in
+// this same namespace. It needs require(), stop(), add() and the bounded
+// constants above, so stop() is declared here and defined below the include.
 namespace { void stop(); }
 #include "producer-platform.inc"
 
@@ -133,13 +132,9 @@ const char*usage=
 
 #include "live-session.inc"
 
-// Command arguments are UTF-16 on Windows and bytes here; both are converted
-// once, so the parsing below sees UTF-8 text either way.
-#if defined(_WIN32)
-int wmain(int argc,wchar_t**argv){
-#else
+// Command arguments are converted to UTF-8 text once, at the entry point, so
+// everything below sees one representation.
 int main(int argc,char**argv){
-#endif
     const std::vector<std::string> arguments=[&]{std::vector<std::string> out;for(int i=0;i<argc;++i)out.push_back(argument(argv[i]));return out;}();
     // Backend is declared first so the sweep (which synchronizes on teardown)
     // is destroyed before its externally owned backend on every return path.

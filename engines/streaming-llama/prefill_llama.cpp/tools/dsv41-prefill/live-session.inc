@@ -6,11 +6,7 @@
 #include <thread>
 #include <filesystem>
 #include <optional>
-#if defined(_WIN32)
-#include <io.h>
-#else
 #include <poll.h>
-#endif
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -24,16 +20,11 @@ public:
         const producer_wire::handle output=producer_wire::standard_output(),input=producer_wire::standard_input();
         require(wire==producer_wire::unarmed()&&producer_wire::is_pipe(input)&&producer_wire::is_pipe(output),
             "Live session requires private inherited pipes");
-#if defined(_WIN32)
-        require(DuplicateHandle(GetCurrentProcess(),output,GetCurrentProcess(),&wire,0,FALSE,DUPLICATE_SAME_ACCESS)!=0,"Cannot retain private session output");
-        require(std::fflush(stdout)==0&&_dup2(_fileno(stderr),_fileno(stdout))==0&&SetStdHandle(STD_OUTPUT_HANDLE,GetStdHandle(STD_ERROR_HANDLE)),"Cannot isolate diagnostic stdout from session payload");
-#else
         // dup() retains the payload end; stdout then points at stderr so producer
         // diagnostics cannot reach the session's JSON stream.
         const int retained=dup(output);require(retained>=0,"Cannot retain private session output");wire=retained;
         require(std::fflush(stdout)==0&&dup2(producer_wire::error_end(),producer_wire::standard_output())==0,
             "Cannot isolate diagnostic stdout from session payload");
-#endif
     }
 };
 class session_pipe {
@@ -50,21 +41,15 @@ public:
     void fill(){
         require(first==last,"Session pipe pending data overwrite");first=last=0;
         while(!last){check();
-#if defined(_WIN32)
-            DWORD available=0;require(PeekNamedPipe(input,nullptr,0,nullptr,&available,nullptr)!=0,"Session parent input pipe closed");
-            if(!available){Sleep(10);continue;}DWORD got=0;
-            require(ReadFile(input,buffer.data(),DWORD(std::min<size_t>(available,buffer.size())),&got,nullptr)&&got,"Session pipe read failed");last=got;
-#else
-            // poll reports readability, so a closed parent pipe is seen as an
-            // event instead of an infinite wait; the 10 ms cadence matches the
-            // Windows PeekNamedPipe loop, which also checks the deadline.
+            // poll reports readability, so a closed parent pipe shows up as an
+            // event instead of an infinite wait. The 10 ms cadence is how the
+            // deadline and the cancellation flag stay live between reads.
             struct pollfd waiter{input,POLLIN,0};
             const int ready=poll(&waiter,1,10);
             require(ready>0&&waiter.revents!=0,"Session parent input pipe closed");
             const ssize_t got=::read(input,buffer.data(),buffer.size());
             require(got>0,(waiter.revents&(POLLHUP|POLLERR))?"Session parent input pipe closed":"Session pipe read failed");
             last=size_t(got);
-#endif
         }
     }
     void read(void*dst,size_t bytes){
@@ -125,13 +110,14 @@ void check_decode_vram_reserve(){
     uint64_t f=0,t=0;if(!nvml_free_bytes(f,t))return;
     auto&s=decode_vram_sampler();
     if(s.started.load()){
-        // Demotion watch: local segment budget/usage, shared-segment usage, RAM.
+        // Device bytes and host RAM, beside the NVML free the reserve is checked
+        // against. The device figures are diagnostics: there is no segment
+        // budget to demote into on this platform.
         uint64_t budget=0,usage=0;local_video_memory(budget,usage);
-        const uint64_t shared=shared_video_memory_usage();
         uint64_t ram_avail=0;const bool ram=available_ram(ram_avail);
-        std::fprintf(stderr,"LLAMADECODE_VRAM_HEADROOM nvml_free_now=%llu min_free_since_l2=%llu samples=%llu reserve=%llu vram_local_budget=%llu vram_local_usage=%llu vram_shared_usage=%llu ram_avail=%llu\n",
+        std::fprintf(stderr,"LLAMADECODE_VRAM_HEADROOM nvml_free_now=%llu min_free_since_l2=%llu samples=%llu reserve=%llu device_total=%llu device_used=%llu ram_avail=%llu\n",
             (unsigned long long)f,(unsigned long long)s.min_free.load(),(unsigned long long)s.samples.load(),(unsigned long long)decode_vram_reserve(),
-            (unsigned long long)budget,(unsigned long long)usage,(unsigned long long)shared,(unsigned long long)(ram?ram_avail:0));}
+            (unsigned long long)budget,(unsigned long long)usage,(unsigned long long)(ram?ram_avail:0));}
     if(f<decode_vram_reserve()){std::fprintf(stderr,"LLAMADECODE_VRAM_RESERVE_BREACH nvml_free=%llu reserve=%llu\n",(unsigned long long)f,(unsigned long long)decode_vram_reserve());std::fflush(stderr);
         throw std::runtime_error("Physical free VRAM fell below the decode VRAM reserve");}
 }
@@ -147,14 +133,10 @@ void grow_decode_l2(llama_dsv41_sweep&sweep,const llama_dsv41_fixed_storage*fixe
     const uint64_t now=ggml_gallocr_get_buffer_size(fixed->graph.get(),0)+fixed->hidden_bytes;
     (void)freed;(void)now;uint64_t offer=~0ull;
     size_t free_bytes=0,total=0;ggml_backend_cuda_get_device_memory(0,&free_bytes,&total);(void)backend; // the job sees one device
-    // On Windows the authoritative no-demotion room is this process's
-    // local-segment budget minus its current usage (DXGI), on the largest
-    // adapter; its process budget and CUDA's free count the imported device
-    // banks twice (diagnostic only). Linux has no process segment budget, so
-    // the device total and in-use bytes fill the same fields. The cap in either
-    // case is NVML's physical free memory, and the offer never exceeds what the
-    // decode-sized plan freed from the job's own startup-admitted plan; no NVML
-    // reading means no L2.
+    // The device total and in-use bytes are diagnostics only - Linux has no
+    // per-process segment budget to demote against. The cap is NVML's physical
+    // free memory, and the offer never exceeds what the decode-sized plan freed
+    // from the job's own startup-admitted plan; no NVML reading means no L2.
     uint64_t budget=0,usage=0;local_video_memory(budget,usage);
     uint64_t nv_free=0,nv_total=0;const bool nv=nvml_free_bytes(nv_free,nv_total);
     // LLAMADECODE growable context cache: the plan keeps the next growth step
