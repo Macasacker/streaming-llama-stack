@@ -9,6 +9,7 @@
 #include "llama-dsv41-engram-early-decision.h"
 #include "llama-dsv41-delta.h"
 #include "llama-weight-fetcher.h"
+#include "llama-dsv41-host-memory.h"
 #include "llama-wf-bounded-policy.h"
 #include "llama-dsv41-recency-lfu.h"
 
@@ -29,18 +30,15 @@
 #include <exception>
 #include <thread>
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <psapi.h>
-#include <malloc.h>
-#if defined(LLAMA_DIRECTSTORAGE) && defined(GGML_USE_CUDA)
-#include <dstorage.h>
-static_assert(sizeof(DSTORAGE_REQUEST)+sizeof(int32_t)<=512,"Requalify strict request metadata budget for this SDK");
-#endif
-#endif
+// The physical lease: a read-only descriptor on the exact file the SHA receipt
+// was taken from, its ancestor directory descriptors, and fstat identity.
+// The Windows twin (CreateFileW + BY_HANDLE_FILE_INFORMATION + FileIdInfo +
+// GetDriveTypeW) is in git at the parent of this chunk's commit.
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 #if defined(GGML_USE_CUDA)
 #include "ggml-cuda.h"
 #ifdef GGML_USE_CUDA
@@ -57,6 +55,21 @@ bool source(uint32_t l){return l==2||l==8||l==14||l==20;}
 constexpr uint64_t mib=1024ull*1024;
 constexpr uint64_t metadata_allowance=32*mib;
 constexpr uint64_t factory_allowance=512*mib; // each system/upload tier, not a total factory cap
+
+// The model must sit on a local disk. Linux reports no fixed-versus-removable
+// indicator and no substituted-drive namespace, so the DRIVE_FIXED and
+// QueryDosDeviceW rules of the Windows build become a refusal of the network and
+// RAM-backed filesystem types, by their statfs magic numbers. Unknown local
+// filesystem types are accepted, exactly as the producer's own volume rule does.
+void require_local_volume(const std::filesystem::path&path){
+    struct statfs probe{};
+    require(statfs(path.c_str(),&probe)==0,"Cannot inspect model volume");
+    const long type=long(probe.f_type);
+    const long refused[]={NFS_SUPER_MAGIC,FUSE_SUPER_MAGIC,0x5346544D/*SMB*/,0xfe534d42/*SMB2*/,0xff53ff53/*CIFS*/,
+        0x53464146/*AFS*/,0x010209/*9P*/,0x7461636f/*OCFS2*/,0x01161970/*GFS2*/,0x564c/*NCP*/,
+        TMPFS_MAGIC,RAMFS_MAGIC,0x516194e9/*devtmpfs*/};
+    for(const long magic:refused)require(type!=magic,"Model must reside on a local volume, not a network or RAM-backed one");
+}
 
 }
 
@@ -526,6 +539,9 @@ struct llama_dsv41_weight_provider::implementation {
     void reset_cache(){slot_key.assign(pool_slots,-1);key_slot.clear();lru.clear();lru_pos.assign(pool_slots,lru.end());
         for(uint32_t s=0;s<pool_slots;++s){lru.push_back(int32_t(s));lru_pos[s]=std::prev(lru.end());}}
     uint32_t stage_count()const{return decode_layout?82u:42u;}
+    // Pinned host staging slots the fetcher allocates: one per compute bank plus
+    // one more, so a layer's read begins while the previous upload is in flight.
+    uint32_t staging_buffers()const{return options.buffers+1;}
     stage&stage_at(uint32_t id){return decode_layout?decode_stages[id]:stages[id];}
     bool routed_tensor(const ggml_tensor*t)const{return std::find(routed.begin(),routed.end(),t)!=routed.end();}
     bool lazy_tensor(const ggml_tensor*t)const{const auto at=std::find(routed.begin(),routed.end(),t);
@@ -609,36 +625,54 @@ struct llama_dsv41_weight_provider::implementation {
     void mark_weight_stream(bool active){if(llama_dsv41_engram_early_enabled())llama_dsv41_engram_weight_stream(active);}
     std::vector<ggml_backend_buffer_ptr>buffers;
     wf_context *fetcher=nullptr;
-#ifdef _WIN32
-    HANDLE file=INVALID_HANDLE_VALUE;
-    HANDLE engram_file=INVALID_HANDLE_VALUE;
+    // The receipt the caller verified binds four facts about this file. They are
+    // the ones the producer records on Linux: st_dev, the 8-byte little-endian
+    // st_ino (its high eight bytes stay zero here), st_size and st_mtime in Unix
+    // nanoseconds. A symlink is refused at open by O_NOFOLLOW and a directory or
+    // a hard-linked file by the S_ISREG/nlink test below, so the Windows
+    // reparse-point and link-count refusals both survive.
+    int file=-1;
+    int engram_file=-1;
     uint8_t *engram_page=nullptr;
-    std::vector<HANDLE>parents;
+    std::vector<int>parents;
     std::filesystem::path path;
     void identity()const{
-        BY_HANDLE_FILE_INFORMATION s{};
-        require(file!=INVALID_HANDLE_VALUE&&GetFileInformationByHandle(file,&s),"Cannot inspect verified model lease");
-        FILE_ID_INFO id{};require(GetFileInformationByHandleEx(file,FileIdInfo,&id,sizeof(id)),"Cannot bind original model FileIdInfo receipt");
-        const uint64_t length=(uint64_t(s.nFileSizeHigh)<<32)|s.nFileSizeLow;
-        const uint64_t modified=(uint64_t(s.ftLastWriteTime.dwHighDateTime)<<32)|s.ftLastWriteTime.dwLowDateTime;
-        constexpr uint64_t epoch=116444736000000000ull;
-        require(modified>=epoch&&(modified-epoch)<=UINT64_MAX/100,"Model timestamp cannot be bound to Unix receipt");
-        require(id.VolumeSerialNumber==options.verified_volume&&std::memcmp(id.FileId.Identifier,options.verified_file_id.data(),16)==0&&
-            length==options.verified_file_bytes&&(modified-epoch)*100==options.verified_mtime_ns&&s.nNumberOfLinks==1&&
-            !(s.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_SPARSE_FILE|FILE_ATTRIBUTE_COMPRESSED)),
+        struct stat st{};
+        require(file>=0&&fstat(file,&st)==0,"Cannot inspect verified model lease");
+        require(S_ISREG(st.st_mode)&&st.st_nlink==1&&st.st_size>=0,"Model must be a physical single-link ordinary file");
+        require(st.st_mtim.tv_sec>=0,"Model modification time predates the Unix epoch");
+        const unsigned long long ino=static_cast<unsigned long long>(st.st_ino);
+        std::array<uint8_t,16> id{};
+        for(unsigned i=0;i<8;++i)id[i]=uint8_t(ino>>(i*8));
+        const uint64_t mtime=uint64_t(st.st_mtim.tv_sec)*1000000000ull+uint64_t(st.st_mtim.tv_nsec);
+        require(uint64_t(st.st_dev)==options.verified_volume&&id==options.verified_file_id&&
+            uint64_t(st.st_size)==options.verified_file_bytes&&mtime==options.verified_mtime_ns,
             "Model identity differs from completed SHA receipt; reverify before streaming");
     }
-#else
-    void identity()const{throw std::runtime_error("Physical V4.1 weight streaming requires Windows");}
-#endif
+    // The row fallback for an Engram table when no whole-prompt cache is admitted:
+    // one 4 KiB-aligned extent of the original encoded bytes through a second
+    // descriptor on the same verified file. Windows opened that descriptor
+    // FILE_FLAG_NO_BUFFERING, which is why the extent is sector-aligned; the read
+    // here is buffered, and the same extent is kept so a row sees identical bytes.
+    bool engram_row_read(uint32_t index,uint64_t offset,void*dst,size_t bytes)const{
+        if(!bytes||bytes>264||index>=2||engram_file<0)return false;
+        const uint64_t begin=offset&~uint64_t(4095),skip=offset-begin,extent=align(skip+bytes,4096);
+        if(extent>8192||begin>options.verified_file_bytes||extent>options.verified_file_bytes-begin)return false;
+        size_t done=0;
+        while(done<extent){
+            const ssize_t got=::pread(engram_file,engram_page+done,extent-done,off_t(begin+done));
+            if(got<=0)return false;
+            done+=size_t(got);
+        }
+        std::memcpy(dst,engram_page+skip,bytes);
+        return true;
+    }
     ~implementation(){
         invalidate();
-#ifdef _WIN32
-        if(file!=INVALID_HANDLE_VALUE)CloseHandle(file);
-        if(engram_file!=INVALID_HANDLE_VALUE)CloseHandle(engram_file);
-        for(auto handle:parents)CloseHandle(handle);
-        _aligned_free(engram_page);
-#endif
+        if(file>=0)::close(file);
+        if(engram_file>=0)::close(engram_file);
+        for(auto handle:parents)::close(handle);
+        std::free(engram_page);
     }
     void invalidate(){
         poisoned=true;
@@ -835,12 +869,14 @@ struct llama_dsv41_weight_provider::implementation {
         const auto staging=policy.staging_bytes;
         planned.staging_bytes=staging;
         planned.request_bytes=options.auto_request_size?policy.request_bytes:512*1024;
-        // The imported CUDA view aliases its D3D allocation. Count each
-        // physical allocation once; the controller monitors selected-GPU NVML.
-        planned.device_bytes=add(add(planned.compute_buffer_bytes*options.buffers,staging),factory_allowance+65536);
-        if(options.compute_direct){
-            planned.device_bytes=add(llama_wf_bounded::shared_heap_physical_bytes(planned.compute_buffer_bytes,options.buffers),factory_allowance+65536);planned.staging_bytes=0;
-        }
+        // Device: the compute banks plus the factory allowance. There is no
+        // GPU-side staging tier here - the relay stages in pinned host RAM, which
+        // is charged to host_bytes below. Direct compute counts the fetcher's
+        // physical heap once (shared_heap_physical_bytes over-rounds it); the
+        // controller monitors the selected GPU's NVML figure.
+        planned.device_bytes=add(planned.compute_buffer_bytes*options.buffers,factory_allowance+65536);
+        if(options.compute_direct)
+            planned.device_bytes=add(llama_wf_bounded::shared_heap_physical_bytes(planned.compute_buffer_bytes,options.buffers),factory_allowance+65536);
         // wf_start retains request arrays for every stage. Each wave boundary
         // can add one request beyond ceil(tensor_bytes/io_block). Include
         // vector capacity growth plus temporary old/new allocations; the SDK
@@ -858,10 +894,13 @@ struct llama_dsv41_weight_provider::implementation {
                     decode_requests=add(decode_requests,add((x.nbytes+planned.request_bytes-1)/planned.request_bytes,cuts));}}
             decode_layout=was;requests=std::max(requests,decode_requests);waves=std::max(waves,decode_waves);
         }
-        require(requests<=UINT64_MAX/(4*512)&&waves<=UINT64_MAX/512,"V4.1 DS request metadata budget overflow");
+        require(requests<=UINT64_MAX/(4*512)&&waves<=UINT64_MAX/512,"V4.1 fetch request metadata budget overflow");
         planned.host_bytes=add(metadata_allowance+factory_allowance,add(requests*(4*512),waves*512));
         if(tail_prefetch)planned.host_bytes=add(planned.host_bytes,8*mib); // one worker stack + bounded hint metadata
-        if(options.zero_padding_only)planned.host_bytes=add(planned.host_bytes,mib); // bounded8192-span complement/request metadata
+        // The relay's pinned staging tier: one whole-bank host buffer per slot,
+        // and one slot more than the compute banks so a read can start while the
+        // previous layer's upload is still in flight.
+        planned.host_bytes=add(planned.host_bytes,uint64_t(staging_buffers())*planned.compute_buffer_bytes);
         if(options.engram_prefetch_host_bytes){
             require(options.engram_prefetch_tokens&&options.engram_prefetch_tokens<=1048576,
                 "Whole-prompt Engram requires an explicit admitted token count");
@@ -919,19 +958,19 @@ llama_dsv41_weight_provider&llama_dsv41_weight_provider::operator=(llama_dsv41_w
 
 bool llama_dsv41_weight_provider::inspect(const config&options,std::string&error){return p->guard([&]{
     require(!p->inspected&&!p->allocated,"Weight provider cannot reopen");
-#if !defined(_WIN32) || !defined(GGML_USE_CUDA)
-    (void)options;throw std::runtime_error("V4.1 physical weight provider requires Windows CUDA/DirectStorage");
+#ifndef GGML_USE_CUDA
+    (void)options;throw std::runtime_error("V4.1 physical weight provider requires a CUDA backend");
 #else
     require(options.backend&&options.buffers>=1&&options.buffers<=2,"Invalid physical weight backend/buffer admission");
-    require((options.staging_limit_bytes==0&&!options.auto_request_size&&!options.async_staging_drain)||
-        (options.auto_request_size&&
-            (options.staging_limit_bytes==llama_wf_bounded::small_staging_bytes||
-             (options.buffers==2&&options.staging_limit_bytes==llama_wf_bounded::profile_staging_bytes))),
-        "Unsupported explicit physical fetch profile");
+    // The strict relay needs one of the typed profiles: an auto request size and
+    // a bounded staging tier. The untyped baseline was never viable here - its
+    // only transport was the Windows path - so it is refused while inspecting
+    // rather than at pipeline creation.
+    require(options.auto_request_size&&options.async_staging_drain&&
+        (options.staging_limit_bytes==llama_wf_bounded::small_staging_bytes||
+         (options.buffers==2&&options.staging_limit_bytes==llama_wf_bounded::profile_staging_bytes)),
+        "Physical weight streaming requires an explicit typed fetch profile (auto request size, async staging drain, 250MiB or two-bank 1500MiB staging)");
     require(options.admitted_host_bytes>=metadata_allowance,"Bounded native metadata inspection was not admitted");
-    require(options.ds_submit_threads==0||options.ds_submit_threads==1||options.ds_submit_threads==2||options.ds_submit_threads==4,
-        "DirectStorage submit threads must be explicit0/1/2/4");
-    require(!options.zero_padding_only||options.compute_direct,"Padding-only zero requires explicit direct compute heaps");
     require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size),
         "Direct compute requires two typed async banks");
     require(!std::getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY"),"Unified CUDA memory is outside strict physical weight admission (including env value zero)");
@@ -942,29 +981,35 @@ bool llama_dsv41_weight_provider::inspect(const config&options,std::string&error
     const char*tail=std::getenv("LLAMADECODE_CONE_TAIL_PREFETCH");
     require(!tail||!std::strcmp(tail,"0")||!std::strcmp(tail,"1"),"LLAMADECODE_CONE_TAIL_PREFETCH must be0 or1");
     p->tail_prefetch=tail&&!std::strcmp(tail,"1");
-    p->options=options;p->path=std::filesystem::u8path(options.model_path);
-    require(p->path.is_absolute()&&p->path==p->path.lexically_normal()&&p->path.has_filename()&&p->path.filename().wstring().find(L':')==std::wstring::npos,"Model path must be a physical absolute file");
-    require(GetDriveTypeW(p->path.root_path().c_str())==DRIVE_FIXED,"Model must reside on a fixed local volume");
-    wchar_t volume[32768]{};require(QueryDosDeviceW(p->path.root_name().c_str(),volume,32768)&&
-        std::wstring(volume).find(L"\\Device\\HarddiskVolume")==0,"Model drive must not be substituted or redirected");
+    p->options=options;p->path=std::filesystem::path(options.model_path);
+    require(p->path.is_absolute()&&p->path==p->path.lexically_normal()&&p->path.has_filename(),"Model path must be a physical absolute file");
+    require_local_volume(p->path);
     std::vector<std::filesystem::path>chain;for(auto d=p->path.parent_path();;d=d.parent_path()){chain.push_back(d);if(d==d.root_path())break;}
     std::reverse(chain.begin(),chain.end());
-    for(const auto&d:chain){HANDLE h=CreateFileW(d.c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);require(h!=INVALID_HANDLE_VALUE,"Cannot pin model directory");p->parents.push_back(h);BY_HANDLE_FILE_INFORMATION s{};require(GetFileInformationByHandle(h,&s)&&(s.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)&&!(s.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT),"Model ancestor is not a physical directory");}
-    p->file=CreateFileW(p->path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);require(p->file!=INVALID_HANDLE_VALUE,"Cannot acquire read-only verified model lease");p->identity();
+    // O_NOFOLLOW refuses a symlinked ancestor, which is what the reparse-point
+    // attribute check refused; each held descriptor is rebound to the named path
+    // by identity(), which runs around every file operation.
+    for(const auto&d:chain){
+        const int handle=::open(d.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+        require(handle>=0,"Cannot pin model directory");p->parents.push_back(handle);
+        struct stat st{};require(fstat(handle,&st)==0&&S_ISDIR(st.st_mode),"Model ancestor is not a physical directory");
+    }
+    p->file=::open(p->path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
+    require(p->file>=0,"Cannot acquire read-only verified model lease");p->identity();
     ggml_context*raw=nullptr;p->gguf.reset(gguf_init_from_file(options.model_path.c_str(),{true,&raw}));p->tensors.reset(raw);
     require(p->gguf&&p->tensors&&gguf_get_data_offset(p->gguf.get())<=8*mib&&gguf_get_n_tensors(p->gguf.get())<=2048,"Native GGUF metadata exceeds inspected original limits");
     p->identity();p->metadata();p->plan_weights();p->inspected=true;
-    DWORD sectors=0,sector_bytes=0,free_clusters=0,clusters=0;
-    require(GetDiskFreeSpaceW(p->path.root_path().c_str(),&sectors,&sector_bytes,&free_clusters,&clusters)&&
-        sector_bytes&&4096%sector_bytes==0,"Unsupported original Engram direct-I/O sector alignment");
     if(!options.engram_prefetch_host_bytes){
-    p->engram_page=static_cast<uint8_t*>(_aligned_malloc(8192,4096));require(p->engram_page,"Cannot allocate bounded Engram direct-I/O page");
-    p->engram_file=CreateFileW(p->path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,
-        FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_NO_BUFFERING|FILE_FLAG_RANDOM_ACCESS,nullptr);
-    require(p->engram_file!=INVALID_HANDLE_VALUE,"Cannot open original Engram tables without OS caching");
-    BY_HANDLE_FILE_INFORMATION original{},direct{};require(GetFileInformationByHandle(p->file,&original)&&
-        GetFileInformationByHandle(p->engram_file,&direct)&&original.dwVolumeSerialNumber==direct.dwVolumeSerialNumber&&
-        original.nFileIndexHigh==direct.nFileIndexHigh&&original.nFileIndexLow==direct.nFileIndexLow,"Engram descriptor differs from verified model");
+    // The row fallback reads bounded 4 KiB-aligned extents. Windows needed a
+    // sector-size probe and FILE_FLAG_NO_BUFFERING because such an extent had to
+    // be block-aligned; the reads here are buffered, so neither is required and
+    // GetDiskFreeSpaceW has no Linux twin.
+    p->engram_page=static_cast<uint8_t*>(std::aligned_alloc(4096,8192));require(p->engram_page,"Cannot allocate bounded Engram row page");
+    p->engram_file=::open(p->path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
+    require(p->engram_file>=0,"Cannot open the original Engram tables for row reads");
+    struct stat original{},direct{};require(fstat(p->file,&original)==0&&fstat(p->engram_file,&direct)==0&&
+        original.st_dev==direct.st_dev&&original.st_ino==direct.st_ino&&original.st_size==direct.st_size,
+        "Engram descriptor differs from verified model");
     }
 #endif
 },error);}
@@ -982,8 +1027,9 @@ bool llama_dsv41_weight_provider::suspend_device(std::string&error){return p->gu
     ggml_backend_synchronize(p->options.backend);
     wf_stop(p->fetcher);wf_quiesce(p->fetcher);require(!wf_has_failed(p->fetcher),"Provider could not quiesce before device suspend");
     wf_destroy(p->fetcher);p->fetcher=nullptr;
-    // Same release as the graceful close: the global DS/D3D12 cache goes too.
-    require(wf_persist_shutdown("keep-alive suspend")==1,"DirectStorage/D3D12 cache could not be released on suspend");
+    // The same release as the graceful close. wf_persist_shutdown has no
+    // process-wide transport cache to drop on Linux, so it reports released.
+    require(wf_persist_shutdown("keep-alive suspend")==1,"Fetcher state could not be released on suspend");
     for(auto&s:p->stages)for(auto&e:s.entries){e.t->data=nullptr;e.t->buffer=nullptr;}
     p->buffers.clear();p->device_suspended=true;
     llama_dsv41_layer_log("DS4COMBO_PROVIDER_SUSPENDED buffers=%u compute_buffer_bytes=%llu model_lease_kept=1\n",p->options.buffers,(unsigned long long)p->planned.compute_buffer_bytes);
@@ -995,26 +1041,35 @@ bool llama_dsv41_weight_provider::resume_device(std::string&error){return p->gua
 },error);}
 bool llama_dsv41_weight_provider::device_suspended()const{std::lock_guard<std::mutex>lock(p->mutex);return p->device_suspended;}
 void llama_dsv41_weight_provider::implementation::create_pipeline(){
-#if !defined(_WIN32) || !defined(GGML_USE_CUDA)
-    throw std::runtime_error("V4.1 physical weight provider requires Windows CUDA/DirectStorage");
+#ifndef GGML_USE_CUDA
+    throw std::runtime_error("V4.1 physical weight provider requires a CUDA backend");
 #else
     auto*p=this;
     const char*lazy=std::getenv("LLAMADECODE_PREFILL_ROUTED");
     require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
     p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
-    require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2&&
-        !p->options.zero_padding_only),"Tail prefetch requires routed strict two-bank prefill");
+    require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),
+        "Tail prefetch requires routed strict two-bank prefill");
     const char*ledger=std::getenv("LLAMADECODE_BYTE_LEDGER");p->byte_ledger=ledger&&!std::strcmp(ledger,"1");
-    require(!p->lazy_prefill||(p->options.compute_direct&&!p->options.zero_padding_only),
-        "Routed prefill requires direct compute banks without padding-only mode");
-    wf_params params=wf_params_default();params.model_path=p->options.model_path.c_str();params.gpu_backend=p->options.backend;params.mode=WF_MODE_DSTORAGE;
-    params.n_layers=int(p->stage_count());params.n_gpu_buffers=int(p->options.buffers);params.max_layer_bytes=p->planned.maximum_stage_bytes;params.n_ram_buffers=0;
+    require(!p->lazy_prefill||p->options.compute_direct,"Routed prefill requires direct compute banks");
+    wf_params params=wf_params_default();params.model_path=p->options.model_path.c_str();params.gpu_backend=p->options.backend;
+    // The provider's Windows transport was DirectStorage. Its Linux route is the
+    // bounded relay named explicitly: the io_uring reader (or the pread baseline)
+    // into the pinned staging tier, then the upload into the compute banks. Not
+    // WF_MODE_AUTO, which could resolve to GPUDirect Storage and register the
+    // fetcher's own allocations before this provider replaces their pointers.
+    params.mode=WF_MODE_DIRECT_IO;
+    params.n_layers=int(p->stage_count());params.n_gpu_buffers=int(p->options.buffers);
+    params.max_layer_bytes=p->planned.maximum_stage_bytes;params.n_ram_buffers=int(p->staging_buffers());
     params.io_block_size=size_t(p->planned.request_bytes);params.ds_staging_limit_bytes=size_t(p->options.staging_limit_bytes);
     params.ds_async_drain=p->options.async_staging_drain;
-    params.ds_submit_threads=p->options.ds_submit_threads;
     params.ds_compute_direct=p->options.compute_direct;
-    params.ds_zero_padding_only=p->options.zero_padding_only;
-    p->fetcher=wf_create_required_dstorage(&params);require(p->fetcher,"Required original weight DirectStorage initialization failed");
+    // Reads are buffered: Linux unbuffered I/O needs block-aligned offset, length
+    // and buffer, and GGUF tensor offsets are multiples of general.alignment (32
+    // by default). With io_direct false the reader never rounds a chunk up, so the
+    // fetcher's banks are exactly the admitted compute_buffer_bytes.
+    params.io_direct=false;
+    p->fetcher=wf_create_required_streaming(&params);require(p->fetcher,"Required original weight stream initialization failed");
     p->allocated=true; // All subsequent failures must synchronize before free.
     for(uint32_t i=0;i<p->options.buffers;++i){
         if(p->options.compute_direct)require(wf_is_ds_direct(p->fetcher)&&wf_get_n_gpu_bufs(p->fetcher)==int(p->options.buffers)&&wf_get_gpu_buf_ptr(p->fetcher,int(i)),"Required direct bank was not allocated; no relay fallback");
@@ -1049,7 +1104,7 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
             std::fprintf(stderr,"LLAMADECODE_PREFILL_LAYOUT banks=%zu streaming_banks=%u persistent_stages=0 expert_pool_bound=0\n",p->buffers.size(),p->options.buffers);
     }
     require(!wf_has_failed(p->fetcher),"Original layer registration failed");p->identity();p->apply_pause("cold_wf_start");wf_start(p->fetcher);
-    require(!wf_has_failed(p->fetcher),"Original DirectStorage pipeline startup failed");p->mark_weight_stream(true);
+    require(!wf_has_failed(p->fetcher),"Original weight stream startup failed");p->mark_weight_stream(true);
 #endif
 }
 bool llama_dsv41_weight_provider::open(const config&options,std::string&error){return inspect(options,error)&&allocate(error);}
@@ -1057,7 +1112,7 @@ bool llama_dsv41_weight_provider::restart_prompt(const config&options,std::strin
     require(p->allocated&&!p->device_suspended&&!p->leased&&p->next==p->stage_count(),"Only a fully released resident provider pass can restart");
     auto binding=[](const config&v){return std::tie(v.model_path,v.verified_file_bytes,v.verified_volume,v.verified_mtime_ns,v.verified_file_id,
         v.verified_sha256,v.backend,v.admitted_device_bytes,v.admitted_host_bytes,v.buffers,v.staging_limit_bytes,v.auto_request_size,
-        v.async_staging_drain,v.compute_direct,v.zero_padding_only,v.engram_prefetch_host_bytes,v.ds_submit_threads);};
+        v.async_staging_drain,v.compute_direct,v.engram_prefetch_host_bytes);};
     require(binding(options)==binding(p->options),"Persistent provider cannot change model/backend/geometry/admission");
     require(!options.engram_prefetch_host_bytes||(options.engram_prefetch_tokens&&
         4ull*1024*1024+uint64_t(options.engram_prefetch_tokens)*48*(4+264)<=options.engram_prefetch_host_bytes),"Restarted prompt exceeds admitted immutable row-cache capacity");
@@ -1070,7 +1125,7 @@ bool llama_dsv41_weight_provider::restart_prompt(const config&options,std::strin
     if(options.decode_layout!=p->decode_layout){
         // LLAMADECODE B1: rebuild the same admitted pipeline with the other stage
         // layout. Same banks/staging/admission; only stage registration differs.
-        require(!options.decode_layout||(p->options.compute_direct&&p->options.buffers==2&&!p->options.zero_padding_only),
+        require(!options.decode_layout||(p->options.compute_direct&&p->options.buffers==2),
             "Decode layout requires the strict two-bank direct fetch profile");
         const auto started=std::chrono::steady_clock::now();
         p->release_host();p->release_l2();   // return decode tiers before prefill restores its plan
@@ -1477,7 +1532,9 @@ bool llama_dsv41_weight_provider::configure_host_cache(const ds4_external_host_c
         const ds4_external_host_cache_v2*api2){return p->guard([&]{
     require(p->decode_layout&&!p->leased&&api.resize&&api.find&&api.upload&&api.store&&api.clear,"Invalid RAM expert cache bridge");
     p->host=api;if(api2&&api2->payload&&api2->store_host){p->host2=*api2;p->host_v2=true;}if(p->host_slots)return;
-#ifdef _WIN32
+#ifndef GGML_USE_CUDA
+    (void)limit;(void)floor;throw std::runtime_error("RAM expert cache requires a CUDA backend");
+#else
     const char*e=std::getenv("LLAMADECODE_HOST_CACHE_MB");
     // Qualification decides the shipping default. An explicit auto uses all
     // admitted headroom, an integer is an exact upper bound, and 0 is off.
@@ -1487,12 +1544,14 @@ bool llama_dsv41_weight_provider::configure_host_cache(const ds4_external_host_c
         char*end=nullptr;errno=0;const auto mb=std::strtoull(e,&end,10);
         require(e[0]!='-'&&!errno&&end!=e&&!*end&&mb<=UINT64_MAX/mib,"LLAMADECODE_HOST_CACHE_MB must be auto or nonnegative MiB");requested=mb*mib;
     }
-    MEMORYSTATUSEX memory{};memory.dwLength=sizeof(memory);
-    PROCESS_MEMORY_COUNTERS_EX process{};process.cb=sizeof(process);
-    require(GlobalMemoryStatusEx(&memory)&&GetProcessMemoryInfo(GetCurrentProcess(),reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&process),sizeof(process)),"Cannot measure RAM expert admission");
+    // The same measurements the producer's own host-memory admission reads:
+    // MemAvailable is the figure GlobalMemoryStatusEx's ullAvailPhys reported,
+    // VmRSS the process private that WorkingSetSize reported.
+    llama_dsv41_host_memory::state memory{};
+    require(llama_dsv41_host_memory::read(memory),"Cannot measure RAM expert admission");
     const uint64_t reserve=add(floor,512*mib),margin=256*mib;
-    const uint64_t physical=memory.ullAvailPhys>reserve+margin?memory.ullAvailPhys-reserve-margin:0;
-    const uint64_t rss=process.WorkingSetSize;
+    const uint64_t physical=memory.available>reserve+margin?memory.available-reserve-margin:0;
+    const uint64_t rss=memory.private_bytes;
     const uint64_t budget=limit>rss+margin?limit-rss-margin:0;
     const uint64_t offer=std::min(requested,std::min(physical,budget));
     require(p->pool_max_stride[0]==p->pool_max_stride[1],"RAM expert gate/up geometry mismatch");
@@ -1502,16 +1561,14 @@ bool llama_dsv41_weight_provider::configure_host_cache(const ds4_external_host_c
     const bool rings=p->host_v2&&p->host_async_level()>=1;
     // The pinned staging rings come out of the same admitted RAM as the tier.
     uint64_t capped=rings?(offer>p->host_ring_bytes()?offer-p->host_ring_bytes():0):offer;
-    if(n&&*n){char*end=nullptr;errno=0;const auto count=std::strtoull(n,&end,10);
+    if(n&&*n){char*end=nullptr;errno=0;const uint64_t count=uint64_t(std::strtoull(n,&end,10));
         require(n[0]!='-'&&!errno&&end!=n&&!*end&&count<=UINT64_MAX/width,"Invalid DS4_CUDA_STREAMING_HOST_CACHE_N");capped=std::min(capped,count*width);}
     p->host_slots=api.resize(capped,p->pool_max_stride[0],p->pool_max_stride[2]);p->host_bytes=uint64_t(p->host_slots)*width;
     if(p->host_slots&&rings){p->allocate_host_rings();p->host_bytes=add(p->host_bytes,p->host_ring_bytes());}
-    require(GlobalMemoryStatusEx(&memory)&&memory.ullAvailPhys>=reserve,"RAM expert allocation crossed physical reserve");
+    require(llama_dsv41_host_memory::read(memory)&&memory.available>=reserve,"RAM expert allocation crossed physical reserve");
     std::fprintf(stderr,"LLAMADECODE_HOST_CACHE slots=%u bytes=%llu offer=%llu host_limit=%llu rss_before=%llu available_after=%llu runtime_floor=%llu desktop_reserve=%llu\n",
         p->host_slots,(unsigned long long)p->host_bytes,(unsigned long long)capped,(unsigned long long)limit,(unsigned long long)rss,
-        (unsigned long long)memory.ullAvailPhys,(unsigned long long)floor,(unsigned long long)(512*mib));
-#else
-    (void)limit;(void)floor;throw std::runtime_error("RAM expert cache requires Windows CUDA");
+        (unsigned long long)memory.available,(unsigned long long)floor,(unsigned long long)(512*mib));
 #endif
 },error);}
 uint64_t llama_dsv41_weight_provider::decode_cache_slot_bytes()const{return p->pool_max_stride[0]+p->pool_max_stride[1]+p->pool_max_stride[2];}
@@ -1585,16 +1642,7 @@ bool llama_dsv41_weight_provider::engram_tile(uint32_t index,llama_dsv41::engram
     std::vector<float>result(count*6144);
     auto read=[&](uint64_t offset,void*dst,size_t bytes){
         if(p->options.engram_prefetch_host_bytes)return p->engram_prompt&&p->engram_prompt->read(index,offset,dst,bytes);
-#ifdef _WIN32
-        if(!bytes||bytes>264)return false;
-        const uint64_t begin=offset&~uint64_t(4095),skip=offset-begin,extent=align(skip+bytes,4096);
-        if(extent>8192||begin>p->options.verified_file_bytes||extent>p->options.verified_file_bytes-begin)return false;
-        LARGE_INTEGER where;where.QuadPart=LONGLONG(begin);DWORD done=0;
-        if(!SetFilePointerEx(p->engram_file,where,nullptr,FILE_BEGIN)||!ReadFile(p->engram_file,p->engram_page,DWORD(extent),&done,nullptr)||done!=extent)return false;
-        std::memcpy(dst,p->engram_page+skip,bytes);return true;
-#else
-        (void)offset;(void)dst;(void)bytes;return false;
-#endif
+        return p->engram_row_read(index,offset,dst,bytes);
     };
     // DS4COMBO producer-warm: rows come from the immutable prepared cache, so
     // contiguous token ranges decode on separate threads into their own fixed
@@ -1626,16 +1674,7 @@ bool llama_dsv41_weight_provider::engram_tile_raw(uint32_t index,llama_dsv41::en
     std::vector<uint8_t>result(count*24*llama_dsv41::engram_row_bytes);
     auto read=[&](uint64_t offset,void*dst,size_t bytes){
         if(p->options.engram_prefetch_host_bytes)return p->engram_prompt&&p->engram_prompt->read(index,offset,dst,bytes);
-#ifdef _WIN32
-        if(!bytes||bytes>264)return false;
-        const uint64_t begin=offset&~uint64_t(4095),skip=offset-begin,extent=align(skip+bytes,4096);
-        if(extent>8192||begin>p->options.verified_file_bytes||extent>p->options.verified_file_bytes-begin)return false;
-        LARGE_INTEGER where;where.QuadPart=LONGLONG(begin);DWORD done=0;
-        if(!SetFilePointerEx(p->engram_file,where,nullptr,FILE_BEGIN)||!ReadFile(p->engram_file,p->engram_page,DWORD(extent),&done,nullptr)||done!=extent)return false;
-        std::memcpy(dst,p->engram_page+skip,bytes);return true;
-#else
-        (void)offset;(void)dst;(void)bytes;return false;
-#endif
+        return p->engram_row_read(index,offset,dst,bytes);
     };
     // Same reader and row ids as engram_tile; the decode runs on the GPU.
     require(llama_dsv41::engram_read_raw_batch(read,p->options.verified_file_bytes,p->engram_offsets[index],p->engram.rows[index],ids.data(),count,24,result.data(),why),"Original Engram row read failed");

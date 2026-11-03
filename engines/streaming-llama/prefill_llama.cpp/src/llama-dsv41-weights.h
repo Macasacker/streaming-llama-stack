@@ -10,10 +10,11 @@
 #include <vector>
 #include "../../../ds4/ds4_external_host_cache.h"
 
-// Original native-1017 GGUF -> bounded DirectStorage layer staging. Metadata
-// tensors never mmap or allocate their complete file payload. Engram tables
-// remain opaque, original row264 bytes on disk and are excluded from stages.
-// This provider does not enable the main model inference gate.
+// Original native-1017 GGUF -> bounded streaming layer staging: the fetcher's
+// io_uring relay into pinned host staging, uploaded into admitted compute banks.
+// Metadata tensors never mmap or allocate their complete file payload. Engram
+// tables remain opaque, original row264 bytes on disk and are excluded from
+// stages. This provider does not enable the main model inference gate.
 class llama_dsv41_weight_provider {
 public:
     struct config {
@@ -21,24 +22,25 @@ public:
         // Caller must first verify this complete original checkpoint's SHA.
         // Physical file size must equal the verified receipt, not a partial.
         uint64_t verified_file_bytes=0;
-        // Identity bound to that completed SHA verification on Windows:
-        // volume serial, 128-bit FileIdInfo identifier, Unix last-write ns.
-        // A stale same-sized file must be reverified, never trusted by size.
+        // Identity bound to that completed SHA verification on Linux: the volume
+        // id (st_dev), the 8-byte little-endian inode (st_ino; its high eight
+        // bytes stay zero here), and Unix last-write nanoseconds. A stale
+        // same-sized file must be reverified, never trusted by size.
         uint64_t verified_volume=0,verified_mtime_ns=0;
         std::array<uint8_t,16> verified_file_id{};
         std::string verified_sha256;
         ggml_backend_t backend=nullptr;
-        // Includes compute buffers plus DS GPU staging and factory host stage.
+        // Compute banks plus the fetcher's host staging and factory allowances.
         uint64_t admitted_device_bytes=0,admitted_host_bytes=0;
         uint64_t job_host_bytes=0; // complete process RSS ceiling, including decode RAM
         uint32_t buffers=1;
         // Source-pinned candidate profile, independently admitted before allocate.
-        // Zero/default retains the measured baseline, not an environment override.
+        // The strict relay accepts only the typed limits, never an ambient value.
         uint64_t staging_limit_bytes=0;
         bool auto_request_size=false;
         bool async_staging_drain=false;
         bool compute_direct=false;
-        // Whole-prompt original row264 cache on its own IoRing. Zero is off.
+        // Whole-prompt original row264 cache on its own reader. Zero is off.
         uint64_t engram_prefetch_host_bytes=0;
         uint32_t engram_prefetch_tokens=0;
         // No-warm-up start: the early Engram cache is built for the very request
@@ -49,8 +51,6 @@ public:
         // restored base's last <=3 tokens). The early cache starts as soon as
         // the open's combined admission passes, before the first weight fetch.
         std::vector<int32_t> engram_early_tokens,engram_early_tail;
-        bool zero_padding_only=false;
-        uint32_t ds_submit_threads=0;
         // LLAMADECODE B1: 82-stage decode layout (embedding, then per layer a
         // dense stage and a routed-expert stage, then the head). Only the
         // routed experts' bytes are fetched. Switched at a pass boundary.
@@ -60,6 +60,8 @@ public:
     struct capacity {
         uint64_t maximum_stage_bytes=0,compute_buffer_bytes=0;
         uint64_t device_bytes=0,host_bytes=0;
+        // The policy's bounded staging figure and the request size the reader
+        // splits a stage into.
         uint64_t staging_bytes=0,request_bytes=0;
     };
 
@@ -69,20 +71,21 @@ public:
     llama_dsv41_weight_provider&operator=(const llama_dsv41_weight_provider&)=delete;
     llama_dsv41_weight_provider(llama_dsv41_weight_provider&&) noexcept;
     llama_dsv41_weight_provider&operator=(llama_dsv41_weight_provider&&) noexcept;
-    // Windows+CUDA+DS only. Caller owns backend for the full provider lifetime.
+    // CUDA only. Caller owns the backend for the full provider lifetime.
     // inspect retains the read-only physical file lease and metadata only;
-    // no DS factory or GPU buffer allocation. Admit combined job budgets from
+    // no fetcher or GPU buffer allocation. Admit combined job budgets from
     // budget() BEFORE allocate(). open() is the standalone inspect+allocate.
     bool inspect(const config &options,std::string &error);
     bool allocate(std::string &error);
     bool open(const config &options,std::string &error);
     // Consume only a fully completed pass, retaining the original model lease,
-    // heaps, requests and imported pointers. Start is deferred to the timed run.
+    // banks, registered spans and imported pointers. Start is deferred to the
+    // timed run.
     bool restart_prompt(const config &options,std::string &error);
     bool start_request(std::string &error);
     bool finish_yoco_encoder(std::string &error);
-    // DS4COMBO fast switch: release / rebuild the DS heaps and imported compute
-    // buffers between passes; model lease, plan and Engram state are kept.
+    // DS4COMBO fast switch: release / rebuild the fetcher's banks and imported
+    // compute buffers between passes; model lease, plan and Engram state are kept.
     bool suspend_device(std::string &error);
     bool resume_device(std::string &error);
     bool device_suspended() const;
@@ -90,9 +93,9 @@ public:
     ggml_backend_t backend() const;
     bool prepare_engram_prompt(const std::vector<int32_t> &tokens,
          const std::function<bool()> &cancelled,std::string &error,llama_dsv41::engram_history initial={},const uint8_t* text_mask=nullptr);
-    // DS4COMBO producer-warm: start the whole-prompt Engram row cache for a
-    // known later request on its own IoRing; prepare_engram_prompt adopts it
-    // for exactly these tokens/history. Both caches are charged to admission.
+    // Whole-prompt Engram row cache for a known later request on its own reader;
+    // prepare_engram_prompt adopts it for exactly these tokens/history. Both
+    // caches are charged to admission.
     // current_request: the cache is for the request about to run (sweep start),
     // so no second cache is alive and an already-queued early cache is kept.
     bool start_engram_prompt_early(const std::vector<int32_t> &tokens,llama_dsv41::engram_history initial,std::string &error,bool current_request=false,const uint8_t* text_mask=nullptr);
@@ -145,7 +148,7 @@ public:
     // the routing, releases the dense stage and waits for the routed stage.
     bool acquire_layer_dense(uint32_t layer,llama_dsv41_layer_graph::weights &weights,std::string &error);
     // LLAMADECODE B2: returns the cache-pool slot of each routed id; only
-    // misses are fetched (DirectStorage, explicit extents into bank 0).
+    // misses are fetched (explicit extents into bank 0).
     bool acquire_layer_experts(uint32_t layer,const std::vector<int32_t> &ids,std::vector<int32_t> &slots,std::string &error);
     // LLAMADECODE ds4-decode: put the provider in the decode layout and make
     // every non-routed stage resident (one pass), so an external decoder can
@@ -154,7 +157,7 @@ public:
     bool decode_resident_tensors(const std::function<bool(uint64_t,uint64_t,void*)> &visit,std::string &error) const;
     // The expert-cache slots of one token's routed ids (only misses are
     // fetched), the pool bases, and the slot count. cuda_stream receives the
-    // DirectStorage fence wait (the external decoder's stream).
+    // upload ordering (the external decoder's stream).
     // Packed FP4 decode: as external_expert_slots, but a second-tier hit is
     // read in place (slot >= *l1_slots addresses bases[3..5] at l2_stride).
     bool external_expert_slots_l2(uint32_t layer,const int32_t *ids,uint32_t n,int32_t *slots,
@@ -187,7 +190,8 @@ public:
     // Prefill retains the complete layer bank until release. Fetch only IDs
     // selected by real router rows; a per-layer bitmap prevents repeat reads.
     bool prefill_experts(uint32_t layer,const std::vector<int32_t>&ids,std::string&error);
-    // DirectStorage bytes and transfer milliseconds of the stages acquired since start_request.
+    // Bounded-stream bytes and transfer milliseconds of the stages acquired
+    // since start_request.
     void fetch_totals(uint64_t &bytes,double &milliseconds) const;
     // The ggml buffers holding a decode layer's dense and routed stages.
     bool decode_banks(uint32_t layer,const void *&dense,const void *&routed) const;

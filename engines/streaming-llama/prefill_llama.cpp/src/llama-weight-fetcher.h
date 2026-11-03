@@ -109,7 +109,6 @@ typedef struct {
     size_t  max_layer_bytes;             // largest layer's (or sub-layer's) weight footprint
     size_t  ds_staging_limit_bytes;        //0 preserves legacy; strict profiles admit250/1500MiB
     bool    ds_async_drain;               // explicit strict profile: existing copy-stream/drain path
-    uint32_t ds_submit_threads;           //0 untouched/default; explicit strict TEST1/2/4
     int     n_sublayers;                 // sub-layers per model layer (default: 1, MoE split: 2-4)
 
     // ---- GPU ----
@@ -128,7 +127,6 @@ typedef struct {
     // ---- Misc ----
     int     n_layers;                    // total model layers
     bool    trace;                       // emit per-operation timing to stderr
-    bool ds_zero_padding_only;           // explicit verified full-span direct fill; default false
     bool ds_compute_direct;              // explicit strict dual-use compute heaps; no relay
 } wf_params;
 
@@ -155,9 +153,7 @@ static inline wf_params wf_params_default(void) {
     p.trace            = false;
     p.ds_staging_limit_bytes = 0;
     p.ds_async_drain = false;
-    p.ds_submit_threads = 0;
     p.ds_compute_direct = false;
-    p.ds_zero_padding_only = false;
     p.n_sublayers      = 1;
     return p;
 }
@@ -191,10 +187,12 @@ typedef struct {
 // Returns NULL on failure.
 WF_API wf_context * wf_create(const wf_params * params);
 
-// Explicit opt-in for callers that require the Windows DirectStorage path. This
-// build does not compile DirectStorage, so it refuses before any allocation and
-// never falls back to unadmitted heaps or caches.
-WF_API wf_context * wf_create_required_dstorage(const wf_params * params);
+// Explicit opt-in for the bounded native weight provider. The caller supplies
+// the exact typed profile it has already admitted (bounded staging, async copy
+// ordering, an explicit pinned staging tier); nothing ambient is read and no
+// fallback allocation is attempted, so a refusal means the plan is not the one
+// the caller measured rather than a quieter mode it did not ask for.
+WF_API wf_context * wf_create_required_streaming(const wf_params * params);
 // Sticky fatal transfer/registration/synchronization status. Required callers
 // must check after void registration, upload waits and release boundaries.
 WF_API bool wf_has_failed(const wf_context * wf);
@@ -396,6 +394,9 @@ WF_API void wf_get_stats(wf_context * wf, wf_stats * stats);
 // Completed strict-profile transfer: actual requested file bytes and
 // submit-to-visible-compute-buffer wall time (includes enqueue, fences and D2D).
 // No filesystem cache or model arithmetic is touched by this snapshot.
+// Bytes and transfer milliseconds of one completed strict layer, reported after
+// wf_wait_layer_gpu() returns for it: the layer's read window plus its upload.
+// False for a layer the fetcher did not transfer (skipped, empty, or not strict).
 WF_API bool wf_get_required_layer_fetch(wf_context * wf, int layer,
                                       uint64_t * bytes, double * milliseconds);
 

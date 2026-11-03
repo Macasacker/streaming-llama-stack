@@ -50,8 +50,6 @@
 #  endif
 #endif
 
-// DirectStorage + D3D12-CUDA interop (Windows only, requires CUDA + DirectStorage SDK)
-
 static bool wf_verbose = false;  // set to true when trace is enabled
 #define WF_ERR(fmt, ...)   fprintf(stderr, "[weight-fetcher] " fmt "\n", ##__VA_ARGS__)
 #define WF_LOG(fmt, ...)   do { if (wf_verbose) fprintf(stderr, "[weight-fetcher] " fmt "\n", ##__VA_ARGS__); } while(0)
@@ -329,11 +327,11 @@ struct wf_context {
     std::atomic<uint64_t> direct_generation{0}; // never reset between passes
     wf_params                     params;
     wf_transfer_mode              effective_mode = WF_MODE_MMAP;
-    // Common lifecycle/query code reads this gate on every platform. The
-    // DirectStorage resources themselves remain Windows-only, but an inert
-    // false field must exist for Mac receiver builds as well.
+    // Direct compute banks: the caller owns the ping-pong heaps, so the relay
+    // never adds its own prefetch buffer. Set from ds_compute_direct or
+    // LLAMA_WF_DS_DIRECT before any mode-specific initialization.
     bool                          ds_direct_mode = false;
-    bool                          required_dstorage = false;
+    bool                          strict_streaming = false;
 #ifdef WF_HAS_CUDA
     int                           cuda_device_index = -1;
 #endif
@@ -475,9 +473,9 @@ struct wf_context {
 #endif
 #endif
 
-    // Sticky fatal state for a DirectStorage queue/device. Kept outside the
-    // feature guard so common wait code can reject a failed transfer in every
-    // build configuration.
+    // Sticky fatal state for a failed read, a refused registration or a failed
+    // upload wait. Kept outside the CUDA guard so common wait code can reject a
+    // failed transfer in every build configuration.
     std::atomic<bool>            ds_failed{false};
 
 
@@ -580,7 +578,7 @@ static void wf_cache_publish_locked(wf_cache_tier & tier, const wf_cache_key & k
 static void wf_cache_init(wf_context * wf) {
     if (!wf || wf->expert_cache_initialized) return;
     wf->expert_cache_initialized = true;
-    if (wf->required_dstorage) return;
+    if (wf->strict_streaming) return;
     wf->expert_cache_vram_request = wf_cache_env_bytes("LLAMA_WF_EXPERT_CACHE_MB");
     wf->expert_cache_ram_request = wf_cache_env_bytes("LLAMA_WF_EXPERT_CACHE_RAM_MB");
     if (!wf->expert_cache_vram_request && !wf->expert_cache_ram_request) return;
@@ -1499,7 +1497,7 @@ static void wf_gds_read_layer(wf_context * wf, int layer_idx) {
 #endif
 
 // ---------------------------------------------------------------------------
-// DirectStorage backend helpers
+// Expert cache and expert prefetch helpers
 // ---------------------------------------------------------------------------
 
 
@@ -1529,14 +1527,14 @@ static bool wf_expert_fully_cached(wf_context * wf, int layer_idx, int expert_id
 static void wf_expert_prefetch_init(wf_context * wf) {
     if (!wf || wf->expert_prefetch_initialized) return;
     wf->expert_prefetch_initialized = true;
-    if (wf->required_dstorage) return;
+    if (wf->strict_streaming) return;
     const char * gate = std::getenv("LLAMA_WF_EXPERT_PREFETCH");
     if (!(gate && gate[0] && gate[0] != '0')) return;
     if (wf->params.moe_mode != WF_MOE_FETCH_ACTIVE) {
         WF_ERR("warning: LLAMA_WF_EXPERT_PREFETCH requires WF_MOE_FETCH_ACTIVE; disabling");
         return;
     }
-    WF_ERR("warning: LLAMA_WF_EXPERT_PREFETCH requires DirectStorage + CUDA; disabling");
+    WF_ERR("warning: LLAMA_WF_EXPERT_PREFETCH has no implementation in this build; disabling");
     return;
 }
 
@@ -1643,8 +1641,7 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
         int next = wf->pipeline_next_layer.load();
         bool any_progress = false;
 
-        // --- Phase A: check DMA completion ---
-        // Non-DirectStorage path: scan all layers for I/O completion
+        // --- Phase A: check the relay's read completions ---
         {
         for (int il = 0; il < n_layers; il++) {
             auto & layer = wf->layers[il];
@@ -1837,48 +1834,59 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
 // Public API implementation
 // ---------------------------------------------------------------------------
 
-static wf_context * wf_create_impl(const wf_params * params, bool required_dstorage) {
+static wf_context * wf_create_impl(const wf_params * params, bool strict_streaming) {
     if (!params || !params->model_path || params->n_layers <= 0) {
         WF_ERR("wf_create: invalid params");
         return nullptr;
     }
 
-    if(params->ds_zero_padding_only&&(!required_dstorage||!params->ds_compute_direct||
-       !params->ds_async_drain||params->n_gpu_buffers!=2)){
-        WF_ERR("Padding-only zero requires the explicit strict two-bank direct profile");
-        return nullptr;
-    }
-
-    if (required_dstorage) {
-        WF_ERR("Required DirectStorage is not compiled in; no fallback allocations attempted");
-        return nullptr;
-    }
-
-    if (std::getenv("LLAMA_WF_DS_REQUEST_MIB")) WF_ERR("[dsv41-dstorage-config] request_bytes=%zu typed_setting=1", params->io_block_size);
-    // Typed profile admission happens before context/factory/heap allocation.
-    // Ambient tuning still refuses in strict mode; the caller uses explicit
-    // source-pinned settings rather than inheriting unbounded environment knobs.
-    if ((params->ds_staging_limit_bytes || params->ds_async_drain) &&
-            (!required_dstorage || !llama_wf_bounded::exact_relay_profile(
+    // The strict profile belongs to the native weight provider: the exact typed
+    // geometry it planned, its own pinned staging tier, no ambient environment
+    // tuning, no expert cache or relay prefetch buffer, and no fallback to
+    // unadmitted heaps. Its Windows transport was DirectStorage; here the same
+    // bounded relay reads through io_uring (or pread) and uploads into compute
+    // banks, and every failure is sticky instead of silently degraded.
+    if (strict_streaming) {
+        if (!llama_wf_bounded::exact_relay_profile(
                 params->max_layer_bytes,uint32_t(params->n_gpu_buffers),
-                params->ds_staging_limit_bytes,params->io_block_size))) {
-        WF_ERR("Required DirectStorage: unsupported typed relay profile");
+                params->ds_staging_limit_bytes,params->io_block_size)) {
+            WF_ERR("Required streaming: unsupported typed relay profile");
+            return nullptr;
+        }
+        if (!params->ds_async_drain) {
+            WF_ERR("Required streaming: the pinned staging tier needs async copy ordering");
+            return nullptr;
+        }
+        if (params->n_ram_buffers < 1) {
+            WF_ERR("Required streaming: an explicit pinned staging tier is required");
+            return nullptr;
+        }
+        if (params->max_layer_bytes > SIZE_MAX/8) {
+            WF_ERR("Required streaming: layer footprint overflows the request plan");
+            return nullptr;
+        }
+        if (params->ds_compute_direct && params->n_gpu_buffers != 2) {
+            WF_ERR("Required direct compute needs exactly two explicit VRAM banks");
+            return nullptr;
+        }
+    } else if (params->ds_staging_limit_bytes || params->ds_async_drain || params->ds_compute_direct) {
+        WF_ERR("Typed fetch profiles belong to the required streaming caller only");
         return nullptr;
     }
-
-    if(params->ds_compute_direct&&(!required_dstorage||params->n_gpu_buffers!=2||params->n_ram_buffers||!params->ds_async_drain||params->max_layer_bytes>SIZE_MAX/8)){
-        WF_ERR("Required direct compute needs exactly two explicit VRAM banks and async copy ordering");return nullptr;
-    }
+    if (std::getenv("LLAMA_WF_DS_REQUEST_MIB")) WF_ERR("[dsv41-fetch-config] request_bytes=%zu typed_setting=1", params->io_block_size);
+    // Ambient tuning is the non-strict caller's; the strict one passes
+    // source-pinned settings and must not inherit unbounded environment knobs.
     wf_verbose = params->trace;
 
     auto * wf = new wf_context();
     wf->params = *params;
-    wf->required_dstorage = required_dstorage;
-    // R3 DS-DIRECT gate (default-off == today's exact behavior). Set BEFORE any mode-specific init.
+    wf->strict_streaming = strict_streaming;
+    // Direct compute banks: the caller owns the two ping-pong heaps and the relay
+    // never adds its own prefetch buffer on top of them.
     {
         const char * e = std::getenv("LLAMA_WF_DS_DIRECT");
         wf->ds_direct_mode = params->ds_compute_direct||(e && e[0] && e[0] != '0');
-        if (wf->ds_direct_mode) WF_LOG("DS-DIRECT mode ENABLED (LLAMA_WF_DS_DIRECT): permanent ping-pong heaps, no staging tier");
+        if (wf->ds_direct_mode) WF_LOG("DS-DIRECT mode ENABLED: caller-owned ping-pong heaps, no relay prefetch buffer");
     }
     wf->layers.resize(params->n_layers);
     wf->io_trackers.resize(params->n_layers);
@@ -1889,13 +1897,13 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
         WF_LOG("resolved CUDA device index: %d", wf->cuda_device_index);
     }
     wf_cuda_device_scope cuda_scope(wf->cuda_device_index);
-    if (required_dstorage && (wf->cuda_device_index < 0 || !cuda_scope.ok)) {
-        WF_ERR("Required DirectStorage: target CUDA device cannot be bound");
+    if (strict_streaming && (wf->cuda_device_index < 0 || !cuda_scope.ok)) {
+        WF_ERR("Required streaming: target CUDA device cannot be bound");
         delete wf;
         return nullptr;
     }
-    if (required_dstorage && !ggml_backend_cuda_get_stream((ggml_backend_t)params->gpu_backend)) {
-        WF_ERR("Required DirectStorage: target CUDA compute stream is unavailable");
+    if (strict_streaming && !ggml_backend_cuda_get_stream((ggml_backend_t)params->gpu_backend)) {
+        WF_ERR("Required streaming: target CUDA compute stream is unavailable");
         delete wf;
         return nullptr;
     }
@@ -1923,16 +1931,16 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
 #endif
     }
 
-    // DirectStorage requires Windows + LLAMA_DIRECTSTORAGE + CUDA at compile time
+    // WF_MODE_DSTORAGE is retired: a caller asking for it gets the async reader,
+    // which is the only NVMe-to-GPU route compiled here.
     if (wf->effective_mode == WF_MODE_DSTORAGE) {
-        WF_LOG("WF_MODE_DSTORAGE not compiled in — falling back to DIRECT_IO");
+        WF_LOG("WF_MODE_DSTORAGE is not compiled in — reading with the async relay instead");
         wf->effective_mode = WF_MODE_DIRECT_IO;
     }
 
     wf->stats.effective_mode = wf->effective_mode;
 
     WF_LOG("transfer mode: %s",
-           wf->effective_mode == WF_MODE_DSTORAGE  ? "DirectStorage (NVMe → GPU via D3D12)" :
            wf->effective_mode == WF_MODE_GDS        ? "GPUDirect Storage" :
            wf->effective_mode == WF_MODE_DIRECT_IO  ? "Direct I/O" :
            wf->effective_mode == WF_MODE_MMAP       ? "mmap (legacy)" : "unknown");
@@ -1956,7 +1964,7 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
         bool use_direct = (wf->effective_mode == WF_MODE_DIRECT_IO) && params->io_direct;
         if (!wf_open_file(&fh, params->split_paths[i], use_direct)) {
             WF_ERR("warning: failed to open split file %s", params->split_paths[i]);
-            if (required_dstorage) { wf_destroy(wf); return nullptr; }
+            if (strict_streaming) { wf_destroy(wf); return nullptr; }
         }
         wf->files.push_back(fh);
     }
@@ -1968,15 +1976,16 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
         buf_size = 512 * 1024 * 1024;
     }
     // Padding: 10% only when raw direct I/O can overread rounded chunks.
-    // DirectStorage and buffered RAM-staged reads only need allocator alignment
-    // slack, which matters for large Kimi runs that fit VRAM by a narrow margin.
-    if (wf->effective_mode == WF_MODE_DSTORAGE ||
-        (wf->effective_mode == WF_MODE_DIRECT_IO && !params->io_direct)) {
+    // Raw unbuffered reads round a chunk up to a sector, so the destination
+    // needs slack. Buffered reads (the only ones here, see wf_open_file) and the
+    // strict profile need only allocator alignment slack, which matters for large
+    // runs that fit VRAM by a narrow margin.
+    if (wf->effective_mode == WF_MODE_DIRECT_IO && !params->io_direct) {
         buf_size += std::max(buf_size / 100, (size_t)(64 * 1024));
     } else {
         buf_size += buf_size / 10;
     }
-    // Round up to 64KB for D3D12 / direct I/O alignment
+    // Round up to 64KB for direct I/O alignment
     buf_size = (buf_size + 65535) & ~(size_t)65535;
 
     WF_LOG("GPU buffer allocation: %d bufs × %.2f MB = %.2f MB total (max_layer=%.2f MB, mode=%d)",
@@ -2036,13 +2045,11 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
         }
     }
 
-    // The retired DirectStorage path would have streamed NVMe → GPU direct with
-    // no RAM buffers, chunk pool or reader threads. It is refused at create,
-    // so every surviving mode allocates the staging tier below.
-    bool is_dstorage = (wf->effective_mode == WF_MODE_DSTORAGE);
+    // Every mode reads through the RAM staging tier and the reader threads:
+    // there is no NVMe-to-GPU queue compiled here.
 
-    // -- Allocate pinned RAM staging buffers (not needed for DirectStorage) --
-    if (!is_dstorage) {
+    // -- Allocate pinned RAM staging buffers --
+    {
         wf->ram_bufs.resize(params->n_ram_buffers);
         for (int i = 0; i < params->n_ram_buffers; i++) {
             auto & slot = wf->ram_bufs[i];
@@ -2077,18 +2084,18 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
     // -- Create CUDA copy stream --
 #ifdef WF_HAS_CUDA
     const cudaError_t stream_created = cudaStreamCreateWithFlags(&wf->copy_stream,
-        required_dstorage&&params->ds_async_drain?cudaStreamNonBlocking:cudaStreamDefault);
+        strict_streaming&&params->ds_async_drain?cudaStreamNonBlocking:cudaStreamDefault);
     const cudaError_t event0_created = cudaEventCreate(&wf->ds_stage_evt[0]);  // staging-drain event (LLAMA_WF_ASYNC_DRAIN)
     const cudaError_t event1_created = cudaEventCreate(&wf->ds_stage_evt[1]);
-    if (required_dstorage && (stream_created != cudaSuccess || event0_created != cudaSuccess || event1_created != cudaSuccess)) {
-        WF_ERR("Required DirectStorage: copy stream/event initialization failed");
+    if (strict_streaming && (stream_created != cudaSuccess || event0_created != cudaSuccess || event1_created != cudaSuccess)) {
+        WF_ERR("Required streaming: copy stream/event initialization failed");
         wf_destroy(wf);
         return nullptr;
     }
 #endif
 
-    // -- Initialize chunk pool (not needed for DirectStorage) --
-    if (!is_dstorage) {
+    // -- Initialize chunk pool --
+    {
         size_t chunks_per_layer = (buf_size + params->io_block_size - 1) / params->io_block_size;
         int pool_size = (int)(chunks_per_layer * params->prefetch_depth * 2);
         pool_size = std::max(pool_size, 256);
@@ -2098,7 +2105,7 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
     }
 
     // -- Create the reader queue and the reader threads --
-    if (!is_dstorage) {
+    {
         wf->io_shutdown.store(false);
         int n_io = std::max(1, params->io_threads);
 #ifdef WF_HAS_IO_URING
@@ -2113,7 +2120,7 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
         WF_LOG("started %d %s readers (QD=%d each, block=%zuKiB)",
                n_io, wf->use_io_uring ? "io_uring" : "pread",
                std::max(1, params->io_queue_depth), params->io_block_size / 1024);
-    } // !is_dstorage
+    }
 
     // -- GDS setup --
 #ifdef WF_HAS_GDS
@@ -2142,8 +2149,8 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
 #endif
 
     // Extract the CUDA compute stream from the GPU backend.
-    // ggml-cuda uses cudaStreamNonBlocking, so we MUST wait on the actual
-    // compute stream (not the null stream) for D3D12 fence synchronization.
+    // ggml-cuda uses cudaStreamNonBlocking, so the upload ordering must wait on
+    // the actual compute stream (not the null stream).
 #ifdef WF_HAS_CUDA
     if (params->gpu_backend) {
         wf->cuda_compute_stream = (cudaStream_t)ggml_backend_cuda_get_stream(
@@ -2155,18 +2162,6 @@ static wf_context * wf_create_impl(const wf_params * params, bool required_dstor
     }
 #endif
 
-    // Cold-start: warm the D3D12<->CUDA DirectStorage interop now (at load) so the
-    // first real streaming-prefill fetch cannot race the driver's lazy VA/semaphore
-    // wiring. Placed here so cuda_compute_stream (captured just above) and copy_stream
-    // are both available; covers BOTH the cold and PERSIST-INFRA-reuse init branches
-    // (both funnel through wf_create's tail) plus the per-request fence/semaphore that
-    // wf_dstorage_create_stateful re-creates. Gated LLAMA_WF_WARM_INTEROP (default on).
-    // The DEFINITION of wf_warm_ds_interop lives inside `#ifdef WF_HAS_DSTORAGE` (opened at
-    // line 1616), but this CALL was unguarded. On Windows WF_HAS_DSTORAGE is defined so both
-    // exist and MSVC is happy; on macOS the definition vanishes and the call does not, so the
-    // Mac build fails with 'use of undeclared identifier'. Guard the call to match the
-    // definition -- byte-identical on Windows, compilable everywhere else.
-
     return wf;
 }
 
@@ -2174,7 +2169,7 @@ wf_context * wf_create(const wf_params * params) {
     return wf_create_impl(params, false);
 }
 
-wf_context * wf_create_required_dstorage(const wf_params * params) {
+wf_context * wf_create_required_streaming(const wf_params * params) {
     return wf_create_impl(params, true);
 }
 
@@ -2270,7 +2265,7 @@ void wf_register_layer(wf_context * wf, int layer_idx,
                         size_t total_bytes) {
     if (!wf || layer_idx < 0 || layer_idx >= (int)wf->layers.size()) return;
 
-    if (wf->required_dstorage) {
+    if (wf->strict_streaming) {
         const int span_limit = wf->params.moe_mode == WF_MOE_FETCH_ACTIVE ? 2048 : 128;
         bool valid = !wf->pipeline_running.load() && n_spans > 0 && n_spans <= span_limit && spans &&
             total_bytes > 0 && total_bytes <= wf->params.max_layer_bytes;
@@ -2289,7 +2284,7 @@ void wf_register_layer(wf_context * wf, int layer_idx,
             }
         }
         if (!valid) {
-            WF_ERR("Required DirectStorage: invalid physical layer registration (no mmap/host fallback permitted)");
+            WF_ERR("Required streaming: invalid physical layer registration (no mmap/host fallback permitted)");
             wf->ds_failed.store(true, std::memory_order_release);
             return;
         }
@@ -2372,7 +2367,7 @@ void wf_hold_from(wf_context * wf, int first_held_stage) {
 
 void wf_start(wf_context * wf) {
     if (!wf || wf->pipeline_running.load()) return;
-    if (wf->required_dstorage && wf->ds_failed.load(std::memory_order_acquire)) return;
+    if (wf->strict_streaming && wf->ds_failed.load(std::memory_order_acquire)) return;
 
     wf_cache_init(wf);
     wf_expert_prefetch_init(wf);
@@ -2536,7 +2531,7 @@ void * wf_wait_layer_gpu(wf_context * wf, int layer_idx) {
 #ifdef WF_HAS_CUDA
         if (wf->cuda_compute_stream) {
             const cudaError_t synced = cudaStreamSynchronize(wf->cuda_compute_stream);
-            if (wf->required_dstorage && synced != cudaSuccess) {
+            if (wf->strict_streaming && synced != cudaSuccess) {
                 wf->ds_failed.store(true,std::memory_order_release);return nullptr;
             }
         }
@@ -2629,9 +2624,8 @@ void * wf_wait_layer_gpu(wf_context * wf, int layer_idx) {
     int gpu_idx = layer.gpu_buf_idx;
     if (gpu_idx < 0) return nullptr;
 
-    // Wave-based transfer: data is already in the compute buffer
-    // (wf_dstorage_transfer_layer does DS → staging → D2D → compute
-    // before setting GPU_READY). No reassembly needed here.
+    // The relay already placed this layer's bytes in its compute buffer before
+    // publishing GPU_READY, so there is nothing to reassemble here.
 
     // Prefetch scheduling moved to wf_prefetch_next_layer (called from post_layer_cb)
 
@@ -2649,7 +2643,7 @@ void wf_prefetch_next_layer(wf_context * wf, int current_layer_idx) {
 // Allocate prefetch buffer using remaining VRAM after graph_alloc.
 // Call once after the streaming graph is allocated.
 void wf_allocate_prefetch(wf_context * wf) {
-    if (wf && wf->required_dstorage) return;
+    if (wf && wf->strict_streaming) return;
 #ifdef WF_HAS_CUDA
     if (!wf || wf->prefetch_buf || wf->prefetch_buf_size == 0) return;
     wf_cuda_device_scope cuda_scope(wf->cuda_device_index);
@@ -2830,7 +2824,7 @@ void wf_quiesce(wf_context * wf) {
 }
 
 bool wf_set_layer_skipped(wf_context * wf, int layer_idx, bool skipped) {
-    if(!wf || !wf->required_dstorage ||
+    if(!wf || !wf->strict_streaming ||
        wf->pipeline_running.load() || layer_idx<0 || layer_idx>=int(wf->layers.size()) ||
        wf->layers[layer_idx].persistent) return false;
     wf->layers[layer_idx].skipped=skipped;
@@ -2838,7 +2832,7 @@ bool wf_set_layer_skipped(wf_context * wf, int layer_idx, bool skipped) {
 }
 
 bool wf_set_layer_persistent(wf_context * wf, int layer_idx, bool persistent) {
-    if (!wf || !wf->required_dstorage || layer_idx < 0 || layer_idx >= (int)wf->layers.size() || wf->pipeline_running.load()) return false;
+    if (!wf || !wf->strict_streaming || layer_idx < 0 || layer_idx >= (int)wf->layers.size() || wf->pipeline_running.load()) return false;
     auto & layer = wf->layers[layer_idx];
     if (layer.spans.empty()) return false;
     for (const auto & span : layer.spans) if (span.is_expert) return false;  // routed stages are rewritten every token
@@ -2961,7 +2955,7 @@ void wf_cuda_wait_upload(wf_context * wf, int layer_idx) {
         // Make the compute stream wait for the upload event.
         // Uses the actual ggml-cuda stream (not null — ggml uses NonBlocking).
         const cudaError_t waited = cudaStreamWaitEvent(wf->cuda_compute_stream, slot.upload_done, 0);
-        if (wf->required_dstorage && waited != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
+        if (wf->strict_streaming && waited != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
     }
 
     // Insert after upload completion is ordered. All cache transfers use the
@@ -2969,7 +2963,7 @@ void wf_cuda_wait_upload(wf_context * wf, int layer_idx) {
     wf_cache_insert_layer(wf, layer_idx);
     if (slot.upload_done) {
         const cudaError_t waited = cudaStreamWaitEvent(wf->cuda_compute_stream, slot.upload_done, 0);
-        if (wf->required_dstorage && waited != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
+        if (wf->strict_streaming && waited != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
     }
 
     // ROUND-10 PROBE (LLAMA_DSV4_WF_CKSUM=<tsv>): post-upload GPU-vs-file checksum of the
@@ -2977,7 +2971,7 @@ void wf_cuda_wait_upload(wf_context * wf, int layer_idx) {
     // every other layer-selective mechanism; the surviving gap is upload fidelity of specific
     // layers' spans. Same-run comparison: hash the uploaded GPU bytes AND the mmap source bytes.
     static const char * wf_cksum_path = std::getenv("LLAMA_DSV4_WF_CKSUM");
-    if (!wf->required_dstorage && wf_cksum_path && wf_cksum_path[0]) {
+    if (!wf->strict_streaming && wf_cksum_path && wf_cksum_path[0]) {
         static std::mutex cksum_mutex;
         static std::set<std::pair<int, std::string>> done_set;
         std::lock_guard<std::mutex> lk(cksum_mutex);
@@ -3055,9 +3049,9 @@ void wf_cuda_record_compute_done(wf_context * wf, int layer_idx) {
     auto & slot = wf->gpu_bufs[gpu_idx];
     if (slot.compute_done) {
         const cudaError_t recorded = cudaEventRecord(slot.compute_done, wf->cuda_compute_stream);
-        if (wf->required_dstorage && recorded != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
+        if (wf->strict_streaming && recorded != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
     }
-    if (!wf->required_dstorage && wf_lockfree_ready_enabled() && gpu_idx < (int)wf->dma_buf_pending.size()) {
+    if (!wf->strict_streaming && wf_lockfree_ready_enabled() && gpu_idx < (int)wf->dma_buf_pending.size()) {
         // Fires on the compute stream AFTER this layer's compute completes,
         // marking buffer gpu_idx reusable lock-free (DMA polls compute_ready).
         // cudaLaunchHostFunc is illegal during stream capture (n_ubatches==1 fast
@@ -3135,9 +3129,18 @@ void wf_set_gpu_buf_ptr(wf_context * wf, int buf_idx, void * ptr) {
 // ---------------------------------------------------------------------------
 
 bool wf_get_required_layer_fetch(wf_context * wf, int layer, uint64_t * bytes, double * milliseconds) {
-    if (!wf || !bytes || !milliseconds) return false;
+    if (!bytes || !milliseconds) return false;
     *bytes = 0; *milliseconds = 0;
-    return false;
+    if (!wf || !wf->strict_streaming || layer < 0 || layer >= (int)wf->layers.size()) return false;
+    const auto & l = wf->layers[layer];
+    // Only a stage this fetcher actually moved has timing to report. The caller
+    // asks immediately after wf_wait_layer_gpu(), whose own wait is the point
+    // where the read and the upload are both finished.
+    if (l.skipped || l.stage.load(std::memory_order_acquire) < WF_STAGE_GPU_READY) return false;
+    if (l.total_bytes == 0 && l.spans.empty()) return true;
+    *bytes = uint64_t(l.total_bytes);
+    *milliseconds = double(l.nvme_read_ms) + double(l.h2d_ms);
+    return true;
 }
 
 void wf_get_stats(wf_context * wf, wf_stats * stats) {
@@ -3210,7 +3213,6 @@ void wf_print_stats(wf_context * wf) {
     // wf_print_stats is explicitly called — always print
     WF_ERR("=== Weight Fetcher Stats ===");
     WF_ERR("  mode:           %s%s",
-           s.effective_mode == WF_MODE_DSTORAGE  ? "DirectStorage" :
            s.effective_mode == WF_MODE_GDS       ? "GPUDirect Storage" :
            s.effective_mode == WF_MODE_DIRECT_IO ? "Direct I/O" :
            s.effective_mode == WF_MODE_MMAP      ? "mmap" : "unknown",
@@ -3368,7 +3370,7 @@ void wf_extent_fetch_stats(double * out4, uint64_t * requests, uint64_t * batche
 }
 bool wf_ready_direct_bank(wf_context * wf, int stage, int bank, uint64_t * generation) {
     if (generation) *generation=0;
-    if (!wf || !generation || !wf->required_dstorage || !wf->params.ds_compute_direct ||
+    if (!wf || !generation || !wf->strict_streaming || !wf->params.ds_compute_direct ||
         wf->params.n_gpu_buffers!=2 ||
         stage<0 || stage>=int(wf->layers.size()) || bank<0 || bank>=2) return false;
     const auto&layer=wf->layers[stage];
