@@ -240,11 +240,10 @@ static const char DS4_REASONING_EFFORT_MAX_PREFIX[] =
 #define DS4_THINK_MAX_MIN_CONTEXT 393216u
 
 static bool ds4_backend_uses_graph(ds4_backend backend) {
-    return backend == DS4_BACKEND_METAL || backend == DS4_BACKEND_CUDA;
+    return backend == DS4_BACKEND_CUDA;
 }
 
 static bool ds4_backend_supports_ssd_streaming(ds4_backend backend) {
-    if (backend == DS4_BACKEND_METAL) return true;
     if (backend == DS4_BACKEND_CUDA) {
 #if defined(DS4_ROCM_BUILD) || (!defined(DS4_NO_GPU))
         return true;
@@ -256,7 +255,6 @@ static bool ds4_backend_supports_ssd_streaming(ds4_backend backend) {
 }
 
 static bool ds4_backend_supports_streaming_auto_cache(ds4_backend backend) {
-    if (backend == DS4_BACKEND_METAL) return true;
 #ifdef DS4_ROCM_BUILD
     if (backend == DS4_BACKEND_CUDA) return true;
 #else
@@ -266,7 +264,6 @@ static bool ds4_backend_supports_streaming_auto_cache(ds4_backend backend) {
 }
 
 static bool ds4_backend_supports_glm_streaming_full_layers(ds4_backend backend) {
-    if (backend == DS4_BACKEND_METAL) return true;
 #ifdef DS4_ROCM_BUILD
     if (backend == DS4_BACKEND_CUDA) return true;
 #else
@@ -1490,7 +1487,7 @@ static void ds4_json_write_string(FILE *fp, const char *s) {
     fputc('"', fp);
 }
 
-static void ds4_expert_profile_init(const char *path, const char *hotlist_path) {
+static DS4_MAYBE_UNUSED void ds4_expert_profile_init(const char *path, const char *hotlist_path) {
     if ((!path || !path[0]) && (!hotlist_path || !hotlist_path[0])) return;
     if (g_expert_profile.active) {
         free(g_expert_profile.path);
@@ -45214,19 +45211,6 @@ struct ds4_engine {
     uint64_t       glm_session_graph_bytes;
 };
 
-static DS4_MAYBE_UNUSED uint64_t ds4_engine_glm_graph_budget(
-        const ds4_engine *e, uint64_t next_graph_bytes) {
-    /* Metal guards against host capacity, so include live sessions as well as
-     * the uncreated slots. Other backends keep their available-memory policy. */
-    if (!e || e->backend != DS4_BACKEND_METAL) return next_graph_bytes;
-    uint64_t uncreated = e->placement_session_count_hint > 0 &&
-                         (uint32_t)e->placement_session_count_hint > e->glm_session_count ?
-        (uint32_t)e->placement_session_count_hint - e->glm_session_count : 1u;
-    if (next_graph_bytes > (UINT64_MAX - e->glm_session_graph_bytes) / uncreated)
-        return UINT64_MAX;
-    return e->glm_session_graph_bytes + uncreated * next_graph_bytes;
-}
-
 static uint64_t ds4_engine_dynamic_expert_cache_bytes(
         const ds4_engine *e) {
     if (!e || !e->ssd_streaming) return 0;
@@ -45310,13 +45294,6 @@ static void ds4_engine_print_startup_memory(
             glm_graph_streaming_active_model_bytes(&e->weights);
         if (active_model_bytes > resident_model_bytes) {
             resident_model_bytes = active_model_bytes;
-        }
-    }
-    if (e->ssd_streaming && e->backend == DS4_BACKEND_METAL) {
-        uint64_t static_bytes = 0;
-        if (weights_streaming_non_routed_bytes(&e->weights, &static_bytes) &&
-            static_bytes > resident_model_bytes) {
-            resident_model_bytes = static_bytes;
         }
     }
 #endif
@@ -61237,11 +61214,7 @@ static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds
      * choices each over 512 experts, so an expert averages a third of a token
      * and the tiles run nearly empty.  Above this row count the GEMM wins;
      * below it the per-token expert path does, by 4% at sixteen rows. */
-#ifdef DS4_HAS_QWEN4_METAL
-    const uint32_t mm_min = 64u;
-#else
     const uint32_t mm_min = 8u;
-#endif
     const bool mm = T > mm_min &&
         (DS4_N_EMBD % 64u) == 0 && (DS4_N_FF_EXP % 64u) == 0 &&
         qwen4_expert_type_has_mm(l->ffn_gate_exps->type) &&
@@ -61289,13 +61262,7 @@ static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds
      * rows, as the prefill path does: as a slot of the per-token kernels it
      * is read once per row, 5 MB of Q8 per row and layer.  Single tokens and
      * verify rows keep the slot. */
-#ifdef DS4_HAS_QWEN4_METAL
-    const bool shared_dense = T > 8u &&
-        qwen4_graph_dense_ok(l->ffn_gate_shexp) && qwen4_graph_dense_ok(l->ffn_up_shexp) &&
-        qwen4_graph_dense_ok(l->ffn_down_shexp);
-#else
     const bool shared_dense = false;
-#endif
     if (ok && shared_dense) {
         ok = qwen4_gemv(g->sh_gate, m, l->ffn_gate_shexp, g->mixed, T) &&
              qwen4_gemv(g->sh_up, m, l->ffn_up_shexp, g->mixed, T) &&
@@ -61306,23 +61273,6 @@ static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds
      * ones: the grouped kernels read every expert once per four rows that
      * chose it instead of once per row, each row's arithmetic unchanged.
      * DS4_QWEN4_MOE_NO_GROUP=1 keeps the per-row kernels for A/B. */
-#ifdef DS4_HAS_QWEN4_METAL
-    const bool grouped = shared_dense && l->ffn_gate_exps->type == DS4_TENSOR_Q4_K &&
-        l->ffn_up_exps->type == DS4_TENSOR_Q4_K && l->ffn_down_exps->type == DS4_TENSOR_MXFP4 &&
-        getenv("DS4_QWEN4_MOE_NO_GROUP") == NULL;
-    if (ok && grouped) {
-        ok = ds4_gpu_qwen4_moe_build_lists_tensor(g->moe_lists, g->moe_counts, g->selected, T, DS4_N_EXPERT_USED,
-                                                  DS4_N_EXPERT, g->cap_tokens) &&
-             ds4_gpu_qwen4_moe_mid_grouped_tensor(g->mid, g->mixed, g->selected, g->moe_lists, g->moe_counts,
-                                                  g->cap_tokens, m->map, m->size, l->ffn_gate_exps->abs_offset,
-                                                  l->ffn_up_exps->abs_offset, l->ffn_gate_exps->type, DS4_N_EXPERT, T,
-                                                  DS4_N_EXPERT_USED, DS4_N_EMBD, DS4_N_FF_EXP) &&
-             ds4_gpu_qwen4_moe_down_grouped_tensor(g->part, g->mid, g->selected, g->moe_lists, g->moe_counts,
-                                                   g->cap_tokens, m->map, m->size, l->ffn_down_exps->abs_offset,
-                                                   l->ffn_down_exps->type, DS4_N_EXPERT, T, DS4_N_EXPERT_USED,
-                                                   DS4_N_FF_EXP, DS4_N_EMBD);
-    } else
-#endif
     if (ok) {
         ok = ds4_gpu_qwen4_moe_mid_tensor(g->mid, g->mixed, g->selected, m->map, m->size, l->ffn_gate_exps->abs_offset,
                                           l->ffn_up_exps->abs_offset, l->ffn_gate_exps->type, DS4_N_EXPERT, T,
@@ -62858,7 +62808,6 @@ static size_t engine_per_tier_graph_overhead_bytes(const ds4_engine *e) {
 
 const char *ds4_backend_name(ds4_backend backend) {
     switch (backend) {
-    case DS4_BACKEND_METAL: return "metal";
     case DS4_BACKEND_CUDA:
 #ifdef DS4_ROCM_BUILD
         return "rocm";
@@ -63249,18 +63198,10 @@ static bool ds4_session_dspark_seed_batch_enabled(
     }
     /* Keep streaming and unmeasured weight/device combinations on their
      * existing schedule. No sampling decision is changed by this dispatch. */
-    return e->backend == DS4_BACKEND_METAL && !e->ssd_streaming &&
-           !e->dspark_exact_sampling &&
-           ds4_gpu_device_is_m5_apple_silicon() &&
-           layer->ffn_gate_exps && layer->ffn_down_exps &&
-           ((layer->ffn_gate_exps->type == DS4_TENSOR_IQ2_XXS &&
-             layer->ffn_down_exps->type == DS4_TENSOR_Q2_K) ||
-            (e->tp.active && layer->ffn_gate_exps->type == DS4_TENSOR_MXFP4 &&
-             layer->ffn_down_exps->type == DS4_TENSOR_MXFP4));
+    return false;
 }
 
 static bool ds4_session_dspark_seed_batch_short_fallback(const ds4_session *s) {
-    if (s->engine->backend == DS4_BACKEND_METAL) return true;
     return s->engine->backend == DS4_BACKEND_CUDA &&
            ds4_gpu_device_is_spark();
 }
@@ -67280,7 +67221,7 @@ int ds4_dump_chat_tokenization(const char *model_path,
 #ifdef DS4_HAS_DEEPSEEK41_GPU
 static bool ds41_memory_admit(ds4_engine *e, uint64_t graph_bytes, bool fit_cache);
 #endif
-static bool imatrix_read_text_file(const char *path, char **out, size_t *len_out) {
+static DS4_MAYBE_UNUSED bool imatrix_read_text_file(const char *path, char **out, size_t *len_out) {
     *out = NULL;
     *len_out = 0;
     struct stat st;
@@ -67333,7 +67274,7 @@ static char *imatrix_find_marker(char *dataset, char *cursor, const char *marker
     return NULL;
 }
 
-static int ds4_engine_collect_sequential_imatrix(
+static DS4_MAYBE_UNUSED int ds4_engine_collect_sequential_imatrix(
         ds4_engine *e,
         char       *dataset,
         size_t      dataset_len,
@@ -67534,177 +67475,16 @@ int ds4_engine_collect_imatrix(ds4_engine *e,
     return 1;
 #else
     if (!e || !dataset_path || !output_path) return 1;
-    if (e->backend != DS4_BACKEND_METAL || !e->gpu_ready) {
-        fprintf(stderr, "ds4: imatrix collection currently requires --metal\n");
-        return 1;
-    }
-    if (ctx_size <= 0) ctx_size = 32768;
-
-    char *dataset = NULL;
-    size_t dataset_len = 0;
-    if (!imatrix_read_text_file(dataset_path, &dataset, &dataset_len)) return 1;
-
-    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
-        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
-        const int rc = ds4_engine_collect_sequential_imatrix(e,
-                                                      dataset,
-                                                      dataset_len,
-                                                      dataset_path,
-                                                      output_path,
-                                                      ctx_size,
-                                                      max_prompts,
-                                                      max_tokens,
-                                                      min_expert_samples);
-        free(dataset);
-        return rc;
-    }
-
-    const ds4_model *model = &e->model;
-    const ds4_weights *weights = &e->weights;
-    const uint32_t prefill_cap =
-        gpu_graph_prefill_cap_for_prompt(ctx_size, e->prefill_chunk);
-    const uint32_t raw_cap = gpu_graph_raw_cap_for_context(ctx_size, prefill_cap);
-
-    ds4_gpu_graph g;
-    /* diagnostic single-tier callsite; placement=NULL. */
-    bool ok = gpu_graph_alloc_raw_cap(&g, weights, &weights->layer[0],
-                                        raw_cap, (uint32_t)ctx_size,
-                                        prefill_cap, false, NULL, false, NULL,
-                                        false);
-    if (!ok) {
-        fprintf(stderr, "ds4: failed to allocate imatrix Metal graph runtime\n");
-        free(dataset);
-        return 1;
-    }
-    g.quality = e->quality;
-    g.ssd_streaming = e->ssd_streaming;
-    g.ssd_streaming_cold = e->ssd_streaming_cold;
-    g.streaming_preload_experts = e->ssd_streaming_preload_experts;
-    g.power_percent = (uint32_t)e->power_percent;
-
-    ds4_imatrix_collector collector;
-    if (!imatrix_collector_init(&collector, prefill_cap, dataset_path)) {
-        fprintf(stderr, "ds4: failed to allocate imatrix collector\n");
-        gpu_graph_free(&g);
-        free(dataset);
-        return 1;
-    }
-
-    fprintf(stderr,
-            "ds4: collecting routed-MoE imatrix from %s (model=%s, layers=%u, experts=%u, ctx=%d, chunk=%u)\n",
-            dataset_path, DS4_MODEL_SHAPE_NAME, DS4_N_LAYER, DS4_N_EXPERT, ctx_size, prefill_cap);
-
-    int prompts_done = 0;
-    int tokens_done = 0;
-    bool sample_target_reached = false;
-    char *cursor = dataset;
-    const char *marker_lit = "===== DS4_IMATRIX_PROMPT";
-    while (*cursor) {
-        char *start = cursor;
-        char *marker = imatrix_find_marker(dataset, cursor, marker_lit);
-        if (marker) {
-            char *nl = strchr(marker, '\n');
-            if (!nl) break;
-            start = nl + 1;
-        } else if (prompts_done != 0) {
-            break;
-        }
-
-        char *next = imatrix_find_marker(dataset, start, marker_lit);
-        char *end = next ? next : dataset + dataset_len;
-        char saved = *end;
-        char *prompt_text = imatrix_trim_block(start, end);
-        if (prompt_text[0] != '\0') {
-            token_vec prompt = {0};
-            ds4_tokenize_rendered_chat(e, prompt_text, &prompt);
-            if (prompt.len > ctx_size) prompt.len = ctx_size;
-            if (max_tokens > 0 && prompt.len > max_tokens - tokens_done) {
-                prompt.len = max_tokens - tokens_done;
-            }
-            if (prompt.len > 0) {
-                if (!gpu_graph_reset_prefill_state(&g)) {
-                    fprintf(stderr, "ds4: failed to reset imatrix graph state\n");
-                    ok = false;
-                } else if ((uint32_t)prompt.len > prefill_cap) {
-                    ok = gpu_graph_prefill_chunked_range(&g, model, weights,
-                                                           &prompt, 0,
-                                                           (uint32_t)prompt.len,
-                                                           NULL, false,
-                                                           NULL, NULL,
-                                                           NULL, NULL,
-                                                           &collector,
-                                                           NULL, NULL, NULL);
-                } else {
-                    ok = gpu_graph_prefill_layer_major(&g, model, weights,
-                                                         &prompt, 0,
-                                                         (uint32_t)prompt.len,
-                                                         NULL, false,
-                                                         &collector,
-                                                         NULL, NULL);
-                }
-                if (!ok) {
-                    fprintf(stderr, "ds4: imatrix prefill failed at prompt %d\n", prompts_done + 1);
-                    token_vec_free(&prompt);
-                    *end = saved;
-                    break;
-                }
-                prompts_done++;
-                tokens_done += prompt.len;
-                sample_target_reached = min_expert_samples > 0 &&
-                    imatrix_collector_min_samples(&collector,
-                                                 weights,
-                                                 DS4_N_LAYER) >=
-                        (uint32_t)min_expert_samples;
-                if (prompts_done % 10 == 0) {
-                    fprintf(stderr,
-                            "ds4: imatrix prompts=%d tokens=%d routes=%llu "
-                            "min_samples=%u\r",
-                            prompts_done,
-                            tokens_done,
-                            (unsigned long long)collector.observed_routes,
-                            imatrix_collector_min_samples(&collector,
-                                                         weights,
-                                                         DS4_N_LAYER));
-                    fflush(stderr);
-                }
-            }
-            token_vec_free(&prompt);
-        }
-        *end = saved;
-        if (sample_target_reached) break;
-        if (!next) break;
-        cursor = next;
-        if (max_prompts > 0 && prompts_done >= max_prompts) break;
-        if (max_tokens > 0 && tokens_done >= max_tokens) break;
-    }
-    fputc('\n', stderr);
-
-    if (ok) {
-        imatrix_collector_report_coverage(&collector, weights, DS4_N_LAYER);
-        if (min_expert_samples > 0 && !sample_target_reached) {
-            fprintf(stderr,
-                    "ds4: imatrix minimum expert sample target %d "
-                    "was not reached\n",
-                    min_expert_samples);
-            ok = false;
-        }
-    }
-    if (ok) {
-        ok = imatrix_collector_save(&collector, weights, output_path);
-        if (ok) {
-            fprintf(stderr,
-                    "ds4: wrote imatrix %s from %d prompts, %d tokens, %llu routed expert observations\n",
-                    output_path,
-                    prompts_done,
-                    tokens_done,
-                    (unsigned long long)collector.observed_routes);
-        }
-    }
-
-    imatrix_collector_free(&collector);
-    gpu_graph_free(&g);
-    free(dataset);
-    return ok ? 0 : 1;
+    /* Routed-expert imatrix collection was the Metal graph path's diagnostic.
+     * Nothing in this build selects that backend, so the CLI's --imatrix-*
+     * flags refuse here exactly as they did before; ds4_engine_collect_
+     * sequential_imatrix is kept as the shape a Linux port would reuse. */
+    (void)ctx_size;
+    (void)max_prompts;
+    (void)max_tokens;
+    (void)min_expert_samples;
+    fprintf(stderr, "ds4: imatrix collection is not implemented in this build\n");
+    return 1;
 #endif
 }
 
@@ -72161,7 +71941,7 @@ static void ds4_engine_fit_glm_streaming_budget(
         return;
     }
     const uint64_t fixed_bytes = glm_graph_saturating_add_u64(
-            model_bytes, ds4_engine_glm_graph_budget(e, graph_mem.total_bytes));
+            model_bytes, graph_mem.total_bytes);
     const uint64_t available = budget > fixed_bytes ?
         budget - fixed_bytes : 0;
 
@@ -72578,7 +72358,6 @@ static bool ds4_engine_preload_pro_q4_expert_tables(
     return true;
 #else
     if (!e ||
-        e->backend != DS4_BACKEND_METAL ||
         e->ssd_streaming ||
         DS4_MODEL_VARIANT != DS4_VARIANT_PRO ||
         getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_PRELOAD") != NULL) {
@@ -72651,84 +72430,6 @@ static bool ds4_engine_preload_pro_q4_expert_tables(
     }
     return true;
 #endif
-}
-
-/* TP sharding: touch the dense weights and only this rank's contiguous range
- * of every routed-expert blob, so the other range is never faulted in.
- * Replaces the whole-file residency request; the pages
- * fault through the same view buffers, streaming-style, but everything a
- * rank will ever read is pre-faulted here. */
-static void model_warm_weights_sharded(const ds4_model *m,
-                                       const ds4_weights *w,
-                                       int rank) {
-    typedef struct { uint64_t off, len; } skip_range;
-    if (rank != 0 && rank != 1) return;
-    skip_range *skips = xmalloc((size_t)DS4_N_LAYER * 3 * sizeof(*skips));
-    uint32_t n_skips = 0;
-    uint64_t skip_bytes = 0;
-    for (uint32_t il = 0; il < (uint32_t)DS4_N_LAYER; il++) {
-        const ds4_layer_weights *l = &w->layer[il];
-        const ds4_tensor *exps[3] = { l->ffn_gate_exps, l->ffn_up_exps,
-                                      l->ffn_down_exps };
-        for (int t = 0; t < 3; t++) {
-            const ds4_tensor *x = exps[t];
-            if (!x || x->ndim != 3 || x->dim[2] < 2) continue;
-            uint64_t in_dim = 0, out_dim = 0, row_bytes = 0;
-            (void)tensor_expert_bytes(m, x, 0, &in_dim, &out_dim, &row_bytes);
-            const uint64_t expert_bytes = out_dim * row_bytes;
-            const uint64_t total_bytes = x->dim[2] * expert_bytes;
-            const uint64_t low_bytes = (x->dim[2] / 2) * expert_bytes;
-            /* Unowned range: rank 0 owns the low ids; rank 1 owns the high
-             * ids and takes any odd-count remainder. */
-            skips[n_skips].off = x->abs_offset + (rank == 0 ? low_bytes : 0);
-            skips[n_skips].len = rank == 0 ? total_bytes - low_bytes : low_bytes;
-            skip_bytes += skips[n_skips].len;
-            n_skips++;
-        }
-    }
-    /* File order should already ascend, but do not rely on it. */
-    for (uint32_t i = 1; i < n_skips; i++) {
-        skip_range key = skips[i];
-        uint32_t j = i;
-        while (j > 0 && skips[j - 1].off > key.off) {
-            skips[j] = skips[j - 1];
-            j--;
-        }
-        skips[j] = key;
-    }
-    const uint64_t page = (uint64_t)sysconf(_SC_PAGESIZE);
-    const uint8_t *p = m->map;
-    const uint64_t start = m->tensor_data_pos, end = m->size;
-    fprintf(stderr,
-            "ds4: warming sharded tensor pages (rank %d): %.2f of %.2f GiB\n",
-            rank,
-            (double)(end - start - skip_bytes) / 1073741824.0,
-            (double)(end - start) / 1073741824.0);
-    const double t0 = now_sec();
-    volatile uint64_t checksum = 0;
-    uint64_t off = start;
-    uint32_t si = 0;
-    /* skips are naturally sorted: layers ascend and tensors within a layer
-     * are laid out in file order. */
-    while (off < end) {
-        uint64_t stop = end;
-        while (si < n_skips && skips[si].off + skips[si].len <= off) si++;
-        if (si < n_skips && skips[si].off <= off) {
-            off = skips[si].off + skips[si].len;
-            si++;
-            continue;
-        }
-        if (si < n_skips && skips[si].off < stop) stop = skips[si].off;
-#if defined(POSIX_MADV_WILLNEED)
-        (void)posix_madvise((void *)(p + off), (size_t)(stop - off),
-                            POSIX_MADV_WILLNEED);
-#endif
-        for (; off < stop; off += page) checksum += p[off];
-        off = stop;
-    }
-    free(skips);
-    fprintf(stderr, "ds4: sharded warm done in %.1fs (checksum=%llu)\n",
-            now_sec() - t0, (unsigned long long)checksum);
 }
 
 /* =========================================================================
@@ -74236,10 +73937,9 @@ static int ds4_engine_open_internal(ds4_engine **out,
     e->distributed = opt->distributed;
     e->power_percent = opt->power_percent > 0 ? opt->power_percent : 100;
     if (opt->vision_path && opt->vision_path[0]) {
-        if (opt->backend != DS4_BACKEND_METAL &&
-            opt->backend != DS4_BACKEND_CUDA) {
+        if (opt->backend != DS4_BACKEND_CUDA) {
             fprintf(stderr,
-                    "ds4: GLM-5.3 vision requires --metal, --cuda, or --rocm\n");
+                    "ds4: GLM-5.3 vision requires the CUDA backend\n");
             free(e);
             *out = NULL;
             return 1;
@@ -74277,8 +73977,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
     if (opt->dspark_confidence_threshold_set) {
         e->dspark_confidence_threshold = opt->dspark_confidence_threshold;
     } else {
-        e->dspark_confidence_threshold =
-            e->backend == DS4_BACKEND_METAL ? 0.6f : 0.7f;
+        e->dspark_confidence_threshold = 0.7f;
     }
     e->dspark_confidence_threshold_set =
         opt->dspark_confidence_threshold_set;
@@ -74299,7 +73998,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
                 e->dspark_confidence_threshold = v;
                 fprintf(stderr,
                         "ds4: DS4_DSPARK_CONFIDENCE_THRESHOLD=%.3f (default was %.3f)\n",
-                        v, e->backend == DS4_BACKEND_METAL ? 0.6f : 0.7f);
+                        v, 0.7f);
             } else {
                 fprintf(stderr,
                         "ds4: ignoring DS4_DSPARK_CONFIDENCE_THRESHOLD=%s "
@@ -74368,8 +74067,9 @@ static int ds4_engine_open_internal(ds4_engine **out,
     if (graph_backend) ds4_linux_graph_backend_set_oom_score(opt->backend);
     model_open(&e->model, opt->model_path, graph_backend, !opt->inspect_only);
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41 &&
-        opt->vision_path && opt->vision_path[0] && e->backend != DS4_BACKEND_METAL) {
-        fprintf(stderr, "ds4: V4.1 vision requires Metal\n");
+        opt->vision_path && opt->vision_path[0]) {
+        /* V4.1 vision ran only on the deleted Metal backend. */
+        fprintf(stderr, "ds4: V4.1 vision is not implemented in this build\n");
         ds4_engine_close(e);
         *out = NULL;
         return 1;
@@ -74402,7 +74102,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
     if (ds4_model_is_qwen4() && !opt->inspect_only) {
         const bool backend_ok =
 #ifdef DS4_HAS_QWEN4_GPU
-            e->backend == DS4_BACKEND_METAL || e->backend == DS4_BACKEND_CUDA ||
+            e->backend == DS4_BACKEND_CUDA ||
 #endif
             (opt->first_token_test && e->backend == DS4_BACKEND_CPU);
         if (!backend_ok || opt->tp.role != DS4_TP_NONE || opt->cuda_tensor_parallel ||
@@ -74410,7 +74110,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
             opt->distributed.role != DS4_DISTRIBUTED_NONE || load_slice ||
             e->ssd_streaming || opt->dspark || e->power_percent != 100 ||
             (opt->mtp_path && opt->mtp_path[0])) {
-            fprintf(stderr, "ds4: Qwen3.8 requires Metal or single-GPU CUDA (or --cpu --first-token-test); "
+            fprintf(stderr, "ds4: Qwen3.8 requires single-GPU CUDA (or --cpu --first-token-test); "
                             "tensor parallelism, pipeline execution, SSD streaming, DSpark, "
                             "external MTP models and power throttling are not supported\n");
             ds4_engine_close(e);
@@ -74419,7 +74119,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
         }
     }
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41 && !opt->inspect_only) {
-        const bool supported = (e->backend == DS4_BACKEND_METAL ||
+        const bool supported = (
 #if defined(DS4_HAS_DEEPSEEK41_GPU)
                 (e->backend == DS4_BACKEND_CUDA && !opt->cuda_tensor_parallel &&
                  (!gpu_cfg || gpu_cfg->n_gpus <= 1)) ||
@@ -74538,13 +74238,11 @@ static int ds4_engine_open_internal(ds4_engine **out,
     const char *expert_hotlist_path = getenv("DS4_EXPERT_HOTLIST");
     if ((expert_profile_path && expert_profile_path[0]) ||
         (expert_hotlist_path && expert_hotlist_path[0])) {
-        if (e->backend == DS4_BACKEND_METAL) {
-            ds4_expert_profile_init(expert_profile_path, expert_hotlist_path);
-        } else {
-            fprintf(stderr,
-                    "ds4: expert profile/hotlist is Metal-only for now; ignoring for %s backend\n",
-                    ds4_backend_name(e->backend));
-        }
+        /* The profile had no CUDA implementation; ds4_expert_profile_init is the
+         * only thing that activated it, so the subsystem stays inert here. */
+        fprintf(stderr,
+                "ds4: expert profile/hotlist is not implemented in this build; ignoring for %s backend\n",
+                ds4_backend_name(e->backend));
     }
     weights_bind(&e->weights,
                  &e->model,
@@ -74641,8 +74339,8 @@ static int ds4_engine_open_internal(ds4_engine **out,
             return 0;
         }
         if (opt->first_token_test) {
-            if (e->backend != DS4_BACKEND_CPU && e->backend != DS4_BACKEND_METAL && e->backend != DS4_BACKEND_CUDA) {
-                fprintf(stderr, "ds4: Qwen3.8 first-token test needs CPU, Metal or CUDA\n");
+            if (e->backend != DS4_BACKEND_CPU && e->backend != DS4_BACKEND_CUDA) {
+                fprintf(stderr, "ds4: Qwen3.8 first-token test needs CPU or CUDA\n");
                 ds4_engine_close(e);
                 *out = NULL;
                 return 1;
@@ -75033,25 +74731,6 @@ static int ds4_engine_open_internal(ds4_engine **out,
     }
 
 #ifndef DS4_NO_GPU
-    if (e->backend == DS4_BACKEND_CUDA) {
-    }
-    if (e->backend == DS4_BACKEND_METAL) {
-        fprintf(stderr, "ds4: Metal backend requested but this build is linked with CUDA, not Metal\n");
-        ds4_engine_close(e);
-        *out = NULL;
-        return 1;
-    }
-    /* With a raised wired limit the sharded span views (~97 GiB) fit the
-     * GPU budget, so let the residency set pin them — that is what makes
-     * the shard actually resident.  Without the sysctl, fall back to lazy
-     * faulting (slow but functional). */
-    if (e->backend == DS4_BACKEND_METAL && tp_shard && glm_graph_wired_limit_bytes() == 0) {
-        fprintf(stderr,
-                "ds4: iogpu.wired_limit_mb is 0 -- TP expert shard will page "
-                "lazily; raise it (e.g. sudo sysctl iogpu.wired_limit_mb=120000) "
-                "for full residency\n");
-        ds4_gpu_model_residency_skip(1);
-    }
     if (graph_backend) {
         if (e->multi_tier) {
             /* Wave-2 multi-tier branch.
@@ -75487,10 +75166,6 @@ static int ds4_engine_open_internal(ds4_engine **out,
             ds4_engine_close(e);
             *out = NULL;
             return 1;
-        }
-        if (tp_shard && e->backend == DS4_BACKEND_METAL) {
-            model_warm_weights_sharded(&e->model, &e->weights,
-                                       tp_shard_rank);
         }
         const bool support_model_runtime_ready =
             e->mtp_ready ||
@@ -76426,12 +76101,12 @@ static int ds4_engine_tp_big_exchange(void *ud, uint32_t layer, uint64_t seq,
 int ds4_engine_tp_bind(ds4_engine *e, struct ds4_tp *tp, char *err, size_t errlen) {
 #ifndef DS4_HAS_DEEPSEEK41_GPU
     (void)e; (void)tp;
-    snprintf(err, errlen, "tensor parallelism requires the Metal backend");
+    snprintf(err, errlen, "tensor parallelism requires the CUDA build");
     return 0;
 #else
-    if (!e || !tp || (e->backend != DS4_BACKEND_METAL &&
-        (e->backend != DS4_BACKEND_CUDA || DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK41))) {
-        snprintf(err, errlen, "tensor parallelism requires Metal or V4.1 CUDA");
+    if (!e || !tp || e->backend != DS4_BACKEND_CUDA ||
+        DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK41) {
+        snprintf(err, errlen, "tensor parallelism requires V4.1 CUDA");
         return 0;
     }
     if (e->tp.ctx) {
@@ -76848,9 +76523,9 @@ int ds4_session_create(ds4_session **out, ds4_engine *e, int ctx_size) {
 #endif
 #ifdef DS4_HAS_QWEN4_GPU
     if (ds4_model_is_qwen4()) {
-        if ((e->backend != DS4_BACKEND_METAL && e->backend != DS4_BACKEND_CUDA) ||
+        if (e->backend != DS4_BACKEND_CUDA ||
             e->distributed.role != DS4_DISTRIBUTED_NONE) {
-            fprintf(stderr, "ds4: Qwen3.8 sessions require single-host Metal or CUDA\n");
+            fprintf(stderr, "ds4: Qwen3.8 sessions require single-host CUDA\n");
             free(s);
             return 1;
         }
@@ -76862,8 +76537,9 @@ int ds4_session_create(ds4_session **out, ds4_engine *e, int ctx_size) {
          * when no live session borrows it (a new context size once the
          * previous sessions closed) and keeps private transients otherwise. */
         const uint32_t block_cap = (uint32_t)ctx_size / 4u + 1u;
-        const bool share = e->share_session_prefill_workspace &&
-                           e->backend == DS4_BACKEND_METAL;
+        /* Sharing one transient arena across batched sessions was the deleted
+         * graph backend's policy; CUDA sessions build per-slot graphs. */
+        const bool share = false;
         const bool arena_fits = e->qwen4_shared_workspace &&
             e->qwen4_shared_workspace->cap_tokens >= cap_tokens &&
             e->qwen4_shared_workspace->n_block_cap >= block_cap;
@@ -76955,8 +76631,7 @@ int ds4_session_create(ds4_session **out, ds4_engine *e, int ctx_size) {
             glm_graph_context_memory_estimate_for_compact_cap_slice(
                 guard_ctx, work_ctx, compact_cap, e->ssd_streaming,
                 layer_start, layer_end);
-        const uint64_t all_graph_bytes =
-            ds4_engine_glm_graph_budget(e, session_mem.total_bytes);
+        const uint64_t all_graph_bytes = session_mem.total_bytes;
         const uint64_t other_graph_bytes = all_graph_bytes - session_mem.total_bytes;
         if (e->ssd_streaming && !e->ssd_streaming_budget_finalized) {
             ds4_engine_fit_glm_streaming_budget(e,
@@ -82439,8 +82114,7 @@ static bool ds41_sessions_batch_supported(ds4_decode_item *items, int count,
         e->support_kind != DS4_SUPPORT_NONE)
         return false;
     const bool cuda = e->backend == DS4_BACKEND_CUDA;
-    if (cuda ? !gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true) :
-        (e->backend != DS4_BACKEND_METAL || getenv("DS4_METAL_DISABLE_V41_SESSION_BATCH")))
+    if (!cuda || !gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_MOE", true))
         return false;
     ds41_gpu_graph *graphs[DS4_TP_BATCH_MAX_ROWS];
     for (int i = 0; i < count; i++) {
@@ -82460,859 +82134,6 @@ static bool ds41_sessions_batch_supported(ds4_decode_item *items, int count,
 
 #endif
 
-#ifdef DS4_HAS_QWEN4_METAL
-/* Batch weight-only work in the shared arena while keeping each session's
- * recurrence, attention caches and n-gram history independent. Row views
- * let the single-session kernels consume slices of the shared transients. */
-
-enum { QWEN4_BATCH_MAX_ROWS = 64 };
-
-typedef struct {
-    ds4_gpu_tensor *R, *ple_gated, *ple_normed;
-    ds4_gpu_tensor *qkv, *ga, *gb, *lin_o;
-    ds4_gpu_tensor *qg, *kp, *vp, *iq, *ik, *q, *gate, *iqn, *attn_o;
-    ds4_gpu_tensor *mixed;   /* speculative batch only: the fused GDN front reads it */
-} qwen4_batch_row;
-
-static ds4_gpu_tensor *qwen4_row_view(ds4_gpu_tensor *base, uint32_t row, uint64_t values) {
-    return ds4_gpu_tensor_view(base, (uint64_t)row * values * sizeof(float),
-                               values * sizeof(float));
-}
-
-static void qwen4_batch_rows_free(qwen4_batch_row *rows, int count) {
-    if (!rows) return;
-    for (int i = 0; i < count; i++) {
-        ds4_gpu_tensor **all[] = {
-            &rows[i].R, &rows[i].ple_gated, &rows[i].ple_normed,
-            &rows[i].qkv, &rows[i].ga, &rows[i].gb, &rows[i].lin_o,
-            &rows[i].qg, &rows[i].kp, &rows[i].vp, &rows[i].iq, &rows[i].ik,
-            &rows[i].q, &rows[i].gate, &rows[i].iqn, &rows[i].attn_o, &rows[i].mixed,
-        };
-        for (size_t j = 0; j < sizeof(all) / sizeof(all[0]); j++) {
-            ds4_gpu_tensor_free(*all[j]);
-            *all[j] = NULL;
-        }
-    }
-}
-
-/* Built once per batch rather than per layer: a view is a tracked allocation,
- * and 48 layers would spend more on making them than on the dispatches they
- * serve. */
-static bool qwen4_batch_rows_build(qwen4_batch_row *rows, int count,
-                                   const ds4_qwen4_gpu_graph *g) {
-    const uint64_t hc_dim = (uint64_t)DS4_N_EMBD * DS4_N_HC;
-    const uint64_t q_dim = (uint64_t)DS4_N_HEAD * DS4_N_HEAD_DIM;
-    const uint64_t kv_dim = (uint64_t)DS4_N_HEAD_KV * DS4_N_HEAD_DIM;
-    const uint64_t iq_dim = (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM;
-    const uint64_t v_dim = (uint64_t)DS4_N_LIN_V_HEAD * DS4_N_LIN_HEAD_DIM;
-    memset(rows, 0, (size_t)count * sizeof(rows[0]));
-    for (int i = 0; i < count; i++) {
-        const uint32_t r = (uint32_t)i;
-        rows[i].R = qwen4_row_view(g->R, r, hc_dim);
-        rows[i].ple_gated = qwen4_row_view(g->ple_gated, r, hc_dim);
-        rows[i].ple_normed = qwen4_row_view(g->ple_normed, r, hc_dim);
-        rows[i].qkv = qwen4_row_view(g->qkv, r, DS4_N_LIN_CONV_DIM);
-        rows[i].ga = qwen4_row_view(g->ga, r, DS4_N_LIN_V_HEAD);
-        rows[i].gb = qwen4_row_view(g->gb, r, DS4_N_LIN_V_HEAD);
-        rows[i].lin_o = qwen4_row_view(g->lin_o, r, v_dim);
-        rows[i].qg = qwen4_row_view(g->qg, r, 2u * q_dim);
-        rows[i].kp = qwen4_row_view(g->kp, r, kv_dim);
-        rows[i].vp = qwen4_row_view(g->vp, r, kv_dim);
-        rows[i].iq = qwen4_row_view(g->iq, r, iq_dim);
-        rows[i].ik = qwen4_row_view(g->ik, r, DS4_N_INDEXER_HEAD_DIM);
-        rows[i].q = qwen4_row_view(g->q, r, q_dim);
-        rows[i].gate = qwen4_row_view(g->gate, r, q_dim);
-        rows[i].iqn = qwen4_row_view(g->iqn, r, iq_dim);
-        rows[i].attn_o = qwen4_row_view(g->attn_o, r, q_dim);
-        if (!rows[i].R || !rows[i].ple_gated || !rows[i].ple_normed ||
-            !rows[i].qkv || !rows[i].ga || !rows[i].gb || !rows[i].lin_o ||
-            !rows[i].qg || !rows[i].kp || !rows[i].vp || !rows[i].iq ||
-            !rows[i].ik || !rows[i].q || !rows[i].gate || !rows[i].iqn ||
-            !rows[i].attn_o) {
-            qwen4_batch_rows_free(rows, count);
-            return false;
-        }
-    }
-    return true;
-}
-
-/* This session's graph already points at the shared arena, so a copy of it
- * with this row's views substituted is precisely what the single-row kernels
- * want: this session's caches and positions, this row's slice of the
- * transients.  The copy is a snapshot, so g->pos still reads the position the
- * batch started from. */
-static void qwen4_batch_row_graph(ds4_qwen4_gpu_graph *out, ds4_session *s,
-                                  const qwen4_batch_row *v) {
-    *out = s->qwen4_graph;
-    out->R = v->R;
-    out->ple_gated = v->ple_gated;
-    out->ple_normed = v->ple_normed;
-    out->qkv = v->qkv;
-    out->ga = v->ga;
-    out->gb = v->gb;
-    out->lin_o = v->lin_o;
-    out->qg = v->qg;
-    out->kp = v->kp;
-    out->vp = v->vp;
-    out->iq = v->iq;
-    out->ik = v->ik;
-    out->q = v->q;
-    out->gate = v->gate;
-    out->iqn = v->iqn;
-    out->attn_o = v->attn_o;
-    if (v->mixed) out->mixed = v->mixed;
-}
-
-/* The Q8 tile computes 32 rows and needs the padding rows to exist in both
- * operands, so the logits and head rows are sized for at least that many:
- * the output head then takes the tile at any batch width instead of the
- * per-token matvec reading its 636 MB once per four rows. */
-static bool qwen4_batch_scratch_ensure(ds4_qwen4_gpu_graph *g, uint32_t rows) {
-    if (rows < 32u) rows = 32u;
-    if (g->batch_logits && g->batch_logit_rows >= rows) return true;
-    ds4_gpu_tensor_free(g->batch_logits);
-    ds4_gpu_tensor_free(g->batch_attn_rows);
-    ds4_gpu_tensor_free(g->batch_attn_part);
-    ds4_gpu_tensor_free(g->batch_head_x);
-    ds4_gpu_tensor_free(g->batch_gdn_rows);
-    g->batch_logit_rows = 0;
-    g->batch_gdn_rows = ds4_gpu_tensor_alloc((uint64_t)DS4_N_LAYER * QWEN4_BATCH_MAX_ROWS * DS4_GPU_QWEN4_GDN_ROW_BYTES);
-    g->batch_logits = ds4_gpu_tensor_alloc((uint64_t)rows * DS4_N_VOCAB * sizeof(float));
-    g->batch_head_x = ds4_gpu_tensor_alloc((uint64_t)rows * DS4_N_EMBD * sizeof(float));
-    g->batch_attn_rows = ds4_gpu_tensor_alloc((uint64_t)DS4_N_LAYER * QWEN4_BATCH_MAX_ROWS *
-                                              DS4_GPU_QWEN4_ATTN_ROW_BYTES);
-    g->batch_attn_part = ds4_gpu_tensor_alloc(ds4_gpu_qwen4_attn_part_floats(rows, DS4_N_HEAD, DS4_N_HEAD_DIM) *
-                                              sizeof(float));
-    if (!g->batch_logits || !g->batch_attn_rows || !g->batch_attn_part || !g->batch_head_x ||
-        !g->batch_gdn_rows) return false;
-    g->batch_logit_rows = rows;
-    return true;
-}
-
-/* Token embeddings, rope positions and n-gram rows for every member.  The
- * n-gram gather is the part that most wants a batch: one call presents all
- * rows at once, so the reader sorts them by offset and issues them in
- * parallel instead of walking each session's sixteen rows on its own. */
-static bool qwen4_batch_stage_embeddings(ds4_decode_item *items, int count,
-                                         const ds4_model *m, const ds4_weights *w,
-                                         ds4_qwen4_gpu_graph *g,
-                                         uint32_t *ids) {
-    const uint32_t E = DS4_N_EMBD, hc = DS4_N_HC, hc_dim = E * hc;
-    float *row = g->host_row;
-    for (int i = 0; i < count; i++) {
-        ds4_qwen4_gpu_graph *rg = &items[i].session->qwen4_graph;
-        float *dst = row + (uint64_t)i * hc_dim;
-        qwen4_ref_row(m, w->token_embd, (uint64_t)items[i].token, dst);
-        for (uint32_t s = 1; s < hc; s++) memcpy(dst + (uint64_t)s * E, dst, E * sizeof(float));
-        uint32_t pos3[4];
-        qwen4_mrope_pos(NULL, 0, rg->pos, &rg->mrope_delta, pos3);
-        pos3[3] = 0;
-        if (!ds4_gpu_tensor_write(rg->pos3, (uint64_t)rg->pos * 16u, pos3, 16u)) return false;
-        qwen4_ple_step(items[i].token, rg->ple_prev, ids + (uint64_t)i * DS4_N_PLE_HEADS);
-    }
-    return ds4_gpu_tensor_write(g->R, 0, row, (uint64_t)count * hc_dim * sizeof(float)) != 0;
-}
-
-/* The n-gram rows are hashed across a 95 GiB table, so this is disk latency
- * rather than compute, and the first trunk layer does not need them: the PLE
- * layer that does sits at trunk index one.  Reading them after that layer has
- * been submitted lets the wait overlap GPU work instead of preceding it. */
-static bool qwen4_batch_stage_ngrams(int count,
-                                     const ds4_model *m, ds4_qwen4_gpu_graph *g,
-                                     const uint32_t *ids) {
-    float *row = g->host_row;
-    if (!qwen4_ngram_read(m, ids, (size_t)count * DS4_N_PLE_HEADS, row)) {
-        fprintf(stderr, "ds4: n-gram read failed: %s\n", strerror(errno));
-        return false;
-    }
-    return ds4_gpu_tensor_write(g->ple_emb, 0, row,
-                                (uint64_t)count * DS4_N_EMBD * sizeof(float)) != 0;
-}
-
-/* The batched scan needs every row's state in the pool it addresses. */
-static bool qwen4_batch_rows_pooled(ds4_decode_item *items, int count, uint32_t *slots) {
-    for (int i = 0; i < count; i++) {
-        const int slot = items[i].session->qwen4_slot;
-        if (slot < 0) return false;
-        slots[i] = (uint32_t)slot;
-    }
-    return true;
-}
-
-static bool qwen4_batch_linear(ds4_decode_item *items, int count,
-                               const qwen4_batch_row *views,
-                               const ds4_qwen4_gpu_graph *rowg,
-                               ds4_qwen4_gpu_graph *g, const ds4_model *m,
-                               const ds4_layer_weights *l, uint32_t il, uint32_t T) {
-    if (!qwen4_gemv(g->qkv, m, l->lin_qkv, g->mixed, T) ||
-        !qwen4_gemv(g->z, m, l->lin_gate, g->mixed, T) ||
-        !qwen4_gemv(g->ga, m, l->lin_alpha, g->mixed, T) ||
-        !qwen4_gemv(g->gb, m, l->lin_beta, g->mixed, T)) {
-        return false;
-    }
-    /* The causal convolution and the delta-net scan are the only steps that
-     * read and write a session's own recurrent state.  Overlapping these rows
-     * through a concurrent encoder was measured and changed nothing: the cost
-     * is the per-dispatch floor, not a barrier between them. */
-    ds4_engine *e = items[0].session->engine;
-    uint32_t slots[QWEN4_BATCH_MAX_ROWS];
-    const bool pooled = e->qwen4_lin_state_pool[il] &&
-        getenv("DS4_QWEN4_NO_BATCH_SCAN") == NULL &&
-        qwen4_batch_rows_pooled(items, count, slots);
-    const uint64_t hist_floats = (uint64_t)(DS4_N_LIN_CONV - 1u) * DS4_N_LIN_CONV_DIM;
-    if (pooled) {
-        if (ds4_gpu_qwen4_conv_stream_rows_tensor(
-                g->qkv, e->qwen4_lin_hist_pool[il], m->map, m->size, l->lin_conv->abs_offset,
-                slots, (uint32_t)count, DS4_N_LIN_CONV_DIM, DS4_N_LIN_CONV,
-                (uint32_t)hist_floats, DS4_N_LIN_CONV_DIM, 1) == 0) {
-            return false;
-        }
-    } else {
-        for (int i = 0; i < count; i++) {
-            if (!ds4_gpu_qwen4_conv_stream_tensor(views[i].qkv, rowg[i].layer_lin_hist[il],
-                                                  m->map, m->size, l->lin_conv->abs_offset,
-                                                  1u, DS4_N_LIN_CONV_DIM, DS4_N_LIN_CONV, true)) {
-                return false;
-            }
-        }
-    }
-    if (!ds4_gpu_qwen4_gdn_prep_tensor(g->qkv, g->ga, g->gb, m->map, m->size,
-                                       l->lin_a->abs_offset, l->lin_dt_bias->abs_offset,
-                                       T, DS4_N_LIN_K_HEAD, DS4_N_LIN_V_HEAD,
-                                       DS4_N_LIN_HEAD_DIM)) {
-        return false;
-    }
-    /* With every row's state in the pool, one dispatch advances them all; the
-     * per-row kernels are short enough that sixteen of them never reach steady
-     * state.  Same grouping and arithmetic per row, so the two paths agree bit
-     * for bit.  DS4_QWEN4_NO_BATCH_SCAN takes the per-row path for A/B. */
-    const uint64_t v_dim = (uint64_t)DS4_N_LIN_V_HEAD * DS4_N_LIN_HEAD_DIM;
-    if (pooled) {
-        if (ds4_gpu_qwen4_gdn_scan_rows_tensor(
-                g->lin_o, e->qwen4_lin_state_pool[il], g->qkv, g->ga, g->gb,
-                slots, (uint32_t)count, DS4_N_LIN_K_HEAD, DS4_N_LIN_V_HEAD,
-                DS4_N_LIN_HEAD_DIM, (uint32_t)(v_dim * DS4_N_LIN_HEAD_DIM),
-                DS4_N_LIN_CONV_DIM, (uint32_t)v_dim) == 0) {
-            return false;
-        }
-    } else {
-        for (int i = 0; i < count; i++) {
-            if (ds4_gpu_qwen4_gdn_scan_tensor(views[i].lin_o, rowg[i].layer_lin_state[il],
-                                              views[i].qkv, views[i].ga, views[i].gb, 1u,
-                                              DS4_N_LIN_K_HEAD, DS4_N_LIN_V_HEAD,
-                                              DS4_N_LIN_HEAD_DIM, NULL, 0u, NULL, 1u) == 0) {
-                return false;
-            }
-        }
-    }
-    return ds4_gpu_qwen4_gdn_out_tensor(g->lin_o, g->z, m->map, m->size,
-                                        l->lin_norm->abs_offset, T, DS4_N_LIN_V_HEAD,
-                                        DS4_N_LIN_HEAD_DIM, DS4_RMS_EPS) != 0 &&
-           qwen4_gemv(g->blk, m, l->lin_out, g->lin_o, T);
-}
-
-/* Every row's attention in one dispatch per stage: the projections above
- * are batched already, and the per-row kernels below are tiny grids that run
- * one after another, so sixteen rows cost sixteen latencies each.  The rows
- * kernels take the row as a grid axis and reach each session's caches
- * through a staged table, keeping the single-row arithmetic (the row's split
- * count included), so the outputs are those of the per-row dispatches.
- * DS4_QWEN4_NO_BATCH_ATTN takes the per-row path for A/B. */
-/* The rows kernels over explicit entries, one per token of the batch in row
- * order: a session with a draft row has two entries, its caches at pos and
- * pos + 1, so the second token sees the first's keys the way a two-row
- * verify does. */
-static bool qwen4_batch_attention_entries(ds4_gpu_qwen4_attn_row *rows, uint32_t n_rows,
-                                          ds4_qwen4_gpu_graph *g, const ds4_model *m,
-                                          const ds4_layer_weights *l, uint32_t il) {
-    const uint32_t ratio = 4u;
-    const float scale = 1.0f / sqrtf((float)DS4_N_HEAD_DIM);
-    uint32_t n_block_stride = 0;
-    bool any_sparse = false, any_block = false;
-    for (uint32_t i = 0; i < n_rows; i++) {
-        const uint32_t n_blocks = (rows[i].pos + 1u) / ratio;
-        if (n_blocks > n_block_stride) n_block_stride = n_blocks;
-        any_sparse |= rows[i].use_sel != 0;
-        any_block |= (rows[i].pos + 1u) % ratio == 0u;
-    }
-    const uint64_t entry0 = (uint64_t)il * QWEN4_BATCH_MAX_ROWS;
-    bool ok = ds4_gpu_qwen4_attn_rows_stage(g->batch_attn_rows, entry0, rows, n_rows, ratio) &&
-              ds4_gpu_qwen4_attn_prep_rows_tensor(g->q, g->gate, g->iqn, g->qg, g->kp, g->vp, g->iq, g->ik,
-                                                  g->batch_attn_rows, entry0, rows, n_rows, m->map, m->size,
-                                                  l->attn_q_norm->abs_offset, l->attn_k_norm->abs_offset,
-                                                  l->indexer_q_norm->abs_offset, DS4_N_HEAD, DS4_N_HEAD_KV,
-                                                  DS4_N_HEAD_DIM, DS4_N_ROT, DS4_N_INDEXER_HEAD,
-                                                  DS4_N_INDEXER_HEAD_DIM, DS4_ROPE_FREQ_BASE, DS4_RMS_EPS);
-    if (ok && any_block) {
-        ok = ds4_gpu_qwen4_idx_block_key_rows_tensor(g->batch_attn_rows, entry0, rows, n_rows, m->map, m->size,
-                                                     l->indexer_k_norm->abs_offset, ratio,
-                                                     DS4_N_INDEXER_HEAD_DIM, DS4_N_ROT, DS4_ROPE_FREQ_BASE,
-                                                     DS4_RMS_EPS);
-    }
-    if (ok && any_sparse) {
-        ok = ds4_gpu_qwen4_idx_score_rows_tensor(g->score, g->tile_max, g->iqn, g->batch_attn_rows, entry0,
-                                                 rows, n_rows, n_block_stride, DS4_N_INDEXER_HEAD,
-                                                 DS4_N_INDEXER_HEAD_DIM, ratio) &&
-             ds4_gpu_qwen4_idx_select_rows_tensor(g->sel_blocks, g->score, g->tile_max, g->batch_attn_rows,
-                                                  entry0, rows, n_rows, n_block_stride, g->k_blocks) &&
-             ds4_gpu_qwen4_idx_expand_rows_tensor(g->sel_tokens, g->n_sel, g->sel_blocks, g->batch_attn_rows,
-                                                  entry0, n_rows, g->k_blocks, ratio, g->sel_stride);
-    }
-    return ok && ds4_gpu_qwen4_attn_decode_rows_tensor(g->attn_o, g->q, g->gate, g->sel_tokens, g->n_sel,
-                                                       g->batch_attn_part, g->batch_attn_rows, entry0, rows,
-                                                       n_rows, DS4_N_HEAD, DS4_N_HEAD_KV, DS4_N_HEAD_DIM,
-                                                       g->sel_stride, scale);
-}
-
-static bool qwen4_batch_attention_rows(int count, ds4_qwen4_gpu_graph *rowg,
-                                       ds4_qwen4_gpu_graph *g, const ds4_model *m,
-                                       const ds4_layer_weights *l, uint32_t il) {
-    const uint32_t sparse_pos = (g->k_blocks + 1u) * 4u - 1u;
-    ds4_gpu_qwen4_attn_row rows[QWEN4_BATCH_MAX_ROWS];
-    for (int i = 0; i < count; i++) {
-        const ds4_qwen4_gpu_graph *r = &rowg[i];
-        rows[i].k_cache = r->layer_k_cache[il];
-        rows[i].v_cache = r->layer_v_cache[il];
-        rows[i].ik_cache = r->layer_ik_cache[il];
-        rows[i].block_key = r->layer_block_key[il];
-        rows[i].pos3 = r->pos3;
-        rows[i].pos = r->pos;
-        rows[i].use_sel = r->pos >= sparse_pos;
-        if (r->pos >= r->ctx_cap) return false;
-    }
-    return qwen4_batch_attention_entries(rows, (uint32_t)count, g, m, l, il);
-}
-
-static bool qwen4_batch_attention(int count, ds4_qwen4_gpu_graph *rowg,
-                                  ds4_qwen4_gpu_graph *g, const ds4_model *m,
-                                  const ds4_layer_weights *l, uint32_t il, uint32_t T) {
-    const uint32_t ratio = 4u;
-    bool ok = qwen4_gemv(g->qg, m, l->attn_q, g->mixed, T) &&
-              qwen4_gemv(g->kp, m, l->attn_k, g->mixed, T) &&
-              qwen4_gemv(g->vp, m, l->attn_v, g->mixed, T) &&
-              qwen4_gemv(g->iq, m, l->indexer_q_proj, g->mixed, T) &&
-              qwen4_gemv(g->ik, m, l->indexer_k_proj, g->mixed, T);
-    const bool rows_path = getenv("DS4_QWEN4_NO_BATCH_ATTN") == NULL &&
-                           getenv("DS4_QWEN4_NO_IDX_SELECT") == NULL &&
-                           (DS4_N_HEAD_DIM == 128u || DS4_N_HEAD_DIM == 256u);
-    if (ok && rows_path) return qwen4_batch_attention_rows(count, rowg, g, m, l, il) &&
-                                qwen4_gemv(g->blk, m, l->attn_output, g->attn_o, T);
-    /* Each row appends to its own KV and indexer caches at its own position,
-     * then reads them back through its own block selection. */
-    for (int i = 0; ok && i < count; i++) {
-        ds4_qwen4_gpu_graph *r = &rowg[i];
-        const uint32_t pos0 = r->pos;
-        ok = ds4_gpu_qwen4_attn_prep_tensor(r->q, r->gate, r->layer_k_cache[il],
-                                            r->layer_v_cache[il], r->iqn, r->layer_ik_cache[il],
-                                            r->qg, r->kp, r->vp, r->iq, r->ik, r->pos3,
-                                            m->map, m->size, l->attn_q_norm->abs_offset,
-                                            l->attn_k_norm->abs_offset,
-                                            l->indexer_q_norm->abs_offset, 1u, DS4_N_HEAD,
-                                            DS4_N_HEAD_KV, DS4_N_HEAD_DIM, DS4_N_ROT,
-                                            DS4_N_INDEXER_HEAD, DS4_N_INDEXER_HEAD_DIM,
-                                            pos0, r->ctx_cap, DS4_ROPE_FREQ_BASE, DS4_RMS_EPS);
-        const uint32_t first_block = pos0 / ratio;
-        const uint32_t n_blocks_after = (pos0 + 1u) / ratio;
-        if (ok && n_blocks_after > first_block) {
-            ok = ds4_gpu_qwen4_idx_block_key_tensor(r->layer_block_key[il], r->layer_ik_cache[il],
-                                                    r->pos3, m->map, m->size,
-                                                    l->indexer_k_norm->abs_offset, first_block,
-                                                    n_blocks_after - first_block, ratio,
-                                                    DS4_N_INDEXER_HEAD_DIM, DS4_N_ROT,
-                                                    DS4_ROPE_FREQ_BASE, DS4_RMS_EPS);
-        }
-        if (ok) ok = qwen4_graph_attention_core(r, il, r->q, r->gate, r->iqn, r->attn_o,
-                                                n_blocks_after, pos0, 1u);
-    }
-    return ok && qwen4_gemv(g->blk, m, l->attn_output, g->attn_o, T);
-}
-
-static bool qwen4_graph_encode_native_session_batch(ds4_decode_item *items, int count,
-                                                    ds4_qwen4_gpu_graph *g,
-                                                    const ds4_model *m, const ds4_weights *w) {
-    const uint32_t T = (uint32_t)count;
-    const uint32_t hc_dim = DS4_N_EMBD * DS4_N_HC;
-    const uint32_t n_trunk = DS4_N_LAYER - DS4_N_NEXTN_PREDICT;
-
-    qwen4_batch_row *views = xmalloc((size_t)count * sizeof(*views));
-    ds4_qwen4_gpu_graph *rowg = xmalloc((size_t)count * sizeof(*rowg));
-    bool ok = qwen4_batch_rows_build(views, count, g);
-    for (int i = 0; ok && i < count; i++) {
-        qwen4_batch_row_graph(&rowg[i], items[i].session, &views[i]);
-    }
-    if (ok) ok = qwen4_batch_scratch_ensure(g, T);
-
-    /* DS4_QWEN4_BATCH_TIMING=1 synchronizes after each stage group and reports
-     * GPU ms per group.  The synchronization is itself expensive, so the split
-     * is for attribution only, never for a throughput claim. */
-    static int timing = -1;
-    if (timing < 0) timing = getenv("DS4_QWEN4_BATCH_TIMING") != NULL;
-    double prof[7] = {0};
-    double prof_last = 0.0;
-#define QWEN4_BATCH_PROF(idx_) do { \
-        if (timing) { \
-            ds4_gpu_end_commands(); \
-            const double now_ = now_sec(); \
-            prof[idx_] += now_ - prof_last; \
-            prof_last = now_; \
-            glm_graph_begin_commands_if_needed(); \
-        } \
-    } while (0)
-
-    uint32_t ple_ids[QWEN4_BATCH_MAX_ROWS * DS4_MAX_PLE_HEADS];
-    bool ngrams_staged = false;
-    if (timing) prof_last = now_sec();
-    if (ok) ok = qwen4_batch_stage_embeddings(items, count, m, w, g, ple_ids);
-    QWEN4_BATCH_PROF(0);
-
-    for (uint32_t il = 0; ok && il < n_trunk; il++) {
-        const ds4_layer_weights *l = &w->layer[il];
-        if (!ngrams_staged && ds4_qwen4_layer_is_ple(il)) {
-            /* Submit everything encoded so far, then read the n-gram rows
-             * while the GPU works through it.  DS4_QWEN4_NO_NGRAM_OVERLAP
-             * reads them up front instead, which is the same work with the
-             * GPU idle for it. */
-            ngrams_staged = true;
-            ok = (getenv("DS4_QWEN4_NO_NGRAM_OVERLAP") != NULL ||
-                  ds4_gpu_flush_commands() != 0) &&
-                 qwen4_batch_stage_ngrams(count, m, g, ple_ids);
-            if (!ok) break;
-        }
-        if (ds4_qwen4_layer_is_ple(il)) {
-            ok = qwen4_gemv(g->ple_key, m, l->ple_key, g->ple_emb, T) &&
-                 qwen4_gemv(g->ple_val, m, l->ple_value, g->ple_emb, T) &&
-                 ds4_gpu_qwen4_ple_gate_tensor(g->ple_gated, g->ple_normed, g->R, g->ple_key,
-                                               g->ple_val, m->map, m->size,
-                                               l->ple_norm_key->abs_offset,
-                                               l->ple_norm_query->abs_offset,
-                                               l->ple_norm_conv->abs_offset,
-                                               T, DS4_N_EMBD, DS4_N_HC, DS4_RMS_EPS);
-            /* the n-gram convolution carries per-session history */
-            for (int i = 0; ok && i < count; i++) {
-                ok = ds4_gpu_qwen4_ple_conv_tensor(views[i].R, views[i].ple_gated,
-                                                   views[i].ple_normed,
-                                                   rowg[i].ple_hist, m->map, m->size,
-                                                   l->ple_conv->abs_offset, l->ple_conv->type,
-                                                   1u, hc_dim, DS4_N_PLE_CONV, DS4_N_PLE_NGRAM,
-                                                   NULL, 0u, NULL, 1u);
-            }
-        }
-        QWEN4_BATCH_PROF(1);
-        if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_attn_norm, l->hc_attn_down,
-                                        l->hc_attn_up, l->hc_attn_inject, T);
-        QWEN4_BATCH_PROF(2);
-        if (ok) {
-            ok = ds4_qwen4_layer_is_linear(il)
-                ? qwen4_batch_linear(items, count, views, rowg, g, m, l, il, T)
-                : qwen4_batch_attention(count, rowg, g, m, l, il, T);
-        }
-        QWEN4_BATCH_PROF(ds4_qwen4_layer_is_linear(il) ? 3 : 4);
-        if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, T,
-                                                     DS4_N_EMBD, DS4_N_HC) != 0;
-        if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down,
-                                        l->hc_ffn_up, l->hc_ffn_inject, T);
-        QWEN4_BATCH_PROF(5);
-        if (ok) ok = qwen4_graph_moe(g, m, l, T);
-        QWEN4_BATCH_PROF(6);
-    }
-    /* The output matrix is the single largest weight read of a decode step,
-     * so it serves every row in one pass. */
-    if (ok) ok = qwen4_graph_hc_mix(g, m, w->output_hc_norm, w->output_hc_down,
-                                    w->output_hc_up, NULL, T) &&
-                 qwen4_gemv(g->batch_logits, m, w->output, g->mixed, T);
-
-    if (timing) {
-        fprintf(stderr, "ds4: Qwen3.8 batch(T=%u) ms: stage %.1f ple %.1f hc_attn %.1f "
-                "gdn %.1f attn %.1f hc_ffn %.1f moe %.1f\n", T,
-                1e3 * prof[0], 1e3 * prof[1], 1e3 * prof[2], 1e3 * prof[3],
-                1e3 * prof[4], 1e3 * prof[5], 1e3 * prof[6]);
-    }
-#undef QWEN4_BATCH_PROF
-    qwen4_batch_rows_free(views, count);
-    free(views);
-    free(rowg);
-    return ok;
-}
-/* Each session contributes its next token and optionally one draft. State
- * snapshots retain the first row for rejection; a draft is accepted only
- * when it is the target's argmax. Grouped reductions can round differently
- * from a single-session verification. */
-
-typedef struct {
-    ds4_session *session;
-    int tokens[2];
-    uint32_t n;      /* rows: the token, then its draft */
-    uint32_t row0;   /* first row in the batch layout */
-} qwen4_batch_member;
-
-static ds4_gpu_tensor *qwen4_rows_view(ds4_gpu_tensor *base, uint32_t row0, uint32_t n, uint64_t values) {
-    return ds4_gpu_tensor_view(base, (uint64_t)row0 * values * sizeof(float), (uint64_t)n * values * sizeof(float));
-}
-
-static bool qwen4_batch_rows_build_ragged(qwen4_batch_row *rows, const qwen4_batch_member *mem, int count,
-                                          const ds4_qwen4_gpu_graph *g) {
-    const uint64_t hc_dim = (uint64_t)DS4_N_EMBD * DS4_N_HC;
-    const uint64_t q_dim = (uint64_t)DS4_N_HEAD * DS4_N_HEAD_DIM;
-    const uint64_t kv_dim = (uint64_t)DS4_N_HEAD_KV * DS4_N_HEAD_DIM;
-    const uint64_t iq_dim = (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM;
-    const uint64_t v_dim = (uint64_t)DS4_N_LIN_V_HEAD * DS4_N_LIN_HEAD_DIM;
-    memset(rows, 0, (size_t)count * sizeof(rows[0]));
-    for (int i = 0; i < count; i++) {
-        const uint32_t r = mem[i].row0, n = mem[i].n;
-        rows[i].R = qwen4_rows_view(g->R, r, n, hc_dim);
-        rows[i].ple_gated = qwen4_rows_view(g->ple_gated, r, n, hc_dim);
-        rows[i].ple_normed = qwen4_rows_view(g->ple_normed, r, n, hc_dim);
-        rows[i].qkv = qwen4_rows_view(g->qkv, r, n, DS4_N_LIN_CONV_DIM);
-        rows[i].ga = qwen4_rows_view(g->ga, r, n, DS4_N_LIN_V_HEAD);
-        rows[i].gb = qwen4_rows_view(g->gb, r, n, DS4_N_LIN_V_HEAD);
-        rows[i].lin_o = qwen4_rows_view(g->lin_o, r, n, v_dim);
-        rows[i].qg = qwen4_rows_view(g->qg, r, n, 2u * q_dim);
-        rows[i].kp = qwen4_rows_view(g->kp, r, n, kv_dim);
-        rows[i].vp = qwen4_rows_view(g->vp, r, n, kv_dim);
-        rows[i].iq = qwen4_rows_view(g->iq, r, n, iq_dim);
-        rows[i].ik = qwen4_rows_view(g->ik, r, n, DS4_N_INDEXER_HEAD_DIM);
-        rows[i].q = qwen4_rows_view(g->q, r, n, q_dim);
-        rows[i].gate = qwen4_rows_view(g->gate, r, n, q_dim);
-        rows[i].iqn = qwen4_rows_view(g->iqn, r, n, iq_dim);
-        rows[i].attn_o = qwen4_rows_view(g->attn_o, r, n, q_dim);
-        rows[i].mixed = qwen4_rows_view(g->mixed, r, n, DS4_N_EMBD);
-        if (!rows[i].R || !rows[i].ple_gated || !rows[i].ple_normed || !rows[i].qkv || !rows[i].ga ||
-            !rows[i].gb || !rows[i].lin_o || !rows[i].qg || !rows[i].kp || !rows[i].vp || !rows[i].iq ||
-            !rows[i].ik || !rows[i].q || !rows[i].gate || !rows[i].iqn || !rows[i].attn_o || !rows[i].mixed) {
-            qwen4_batch_rows_free(rows, count);
-            return false;
-        }
-    }
-    return true;
-}
-
-/* Embeddings, rope positions and n-gram ids for every row; a session with a
- * draft row records the verify snapshot's host state after its first token,
- * as qwen4_graph_stage_inputs does. */
-static bool qwen4_batch_stage_embeddings_ragged(const qwen4_batch_member *mem, int count, uint32_t N,
-                                                const ds4_model *m, const ds4_weights *w,
-                                                ds4_qwen4_gpu_graph *g, uint32_t *ids) {
-    const uint32_t E = DS4_N_EMBD, hc = DS4_N_HC, hc_dim = E * hc;
-    float *row = g->host_row;
-    for (int i = 0; i < count; i++) {
-        ds4_qwen4_gpu_graph *rg = &mem[i].session->qwen4_graph;
-        for (uint32_t t = 0; t < mem[i].n; t++) {
-            const uint32_t r = mem[i].row0 + t;
-            float *dst = row + (uint64_t)r * hc_dim;
-            qwen4_ref_row(m, w->token_embd, (uint64_t)mem[i].tokens[t], dst);
-            for (uint32_t sidx = 1; sidx < hc; sidx++) memcpy(dst + (uint64_t)sidx * E, dst, E * sizeof(float));
-            uint32_t pos3[4];
-            qwen4_mrope_pos(NULL, 0, rg->pos + t, &rg->mrope_delta, pos3);
-            pos3[3] = 0;
-            if (!ds4_gpu_tensor_write(rg->pos3, (uint64_t)(rg->pos + t) * 16u, pos3, 16u)) return false;
-            qwen4_ple_step(mem[i].tokens[t], rg->ple_prev, ids + (uint64_t)r * DS4_N_PLE_HEADS);
-            if (t == 0 && rg->snap_after_first) {
-                memcpy(rg->snap_ple_prev, rg->ple_prev, sizeof(rg->snap_ple_prev));
-                rg->snap_pos = rg->pos + 1u;
-                rg->snap_mrope_delta = rg->mrope_delta;
-            }
-        }
-    }
-    return ds4_gpu_tensor_write(g->R, 0, row, (uint64_t)N * hc_dim * sizeof(float)) != 0;
-}
-
-static bool qwen4_graph_encode_native_session_batch_ragged(const qwen4_batch_member *mem, int count, uint32_t N,
-                                                           ds4_qwen4_gpu_graph *g, const ds4_model *m,
-                                                           const ds4_weights *w) {
-    const uint32_t T = N;
-    const uint32_t hc_dim = DS4_N_EMBD * DS4_N_HC;
-    const uint32_t n_trunk = DS4_N_LAYER - DS4_N_NEXTN_PREDICT;
-    qwen4_batch_row *views = xmalloc((size_t)count * sizeof(*views));
-    ds4_qwen4_gpu_graph *rowg = xmalloc((size_t)count * sizeof(*rowg));
-    uint32_t *ple_ids = xmalloc((size_t)N * DS4_MAX_PLE_HEADS * sizeof(uint32_t));
-    bool ok = qwen4_batch_rows_build_ragged(views, mem, count, g);
-    for (int i = 0; ok && i < count; i++) qwen4_batch_row_graph(&rowg[i], mem[i].session, &views[i]);
-    if (ok) ok = qwen4_batch_scratch_ensure(g, N > 32u ? N : 32u);
-    if (ok) ok = qwen4_batch_stage_embeddings_ragged(mem, count, N, m, w, g, ple_ids);
-    bool ngrams_staged = false;
-    for (uint32_t il = 0; ok && il < n_trunk; il++) {
-        const ds4_layer_weights *l = &w->layer[il];
-        if (!ngrams_staged && ds4_qwen4_layer_is_ple(il)) {
-            ngrams_staged = true;
-            ok = (getenv("DS4_QWEN4_NO_NGRAM_OVERLAP") != NULL || ds4_gpu_flush_commands() != 0) &&
-                 qwen4_batch_stage_ngrams((int)N, m, g, ple_ids);
-            if (!ok) break;
-        }
-        if (ds4_qwen4_layer_is_ple(il)) {
-            ok = qwen4_gemv(g->ple_key, m, l->ple_key, g->ple_emb, T) &&
-                 qwen4_gemv(g->ple_val, m, l->ple_value, g->ple_emb, T) &&
-                 ds4_gpu_qwen4_ple_gate_tensor(g->ple_gated, g->ple_normed, g->R, g->ple_key, g->ple_val,
-                                               m->map, m->size, l->ple_norm_key->abs_offset,
-                                               l->ple_norm_query->abs_offset, l->ple_norm_conv->abs_offset,
-                                               T, DS4_N_EMBD, DS4_N_HC, DS4_RMS_EPS);
-            for (int i = 0; ok && i < count; i++) {
-                ok = ds4_gpu_qwen4_ple_conv_tensor(views[i].R, views[i].ple_gated, views[i].ple_normed,
-                                                   rowg[i].ple_hist, m->map, m->size, l->ple_conv->abs_offset,
-                                                   l->ple_conv->type, mem[i].n, hc_dim, DS4_N_PLE_CONV,
-                                                   DS4_N_PLE_NGRAM,
-                                                   rowg[i].snap_after_first ? rowg[i].snap_ple_hist : NULL, 0u,
-                                                   NULL, 1u);
-            }
-        }
-        if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_attn_norm, l->hc_attn_down, l->hc_attn_up,
-                                        l->hc_attn_inject, T);
-        if (ok && ds4_qwen4_layer_is_linear(il)) {
-            /* projections over every row; the convolution and the scan walk
-             * each session's one or two rows against its own state through
-             * the row table, snapshotting after the first as the verify does */
-            ok = qwen4_gemv(g->qkv, m, l->lin_qkv, g->mixed, T) &&
-                 qwen4_gemv(g->z, m, l->lin_gate, g->mixed, T) &&
-                 qwen4_gemv(g->ga, m, l->lin_alpha, g->mixed, T) &&
-                 qwen4_gemv(g->gb, m, l->lin_beta, g->mixed, T);
-            ds4_gpu_qwen4_gdn_row grows[QWEN4_BATCH_MAX_ROWS];
-            for (int i = 0; i < count; i++) {
-                const bool snap = rowg[i].snap_after_first && rowg[i].snap_lin_state[il] && mem[i].n == 2u;
-                grows[i].state = rowg[i].layer_lin_state[il];
-                grows[i].hist = rowg[i].layer_lin_hist[il];
-                grows[i].snap_state = snap ? rowg[i].snap_lin_state[il] : NULL;
-                grows[i].snap_hist = snap ? rowg[i].snap_lin_hist[il] : NULL;
-                grows[i].row0 = mem[i].row0;
-                grows[i].n_tok = mem[i].n;
-            }
-            const uint64_t entry0 = (uint64_t)il * QWEN4_BATCH_MAX_ROWS;
-            const uint64_t v_dim = (uint64_t)DS4_N_LIN_V_HEAD * DS4_N_LIN_HEAD_DIM;
-            if (ok) ok = ds4_gpu_qwen4_gdn_rows_stage(g->batch_gdn_rows, entry0, grows, (uint32_t)count) &&
-                         ds4_gpu_qwen4_conv_stream_rows2_tensor(g->qkv, m->map, m->size, l->lin_conv->abs_offset,
-                                                                g->batch_gdn_rows, entry0, grows, (uint32_t)count, T,
-                                                                DS4_N_LIN_CONV_DIM, DS4_N_LIN_CONV, DS4_N_LIN_CONV_DIM,
-                                                                1) &&
-                         ds4_gpu_qwen4_gdn_prep_tensor(g->qkv, g->ga, g->gb, m->map, m->size, l->lin_a->abs_offset,
-                                                       l->lin_dt_bias->abs_offset, T, DS4_N_LIN_K_HEAD,
-                                                       DS4_N_LIN_V_HEAD, DS4_N_LIN_HEAD_DIM) &&
-                         ds4_gpu_qwen4_gdn_scan_rows2_tensor(g->lin_o, g->qkv, g->ga, g->gb, g->batch_gdn_rows, entry0,
-                                                             grows, (uint32_t)count, T, DS4_N_LIN_K_HEAD,
-                                                             DS4_N_LIN_V_HEAD, DS4_N_LIN_HEAD_DIM, DS4_N_LIN_CONV_DIM,
-                                                             (uint32_t)v_dim) &&
-                         ds4_gpu_qwen4_gdn_out_tensor(g->lin_o, g->z, m->map, m->size, l->lin_norm->abs_offset, T,
-                                                      DS4_N_LIN_V_HEAD, DS4_N_LIN_HEAD_DIM, DS4_RMS_EPS) != 0 &&
-                         qwen4_gemv(g->blk, m, l->lin_out, g->lin_o, T);
-        } else if (ok) {
-            ok = qwen4_gemv(g->qg, m, l->attn_q, g->mixed, T) &&
-                 qwen4_gemv(g->kp, m, l->attn_k, g->mixed, T) &&
-                 qwen4_gemv(g->vp, m, l->attn_v, g->mixed, T) &&
-                 qwen4_gemv(g->iq, m, l->indexer_q_proj, g->mixed, T) &&
-                 qwen4_gemv(g->ik, m, l->indexer_k_proj, g->mixed, T);
-            /* one entry per token: a draft row's entry sits at pos + 1 */
-            ds4_gpu_qwen4_attn_row arows[2 * QWEN4_BATCH_MAX_ROWS];
-            const uint32_t sparse_pos = (g->k_blocks + 1u) * 4u - 1u;
-            for (int i = 0; ok && i < count; i++) {
-                const ds4_qwen4_gpu_graph *r = &rowg[i];
-                for (uint32_t t = 0; t < mem[i].n; t++) {
-                    ds4_gpu_qwen4_attn_row *e = &arows[mem[i].row0 + t];
-                    e->k_cache = r->layer_k_cache[il];
-                    e->v_cache = r->layer_v_cache[il];
-                    e->ik_cache = r->layer_ik_cache[il];
-                    e->block_key = r->layer_block_key[il];
-                    e->pos3 = r->pos3;
-                    e->pos = r->pos + t;
-                    e->use_sel = e->pos >= sparse_pos;
-                    if (e->pos >= r->ctx_cap) ok = false;
-                }
-            }
-            if (ok) ok = qwen4_batch_attention_entries(arows, T, g, m, l, il) &&
-                         qwen4_gemv(g->blk, m, l->attn_output, g->attn_o, T);
-        }
-        if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, T, DS4_N_EMBD, DS4_N_HC) != 0;
-        if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, T);
-        if (ok) ok = qwen4_graph_moe(g, m, l, T);
-    }
-    if (ok) ok = qwen4_graph_hc_mix(g, m, w->output_hc_norm, w->output_hc_down, w->output_hc_up, NULL, T) &&
-                 qwen4_gemv(g->batch_logits, m, w->output, g->mixed, T);
-    qwen4_batch_rows_free(views, count);
-    free(ple_ids);
-    free(rowg);
-    free(views);
-    return ok;
-}
-
-/* Next drafts for every session: one predictor pass over every row of the
- * batch (whose trunk streams sit in the batch's R, at the positions the
- * trunk rows had, so the nextn layer's attention row table is the trunk's),
- * then one product of the head over every session's last committed row and
- * one argmax each.  A rejected draft's row runs too, with the parent as
- * the token that follows: the next pass rewrites its cache entry before
- * anything reads it, and its output is ignored.  parents are the tokens
- * the caller will feed next. */
-static bool qwen4_batch_mtp_drafts(qwen4_batch_member *mem, int count, const uint32_t *committed,
-                                   const int *parents, const uint32_t *idx0, uint32_t N,
-                                   ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds4_weights *w, int *drafts) {
-    const uint32_t il = DS4_N_LAYER - 1u;
-    const ds4_layer_weights *l = &w->layer[il];
-    const uint32_t E = DS4_N_EMBD, hc = DS4_N_HC;
-    const uint64_t row_bytes = (uint64_t)hc * E * sizeof(float);
-    int32_t ids[2 * QWEN4_BATCH_MAX_ROWS];
-    ds4_gpu_qwen4_attn_row arows[2 * QWEN4_BATCH_MAX_ROWS];
-    const uint32_t sparse_pos = (g->k_blocks + 1u) * 4u - 1u;
-    for (int i = 0; i < count; i++) {
-        const ds4_qwen4_gpu_graph *r = &mem[i].session->qwen4_graph;
-        for (uint32_t t = 0; t < mem[i].n; t++) {
-            ids[mem[i].row0 + t] = t + 1u < committed[i] ? mem[i].tokens[t + 1u] : parents[i];
-            ds4_gpu_qwen4_attn_row *e = &arows[mem[i].row0 + t];
-            e->k_cache = r->layer_k_cache[il];
-            e->v_cache = r->layer_v_cache[il];
-            e->ik_cache = r->layer_ik_cache[il];
-            e->block_key = r->layer_block_key[il];
-            e->pos3 = r->pos3;
-            e->pos = idx0[i] + t;
-            e->use_sel = e->pos >= sparse_pos;
-            if (e->pos >= r->ctx_cap) return false;
-        }
-    }
-    for (uint32_t t = 0; t < N; t++)
-        qwen4_ref_row(m, w->token_embd, (uint64_t)ids[t], g->host_row + (uint64_t)t * E);
-    if (!ds4_gpu_tensor_write(g->batch_head_x, 0, g->host_row, (uint64_t)N * E * sizeof(float)) ||
-        !glm_graph_begin_commands_if_needed()) return false;
-    /* The trunk's MoE scratch is idle here. Reuse it for predictor inputs
-     * and project all rows together, keeping the existing stage kernels. */
-    const uint64_t emb_bytes = (uint64_t)E * sizeof(float);
-    const uint64_t cat_bytes = (hc + 1u) * 2u * emb_bytes;
-    const uint64_t proj_bytes = (hc + 1u) * emb_bytes;
-    bool ok = true;
-    for (uint32_t t = 0; ok && t < N; t++) {
-        ds4_gpu_tensor *emb = ds4_gpu_tensor_view(g->batch_head_x, t * emb_bytes, emb_bytes);
-        ds4_gpu_tensor *R = ds4_gpu_tensor_view(g->R, t * row_bytes, row_bytes);
-        ds4_gpu_tensor *cat = ds4_gpu_tensor_view(g->part, t * cat_bytes, cat_bytes);
-        ok = emb && R && cat && ds4_gpu_qwen4_mtp_stage_tensor(cat, emb, R, m->map, m->size,
-                l->nextn_enorm->abs_offset, l->nextn_hnorm->abs_offset, E, hc, DS4_RMS_EPS);
-        ds4_gpu_tensor_free(cat);
-        ds4_gpu_tensor_free(R);
-        ds4_gpu_tensor_free(emb);
-    }
-    if (ok) ok = qwen4_gemv(g->mid, m, l->nextn_eh_proj, g->part, N * (hc + 1u));
-    for (uint32_t t = 0; ok && t < N; t++) {
-        ds4_gpu_tensor *proj = ds4_gpu_tensor_view(g->mid, t * proj_bytes, proj_bytes);
-        ds4_gpu_tensor *R = ds4_gpu_tensor_view(g->R, t * row_bytes, row_bytes);
-        ok = proj && R && ds4_gpu_qwen4_mtp_combine_tensor(R, proj, E, hc);
-        ds4_gpu_tensor_free(R);
-        ds4_gpu_tensor_free(proj);
-    }
-    if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_attn_norm, l->hc_attn_down, l->hc_attn_up, l->hc_attn_inject, N);
-    if (ok) ok = qwen4_gemv(g->qg, m, l->attn_q, g->mixed, N) &&
-                 qwen4_gemv(g->kp, m, l->attn_k, g->mixed, N) &&
-                 qwen4_gemv(g->vp, m, l->attn_v, g->mixed, N) &&
-                 qwen4_gemv(g->iq, m, l->indexer_q_proj, g->mixed, N) &&
-                 qwen4_gemv(g->ik, m, l->indexer_k_proj, g->mixed, N) &&
-                 qwen4_batch_attention_entries(arows, N, g, m, l, il) &&
-                 qwen4_gemv(g->blk, m, l->attn_output, g->attn_o, N);
-    if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, N, E, hc) != 0;
-    if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, N);
-    if (ok) ok = qwen4_graph_moe(g, m, l, N);
-    /* every session's last committed row, gathered for one pass of the head
-     * mixer into the batch's head rows */
-    for (int i = 0; ok && i < count; i++) {
-        ok = ds4_gpu_tensor_copy(g->part, (uint64_t)i * row_bytes, g->R,
-                                 (uint64_t)(mem[i].row0 + committed[i] - 1u) * row_bytes, row_bytes) != 0;
-    }
-    ds4_gpu_tensor *R_save = g->R, *mixed_save = g->mixed;
-    g->R = g->part;
-    g->mixed = g->batch_head_x;
-    if (ok) ok = qwen4_graph_hc_mix(g, m, l->nextn_hc_head_norm, l->nextn_hc_head_down, l->nextn_hc_head_up, NULL,
-                                    (uint32_t)count);
-    g->R = R_save;
-    g->mixed = mixed_save;
-    if (ok) ok = qwen4_gemv(g->batch_logits, m, w->output, g->batch_head_x, (uint32_t)count);
-    for (int i = 0; ok && i < count; i++) {
-        ds4_qwen4_gpu_graph *sg = &mem[i].session->qwen4_graph;
-        ds4_gpu_tensor *row = ds4_gpu_tensor_view(g->batch_logits, (uint64_t)i * DS4_N_VOCAB * sizeof(float),
-                                                  (uint64_t)DS4_N_VOCAB * sizeof(float));
-        ok = row && ds4_gpu_qwen4_argmax_tensor(sg->mtp_argmax, sg->mtp_argmax_tmp, row, DS4_N_VOCAB) != 0;
-        ds4_gpu_tensor_free(row);
-    }
-    if (!ds4_gpu_end_commands()) ok = false;
-    for (int i = 0; ok && i < count; i++) {
-        ds4_qwen4_gpu_graph *sg = &mem[i].session->qwen4_graph;
-        int32_t token = -1;
-        ok = ds4_gpu_tensor_read(sg->mtp_argmax, 0, &token, sizeof(token)) != 0 &&
-             token >= 0 && token < (int32_t)DS4_N_VOCAB;
-        drafts[i] = token;
-        sg->mtp_pos = idx0[i] + committed[i];
-        sg->mtp_last_rows = 0;
-    }
-    return ok;
-}
-
-static bool qwen4_graph_native_session_batch_check(ds4_decode_item *items, int count,
-                                                   const ds4_engine *e, bool speculative) {
-    const char *env = getenv("DS4_QWEN4_SESSION_BATCH");
-    if ((env && env[0] && strcmp(env, "0") == 0) ||
-        count < 2 || count > QWEN4_BATCH_MAX_ROWS ||
-        !e->qwen4_shared_workspace) {
-        return false;
-    }
-    const ds4_qwen4_gpu_graph *arena = e->qwen4_shared_workspace;
-    if (arena->cap_tokens < (uint32_t)count) return false;
-    if (speculative) {
-        const uint64_t rows = 2u * (uint32_t)count;
-        const uint64_t projection = rows * (DS4_N_HC + 1u) * DS4_N_EMBD * sizeof(float);
-        if (rows > arena->cap_tokens ||
-            ds4_gpu_tensor_bytes(arena->mid) < projection ||
-            ds4_gpu_tensor_bytes(arena->part) < 2u * projection) return false;
-    }
-    for (int i = 0; i < count; i++) {
-        const ds4_session *s = items[i].session;
-        const ds4_qwen4_gpu_graph *g = &s->qwen4_graph;
-        if (!s || s->engine != e || s->distributed || !s->checkpoint_valid ||
-            !s->qwen4_graph_ready || ds4_session_is_cpu(s) ||
-            g->owns_scratch || g->R != arena->R ||
-            g->n_block_cap > arena->n_block_cap ||
-            g->pos != (uint32_t)s->checkpoint.len ||
-            g->vis_span_count != 0 || (speculative && !g->mtp_R) ||
-            g->snap_after_first || g->snap_after_second ||
-            g->steer_attn_scale != 0.0f || g->steer_ffn_scale != 0.0f ||
-            g->dump_prompt_rows) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool qwen4_graph_native_session_batch_supported(ds4_decode_item *items, int count,
-                                                       const ds4_engine *e) {
-    return qwen4_graph_native_session_batch_check(items, count, e, false);
-}
-
-#endif /* DS4_HAS_QWEN4_METAL */
-
-static bool ds4_sessions_eval_batch_metal_supported(
-        ds4_decode_item *items,
-        int count,
-        ds4_engine *e) {
-    const char *tp_batch = getenv("DS4_METAL_TP_SESSION_BATCH");
-    if (!items || count < 2 || !e || e->backend != DS4_BACKEND_METAL ||
-        e->support_kind != DS4_SUPPORT_NONE ||
-        (e->tp.active && tp_batch && strcmp(tp_batch, "0") == 0) ||
-        getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
-        getenv("DS4_METAL_DECODE_STAGE_PROFILE") != NULL) {
-        return false;
-    }
-#ifdef DS4_HAS_QWEN4_METAL
-    if (items[0].session && ds4_session_is_qwen4(items[0].session))
-        return qwen4_graph_native_session_batch_supported(items, count, e);
-#endif
-    for (int i = 0; i < count; i++) {
-        ds4_session *s = items[i].session;
-        if (!s || s->engine != e || s->distributed ||
-            ds4_session_is_cpu(s) || !s->checkpoint_valid) {
-            return false;
-        }
-        if (ds4_session_is_glm(s)) {
-            if (!s->glm_graph_ready || s->glm_graph.ssd_streaming ||
-                glm_debug_hidden_dump_layer() >= 0 ||
-                e->glm_mtp ||
-                getenv("DS4_GLM_MTP_PROBE") != NULL) {
-                return false;
-            }
-        } else if (s->graph.ssd_streaming) {
-            return false;
-        }
-    }
-    return true;
-}
 
 static bool gpu_graph_native_session_batch_shared_supported(
         ds4_decode_item *items,
@@ -83706,12 +82527,7 @@ static int ds4_sessions_eval_batch_native(
         (uint32_t)(prefill_prompt->len - prefill->checkpoint.len) : 0u;
     const bool native_glm53 = ok &&
         glm53_graph_native_session_batch_supported(items, count);
-#ifdef DS4_HAS_QWEN4_METAL
-    const bool native_qwen4 = ok && !prefill &&
-        ds4_session_is_qwen4(items[0].session);
-#else
     const bool native_qwen4 = false;
-#endif
     const bool native_shared = ok && !native_ds41 && !native_glm53 && !native_qwen4 &&
         gpu_graph_native_session_batch_shared_supported(items, count, e);
     const bool native_qkv = native_shared &&
@@ -83732,11 +82548,6 @@ static int ds4_sessions_eval_batch_native(
                                           prefill_rows, &e->model, &e->weights);
 #else
         ok = false;
-#endif
-#ifdef DS4_HAS_QWEN4_METAL
-    } else if (native_qwen4) {
-        ok = qwen4_graph_encode_native_session_batch(
-                items, count, e->qwen4_shared_workspace, &e->model, &e->weights);
 #endif
     } else if (native_glm53) {
         ok = glm53_graph_encode_native_session_batch(
@@ -83785,21 +82596,6 @@ static int ds4_sessions_eval_batch_native(
 #endif
     for (int i = 0; ok && i < count; i++) {
         ds4_session *s = items[i].session;
-#ifdef DS4_HAS_QWEN4_METAL
-        if (native_qwen4) {
-            ok = ds4_gpu_tensor_read(e->qwen4_shared_workspace->batch_logits,
-                                     (uint64_t)i * DS4_N_VOCAB * sizeof(float),
-                                     s->logits,
-                                     (uint64_t)DS4_N_VOCAB * sizeof(float)) != 0;
-            if (ok) {
-                s->qwen4_graph.pos++;
-                s->qwen4_rewound = false;
-                s->glm_mtp_have = 0;
-                s->glm_mtp_have2 = false;
-            }
-            continue;
-        }
-#endif
         ds4_gpu_tensor *logits = ds4_session_is_glm(s)
             ? s->glm_graph.logits : gpu_graph_logits(&s->graph);
 #ifdef DS4_HAS_DEEPSEEK41_GPU
@@ -83888,61 +82684,15 @@ static bool ds41_mixed_batch_supported(ds4_decode_item *items, int count,
     if (prefill->engine->backend == DS4_BACKEND_CUDA)
         return gpu_graph_tp_env_flag("DS4_CUDA_MIXED_PREFILL_DECODE", true) &&
             ds41_sessions_batch_supported(combined, rows + count, prefill->engine);
-    return ds4_sessions_eval_batch_metal_supported(combined, rows + count, prefill->engine);
+    return false;
 }
 #endif
 
-static bool ds4_sessions_eval_batch_with_prefill_metal_supported(
-        ds4_decode_item *items,
-        int count,
-        ds4_session *prefill_session,
-        const ds4_tokens *prefill_prompt) {
-    if (!items || count <= 0 || !prefill_session || !prefill_prompt ||
-        !prefill_session->engine) {
-        return false;
-    }
-    ds4_engine *e = prefill_session->engine;
-    const char *tp_batch = getenv("DS4_METAL_TP_SESSION_BATCH");
-    if (e->backend != DS4_BACKEND_METAL ||
-        e->support_kind != DS4_SUPPORT_NONE ||
-        (e->tp.active && tp_batch && strcmp(tp_batch, "0") == 0) ||
-        ds4_session_is_cpu(prefill_session) ||
-        ds4_session_is_glm(prefill_session) ||
-        prefill_session->distributed ||
-        prefill_session->graph.ssd_streaming ||
-        ds4_session_cancelled(prefill_session) ||
-        getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
-        getenv("DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE") != NULL ||
-        getenv("DS4_METAL_LAYER_STAGE_PROFILE") != NULL) {
-        return false;
-    }
-
-    const uint32_t start = (uint32_t)prefill_session->checkpoint.len;
-    const uint32_t rows = (uint32_t)prefill_prompt->len - start;
-    ds4_gpu_graph *g = &prefill_session->graph;
-    if (rows < gpu_graph_resume_prefill_min_tokens() ||
-        rows > g->prefill_cap || rows > g->raw_cap ||
-        (start % g->prefill_cap) + rows > g->prefill_cap) {
-        return false;
-    }
-
-    for (int i = 0; i < count; i++) {
-        ds4_session *s = items[i].session;
-        if (!s || s->engine != e || s == prefill_session ||
-            s->distributed || ds4_session_is_cpu(s) ||
-            ds4_session_is_glm(s) || !s->checkpoint_valid ||
-            s->graph.ssd_streaming || ds4_session_cancelled(s)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/* Interleave one resumed Metal prefill chunk and independent decode rows by
- * layer in a single command epoch. Arithmetic stays on the established
- * per-sequence paths, so every session retains private cache and checkpoint
- * state while the scheduler avoids serial prefill/decode submissions. */
-static int ds4_sessions_eval_batch_with_prefill_gpu(
+/* Interleave one resumed prefill chunk and independent decode rows by layer in
+ * a single command epoch. This was the deleted graph backend's scheduler: the
+ * CUDA engine batches through ds4_sessions_eval_batch_with_prefill_cuda, so
+ * nothing calls it in this build. Kept as the shape a Linux port would reuse. */
+static DS4_MAYBE_UNUSED int ds4_sessions_eval_batch_with_prefill_gpu(
         ds4_decode_item *items,
         int count,
         ds4_session *prefill_session,
@@ -84128,21 +82878,6 @@ static int ds4_sessions_eval_batch_with_prefill_cuda(
         char *err,
         size_t errlen);
 
-#ifdef DS4_HAS_QWEN4_METAL
-/* Speculate when (1 + acceptance) * plain_cost > speculative_cost. Probe
- * both schedules periodically so changes in text or GPU speed can reverse
- * the decision. Transition cycles do not update either timing estimate. */
-static float qwen4_ema(float avg, float sample, uint32_t n_prior) {
-    return avg + (sample - avg) / (n_prior < 15u ? (float)(n_prior + 1u) : 16.0f);
-}
-
-static bool qwen4_batch_spec_next(const ds4_engine *e) {
-    const uint32_t cycle = e->qwen4_batch_cycles;
-    const float p = e->qwen4_batch_p, cp = e->qwen4_batch_ms[0], cs = e->qwen4_batch_ms[1];
-    if (cp <= 0.0f || cs <= 0.0f) return cycle % 32u < 8u;
-    return (1.0f + p) * cp > cs ? cycle % 128u >= 2u : cycle % 32u < 2u;
-}
-#endif
 
 int ds4_sessions_eval_batch_speculative_argmax(ds4_decode_item *items, int count,
                                                int (*accepted)[2], int *n_accepted,
@@ -84173,148 +82908,6 @@ int ds4_sessions_eval_batch_speculative_argmax(ds4_decode_item *items, int count
             return 1;
         }
     }
-#ifdef DS4_HAS_QWEN4_METAL
-    if (count >= 2 && count <= 16 && ds4_session_is_qwen4(items[0].session) && e->glm_mtp &&
-        !e->tp.active && e->backend == DS4_BACKEND_METAL &&
-        qwen4_graph_native_session_batch_check(items, count, e, true)) {
-        const ds4_model *m = &e->model;
-        const ds4_weights *w = &e->weights;
-        const uint32_t V = DS4_N_VOCAB;
-        const double t0 = now_sec();
-        if (e->qwen4_batch_width != (uint32_t)count) {
-            e->qwen4_batch_width = (uint32_t)count;
-            e->qwen4_batch_cycles = e->qwen4_batch_spec_cycles = 0;
-            e->qwen4_batch_p = e->qwen4_batch_ms[0] = e->qwen4_batch_ms[1] = 0;
-        }
-        qwen4_batch_member mem[16];
-        uint32_t pos0[16], committed[16];
-        int parents[16], drafts[16];
-        uint32_t N = 0, n_draft = 0, n_acc = 0;
-        for (int i = 0; i < count; i++) {
-            ds4_session *s = items[i].session;
-            ds4_qwen4_gpu_graph *g = &s->qwen4_graph;
-            mem[i].session = s;
-            mem[i].tokens[0] = items[i].token;
-            mem[i].n = 1u;
-            mem[i].row0 = N;
-            pos0[i] = g->pos;
-            /* The logit rows below replace those paired with older snapshots. */
-            g->snap_valid = g->snap2_valid = g->snap0_valid = false;
-            if (s->glm_mtp_have && s->glm_mtp_parent == items[i].token &&
-                s->ctx_size - s->checkpoint.len >= 2 && g->pos + 2u <= g->ctx_cap &&
-                g->snap_ple_hist && g->mtp_R) {
-                mem[i].tokens[1] = s->glm_mtp_draft;
-                mem[i].n = 2u;
-                g->snap_after_first = true;
-            }
-            s->glm_mtp_have = 0;
-            s->glm_mtp_have2 = false;
-            N += mem[i].n;
-        }
-        ds4_qwen4_gpu_graph *arena = e->qwen4_shared_workspace;
-        bool ok = ds4_gpu_begin_commands() != 0 &&
-                  qwen4_graph_encode_native_session_batch_ragged(mem, count, N, arena, m, w);
-        if (!ds4_gpu_end_commands()) ok = false;
-        for (int i = 0; i < count; i++) {
-            ds4_qwen4_gpu_graph *g = &items[i].session->qwen4_graph;
-            if (g->snap_after_first) {
-                g->snap_valid = ok;
-                g->snap_after_first = false;
-            }
-        }
-        if (!ok) {
-            for (int i = 0; i < count; i++) ds4_session_invalidate(items[i].session);
-            if (err && errlen) snprintf(err, errlen, "metal speculative batch failed");
-            return 1;
-        }
-        for (int i = 0; i < count; i++) {
-            ds4_session *s = items[i].session;
-            ds4_qwen4_gpu_graph *g = &s->qwen4_graph;
-            if (!s->qwen4_verify_logits) s->qwen4_verify_logits = xmalloc(4u * (size_t)V * sizeof(float));
-            float *rows = s->qwen4_verify_logits;
-            if (!ds4_gpu_tensor_read(arena->batch_logits, (uint64_t)mem[i].row0 * V * sizeof(float), rows,
-                                     (uint64_t)mem[i].n * V * sizeof(float))) {
-                for (int j = 0; j < count; j++) ds4_session_invalidate(items[j].session);
-                if (err && errlen) snprintf(err, errlen, "metal speculative batch: logits read failed");
-                return 1;
-            }
-            token_vec_push(&s->checkpoint, mem[i].tokens[0]);
-            committed[i] = 1u;
-            if (mem[i].n == 2u) {
-                s->qwen4_spec_cycles++;
-                const bool accept = sample_argmax(rows, V) == mem[i].tokens[1] || qwen4_spec_force_accept();
-                qwen4_spec_note_first_draft(s, accept);
-                n_draft++;
-                n_acc += accept;
-                if (accept) {
-                    token_vec_push(&s->checkpoint, mem[i].tokens[1]);
-                    memcpy(s->logits, rows + V, (size_t)V * sizeof(float));
-                    g->pos = pos0[i] + 2u;
-                    s->qwen4_spec_accepted++;
-                    committed[i] = 2u;
-                } else {
-                    if (!g->snap_valid || !qwen4_graph_state_swap(g)) {
-                        for (int j = 0; j < count; j++) ds4_session_invalidate(items[j].session);
-                        if (err && errlen) snprintf(err, errlen, "Qwen3.8 mtp: rejection restore failed");
-                        return 1;
-                    }
-                    memcpy(s->logits, rows, (size_t)V * sizeof(float));
-                }
-                if (qwen4_spec_trace()) {
-                    fprintf(stderr, "ds4: spec batch pos %u token %d draft %d %s\n", pos0[i], mem[i].tokens[0],
-                            mem[i].tokens[1], accept ? "accept" : "reject");
-                }
-            } else {
-                memcpy(s->logits, rows, (size_t)V * sizeof(float));
-                g->pos = pos0[i] + 1u;
-            }
-            s->checkpoint_valid = true;
-            s->mtp_draft_valid = false;
-            s->qwen4_rewound = false;
-            parents[i] = sample_argmax(s->logits, V);
-            n_accepted[i] = (int)committed[i];
-            accepted[i][0] = mem[i].tokens[0];
-            accepted[i][1] = committed[i] == 2u ? mem[i].tokens[1] : -1;
-        }
-        if (n_draft) {
-            e->qwen4_batch_p = qwen4_ema(e->qwen4_batch_p, (float)n_acc / (float)n_draft, e->qwen4_batch_spec_cycles);
-            e->qwen4_batch_spec_cycles++;
-        }
-        /* the next drafts, when the policy wants them: a session at its
-         * context limit simply gets none */
-        bool room = qwen4_batch_spec_next(e) && getenv("DS4_QWEN4_NO_BATCH_DRAFT") == NULL;
-        for (int i = 0; i < count; i++) {
-            if (items[i].session->qwen4_graph.pos + 2u > items[i].session->qwen4_graph.ctx_cap) room = false;
-        }
-        if (room) {
-            if (!qwen4_batch_mtp_drafts(mem, count, committed, parents, pos0, N, arena, m, w, drafts)) {
-                (void)ds4_gpu_end_commands();
-                for (int i = 0; i < count; i++) ds4_session_invalidate(items[i].session);
-                if (err && errlen) snprintf(err, errlen, "metal speculative batch: predictor failed");
-                return 1;
-            }
-            for (int i = 0; i < count; i++) {
-                ds4_session *s = items[i].session;
-                s->glm_mtp_draft = drafts[i];
-                s->glm_mtp_parent = parents[i];
-                s->glm_mtp_have = 1;
-            }
-        }
-        /* a steady cycle, verifying drafts and making the next, or plain
-         * both ways, prices its kind; the transitions between them do not */
-        if ((n_draft > 0) == room) {
-            float *c = &e->qwen4_batch_ms[n_draft > 0];
-            *c = qwen4_ema(*c, (float)((now_sec() - t0) * 1e3), *c == 0.0f ? 0u : 16u);
-        }
-        if (qwen4_spec_trace()) {
-            fprintf(stderr, "ds4: spec batch policy: cycle %u %s, p %.2f plain %.1f ms spec %.1f ms, next %s\n",
-                    e->qwen4_batch_cycles, n_draft ? "speculative" : "plain", (double)e->qwen4_batch_p,
-                    (double)e->qwen4_batch_ms[0], (double)e->qwen4_batch_ms[1], room ? "drafts" : "plain");
-        }
-        e->qwen4_batch_cycles++;
-        return 0;
-    }
-#endif
     /* Sequential fallback: one speculative cycle per session. */
     for (int i = 0; i < count; i++) {
         int toks[3];
@@ -84385,9 +82978,6 @@ int ds4_sessions_eval_batch(ds4_decode_item *items, int count,
 #ifndef DS4_NO_GPU
     if (e->backend == DS4_BACKEND_CUDA) {
         return ds4_sessions_eval_batch_cuda(items, count, err, errlen);
-    }
-    if (ds4_sessions_eval_batch_metal_supported(items, count, e)) {
-        return ds4_sessions_eval_batch_native(items, count, e, NULL, NULL, err, errlen);
     }
 #endif
 
@@ -84460,11 +83050,6 @@ int ds4_sessions_eval_batch_with_prefill(
 #endif
     if (prefill_session->engine->backend == DS4_BACKEND_CUDA) {
         return ds4_sessions_eval_batch_with_prefill_cuda(
-                items, count, prefill_session, prefill_prompt, err, errlen);
-    }
-    if (ds4_sessions_eval_batch_with_prefill_metal_supported(
-                items, count, prefill_session, prefill_prompt)) {
-        return ds4_sessions_eval_batch_with_prefill_gpu(
                 items, count, prefill_session, prefill_prompt, err, errlen);
     }
 #endif

@@ -599,12 +599,12 @@ int ds4_tp_validate_engine_options(
         }
         return 1;
     }
-    bool supported_backend = opt->backend == DS4_BACKEND_METAL;
+    bool supported_backend = false;
 #if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
-    supported_backend |= opt->backend == DS4_BACKEND_CUDA;
+    supported_backend = opt->backend == DS4_BACKEND_CUDA;
 #endif
     if (!supported_backend) {
-        tp_set_err(err, errlen, "network tensor parallelism requires Metal or supported CUDA models");
+        tp_set_err(err, errlen, "network tensor parallelism requires the CUDA backend");
         return 0;
     }
     if (opt->backend == DS4_BACKEND_CUDA && (opt->cuda_tensor_parallel || opt->ssd_streaming)) {

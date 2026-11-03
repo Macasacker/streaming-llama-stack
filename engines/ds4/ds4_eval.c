@@ -1568,7 +1568,6 @@ static const char *need_arg(int *i, int argc, char **argv, const char *opt) {
 }
 
 static ds4_backend parse_backend(const char *s, const char *opt) {
-    if (!strcmp(s, "metal")) return DS4_BACKEND_METAL;
 #ifdef DS4_ROCM_BUILD
     if (!strcmp(s, "rocm")) return DS4_BACKEND_CUDA;
 #else
@@ -1577,9 +1576,9 @@ static ds4_backend parse_backend(const char *s, const char *opt) {
     if (!strcmp(s, "cpu")) return DS4_BACKEND_CPU;
     fprintf(stderr, "ds4-eval: invalid value for %s: %s\n", opt, s);
 #ifdef DS4_ROCM_BUILD
-    fprintf(stderr, "ds4-eval: valid backends are: metal, rocm, cpu\n");
+    fprintf(stderr, "ds4-eval: valid backends are: rocm, cpu\n");
 #else
-    fprintf(stderr, "ds4-eval: valid backends are: metal, cuda, cpu\n");
+    fprintf(stderr, "ds4-eval: valid backends are: cuda, cpu\n");
 #endif
     exit(2);
 }
@@ -1704,8 +1703,6 @@ static eval_config parse_options(int argc, char **argv) {
             c.threads = parse_int_arg(need_arg(&i, argc, argv, arg), arg);
         } else if (!strcmp(arg, "--backend")) {
             c.backend = parse_backend(need_arg(&i, argc, argv, arg), arg);
-        } else if (!strcmp(arg, "--metal")) {
-            c.backend = DS4_BACKEND_METAL;
 #ifdef DS4_ROCM_BUILD
         } else if (!strcmp(arg, "--rocm")) {
             c.backend = DS4_BACKEND_CUDA;

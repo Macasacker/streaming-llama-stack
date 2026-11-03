@@ -63,7 +63,8 @@ def main():
     lang = "c" if args.after.endswith((".c", ".h")) else "c++"
 
     with tempfile.NamedTemporaryFile("w", suffix=".i", delete=False) as f:
-        f.write(args.before if not mapping else rename(open(args.before).read(), mapping))
+        before_text = open(args.before).read()
+        f.write(before_text if not mapping else rename(before_text, mapping))
         before_path = f.name
     try:
         a = preprocess(args.cc, before_path, args.include, extra, lang).split("\n")

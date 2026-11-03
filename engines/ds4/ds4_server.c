@@ -10223,7 +10223,6 @@ struct server {
     pthread_mutex_t model_mu;
     pthread_cond_t model_cv;
     bool model_busy;
-    bool qwen4_batch_mtp;
     bool model_stopping;
     int decode_pending;
     int active_generations;
@@ -14964,14 +14963,6 @@ decode_again:
                 finish = "error";
                 break;
             }
-        } else if (!use_peer_decode && s->batched_mode && s->qwen4_batch_mtp &&
-                   max_tokens - completion >= 2 && !j->req.ignore_eos &&
-                   (!ds4_engine_mtp_exact_sampling(s->engine) || temperature == 0.0f) &&
-                   getenv("DS4_MTP_SPEC_DISABLE") == NULL) {
-            if (server_eval_tokens(s, slot, token, true, toks, &ntok, err, sizeof(err)) != 0) {
-                finish = "error";
-                break;
-            }
         } else {
             const int eval_rc = use_peer_decode ?
                 server_peer_decode_eval(s, slot, token, err, sizeof(err)) :
@@ -16702,7 +16693,6 @@ static void usage(FILE *fp, const char *topic) {
 }
 
 static ds4_backend parse_backend_arg(const char *s, const char *arg) {
-    if (!strcmp(s, "metal")) return DS4_BACKEND_METAL;
 #ifdef DS4_ROCM_BUILD
     if (!strcmp(s, "rocm")) return DS4_BACKEND_CUDA;
 #else
@@ -16711,9 +16701,9 @@ static ds4_backend parse_backend_arg(const char *s, const char *arg) {
     if (!strcmp(s, "cpu")) return DS4_BACKEND_CPU;
     server_log(DS4_LOG_DEFAULT, "ds4-server: invalid %s value: %s", arg, s);
 #ifdef DS4_ROCM_BUILD
-    server_log(DS4_LOG_DEFAULT, "ds4-server: valid server backends are: metal, rocm, cpu");
+    server_log(DS4_LOG_DEFAULT, "ds4-server: valid server backends are: rocm, cpu");
 #else
-    server_log(DS4_LOG_DEFAULT, "ds4-server: valid server backends are: metal, cuda, cpu");
+    server_log(DS4_LOG_DEFAULT, "ds4-server: valid server backends are: cuda, cpu");
 #endif
     exit(2);
 }
@@ -17082,8 +17072,6 @@ static server_config parse_options(int argc, char **argv) {
             directional_steering_scale_set = true;
         } else if (!strcmp(arg, "--warm-weights")) {
             c.engine.warm_weights = true;
-        } else if (!strcmp(arg, "--metal")) {
-            c.engine.backend = DS4_BACKEND_METAL;
 #ifdef DS4_ROCM_BUILD
         } else if (!strcmp(arg, "--rocm")) {
             c.engine.backend = DS4_BACKEND_CUDA;
@@ -17371,8 +17359,6 @@ int main(int argc, char **argv) {
     s.ctx_size = cfg.ctx_size;
     s.slot_count = slot_count;
     s.batched_mode = cfg.batched_sessions > 0;
-    s.qwen4_batch_mtp = cfg.engine.backend == DS4_BACKEND_METAL &&
-                       ds4_engine_is_qwen4(engine) && ds4_engine_mtp_draft_tokens(engine) > 1;
     s.mixed_prefill_quantum = cfg.mixed_prefill_quantum;
     s.last_prefill_slot = slot_count - 1;
     s.default_tokens = cfg.default_tokens;
@@ -17556,7 +17542,7 @@ int main(int argc, char **argv) {
                    server_prefill_quantum_for(&s, false),
                    server_prefill_quantum_for(&s, true),
                    server_decode_coalesce_us());
-        if (ds4_engine_mtp_draft_tokens(engine) > 1 && !s.qwen4_batch_mtp) {
+        if (ds4_engine_mtp_draft_tokens(engine) > 1) {
             server_log(DS4_LOG_DEFAULT,
                        "ds4-server: MTP speculative decoding is disabled while native session batching is active");
         }

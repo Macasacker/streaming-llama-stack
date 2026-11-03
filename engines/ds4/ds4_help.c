@@ -151,11 +151,11 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
         opt(fp, c, "--vision FILE", "Vision encoder GGUF for the selected model.");
     }
 #ifdef DS4_ROCM_BUILD
-    opt(fp, c, "--metal | --rocm | --cpu", "Select the backend explicitly.");
-    opt(fp, c, "--backend NAME", "Backend name: metal, rocm, or cpu.");
+    opt(fp, c, "--rocm | --cpu", "Select the backend explicitly.");
+    opt(fp, c, "--backend NAME", "Backend name: rocm, or cpu.");
 #else
-    opt(fp, c, "--metal | --cuda | --cpu", "Select the backend explicitly.");
-    opt(fp, c, "--backend NAME", "Backend name: metal, cuda, or cpu.");
+    opt(fp, c, "--cuda | --cpu", "Select the backend explicitly.");
+    opt(fp, c, "--backend NAME", "Backend name: cuda, or cpu.");
     opt(fp, c, "--gpu-vram N[,N,...]|auto", "CUDA VRAM budgets per device, in GiB, or auto-detect free VRAM.");
     opt(fp, c, "--gpu-devices N[,N,...]", "CUDA device indices used by multi-GPU placement.");
     if (tool != DS4_HELP_EVAL) {
@@ -191,7 +191,7 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
     opt(fp, c, "--ssd-streaming-cache-experts N|NGB", "SSD streaming cache target. N requests dynamic expert slots; NGB also reserves two full prefill layers. Either may be reduced to fit the model, graph, context, and backend working set.");
     opt(fp, c, "--ram-streaming-cache-experts N|NGB", "CUDA SSD streaming: cache routed experts in host RAM as expert count or GiB, e.g. 80GB, before falling back to SSD reads.");
     opt(fp, c, "--ram-streaming-cache-preload", "CUDA SSD streaming: preload the RAM expert cache at startup instead of warming it on first use.");
-    opt(fp, c, "--ssd-streaming-full-layers N", "GLM Metal streaming: keep the first N routed layers fully resident. Default: auto from NGB expert budget; use 0 to disable.");
+    opt(fp, c, "--ssd-streaming-full-layers N", "GLM SSD streaming: keep the first N routed layers fully resident. Only GLM graph streaming honours it; elsewhere the value is ignored.");
     opt(fp, c, "--ssd-streaming-preload-experts N", "SSD streaming: upfront popularity preload count. DeepSeek auto-seeds by default; GLM demand-fills unless N is explicit.");
     opt(fp, c, "--simulate-used-memory NGB", "Diagnostic: lock N GiB before model load to simulate a smaller-memory machine.");
     opt(fp, c, "--prefill-chunk N", "Graph prefill chunk size. Default: CUDA TP 2048; PRO long prompts 8192; others 4096.");
@@ -206,7 +206,7 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
             opt(fp, c, "--mtp-margin F", "Verifier confidence margin for fast MTP acceptance. Default: 3");
             opt(fp, c, "--mtp-timing", "Enable embedded MTP and print acceptance/timing counters.");
             opt(fp, c, "--dspark", "Enable DSpark using the support GGUF passed with --mtp-model.");
-            opt(fp, c, "--dspark-confidence F", "Enable DSpark with confidence pruning threshold 0..1. Greedy/opportunistic default: Metal 0.6, CUDA/ROCm 0.7; exact sampling: 0.8");
+            opt(fp, c, "--dspark-confidence F", "Enable DSpark with confidence pruning threshold 0..1. Greedy/opportunistic default: 0.7; exact sampling: 0.8");
             opt(fp, c, "--mtp-exact-sampling", "Preserve the ordinary temperature distribution instead of accepting target-matching greedy drafts directly.");
             opt(fp, c, "--dspark-strict", "Load DSpark support but keep target-only decode.");
         } else if (tool == DS4_HELP_BENCH) {
@@ -217,7 +217,7 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
         opt(fp, c, "--prefill-mode M", "accurate|fast|ultra: V4.1 CUDA prefill quality class (default: ultra arithmetic).");
         opt(fp, c, "--warm-weights", "Touch resident weights at startup to reduce first-use stalls.");
         if (tool == DS4_HELP_DS4 || tool == DS4_HELP_BENCH) {
-            opt(fp, c, "--expert-profile FILE", "Metal-only: write routed expert locality/cache simulation JSON.");
+            opt(fp, c, "--expert-profile FILE", "Routed expert locality/cache simulation JSON. Not implemented in this build; the value is ignored.");
         }
     }
     fputc('\n', fp);
@@ -303,18 +303,18 @@ static void print_cli_diagnostics(FILE *fp, const help_colors *c) {
     opt(fp, c, "--dump-logprobs FILE", "Write greedy continuation top-logprobs as JSON.");
     opt(fp, c, "--logprobs-top-k N", "Alternatives stored by --dump-logprobs. Default: 20");
     opt(fp, c, "--decode-consistency N", "Compare N-token decode logits with a fresh full prefill.");
-    opt(fp, c, "--expert-profile FILE", "Metal-only: write routed expert locality/cache simulation JSON.");
+    opt(fp, c, "--expert-profile FILE", "Routed expert locality/cache simulation JSON. Not implemented in this build; the value is ignored.");
     opt(fp, c, "--perplexity-file FILE", "Score raw text with teacher-forced NLL.");
-    opt(fp, c, "--imatrix-dataset FILE", "Rendered prompt dataset for imatrix collection.");
-    opt(fp, c, "--imatrix-out FILE", "Write llama-compatible routed-MoE imatrix .dat.");
-    opt(fp, c, "--imatrix-max-prompts N", "Stop imatrix collection after N prompts.");
-    opt(fp, c, "--imatrix-max-tokens N", "Stop imatrix collection after N prompt tokens.");
-    opt(fp, c, "--imatrix-min-expert-samples N", "Continue until every routed expert has N samples.");
+    opt(fp, c, "--imatrix-dataset FILE", "Not implemented in this build: routed-expert imatrix collection.");
+    opt(fp, c, "--imatrix-out FILE", "Not implemented in this build: routed-expert imatrix collection.");
+    opt(fp, c, "--imatrix-max-prompts N", "Ignored in this build: imatrix collection is not implemented.");
+    opt(fp, c, "--imatrix-max-tokens N", "Ignored in this build: imatrix collection is not implemented.");
+    opt(fp, c, "--imatrix-min-expert-samples N", "Ignored in this build: imatrix collection is not implemented.");
     opt(fp, c, "--head-test", "Run the output HC/logits head after the native slice.");
     opt(fp, c, "--first-token-test", "Run exact CPU whole-model pass for the first prompt token.");
-    opt(fp, c, "--metal-graph-test", "Compare first GPU-resident graph stages with CPU.");
-    opt(fp, c, "--metal-graph-full-test", "Run the GPU-resident self-token graph across all layers.");
-    opt(fp, c, "--metal-graph-prompt-test", "Compare CPU and GPU graph logits for the full prompt.");
+    opt(fp, c, "--gpu-graph-test", "Compare first GPU-resident graph stages with CPU.");
+    opt(fp, c, "--gpu-graph-full-test", "Run the GPU-resident self-token graph across all layers.");
+    opt(fp, c, "--gpu-graph-prompt-test", "Compare CPU and GPU graph logits for the full prompt.");
     fputc('\n', fp);
 }
 
@@ -520,7 +520,7 @@ static void print_examples(FILE *fp, const help_colors *c, ds4_help_tool tool, c
         opt(fp, c, "coordinator", "./ds4 --role coordinator --layers 0:20 --listen 0.0.0.0 9000 -p \"Hello\" -m ds4flash.gguf");
     } else if (topic_is(topic, "runtime")) {
         if (tool == DS4_HELP_SERVER) {
-            opt(fp, c, "Metal API", "./ds4-server -m ds4flash.gguf --metal --ctx 100000");
+            opt(fp, c, "CUDA API", "./ds4-server -m ds4flash.gguf --cuda --ctx 100000");
             opt(fp, c, "quiet API", "./ds4-server --power 60 --host 127.0.0.1 --port 8000");
         } else if (tool == DS4_HELP_AGENT) {
             opt(fp, c, "agent", "./ds4-agent -m ds4flash.gguf --ctx 100000");
@@ -532,7 +532,7 @@ static void print_examples(FILE *fp, const help_colors *c, ds4_help_tool tool, c
             opt(fp, c, "eval", "./ds4-eval --questions 10 --ctx 100000");
             opt(fp, c, "CPU debug", "./ds4-eval --cpu --questions 1 --tokens 32");
         } else {
-            opt(fp, c, "Metal", "./ds4 -m ds4flash.gguf --metal -c 100000");
+            opt(fp, c, "CUDA", "./ds4 -m ds4flash.gguf --cuda -c 100000");
             opt(fp, c, "quiet thermals", "./ds4 -p \"Summarize README\" --power 50");
         }
     } else if (topic_is(topic, "steering")) {

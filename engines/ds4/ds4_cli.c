@@ -218,7 +218,6 @@ static float parse_float_range(const char *s, const char *opt, float min, float 
 }
 
 static ds4_backend parse_backend(const char *s) {
-    if (!strcmp(s, "metal")) return DS4_BACKEND_METAL;
 #ifdef DS4_ROCM_BUILD
     if (!strcmp(s, "rocm")) return DS4_BACKEND_CUDA;
 #else
@@ -227,9 +226,9 @@ static ds4_backend parse_backend(const char *s) {
     if (!strcmp(s, "cpu")) return DS4_BACKEND_CPU;
     fprintf(stderr, "ds4: invalid backend: %s\n", s);
 #ifdef DS4_ROCM_BUILD
-    fprintf(stderr, "ds4: valid backends are: metal, rocm, cpu\n");
+    fprintf(stderr, "ds4: valid backends are: rocm, cpu\n");
 #else
-    fprintf(stderr, "ds4: valid backends are: metal, cuda, cpu\n");
+    fprintf(stderr, "ds4: valid backends are: cuda, cpu\n");
 #endif
     exit(2);
 }
@@ -2278,8 +2277,6 @@ static cli_config parse_options(int argc, char **argv) {
             c.engine.backend = parse_backend(need_arg(&i, argc, argv, arg));
         } else if (!strcmp(arg, "--cpu")) {
             c.engine.backend = DS4_BACKEND_CPU;
-        } else if (!strcmp(arg, "--metal")) {
-            c.engine.backend = DS4_BACKEND_METAL;
 #ifdef DS4_ROCM_BUILD
         } else if (!strcmp(arg, "--rocm")) {
             c.engine.backend = DS4_BACKEND_CUDA;
@@ -2305,11 +2302,11 @@ static cli_config parse_options(int argc, char **argv) {
             c.gen.decode_consistency_tokens = parse_int(need_arg(&i, argc, argv, arg), arg);
         } else if (!strcmp(arg, "--perplexity-file")) {
             c.gen.perplexity_file_path = need_arg(&i, argc, argv, arg);
-        } else if (!strcmp(arg, "--imatrix-dataset")) {
-            c.gen.imatrix_dataset_path = need_arg(&i, argc, argv, arg);
-        } else if (!strcmp(arg, "--imatrix-out")) {
-            c.gen.imatrix_output_path = need_arg(&i, argc, argv, arg);
-            c.engine.backend = DS4_BACKEND_METAL;
+        } else if (!strcmp(arg, "--imatrix-dataset") || !strcmp(arg, "--imatrix-out")) {
+            /* Routed-expert imatrix collection existed only on the deleted Metal
+             * backend. Refuse before the model is opened rather than after. */
+            fprintf(stderr, "ds4: imatrix collection is not implemented in this build\n");
+            exit(2);
         } else if (!strcmp(arg, "--imatrix-max-prompts")) {
             c.gen.imatrix_max_prompts = parse_int(need_arg(&i, argc, argv, arg), arg);
         } else if (!strcmp(arg, "--imatrix-max-tokens")) {
@@ -2332,30 +2329,12 @@ static cli_config parse_options(int argc, char **argv) {
             c.gen.head_test = true;
         } else if (!strcmp(arg, "--first-token-test")) {
             c.gen.first_token_test = true;
-        } else if (!strcmp(arg, "--metal-graph-test")) {
+        } else if (!strcmp(arg, "--gpu-graph-test")) {
             c.gen.gpu_graph_test = true;
-#ifdef DS4_ROCM_BUILD
-            c.engine.backend = DS4_BACKEND_CUDA;
-#else
-            c.engine.backend = DS4_BACKEND_METAL;
-#endif
-        } else if (!strcmp(arg, "--metal-graph-full-test")) {
+        } else if (!strcmp(arg, "--gpu-graph-full-test")) {
             c.gen.gpu_graph_full_test = true;
-#ifdef DS4_ROCM_BUILD
-            c.engine.backend = DS4_BACKEND_CUDA;
-#else
-            c.engine.backend = DS4_BACKEND_METAL;
-#endif
-        } else if (!strcmp(arg, "--metal-graph-prompt-test")) {
+        } else if (!strcmp(arg, "--gpu-graph-prompt-test")) {
             c.gen.gpu_graph_prompt_test = true;
-#ifdef DS4_ROCM_BUILD
-            c.engine.backend = DS4_BACKEND_CUDA;
-#else
-            c.engine.backend = DS4_BACKEND_METAL;
-#endif
-        } else if (!strcmp(arg, "--metal-graph-generate")) {
-            fprintf(stderr, "ds4: --metal-graph-generate was removed; --metal is the graph path\n");
-            exit(2);
         } else if (!strcmp(arg, "--inspect")) {
             c.inspect = true;
         } else if (!strcmp(arg, "--warm-weights")) {
@@ -2372,14 +2351,6 @@ static cli_config parse_options(int argc, char **argv) {
 
     if (c.engine.directional_steering_file && !directional_steering_scale_set) {
         c.engine.directional_steering_ffn = 1.0f;
-    }
-    if (c.gen.imatrix_output_path && !c.gen.imatrix_dataset_path) {
-        fprintf(stderr, "ds4: --imatrix-out requires --imatrix-dataset\n");
-        exit(2);
-    }
-    if (c.gen.imatrix_dataset_path && !c.gen.imatrix_output_path) {
-        fprintf(stderr, "ds4: --imatrix-dataset requires --imatrix-out\n");
-        exit(2);
     }
     if (c.gen.imatrix_min_expert_samples < 0) {
         fprintf(stderr, "ds4: --imatrix-min-expert-samples must not be negative\n");
@@ -2573,14 +2544,6 @@ int main(int argc, char **argv) {
     int rc = 0;
     if (cfg.inspect) {
         ds4_engine_summary(engine);
-    } else if (cfg.gen.imatrix_output_path) {
-        rc = ds4_engine_collect_imatrix(engine,
-                                        cfg.gen.imatrix_dataset_path,
-                                        cfg.gen.imatrix_output_path,
-                                        cfg.gen.ctx_size,
-                                        cfg.gen.imatrix_max_prompts,
-                                        cfg.gen.imatrix_max_tokens,
-                                        cfg.gen.imatrix_min_expert_samples);
     } else if (cfg.gen.perplexity_file_path) {
         rc = run_perplexity_file(engine, &cfg);
     } else if (cfg.gen.prompt == NULL) {

@@ -36,13 +36,14 @@ class Unparsable(Exception):
 
 
 class Evaluator:
-    def __init__(self, scope):
+    def __init__(self, scope, never_defined=()):
         self.scope = scope          # macros this tool is allowed to reason about
+        self.never_defined = set(never_defined)   # macros this build never defines
 
     def value(self, name):
         if name in TRUE_PLATFORM:
             return T
-        if name in FALSE_PLATFORM:
+        if name in FALSE_PLATFORM or name in self.never_defined:
             return F
         return U
 
@@ -126,7 +127,11 @@ class Evaluator:
                 out = re.sub(r"\s*&&\s*!\s*defined\s*\(\s*" + name + r"\s*\)", "", out)
                 out = re.sub(r"!\s*defined\s*\(\s*" + name + r"\s*\)\s*&&\s*", "", out)
             if re.fullmatch(r"\s*!?\s*defined\s*\(\s*" + name + r"\s*\)\s*", out):
-                return ""
+                # Collapsing the whole expression to a constant is only allowed when the
+                # macro's value is known. An in-scope macro the tool knows nothing about
+                # stays unknown; guessing LIVE here would delete the live #else branch.
+                if self.value(name) is not U:
+                    return ""
         return out.strip()
 
     def decide(self, expr):
@@ -266,8 +271,8 @@ def plan_node(ev, scope, node, plans, blocked):
         plans.append((b["dir"], b["bend"], "drop-unreachable-branch", b["expr"].strip()))
 
 
-def process(path, tokens, apply):
-    ev = Evaluator(tokens)
+def process(path, tokens, never_defined, apply):
+    ev = Evaluator(tokens, never_defined)
     lines, root = parse(path)
     plans, blocked = [], []
     for child in root["children"]:
@@ -291,12 +296,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tokens", default="_WIN32,windows.h,Win32,DStorage,IoRing",
                     help="comma-separated macros/headers this sweep targets")
+    ap.add_argument("--never-defined", default="",
+                    help="comma-separated macros this build never defines, treated as false")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("files", nargs="+")
     args = ap.parse_args()
     scope = [t for t in args.tokens.split(",") if t]
+    dead = [t for t in args.never_defined.split(",") if t]
     for path in args.files:
-        kinds, blocked = process(path, scope, args.apply)
+        kinds, blocked = process(path, scope, dead, args.apply)
         print(f"{path}: {kinds or 'no edits'}, {len(blocked)} blocked")
         for line, why, expr in blocked[:40]:
             print(f"   BLOCKED {line}: {why} :: {expr[:80]}")
