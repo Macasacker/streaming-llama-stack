@@ -320,10 +320,15 @@ tools   54 refs: dsv41-prefill/main.cpp (windows.h, bcrypt.h, dxgi1_4.h), produc
 2. Done (3.1e). `llama-wf-gpu-ring.inl`, the DStorage interop and the `ds_gpu_ring_slots`
    parameter deleted; `--ds-gpu-ring-slots` is gone from the producer rather than faked.
 3. Open. Port `llama-dsv41-engram-prefetch.cpp` to io_uring with 1 MiB extents at QD64, and measure
-   it against the `pread` baseline separately. That change is what took 76.2 s to 43.2 s.
-4. Open. Replace the provider lease and the Windows throws in `llama-dsv41-weights.cpp` - eight of
-   them remain on Linux, and they are what still stops a prefill (`:632`, `:924`, `:1001`, `:1164`,
-   `:1283`, `:1323`, `:1399`, `:1517`).
+   it against the `pread` baseline separately. That change is what took 76.2 s to 43.2 s. Its
+   `prepare_early` row planner (the hash-to-extent work, the admission arena and the prior-cache row
+   copy) is platform-neutral code inside `#ifdef _WIN32` and is the bulk of the port; the rings are
+   the smaller half. `load_early`/`load` take a `const wchar_t*` path and a Windows handle - change
+   them to a path and an fd, which is what the provider's lease now holds.
+4. Done except the Engram arms (3.1f). The provider's physical lease, `inspect`, `create_pipeline`,
+   `acquire_layer_experts` and `configure_host_cache` are Linux. The three refusals that remain are
+   the Engram early-loader arms (`launch_early`, `start_engram_prompt_early`, and the synchronous
+   load in `prepare_engram_prompt`), which cannot be written before 3.1g ports the loader they call.
 5. Open. Replace `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`. This is
    the locked-memory decision (`mlock` needs an `RLIMIT_MEMLOCK` or cgroup allowance) and it also
    gates the decode library's host-cache path.
@@ -795,22 +800,72 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `io_uring_wait_cqe` does not return `-EINTR` on this kernel: it blocked through a 20 s timeout,
     so that path is defensive rather than a bug fixed.
 
+3.1f The weight provider's lease, pipeline and named extents. Done (`3afcd91`, `1e4cf01`, and the
+    review follow-up). Phase 3 items 4 and the extent half of 5. The decision the chunk was asked to
+    make - do `wf_fetch_extents_direct` and `wf_ready_direct_bank` become io_uring reads or go away -
+    came out as reads: an extent batch is split into parts, read through io_uring (or the `pread`
+    baseline) into a pinned window of four 8 MiB slots, and uploaded into the named bank. With a
+    caller stream the uploads go on that stream, so they are ordered after the compute queued on it;
+    the tail-hint worker uploads on the fetcher's copy stream and publishes one `cudaEvent` per
+    batch, waited on by fence. `wf_ready_direct_bank` had nothing to report because the generation
+    was only ever published by the deleted queue, so the relay publishes one where a stage reaches
+    `GPU_READY` (both sites) and never reuses it. Extents are bounds-checked against their file and
+    their bank before any byte is written, and a negative or short completion poisons the fetcher.
+    The reader is CUDA-optional: without a CUDA build the banks are host buffers and the upload is a
+    `memcpy`, which is how `docs/evidence/wf-extent-selftest.cpp` drives it with no VRAM free.
+
+    The lease is `open(O_RDONLY|O_NOFOLLOW)` on the file the receipt names, opened relative to the
+    pinned parent (`openat`), with the ancestor descriptors rebound to their names by `identity()`,
+    which runs around every file operation. `identity()` compares `st_dev`, the 8-byte little-endian
+    `st_ino` in the 16-byte receipt field, `st_size`, `st_mtime` in Unix ns, `S_ISREG` and
+    `st_nlink==1` - exactly the four keys `slstack/native_broker.py` writes. `DRIVE_FIXED` and
+    `QueryDosDeviceW` became a `statfs` refusal of network and RAM-backed types; a reparse point is
+    refused at open; the sector-alignment probe went with `FILE_FLAG_NO_BUFFERING`, and the Engram
+    row extent keeps its 4 KiB alignment so a row sees identical bytes.
+
+    Behaviour changes, all deliberate: the strict create (`wf_create_required_dstorage`, always a
+    refusal here) is `wf_create_required_streaming` and means the exact typed relay - bounded
+    staging, async copy ordering, an explicit pinned tier, no ambient tuning, no expert cache or
+    relay prefetch buffer - so `required_dstorage` became `strict_streaming` with its eleven
+    behaviour branches unchanged; the provider passes `WF_MODE_DIRECT_IO` explicitly (not `AUTO`,
+    which could resolve to GDS and register the fetcher's allocations before its bank pointers are
+    replaced) and `io_direct=false` (buffered reads never round a chunk up, so the fetcher's banks
+    are exactly the admitted `compute_buffer_bytes`); admission moved - the pinned host staging tier
+    (`(buffers+1)` banks) and the 32 MiB extent window are charged to the host plan and the GPU-side
+    staging term left the device plan, so a launch recipe needs a larger
+    `--provider-host-bytes` than the Windows one; `--fetch-profile baseline` is refused while
+    inspecting instead of at pipeline creation; `acquire()` gained a guard that a stage landed in
+    the bank its regions were planned in, because the extents name regions of that bank; and
+    `--ds-submit-threads` and `--ds-zero-padding-only` are unknown producer options now, with their
+    `wf_params` fields, config fields, receipt keys and the stale `tools/slstack-weight-fetcher.def`
+    export list. `wf_extent_fetch_stats`'s submit/fence/verify fields stay 0 and say so, so the
+    `LLAMADECODE_DS4X_TOKEN` line keeps its shape.
+
+    What the review of this chunk caught, and what it did not: `io_uring_wait_cqe()` does not flush
+    the submission queue on this kernel and liburing 2.15, and `io_uring_submit()` can return 0
+    without being an error, so both io_uring readers now wait through `io_uring_submit_and_wait()`
+    - `docs/evidence/uring-flush-probe.cpp` demonstrates the two halves of that claim. The review's
+    other four findings were checked against the tree and were not real: `direct_generation` is
+    published in the GDS arm too, so a tail hint cannot see generation 0; a layout switch rebuilds
+    the fetcher, so a YOCO skip mask cannot carry over into the decode layout; the provider's host
+    plan, which now carries the staging tier and the extent window, is what
+    `llama-dsv41-sweep.cpp`'s combined host budget sums; and a stale or zero ready-batch generation
+    refuses without poisoning.
+
 3.1 Streaming producer on Linux. What is left of Phase 3 is still a port, not a sweep.
-    Port `llama-dsv41-engram-prefetch.cpp`; replace the provider lease and the eight Linux
-    refusals in `src/llama-dsv41-weights.cpp` (`:632`, `:924`, `:1001`, `:1164`, `:1283`,
-    `:1323`, `:1399`, `:1517`), which are what still stop a prefill; replace
-    `llama-dsv41-locked-ram.h` and the carry lease; then the Win32 host code in `mtmd`,
-    `server` and `decode-receiver`.
+    Port `llama-dsv41-engram-prefetch.cpp` (3.1g), which also opens the provider's three Engram
+    arms; decide the locked-memory mechanism and replace `llama-dsv41-locked-ram.h` and the carry
+    lease; then the Win32 host code in `mtmd`, `server` and `decode-receiver`.
     Gate: a 262K prefill, which needs a qualified GGUF on this box (see the machine facts).
     Findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
     file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk
-    5.1's `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; the fetcher is
-    now io_uring-backed and Win32-free (3.1e), but its `wf_fetch_extents_direct` family still
-    refuses, so the provider's extent paths have no Linux transport until 3.1f decides whether
-    they become io_uring reads or go away; `params.ds_submit_threads` no longer has a reader in
-    the fetcher, so the producer's `--ds-submit-threads` is admission-only; and
+    5.1's `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; and
     `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py` mirrors `wf_params` by ctypes
-    field order, which the ring deletion shifted - that module is Phase 6's to delete.
+    field order, which the 3.1e and 3.1f deletions shifted - that module is Phase 6's to delete.
+    Two things need re-running when the GPU has headroom: `docs/evidence/wf-io-selftest.cpp`
+    already passes, and the CUDA arms of the extent reader (`docs/linux-port-commands.md` has the
+    link line) have never executed - a `ggml` CUDA backend wants about 700 MB past what Strata and
+    the browser leave.
 
 3.2 Producer decode library wiring. Done as part of 3.1c, because `live-session.inc` is part of
     `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable in place of
@@ -893,8 +948,9 @@ inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifi
 matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill` and in
-`src/llama-weight-fetcher.{cpp,h}`: 0 (chunks 3.1d and 3.1e). The repo-wide pattern above now
-counts 645. The rest of the producer tree is still Windows-shaped: 21 files under `src/`, 6 under
+`src/llama-weight-fetcher.{cpp,h}`: 0 (chunks 3.1d and 3.1e). `src/llama-dsv41-weights.cpp` is down
+to its three Engram early-loader arms, which chunk 3.1g owns. The repo-wide pattern above now
+counts 633. The rest of the producer tree is still Windows-shaped: 17 files under `src/`, 6 under
 `common/`, 4 under `tools/mtmd`, 3 under `tools/server`, 1 under `tools/decode-receiver`, plus the
 ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 

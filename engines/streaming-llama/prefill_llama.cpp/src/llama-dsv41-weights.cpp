@@ -636,8 +636,30 @@ struct llama_dsv41_weight_provider::implementation {
     int engram_file=-1;
     uint8_t *engram_page=nullptr;
     std::vector<int>parents;
+    std::vector<std::filesystem::path>parent_names;
     std::filesystem::path path;
+    // Each held descriptor is rebound to the named directory before any open or
+    // row read, so a swapped component cannot point the lease, or the row
+    // reader's second open, at another directory that happens to hold the name.
+    // The producer's own file layer does the same around every file operation.
+    void parents_ok()const{
+        for(size_t i=0;i<parents.size();++i){
+            struct stat held{},named{};
+            require(fstat(parents[i],&held)==0&&S_ISDIR(held.st_mode),"Held model ancestor changed");
+            const int probe=::open(parent_names[i].c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+            const bool valid=probe>=0&&fstat(probe,&named)==0&&S_ISDIR(named.st_mode)&&
+                held.st_dev==named.st_dev&&held.st_ino==named.st_ino;
+            if(probe>=0)::close(probe);
+            require(valid,"Named model ancestor identity changed");
+        }
+    }
+    // Relative to the pinned parent directory, never by the nameable path.
+    int open_on_parent(const std::filesystem::path&name)const{
+        require(!parents.empty(),"Model lease has no pinned parent directory");
+        return ::openat(parents.back(),name.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
+    }
     void identity()const{
+        parents_ok();
         struct stat st{};
         require(file>=0&&fstat(file,&st)==0,"Cannot inspect verified model lease");
         require(S_ISREG(st.st_mode)&&st.st_nlink==1&&st.st_size>=0,"Model must be a physical single-link ordinary file");
@@ -968,8 +990,29 @@ llama_dsv41_weight_provider&llama_dsv41_weight_provider::operator=(llama_dsv41_w
 
 bool llama_dsv41_weight_provider::inspect(const config&options,std::string&error){return p->guard([&]{
     require(!p->inspected&&!p->allocated,"Weight provider cannot reopen");
+    p->options=options;
+    // The physical lease is the provider's trust anchor, so it is taken and
+    // checked before anything about the device: a caller with no backend at all
+    // still learns that the file is not the one its receipt describes.
+    require(options.verified_sha256.size()==64&&options.verified_sha256.find_first_not_of("0123456789abcdef")==std::string::npos&&options.verified_file_bytes>0,"Completed file SHA256/identity receipt required");
+    p->path=std::filesystem::path(options.model_path);
+    require(p->path.is_absolute()&&p->path==p->path.lexically_normal()&&p->path.has_filename(),"Model path must be a physical absolute file");
+    require_local_volume(p->path);
+    std::vector<std::filesystem::path>chain;for(auto d=p->path.parent_path();;d=d.parent_path()){chain.push_back(d);if(d==d.root_path())break;}
+    std::reverse(chain.begin(),chain.end());
+    // O_NOFOLLOW refuses a symlinked ancestor, which is what the reparse-point
+    // attribute check refused; each held descriptor is rebound to the named path
+    // by identity(), which runs around every file operation.
+    for(const auto&d:chain){
+        const int handle=::open(d.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+        require(handle>=0,"Cannot pin model directory");p->parents.push_back(handle);p->parent_names.push_back(d);
+        struct stat st{};require(fstat(handle,&st)==0&&S_ISDIR(st.st_mode),"Model ancestor is not a physical directory");
+    }
+    p->parents_ok();
+    p->file=p->open_on_parent(p->path.filename());
+    require(p->file>=0,"Cannot acquire read-only verified model lease");p->identity();
 #ifndef GGML_USE_CUDA
-    (void)options;throw std::runtime_error("V4.1 physical weight provider requires a CUDA backend");
+    throw std::runtime_error("V4.1 physical weight provider requires a CUDA backend");
 #else
     require(options.backend&&options.buffers>=1&&options.buffers<=2,"Invalid physical weight backend/buffer admission");
     // The strict relay needs one of the typed profiles: an auto request size and
@@ -985,27 +1028,11 @@ bool llama_dsv41_weight_provider::inspect(const config&options,std::string&error
         "Direct compute requires two typed async banks");
     require(!std::getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY"),"Unified CUDA memory is outside strict physical weight admission (including env value zero)");
     require(ggml_backend_is_cuda(options.backend),"V4.1 physical provider requires an actual CUDA backend");
-    require(options.verified_sha256.size()==64&&options.verified_sha256.find_first_not_of("0123456789abcdef")==std::string::npos&&options.verified_file_bytes>0,"Completed file SHA256/identity receipt required");
     const char*device=ggml_backend_dev_description(ggml_backend_get_device(options.backend));
     require(device&&*device,"V4.1 streaming producer requires the explicitly admitted CUDA backend");
     const char*tail=std::getenv("LLAMADECODE_CONE_TAIL_PREFETCH");
     require(!tail||!std::strcmp(tail,"0")||!std::strcmp(tail,"1"),"LLAMADECODE_CONE_TAIL_PREFETCH must be0 or1");
     p->tail_prefetch=tail&&!std::strcmp(tail,"1");
-    p->options=options;p->path=std::filesystem::path(options.model_path);
-    require(p->path.is_absolute()&&p->path==p->path.lexically_normal()&&p->path.has_filename(),"Model path must be a physical absolute file");
-    require_local_volume(p->path);
-    std::vector<std::filesystem::path>chain;for(auto d=p->path.parent_path();;d=d.parent_path()){chain.push_back(d);if(d==d.root_path())break;}
-    std::reverse(chain.begin(),chain.end());
-    // O_NOFOLLOW refuses a symlinked ancestor, which is what the reparse-point
-    // attribute check refused; each held descriptor is rebound to the named path
-    // by identity(), which runs around every file operation.
-    for(const auto&d:chain){
-        const int handle=::open(d.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-        require(handle>=0,"Cannot pin model directory");p->parents.push_back(handle);
-        struct stat st{};require(fstat(handle,&st)==0&&S_ISDIR(st.st_mode),"Model ancestor is not a physical directory");
-    }
-    p->file=::open(p->path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
-    require(p->file>=0,"Cannot acquire read-only verified model lease");p->identity();
     ggml_context*raw=nullptr;p->gguf.reset(gguf_init_from_file(options.model_path.c_str(),{true,&raw}));p->tensors.reset(raw);
     require(p->gguf&&p->tensors&&gguf_get_data_offset(p->gguf.get())<=8*mib&&gguf_get_n_tensors(p->gguf.get())<=2048,"Native GGUF metadata exceeds inspected original limits");
     p->identity();p->metadata();p->plan_weights();p->inspected=true;
@@ -1015,7 +1042,7 @@ bool llama_dsv41_weight_provider::inspect(const config&options,std::string&error
     // be block-aligned; the reads here are buffered, so neither is required and
     // GetDiskFreeSpaceW has no Linux twin.
     p->engram_page=static_cast<uint8_t*>(std::aligned_alloc(4096,8192));require(p->engram_page,"Cannot allocate bounded Engram row page");
-    p->engram_file=::open(p->path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
+    p->engram_file=p->open_on_parent(p->path.filename());
     require(p->engram_file>=0,"Cannot open the original Engram tables for row reads");
     struct stat original{},direct{};require(fstat(p->file,&original)==0&&fstat(p->engram_file,&direct)==0&&
         original.st_dev==direct.st_dev&&original.st_ino==direct.st_ino&&original.st_size==direct.st_size,
@@ -1079,6 +1106,13 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     // by default). With io_direct false the reader never rounds a chunk up, so the
     // fetcher's banks are exactly the admitted compute_buffer_bytes.
     params.io_direct=false;
+    // Named, not inherited: the relay must be at least one stage ahead in bank
+    // assignment for a stage to land in bank id%2 (the bank its regions, and the
+    // extents the provider writes later, are planned in). With the consumer
+    // releasing each stage before the next is requested and the relay only one
+    // stage deep, both banks are free at that moment and the first-free scan puts
+    // an odd stage in bank 0 - which acquire()'s guard then refuses.
+    params.prefetch_depth=3;
     p->fetcher=wf_create_required_streaming(&params);require(p->fetcher,"Required original weight stream initialization failed");
     p->allocated=true; // All subsequent failures must synchronize before free.
     for(uint32_t i=0;i<p->options.buffers;++i){

@@ -1146,6 +1146,14 @@ static void wf_io_uring_worker(wf_context * wf, int thread_id) {
 
         if (inflight > 0) {
             struct io_uring_cqe * cqe = nullptr;
+            // Submit and wait in one enter. io_uring_wait_cqe() does not flush the
+            // submission queue on this liburing - a queued read that was never
+            // submitted never completes - and io_uring_submit() can legitimately
+            // return 0, which would leave the queued reads unseen forever.
+            if (io_uring_submit_and_wait(&ring, 1) < 0) {
+                settle("io_uring_submit_and_wait failed");
+                break;
+            }
             const int waited = io_uring_wait_cqe(&ring, &cqe);
             if (waited != 0) {
                 settle("io_uring_wait_cqe failed");
@@ -3610,6 +3618,10 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
         if (overlap) overlap(overlap_user);                     // host work while reads are in flight
         while (done < parts.size()) {
             struct io_uring_cqe * cqe = nullptr;
+            // Submit and wait in one enter: io_uring_wait_cqe() does not flush the
+            // submission queue on this liburing, and io_uring_submit() can return
+            // 0 without an error, which would leave queued reads unseen.
+            if (io_uring_submit_and_wait(ring, 1) < 0) { wf_extent_fail(wf, "io_uring_submit_and_wait failed"); return false; }
             if (io_uring_wait_cqe(ring, &cqe) != 0) { wf_extent_fail(wf, "io_uring_wait_cqe failed"); return false; }
             const size_t which = size_t(reinterpret_cast<uintptr_t>(io_uring_cqe_get_data(cqe)));
             const long res = cqe->res;

@@ -165,6 +165,23 @@ int main(void) {
           bank_matches(wf, 0, extents[2].bank_offset, extents[2].file_offset, extents[2].nbytes, file));
     check("the relay's own stage bytes survived the extent write", bank_matches(wf, 0, 0, 0, 1u << 20, file));
 
+    // More parts than the window has slots, so slot recycling, the user_data to
+    // part mapping and the completion accounting are all exercised.
+    {
+        const size_t capacity = wf_get_gpu_buf_capacity(wf);
+        std::vector<wf_extent> many;
+        for (int i = 0; i < 7; i++)            // seven parts against four slots
+            many.push_back({uint64_t(2u << 20) + uint64_t(i) * (3u << 20),
+                            uint64_t(1u << 20) + uint64_t(i) * (3u << 20), uint64_t(3u << 20), 0});
+        uint64_t n = 0; double m = 0;
+        const bool ok = wf_fetch_extents_direct(wf, 0, many.data(), int(many.size()), nullptr, &n, &m);
+        bool placed = ok && n == uint64_t(many.size()) * (3u << 20);
+        for (const auto & e : many)
+            placed = placed && bank_matches(wf, 0, e.bank_offset, e.file_offset, e.nbytes, file);
+        check("a batch larger than the staging window recycles its slots and lands every byte",
+              placed && !wf_has_failed(wf) && uint64_t(many.size()) * (3u << 20) + (1u << 20) <= capacity);
+    }
+
     // The overlap hook runs while the first reads are in flight.
     {
         // Reuse the region the second extent wrote: the hook is the point of the

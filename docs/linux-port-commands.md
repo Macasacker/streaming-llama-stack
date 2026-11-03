@@ -206,6 +206,23 @@ backend costs, so they run when the GPU has it: link the same program against
 `ninja -C build/llama src/libllama.a` first) and the `libggml-cuda.a` set, as in
 the io_uring section above.
 
+### Does the io_uring wait flush the submission queue?
+
+Both of the producer's io_uring readers queue reads and then wait for their
+completions, and `io_uring_submit()` can return 0 without being an error. On this
+kernel and liburing 2.15, `io_uring_wait_cqe()` does **not** flush entries the
+kernel has not been told about, so a zero return would leave a layer's reads
+unseen forever - the pipeline polls with a timeout, so it would read as a stall.
+Both readers therefore wait through `io_uring_submit_and_wait()`. The probe that
+established this is committed at `docs/evidence/uring-flush-probe.cpp`:
+
+```bash
+cp docs/evidence/uring-flush-probe.cpp build/
+g++ -std=gnu++17 -O1 -o build/uring-flush-probe build/uring-flush-probe.cpp -luring
+./build/uring-flush-probe    # 3 checks: a queued read with no submit has no
+                             # completion; submit-and-wait delivers it
+```
+
 ### Driving the real producer with no model
 
 A throwaway 1 MiB file, a copy receipt naming it and four LE32 tokens take the CLI

@@ -10,25 +10,29 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-Phase 3's producer CLI and its weight fetcher are now Linux: the CLI compiles, links, runs, and
-the fetcher reads through io_uring rings with no Win32 code in its file. What remains of Phase 3 is
-deeper in the tree, and it is a port, not a sweep. In the order worth doing:
+Phase 3's producer CLI, its weight fetcher and its native weight provider are now Linux: the
+provider holds a POSIX lease on the verified model file, builds the bounded relay, acquires stages
+in alternating banks, writes named file extents into a compute bank, and admits its RAM expert tier
+from `/proc`. A streamed prefill still needs the Engram row loader, and the gate itself needs a
+qualified GGUF. In the order worth doing:
 
-1. **Chunk 3.1f - the weight provider, and then the prefill works.** `src/llama-dsv41-weights.cpp`
-   refuses on Linux at eight sites (`:632`, `:924`, `:1001`, `:1164`, `:1283`, `:1323`, `:1399`,
-   `:1517`): the physical file lease (`implementation::identity()`), `inspect`, `create_pipeline`,
-   the three early/whole-prompt Engram IoRing loaders, the expert cache and the RAM host cache.
-   These are what still stop a prefill after the CLI itself runs. `create_pipeline` asks the
-   fetcher for `wf_create_required_dstorage`, which refuses here, and the provider's extent paths
-   call `wf_fetch_extents_direct` / `wf_ready_direct_bank`, whose Linux arms `return false` - so
-   3.1f decides whether those become io_uring reads against the fetcher's ring or go away. Note
-   that `params.ds_submit_threads` has no reader in the fetcher any more, so `--ds-submit-threads`
-   is admission-only. `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp` are
-   the same family, and they need the locked-memory decision below before they can be written.
-2. **Chunk 3.1g - `llama-dsv41-engram-prefetch.cpp` (Phase 3 item 3).** io_uring with 1 MiB extents
-   at QD64, measured against the `pread` baseline; that change is what took 76.2 s to 43.2 s on the
-   Windows machine. `LLAMA_WF_IO_URING=0` now selects the fetcher's pread baseline, which is the
-   comparison Phase 8 item 3 asks for.
+1. **Chunk 3.1g - `llama-dsv41-engram-prefetch.cpp` (Phase 3 item 3), and with it the provider's
+   three Engram arms.** All 630 lines of the implementation, including the platform-neutral row
+   planner (hash to row ids, extents, the admission arena, the prior-cache row copy), sit inside
+   `#ifdef _WIN32`: IoRing rings at QD64 over 1 MiB extents, registered files and buffers, a slot
+   table, table-0-before-table-1 publication, and cancellation. io_uring measured against the
+   `pread` baseline is Phase 8 item 3's comparison, and the 76.2 s to 43.2 s figure came from this
+   change on the Windows machine. `load_early()` and `load()` take a `const wchar_t*` and a Windows
+   `HANDLE`; the provider's lease holds an `int fd` and a `std::filesystem::path`, so change the
+   signature in this file rather than adapting at the call site. Nothing else in the Engram family
+   needs porting - `llama-dsv41-engram.{h,cpp}`, `llama-dsv41-engram-row-cache.h` and
+   `llama-dsv41-engram-early-decision.h` are already Win32-free - so opening `launch_early`,
+   `start_engram_prompt_early` and the synchronous load in `prepare_engram_prompt` is the last
+   thing between this tree and a prefill attempt.
+2. **Chunk 3.1h - the locked-memory decision, then `llama-dsv41-locked-ram.h` and the carry lease in
+   `llama-dsv41-carry.cpp`** (Phase 3 item 5). They are the same family, and neither can be written
+   before the decision below: `mlock` of a pinned tier needs an `RLIMIT_MEMLOCK` or a cgroup
+   allowance, and `host_memory::begin()` deliberately does not solve it.
 3. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
    `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
    profiler. No behaviour attached; regenerate the env table because lines move.
@@ -45,35 +49,44 @@ verified by the selftest; a live session against weights is not, and cannot be h
 
 `git log --oneline` from `58ff877` forward is the port, chunk by chunk; `docs/linux-port-plan.md`
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
-`7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` + `1325655` (3.1e), plus the plan/handoff commits. `git status -sb` shows no `[ahead N]` after pushing; check
-it rather than assuming.
+`7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` +
+`1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), plus the plan/handoff commits. `git status -sb`
+shows no `[ahead N]` after pushing; check it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
 reports 0 findings, so commits need no `--no-verify` (`core.hooksPath` runs it as a pre-commit
-hook). Python suite: **584 tests, 6 failures, 5 errors** (fork baseline 585 / 6 / 6), and the
+hook). Python suite: **584 tests, 5-6 failures, 5 errors** (fork baseline 585 / 6 / 6), and the
 failing *names* are the plan's list - `test_combo_process` (3), `test_journal_recovery_flags`,
 `test_single_liveness`, `test_shared_guard_adapter` (Windows-only guard and producer paths),
 `test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco` (missing `cosmos_windows` module),
-`test_h3_video_delivery` (video gate). Process tests flip between runs - the parent commit's full
-run showed 7 failures / 6 errors, and the two extra names
-(`test_actual_shared_guard_executes_the_nested_command`,
-`test_native_startup_accepts_lora_before_help_without_loading_weights`) pass when their file is run
-alone. Compare the set of names, never the counts. Chunk 5.1 and 8.1 own the survivors.
+`test_h3_video_delivery` (video gate). Process tests flip between runs - `test_combo_single_stop`
+and `test_real_owned_child_stops_on_kit11_hold` pass or fail depending on the run. Compare the set
+of names, never the counts. Chunk 5.1 and 8.1 own the survivors.
 
-Nothing verified so far is a performance result for a model. The only measurement is the fetcher's
-host read comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring 24 ms vs pread 32 ms for 64 MiB
-across 218 ops, four threads at QD8, one NVMe, cold cache) - it isolates the reader, not a prefill.
-No supported model weights exist on this box.
+Three hand-compiled programs cover what has no test target, all passing on this tree:
+`docs/evidence/platform-selftest.cpp` (44 checks, the producer's file/hash/VRAM layer),
+`docs/evidence/wf-io-selftest.cpp` (139 checks, the fetcher's relay through the real `wf_*`
+pipeline), and `docs/evidence/wf-extent-selftest.cpp` (32 checks, the strict extent reader).
+`docs/linux-port-commands.md` has the exact compile lines.
+
+Nothing verified so far is a performance result for a model. The measurements are the fetcher's
+reader comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring x1.04 at four threads, x1.44-x1.67
+at one, 64 MiB across 218 ops, one NVMe, cold cache) - it isolates the reader, not a prefill. No
+supported model weights exist on this box.
 
 ## Constraints on this box
 
-1. A Strata serve process (`qwen38-gyro/Strata/build/strata --serve ...`) holds ~30.0 GiB of
-   32 GiB VRAM. **Its pid changes between sessions and even within one** - read it from
+1. A Strata serve process (`qwen38-gyro/Strata/build/strata --serve ...`) holds ~29.9 GiB of
+   32 GiB VRAM, and the user's browser GPU process holds another 170-320 MB. **Both pids change
+   between sessions and even within one** - read them from
    `nvidia-smi --query-compute-apps=pid,used_memory`. Stopping Strata also stops this assistant, so
    GPU work is the user's to run by hand. Never kill it to test. Host-only gates work;
-   `llama-server --version` and the producer's CUDA-enumeration path both initialised a context
-   (~160 MB) without disturbing it, and NVML queries (`nvmlDeviceGetMemoryInfo`) are read-only.
-   Anything that allocates device memory is still the user's call.
+   `llama-server --version`, the producer's CUDA-enumeration path and the fetcher selftests all
+   initialised a context without disturbing it, and NVML queries (`nvmlDeviceGetMemoryInfo`) are
+   read-only. Anything that allocates device memory is still the user's call, and **the headroom
+   moves**: it went from ~900 MB to ~0 mid-session on 2026-11-03, which is why a CUDA-needing gate
+   can pass at one hour and fail at the next. Re-run before concluding the code broke; a program
+   that only does `cudaMalloc(8 MiB)` says whether the box or the change is at fault.
 2. No supported model file exists. The GGUFs on disk are
    `qwen38-gyro/Strata/models/Qwen3.8-Flash-Next-Gyro-{S,M,L}-TQ1_0/TQ2_0/TQ3_0.gguf`
    (54.5 / 92 / 108 GiB); their metadata matches `DS4_SHAPE_QWEN4_EXP` but they are TQ-quantized
@@ -128,9 +141,10 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 - Sweep inputs a later session may need to re-run are committed under `docs/evidence/` -
   `rename-2.2d.json` is chunk 2.2d's rename map, `platform-selftest.cpp` is chunk 3.1c's
-  platform-layer program, and `wf-io-selftest.cpp` is chunk 3.1e's reader program (io_uring against
-  the pread baseline, byte-compared through the real `wf_*` pipeline). Copy them to `build/` and
-  compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
+  platform-layer program, `wf-io-selftest.cpp` is chunk 3.1e's reader program (io_uring against the
+  pread baseline, byte-compared through the real `wf_*` pipeline), `wf-extent-selftest.cpp` is chunk
+  3.1f's extent reader, and `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait
+  rule. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
   smoke recipe. Anything written under `build/` is scratch and is not in git; chunk 2.2b's map was
   never saved, so its rename is only reconstructable from its commit message.
 - When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
@@ -142,47 +156,60 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 ## Behaviour changes landed this session
 
-Chunk 3.1c/3.1d's behaviour changes (the CLI running on Linux, the POSIX receipt identity fields,
-`--carry-storage hybrid` without a drive letter, SIGINT/SIGTERM cancellation, the live carry-resume
-RAM floor, no process-memory limit in `host_memory::begin()`, the two `LLAMADECODE_*` diagnostic
-lines) are recorded in the plan's own entries for those chunks. This session's:
+Chunks 3.1c/3.1d/3.1e's behaviour changes (the CLI running on Linux, the POSIX receipt identity
+fields, `--carry-storage hybrid` without a drive letter, SIGINT/SIGTERM cancellation, the live
+carry-resume RAM floor, no process-memory limit in `host_memory::begin()`, the io_uring reader and
+`LLAMA_WF_IO_URING=0`, `WF_MODE_AUTO` probing cuFile, buffered `io_direct`, the deleted
+`--ds-gpu-ring-slots`, the sticky failed-read accounting, liburing on the link line) are recorded in
+the plan's own entries for those chunks. This session's (chunk 3.1f):
 
-- The weight fetcher reads with **io_uring**: one ring per reader thread, `io_queue_depth` reads in
-  flight each, registered fds where the kernel accepts them. The `pread` workers remain as the
-  baseline and run whenever `io_uring_queue_init` fails. `wf_get_io_engine()` (new export) names
-  which one a fetcher started, and `LLAMA_WF_IO_URING=0` forces the baseline - the one new
-  documented env row, added so Phase 8 item 3's isolated comparison is possible. Measured honestly
-  (`docs/evidence/wf-io-selftest.cpp`, whole-pass wall clock, best of three cold rounds): **x1.00**
-  at four threads, where four `pread` threads already saturate the device, and **x1.57** at one
-  thread, which is what the rings actually add - queue depth per thread. Do not quote
-  `wf_get_stats`'s `total_nvme_read_ms` for a comparison: it sums each layer's own read window and
-  layers overlap, so it reads x1.37 where the wall clock reads x1.00.
-- `WF_MODE_AUTO` no longer picks GDS because `cufile.h` exists. It calls `cuFileDriverOpen()` while
-  resolving the mode and prefers GDS only if the driver reports support; on this box (no
-  `nvidia-fs`) AUTO now resolves to `DIRECT_IO` at once instead of choosing GDS and falling back at
-  pipeline start.
-- `io_direct` no longer opens `O_DIRECT`, and says so once per file. Linux requires offset, length
-  and buffer to be block-aligned; GGUF tensor offsets are multiples of `general.alignment` (32 by
-  default), so the chunked reads would have failed `EINVAL` and completed with **zero bytes** while
-  still counting as done - silently wrong weights. Reads are buffered. The aligned variant (a second
-  fd, 4 KiB-aligned offsets, a bounce for the unaligned head) is open follow-up work, the same
-  deferral Phase 1 recorded for the engine transport.
-- `--ds-gpu-ring-slots` is gone: it is now an unknown producer option (parse refusal), the receipt
-  no longer reports `ds_gpu_ring_slots`, and `wf_params` lost that field. Anything that mirrors
-  `wf_params` by field order is stale - notably
+- **The provider's lease is POSIX.** `open(O_RDONLY|O_NOFOLLOW)` relative to the pinned parent
+  directory (`openat`), ancestor descriptors held for the provider's lifetime and rebound to their
+  names by `identity()`, which runs around every file operation. `identity()` checks `st_dev`, the
+  8-byte little-endian `st_ino` inside the 16-byte receipt field, `st_size`, `st_mtime` in Unix ns,
+  `S_ISREG` and `st_nlink==1` - the four keys `slstack/native_broker.py` writes into a copy receipt.
+  `DRIVE_FIXED` + `QueryDosDeviceW` became a `statfs` refusal of network and RAM-backed types; the
+  Engram row reader keeps the 4 KiB-aligned extent but reads it with `pread`, so the
+  `GetDiskFreeSpaceW` sector probe is gone.
+- **The strict profile is the relay, not DirectStorage.** `wf_create_required_dstorage` (it refused
+  unconditionally here) is `wf_create_required_streaming`, and the internal flag is
+  `strict_streaming`. It admits one exact typed geometry - auto request size, bounded staging, async
+  copy ordering, an explicit pinned staging tier - with no ambient env tuning, no expert cache, no
+  relay prefetch buffer, and sticky failures. The provider asks for `WF_MODE_DIRECT_IO` explicitly
+  (not `AUTO`, which could resolve to GDS and register the fetcher's allocations before its bank
+  pointers are replaced) and `io_direct=false`, so the fetcher's banks are exactly the admitted
+  `compute_buffer_bytes`.
+- **Admission moved, so a launch recipe needs a larger `--provider-host-bytes` than the Windows
+  one.** The relay's pinned staging tier (`(buffers+1)` bank-sized buffers) and the extent reader's
+  32 MiB window are charged to the provider's host plan; the GPU-side staging term left the device
+  plan, because nothing here stages on the device. `--fetch-profile baseline` is refused while
+  inspecting, with a message naming the typed profiles, rather than at pipeline creation.
+- **Named extents are io_uring reads into the compute bank.** `wf_fetch_extents_direct`,
+  `..._overlap`, `wf_fetch_ready_extents`, `wf_wait_ready_extents` and `wf_ready_direct_bank` went
+  from `return false` to real: extents are split into parts, read through io_uring (or the `pread`
+  baseline) into a pinned window of four 8 MiB slots, and uploaded on the caller's stream - or the
+  fetcher's copy stream for the tail-hint worker, which publishes one event per batch and hands back
+  a fence. The relay now publishes the per-stage generation where a stage reaches `GPU_READY` (both
+  sites; the deleted queue used to be the only publisher), so `wf_ready_direct_bank` and the hint
+  protocol work. `acquire_layer_experts` and `prefill_experts` are live. Bounds are checked against
+  the file and the bank before any byte is written; a negative or short read poisons the fetcher; a
+  batch naming a stage that left its bank refuses without poisoning (nothing was written).
+- `acquire()` gained a guard that a stage landed in the bank its regions were planned in
+  (`buffers[id%2]`), because the extents name regions of that bank: a stage recycled into the other
+  one would bind the wrong file bytes into the wrong tensors.
+- `configure_host_cache` measures the RAM expert tier from `/proc` (`MemAvailable`, `VmRSS`) through
+  `src/llama-dsv41-host-memory.h`, keeping the Windows reserve and margin arithmetic and the
+  `LLAMADECODE_HOST_CACHE` log line's field names.
+- Deleted rather than faked, as `--ds-gpu-ring-slots` was in 3.1e: `--ds-submit-threads` (no reader
+  since the IOCP workers went) and `--ds-zero-padding-only` are unknown producer options, with their
+  `wf_params` and provider `config` fields, their receipt keys, and
+  `tools/slstack-weight-fetcher.def` - a Windows export list no build rule used, whose names were
+  already stale. Anything mirroring `wf_params` by field order is now doubly stale - notably
   `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py`, which Phase 6 deletes anyway.
-- The fetcher's strict extent-fetch entry points (`wf_fetch_extents_direct`, `wf_ready_direct_bank`,
-  `wf_fetch_ready_extents`, `wf_wait_ready_extents`, `wf_create_required_dstorage`) keep their Linux
-  refusals; `wf_persist_shutdown()` still returns 1. Chunk 3.1f decides what they become.
-- A failed read is now fatal instead of silent: a negative completion, or a short read of bytes the
-  file does hold, sets the sticky transfer failure; `wf_register_layer` refuses a span running past
-  its file's size in **every** mode (it checked them only on the strict DirectStorage path); and
-  `wf_wait_layer_gpu` returns nullptr once the fetcher has failed. Before this a refused
-  registration still handed compute the GPU buffer pointer, and a short read counted as a completed
-  chunk, so the pipeline uploaded uninitialised staging as weights.
-- `liburing` is now linked (`find_library(LLAMA_URING_LIBRARY uring)` into `llama`, the producer and
-  the fetcher `.so`), because `WF_HAS_IO_URING` is decided by `__has_include(<liburing.h>)` and
-  nothing used to link the library.
+- **Both io_uring readers wait through `io_uring_submit_and_wait()`.** `io_uring_wait_cqe()` does
+  not flush entries the kernel has not been told about on this liburing, and `io_uring_submit()` can
+  return 0 without being an error, so the old "submit, then wait" pair could leave a layer's reads
+  unseen forever. `docs/evidence/uring-flush-probe.cpp` demonstrates both halves.
 - Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
   `slstack-weight-fetcher.dll`, and `scripts/build_combo_runtime.py` builds a preset named
   "RTX: ULTRA prefill -> ds4-win decode". Those are 5.1/7.1. Note for 5.1:
@@ -204,11 +231,16 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
 - `io_uring_wait_cqe` does not return `-EINTR` here: a probe blocking it while a `sigaction`
   handler with `flags=0` (what the producer installs) fires showed no escape, so liburing retries.
   The error paths are defensive, not a live bug.
-- `adversarial-code-review` on 3.1e earned its keep: it caught the inflated gain metric and the
-  short-read accounting, both of which I had asserted were handled. Run it before declaring a chunk
-  done, and re-verify its claims - one of its findings (the "24 checks" count) was against text I
-  had already corrected, and its "last producer TU carrying Win32" phrasing was mine and was wrong:
-  `llama-dsv41-engram-prefetch.cpp` still carries 95 hits.
+- `adversarial-code-review` earned its keep again on 3.1f, but only for **one** of its five
+  findings: it found the io_uring submit/wait flush hazard (real), while its Critical claim that a
+  zero `io_uring_submit()` return is treated as fatal was a misreading of `< 0` as `<= 0`, and its
+  other three - generation 0 through the tail hint, a stale YOCO skip mask after a layout switch,
+  the extent window outside the job host budget - were refuted by lines already in the tree (the GDS
+  arm publishes the generation, a layout switch rebuilds the fetcher,
+  `llama-dsv41-sweep.cpp:456` sums `provider.host_bytes`). Verify every finding against the working
+  tree, and prove a behavioural claim with a program rather than with recall: the flush claim was
+  settled by `docs/evidence/uring-flush-probe.cpp` in thirty seconds. A reviewer that quotes text
+  not in the tree is reading the diff base; say so and make it re-read.
 
 - Regenerate the env table in the same commit as any engine source edit:
   `python3 -B -m slstack.envdocs --refresh-defaults` then `python3 -B -m slstack.envdocs`. Any line
@@ -246,11 +278,14 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
 - `libnvidia-ml.so.1` is present (`/usr/lib`) and is `dlopen`ed, not linked. NVML only answers when
   `CUDA_VISIBLE_DEVICES` holds a `GPU-...` UUID; with it unset the free/total reads return false and
   the L2 offer is 0, exactly as on Windows.
-- The fetcher's reader has two rules that are easy to break again. A chunk taken off the queue and
+- The fetcher's reader has three rules that are easy to break again. A chunk taken off the queue and
   never submitted never completes, and the pipeline waits on that layer's completion counter - so a
   full SQ ring puts the remainder back on the queue, and `wf_stop` drains the queue and the
-  in-flight reads before joining. And `IOSQE_FIXED_FILE` means the SQE's `fd` field is the
-  *registered index*, not a descriptor; registration is optional, so both paths must stay wired.
+  in-flight reads before joining. `IOSQE_FIXED_FILE` means the SQE's `fd` field is the *registered
+  index*, not a descriptor; registration is optional, so both paths must stay wired. And **the wait
+  must also be a submit**: `io_uring_wait_cqe()` does not flush the submission queue here, so every
+  read queue needs `io_uring_submit_and_wait()`, not `io_uring_submit()` plus a wait. Treat only a
+  negative submit return as an error - 0 is legitimate.
 - `WF_HAS_IO_URING` comes from `__has_include(<liburing.h>)`, so liburing must be on the link line
   (`LLAMA_URING_LIBRARY`, resolved in the top-level `CMakeLists.txt` and linked into `llama`, the
   producer and the fetcher `.so`). A header-only install would fail at link, not at run time.
@@ -263,6 +298,16 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
   fixing - stash, then `GIT_SEQUENCE_EDITOR="sed -i '1s/^pick /reword /'" GIT_EDITOR=<script that
   copies the corrected message to $1> git rebase -i HEAD~2`. The trees must match afterwards
   (`git diff --stat <old-head> <new-head>` should be empty).
+- The strict extent reader is **CUDA-optional on purpose**: without `WF_HAS_CUDA` the fetcher's
+  banks are host buffers and the upload is a `memcpy`, so
+  `docs/evidence/wf-extent-selftest.cpp` compiles `src/llama-weight-fetcher.cpp` with no
+  `-DGGML_USE_CUDA` and needs no VRAM. Do not "simplify" that by folding the `#ifdef` arms - the
+  non-CUDA build is also what a CPU-only llama build links. Testing the CUDA arms needs a
+  `ggml_backend_cuda_init` plus a compute stream, and a ggml CUDA backend wants roughly 700 MB of
+  device memory past its context; on this box that is more than Strata and the browser leave, so
+  those arms have never executed.
+- `std::strtoull` returns `unsigned long long`, which on LP64 is not `uint64_t` (`unsigned long`), so
+  `std::min(capped, count * width)` fails to compile here and compiled on MSVC. Convert explicitly.
 - nvcc rejects a bare `-fPIC`; use `-Xcompiler -fPIC`. A shared library needs every linked object
   `-fPIC` once it contains TLS (`__thread`).
 - CUDA 13.4 / CCCL 3 facts: `nvcc` at `/opt/cuda/bin/nvcc`, libs in `/opt/cuda/lib` and
@@ -287,8 +332,10 @@ lines) are recorded in the plan's own entries for those chunks. This session's:
   docs and evidence files must use repo-relative paths. `git status -sb` is the push check; the
   pre-commit hook also scans the commit message, so a message must not quote a machine path either.
 - `mlock` of the pinned host tier needs an `RLIMIT_MEMLOCK` or cgroup allowance - still undecided
-  (plan's "locked memory" risk). It gates `llama-dsv41-locked-ram.h` (chunk 3.1f) and the decode
-  library's host-cache path, and `host_memory.begin()` deliberately does not solve it.
+  (plan's "locked memory" risk). It gates `llama-dsv41-locked-ram.h` and the carry lease (chunk
+  3.1h) and the decode library's host-cache path, and `host_memory.begin()` deliberately does not
+  solve it. Note that `cudaHostAlloc`/`cudaMallocHost`, which the fetcher's staging tier and the
+  extent window use, do not need that allowance - only the engine's `mlock` does.
 
 ## Suggested skills
 
