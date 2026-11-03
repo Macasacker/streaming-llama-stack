@@ -1,4 +1,4 @@
-// Included by the Windows producer after its bounded native-file/hash helpers.
+// Included by the producer after its bounded native-file/hash helpers.
 #include "live-session-checkpoint.h"
 #include "llama-dsv41-artifact.h"
 #include "llama-dsv41-layer-log.h"
@@ -6,39 +6,66 @@
 #include <thread>
 #include <filesystem>
 #include <optional>
+#if defined(_WIN32)
 #include <io.h>
+#else
+#include <poll.h>
+#endif
 #include <fcntl.h>
 #include <sys/stat.h>
 
 namespace {
 class session_output_redirect {
-    HANDLE wire=nullptr;
+    producer_wire::handle wire=producer_wire::unarmed();
 public:
-    ~session_output_redirect(){if(wire)CloseHandle(wire);}
-    HANDLE get()const{return wire;}
+    ~session_output_redirect(){if(wire!=producer_wire::unarmed())producer_wire::release(wire);}
+    producer_wire::handle get()const{return wire;}
     void bind(){
-        const HANDLE output=GetStdHandle(STD_OUTPUT_HANDLE),input=GetStdHandle(STD_INPUT_HANDLE);
-        require(!wire&&GetFileType(input)==FILE_TYPE_PIPE&&GetFileType(output)==FILE_TYPE_PIPE,"Live session requires private inherited pipes");
+        const producer_wire::handle output=producer_wire::standard_output(),input=producer_wire::standard_input();
+        require(wire==producer_wire::unarmed()&&producer_wire::is_pipe(input)&&producer_wire::is_pipe(output),
+            "Live session requires private inherited pipes");
+#if defined(_WIN32)
         require(DuplicateHandle(GetCurrentProcess(),output,GetCurrentProcess(),&wire,0,FALSE,DUPLICATE_SAME_ACCESS)!=0,"Cannot retain private session output");
         require(std::fflush(stdout)==0&&_dup2(_fileno(stderr),_fileno(stdout))==0&&SetStdHandle(STD_OUTPUT_HANDLE,GetStdHandle(STD_ERROR_HANDLE)),"Cannot isolate diagnostic stdout from session payload");
+#else
+        // dup() retains the payload end; stdout then points at stderr so producer
+        // diagnostics cannot reach the session's JSON stream.
+        const int retained=dup(output);require(retained>=0,"Cannot retain private session output");wire=retained;
+        require(std::fflush(stdout)==0&&dup2(producer_wire::error_end(),producer_wire::standard_output())==0,
+            "Cannot isolate diagnostic stdout from session payload");
+#endif
     }
 };
 class session_pipe {
-    HANDLE input=GetStdHandle(STD_INPUT_HANDLE),output;
+    producer_wire::handle input=producer_wire::standard_input(),output;
     std::array<unsigned char,65536>buffer{};size_t first=0,last=0;
     std::chrono::steady_clock::time_point deadline;
     uint64_t timeout_ms;
 public:
-    explicit session_pipe(uint64_t timeout,HANDLE output):output(output),timeout_ms(timeout){
-        require(GetFileType(input)==FILE_TYPE_PIPE&&GetFileType(output)==FILE_TYPE_PIPE,"Session stdio requires private parent-owned pipes");renew();
+    explicit session_pipe(uint64_t timeout,producer_wire::handle output):output(output),timeout_ms(timeout){
+        require(producer_wire::is_pipe(input)&&producer_wire::is_pipe(output),"Session stdio requires private parent-owned pipes");renew();
     }
     void renew(){deadline=std::chrono::steady_clock::now()+std::chrono::milliseconds(timeout_ms);}
     void check(){stop();require(std::chrono::steady_clock::now()<deadline,"Session private-pipe deadline expired");}
     void fill(){
         require(first==last,"Session pipe pending data overwrite");first=last=0;
-        while(!last){check();DWORD available=0;require(PeekNamedPipe(input,nullptr,0,nullptr,&available,nullptr)!=0,"Session parent input pipe closed");
+        while(!last){check();
+#if defined(_WIN32)
+            DWORD available=0;require(PeekNamedPipe(input,nullptr,0,nullptr,&available,nullptr)!=0,"Session parent input pipe closed");
             if(!available){Sleep(10);continue;}DWORD got=0;
-            require(ReadFile(input,buffer.data(),DWORD(std::min<size_t>(available,buffer.size())),&got,nullptr)&&got,"Session pipe read failed");last=got;}
+            require(ReadFile(input,buffer.data(),DWORD(std::min<size_t>(available,buffer.size())),&got,nullptr)&&got,"Session pipe read failed");last=got;
+#else
+            // poll reports readability, so a closed parent pipe is seen as an
+            // event instead of an infinite wait; the 10 ms cadence matches the
+            // Windows PeekNamedPipe loop, which also checks the deadline.
+            struct pollfd waiter{input,POLLIN,0};
+            const int ready=poll(&waiter,1,10);
+            require(ready>0&&waiter.revents!=0,"Session parent input pipe closed");
+            const ssize_t got=::read(input,buffer.data(),buffer.size());
+            require(got>0,(waiter.revents&(POLLHUP|POLLERR))?"Session parent input pipe closed":"Session pipe read failed");
+            last=size_t(got);
+#endif
+        }
     }
     void read(void*dst,size_t bytes){
         require(bytes<=65536,"Session read exceeds64KiB");auto*out=static_cast<unsigned char*>(dst);
@@ -51,10 +78,10 @@ public:
             if(e){++first;return out;}}
     }
     void write(const void*src,size_t bytes){
-        require(bytes<=65536,"Session write exceeds64KiB");check();DWORD sent=0;
-        // The parent drains this private pipe under the same kill-on-close Job
-        // and operation deadline. Its cancellation terminates blocked writes.
-        require(WriteFile(output,src,DWORD(bytes),&sent,nullptr)&&sent==bytes,"Session pipe write failed");
+        require(bytes<=65536,"Session write exceeds64KiB");check();
+        // The parent drains this private pipe under the same operation deadline.
+        // Its cancellation terminates blocked writes.
+        require(producer_wire::write_all(output,src,bytes),"Session pipe write failed");
     }
     void send(const json&j){const auto text=j.dump()+"\n";require(text.size()<=65536,"Session reply metadata exceeds64KiB");write(text.data(),text.size());}
 };
@@ -65,44 +92,14 @@ namespace {
 
 using decode_quiet_scope=llama_dsv41_decode_quiet_scope; // per-layer logs opt-in during decode steps
 // LLAMADECODE ds4-decode: LLAMADECODE_DS4_DECODE=1 runs each decode step with
-// ds4-win's own single-token decode (ds4-decode.dll, built from the stack's
-// engines/ds4-win with DS4_EXTERNAL_DECODE) on this owner's canonical state,
-// resident weights and B2 expert cache. Prefill stays on the executor.
+// ds4's own single-token decode (ds4-decode.so, built by `make cuda-decode`
+// with DS4_EXTERNAL_DECODE) on this owner's canonical state, resident weights
+// and B2 expert cache. Prefill stays on the executor. The local video-memory
+// and NVML readings these guards need come from producer-platform.inc.
 // LLAMADECODE cache growth: once the first one-token step has sized the
 // decode graph, the VRAM freed by the decode-sized plan (minus the decode
 // graph, the 1-row hidden bank and a growth margin; capped by the device's
 // free memory less a floor) becomes the L2 expert tier. LLAMADECODE_L2=0 disables.
-void local_video_memory(uint64_t&budget,uint64_t&usage){
-    budget=usage=0;IDXGIFactory4*factory=nullptr;
-    if(FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory4),reinterpret_cast<void**>(&factory)))||!factory)return;
-    uint64_t best=0;
-    for(UINT i=0;;++i){IDXGIAdapter1*a=nullptr;if(factory->EnumAdapters1(i,&a)==DXGI_ERROR_NOT_FOUND)break;
-        DXGI_ADAPTER_DESC1 d{};a->GetDesc1(&d);IDXGIAdapter3*a3=nullptr;
-        if(d.DedicatedVideoMemory>best&&SUCCEEDED(a->QueryInterface(__uuidof(IDXGIAdapter3),reinterpret_cast<void**>(&a3)))){
-            DXGI_QUERY_VIDEO_MEMORY_INFO info{};
-            if(SUCCEEDED(a3->QueryVideoMemoryInfo(0,DXGI_MEMORY_SEGMENT_GROUP_LOCAL,&info))){best=d.DedicatedVideoMemory;budget=info.Budget;usage=info.CurrentUsage;}
-            a3->Release();}
-        a->Release();}
-    factory->Release();
-}
-// Physical device memory from NVML (the driver's own count; WDDM/CUDA free
-// double-counts the imported D3D12 banks). Selected by the job's GPU UUID.
-bool nvml_free_bytes(uint64_t&free_bytes,uint64_t&total_bytes){
-    free_bytes=total_bytes=0;
-    static HMODULE nvml=LoadLibraryExW(L"nvml.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if(!nvml)return false;
-    struct memory{unsigned long long total,free,used;};
-    using init_t=int(*)();using by_uuid_t=int(*)(const char*,void**);using info_t=int(*)(void*,memory*);
-    static auto init=reinterpret_cast<init_t>(GetProcAddress(nvml,"nvmlInit_v2"));
-    static auto by_uuid=reinterpret_cast<by_uuid_t>(GetProcAddress(nvml,"nvmlDeviceGetHandleByUUID"));
-    static auto info=reinterpret_cast<info_t>(GetProcAddress(nvml,"nvmlDeviceGetMemoryInfo"));
-    static const int ready=init?init():-1;
-    const char*uuid=std::getenv("CUDA_VISIBLE_DEVICES");
-    if(ready!=0||!by_uuid||!info||!uuid||std::strncmp(uuid,"GPU-",4))return false;
-    void*device=nullptr;memory m{};
-    if(by_uuid(uuid,&device)!=0||info(device,&m)!=0)return false;
-    free_bytes=m.free;total_bytes=m.total;return true;
-}
 // Physical VRAM reserve kept free beside the L2 (LLAMADECODE_VRAM_RESERVE_MIB, default 128 MiB;
 // owner 2026-10-30: 128 MiB reserve + 64 MiB growth margin, 8/8 runs at 50K-200K without a breach).
 uint64_t decode_vram_reserve(){static const uint64_t r=[]{const char*e=std::getenv("LLAMADECODE_VRAM_RESERVE_MIB");
@@ -128,17 +125,13 @@ void check_decode_vram_reserve(){
     uint64_t f=0,t=0;if(!nvml_free_bytes(f,t))return;
     auto&s=decode_vram_sampler();
     if(s.started.load()){
-        // WDDM demotion watch: DXGI local budget/usage, non-local (shared) usage, system RAM.
-        uint64_t budget=0,usage=0,shared=0;local_video_memory(budget,usage);
-        {IDXGIFactory4*fa=nullptr;if(SUCCEEDED(CreateDXGIFactory1(__uuidof(IDXGIFactory4),reinterpret_cast<void**>(&fa)))&&fa){uint64_t best=0;
-            for(UINT i=0;;++i){IDXGIAdapter1*a=nullptr;if(fa->EnumAdapters1(i,&a)==DXGI_ERROR_NOT_FOUND)break;DXGI_ADAPTER_DESC1 d{};a->GetDesc1(&d);IDXGIAdapter3*a3=nullptr;
-                if(d.DedicatedVideoMemory>best&&SUCCEEDED(a->QueryInterface(__uuidof(IDXGIAdapter3),reinterpret_cast<void**>(&a3)))){DXGI_QUERY_VIDEO_MEMORY_INFO nl{};
-                    if(SUCCEEDED(a3->QueryVideoMemoryInfo(0,DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL,&nl))){best=d.DedicatedVideoMemory;shared=nl.CurrentUsage;}a3->Release();}
-                a->Release();}fa->Release();}}
-        MEMORYSTATUSEX ms{};ms.dwLength=sizeof(ms);GlobalMemoryStatusEx(&ms);
-        std::fprintf(stderr,"LLAMADECODE_VRAM_HEADROOM nvml_free_now=%llu min_free_since_l2=%llu samples=%llu reserve=%llu dxgi_local_budget=%llu dxgi_local_usage=%llu dxgi_shared_usage=%llu ram_avail=%llu\n",
+        // Demotion watch: local segment budget/usage, shared-segment usage, RAM.
+        uint64_t budget=0,usage=0;local_video_memory(budget,usage);
+        const uint64_t shared=shared_video_memory_usage();
+        uint64_t ram_avail=0;const bool ram=available_ram(ram_avail);
+        std::fprintf(stderr,"LLAMADECODE_VRAM_HEADROOM nvml_free_now=%llu min_free_since_l2=%llu samples=%llu reserve=%llu vram_local_budget=%llu vram_local_usage=%llu vram_shared_usage=%llu ram_avail=%llu\n",
             (unsigned long long)f,(unsigned long long)s.min_free.load(),(unsigned long long)s.samples.load(),(unsigned long long)decode_vram_reserve(),
-            (unsigned long long)budget,(unsigned long long)usage,(unsigned long long)shared,(unsigned long long)ms.ullAvailPhys);}
+            (unsigned long long)budget,(unsigned long long)usage,(unsigned long long)shared,(unsigned long long)(ram?ram_avail:0));}
     if(f<decode_vram_reserve()){std::fprintf(stderr,"LLAMADECODE_VRAM_RESERVE_BREACH nvml_free=%llu reserve=%llu\n",(unsigned long long)f,(unsigned long long)decode_vram_reserve());std::fflush(stderr);
         throw std::runtime_error("Physical free VRAM fell below the decode VRAM reserve");}
 }
@@ -154,12 +147,14 @@ void grow_decode_l2(llama_dsv41_sweep&sweep,const llama_dsv41_fixed_storage*fixe
     const uint64_t now=ggml_gallocr_get_buffer_size(fixed->graph.get(),0)+fixed->hidden_bytes;
     (void)freed;(void)now;uint64_t offer=~0ull;
     size_t free_bytes=0,total=0;ggml_backend_cuda_get_device_memory(0,&free_bytes,&total);(void)backend; // the job sees one device
-    // WDDM: the authoritative no-demotion room is this process's local-segment
-    // budget minus its current usage (DXGI), on the largest adapter (the 5090).
-    // WDDM's process budget and CUDA's free count the imported D3D12 banks
-    // twice (diagnostic only). The cap is NVML's physical free memory, and the
-    // offer never exceeds what the decode-sized plan freed from the job's own
-    // startup-admitted plan; no NVML reading means no L2.
+    // On Windows the authoritative no-demotion room is this process's
+    // local-segment budget minus its current usage (DXGI), on the largest
+    // adapter; its process budget and CUDA's free count the imported device
+    // banks twice (diagnostic only). Linux has no process segment budget, so
+    // the device total and in-use bytes fill the same fields. The cap in either
+    // case is NVML's physical free memory, and the offer never exceeds what the
+    // decode-sized plan freed from the job's own startup-admitted plan; no NVML
+    // reading means no L2.
     uint64_t budget=0,usage=0;local_video_memory(budget,usage);
     uint64_t nv_free=0,nv_total=0;const bool nv=nvml_free_bytes(nv_free,nv_total);
     // LLAMADECODE growable context cache: the plan keeps the next growth step
@@ -169,7 +164,7 @@ void grow_decode_l2(llama_dsv41_sweep&sweep,const llama_dsv41_fixed_storage*fixe
     uint32_t slots=0;std::string error;success(provider->grow_decode_cache(offer,&slots,error),error);
     if(slots)decode_vram_sampler().start();
     uint64_t nv_after=0,nv_total_after=0;(void)nvml_free_bytes(nv_after,nv_total_after);
-    std::fprintf(stderr,"LLAMADECODE_L2_OFFER freed=%llu decode_now=%llu cuda_free=%llu cuda_total=%llu dxgi_budget=%llu dxgi_usage=%llu nvml_free=%llu nvml_total=%llu nvml_free_after=%llu offered=%llu slots=%u next_step_reserved=%llu\n",(unsigned long long)freed,
+    std::fprintf(stderr,"LLAMADECODE_L2_OFFER freed=%llu decode_now=%llu cuda_free=%llu cuda_total=%llu local_budget=%llu local_usage=%llu nvml_free=%llu nvml_total=%llu nvml_free_after=%llu offered=%llu slots=%u next_step_reserved=%llu\n",(unsigned long long)freed,
         (unsigned long long)now,(unsigned long long)free_bytes,(unsigned long long)total,(unsigned long long)budget,(unsigned long long)usage,
         (unsigned long long)nv_free,(unsigned long long)nv_total,(unsigned long long)nv_after,(unsigned long long)offer,slots,(unsigned long long)next_step);std::fflush(stderr);
 }
@@ -197,7 +192,7 @@ uint64_t append_decode_max(){static const uint64_t n=[]{const char*e=std::getenv
 // max_tokens (the last sampled token is returned, not evaluated). Cleared at
 // every decode start and after a cancel.
 // LLAMADECODE multi-row append (opt-in, LLAMADECODE_APPEND_MULTIROW=1): an append of
-// 2..LLAMADECODE_APPEND_DECODE_MAX tokens runs as ONE ds4-win layer-major prefill
+// 2..LLAMADECODE_APPEND_DECODE_MAX tokens runs as ONE ds4 layer-major prefill
 // (ds4x_prefill, native ds41_graph_prefill on a small workspace) instead of one ds4
 // decode step per token; the routed experts of the rows are fetched as one union per layer.
 bool append_multirow_enabled(){static const bool on=[]{const char*e=std::getenv("LLAMADECODE_APPEND_MULTIROW");return e&&e[0]=='1'&&!e[1];}();return on;}
@@ -206,12 +201,12 @@ bool append_multirow_enabled(){static const bool on=[]{const char*e=std::getenv(
 // (default ON). LLAMADECODE_DS4X_KEEP_OPEN=0 restores x_close + x_open.
 bool ds4x_keep_open(){static const bool on=[]{const char*e=std::getenv("LLAMADECODE_DS4X_KEEP_OPEN");const bool v=llama_dsv41_ds4x_keep::keep_open_from_env(e);
     std::fprintf(stderr,"LLAMADECODE_DS4X_KEEP_OPEN enabled=%d default=on (=0 disables)\n",int(v));std::fflush(stderr);return v;}();return on;}
-const std::wstring&decode_cancel_file(){static const std::wstring p=[]{const char*e=std::getenv("LLAMADECODE_DECODE_CANCEL_FILE");
-    return e&&*e?std::filesystem::u8path(e).wstring():std::wstring();}();return p;}
-bool decode_cancel_requested(){const auto&p=decode_cancel_file();return !p.empty()&&GetFileAttributesW(p.c_str())!=INVALID_FILE_ATTRIBUTES;}
-void clear_decode_cancel(){const auto&p=decode_cancel_file();if(!p.empty())DeleteFileW(p.c_str());}
+const std::filesystem::path&decode_cancel_file(){static const std::filesystem::path p=[]{const char*e=std::getenv("LLAMADECODE_DECODE_CANCEL_FILE");
+    return e&&*e?native_path(e):std::filesystem::path();}();return p;}
+bool decode_cancel_requested(){const auto&p=decode_cancel_file();return !p.empty()&&file_present(p);}
+void clear_decode_cancel(){const auto&p=decode_cancel_file();if(!p.empty())(void)remove_file(p);}
 struct ds4_external {
-    HMODULE module=nullptr;bool open=false;
+    library module=nullptr;bool open=false;
     int(*x_open)(const char*,uint32_t,char*,size_t)=nullptr;const void*(*x_map)()=nullptr;
     int(*x_register)(uint64_t,uint64_t,void*)=nullptr;
     int(*x_bind)(void*const*,void*const*,void*const*,const uint32_t*,void*const*,void*const*)=nullptr;
@@ -270,20 +265,19 @@ struct ds4_external {
             std::fprintf(stderr,"LLAMADECODE_DS4X_SLOTS_FAILED layer=%u direct_l2=1 reason=%s\n",layer,why.c_str());return 0;}
         return 1;
     }
-    template<class F>void bind(F&f,const char*name){f=reinterpret_cast<F>(GetProcAddress(module,name));require(f,"ds4-decode.dll export missing");}
+    template<class F>void bind(F&f,const char*name){f=reinterpret_cast<F>(library_symbol(module,name));require(f,"decode library export missing");}
     void load(){
         if(module)return;
-        auto dll=executable().parent_path()/L"ds4-decode.dll";
-        module=LoadLibraryExW(dll.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-        require(module,"Cannot load ds4-decode.dll beside the producer");
+        module=open_decode_library();
+        require(module,(std::string("Cannot load ")+decode_library_name+" beside the producer").c_str());
         bind(x_open,"ds4x_open");bind(x_map,"ds4x_model_map");bind(x_register,"ds4x_register_weight");bind(x_bind,"ds4x_bind_state");
         bind(x_hook,"ds4x_set_expert_hook");bind(x_decode,"ds4x_decode");bind(x_close,"ds4x_close");bind(x_affinity,"ds4x_set_affinity");
-        x_host_timing=reinterpret_cast<decltype(x_host_timing)>(GetProcAddress(module,"ds4x_host_timing_v1"));
+        x_host_timing=reinterpret_cast<decltype(x_host_timing)>(library_symbol(module,"ds4x_host_timing_v1"));
         const char*ram=std::getenv("LLAMADECODE_HOST_CACHE_MB");
         if(ram&&*ram&&std::strcmp(ram,"0")){
             int(*api)(ds4_external_host_cache_v1*)=nullptr;bind(api,"ds4x_host_cache_v1");
             require(api(&host_cache)==1,"ds4-decode RAM cache ABI refused");
-            int(*api2)(ds4_external_host_cache_v2*)=reinterpret_cast<int(*)(ds4_external_host_cache_v2*)>(GetProcAddress(module,"ds4x_host_cache_v2"));
+            int(*api2)(ds4_external_host_cache_v2*)=reinterpret_cast<int(*)(ds4_external_host_cache_v2*)>(library_symbol(module,"ds4x_host_cache_v2"));
             have_host2=api2&&api2(&host_cache2)==1;
             const char*mode=std::getenv("LLAMADECODE_HOST_MODE");
             require(!mode||!std::strcmp(mode,"upload")||!std::strcmp(mode,"cpu")||!std::strcmp(mode,"mix"),"LLAMADECODE_HOST_MODE must be upload, cpu or mix");
@@ -307,26 +301,26 @@ struct ds4_external {
             }
         }
         if(append_multirow_enabled()){bind(x_prefill_ws,"ds4x_prefill_workspace");bind(x_prefill,"ds4x_prefill");}
-        x_bind_ex=reinterpret_cast<decltype(x_bind_ex)>(GetProcAddress(module,"ds4x_bind_state_ex"));
-        x_replace=reinterpret_cast<decltype(x_replace)>(GetProcAddress(module,"ds4x_replace_weight"));
-        x_drop=reinterpret_cast<decltype(x_drop)>(GetProcAddress(module,"ds4x_drop_weights"));
-        x_hook_l2=reinterpret_cast<decltype(x_hook_l2)>(GetProcAddress(module,"ds4x_set_expert_hook_l2"));
-        if(ds4x_keep_open()&&(!x_replace||!x_drop)){std::fprintf(stderr,"LLAMADECODE_DS4X_KEEP_OPEN unavailable reason=ds4-decode.dll lacks ds4x_replace_weight/ds4x_drop_weights; x_close+x_open\n");std::fflush(stderr);}
+        x_bind_ex=reinterpret_cast<decltype(x_bind_ex)>(library_symbol(module,"ds4x_bind_state_ex"));
+        x_replace=reinterpret_cast<decltype(x_replace)>(library_symbol(module,"ds4x_replace_weight"));
+        x_drop=reinterpret_cast<decltype(x_drop)>(library_symbol(module,"ds4x_drop_weights"));
+        x_hook_l2=reinterpret_cast<decltype(x_hook_l2)>(library_symbol(module,"ds4x_set_expert_hook_l2"));
+        if(ds4x_keep_open()&&(!x_replace||!x_drop)){std::fprintf(stderr,"LLAMADECODE_DS4X_KEEP_OPEN unavailable reason=%s lacks ds4x_replace_weight/ds4x_drop_weights; x_close+x_open\n",decode_library_name);std::fflush(stderr);}
     }
     bool can_keep()const{return ds4x_keep_open()&&x_replace&&x_drop;}
     // (Re)prepare on the current owner: decode layout, resident weights
     // registered at their device addresses, state views, expert hook.
     void prepare(llama_dsv41_sweep&sweep,const llama_dsv41_weight_provider::config&weights,uint32_t context){
-        load();std::string error;MEMORYSTATUSEX before{};before.dwLength=sizeof(before);
-        if(host_cache.resize)require(GlobalMemoryStatusEx(&before),"Prefill release RAM query failed");
+        load();std::string error;uint64_t before=0;
+        if(host_cache.resize)require(available_ram(before),"Prefill release RAM query failed");
         auto t0=clock_type::now();success(sweep.compact_for_external_decode(error,bool(host_cache.resize)),error);handoff.compact_ms=ms(t0);
         provider=sweep.provider_for_external_decode();
         host_limit=weights.job_host_bytes;
         if(host_cache.resize){
             success(provider->release_prefill_rows(error),error);
-            MEMORYSTATUSEX after{};after.dwLength=sizeof(after);require(GlobalMemoryStatusEx(&after),"Decode RAM query failed");
+            uint64_t after=0;require(available_ram(after),"Decode RAM query failed");
             std::fprintf(stderr,"LLAMADECODE_PREFILL_HOST_RELEASE available_before=%llu available_after=%llu delta=%lld frontier_certificate_kept=1\n",
-                (unsigned long long)before.ullAvailPhys,(unsigned long long)after.ullAvailPhys,(long long)after.ullAvailPhys-(long long)before.ullAvailPhys);
+                (unsigned long long)before,(unsigned long long)after,(long long)after-(long long)before);
         }
         if(!provider->decode_layout()){
             handoff.rebuilt=true;
@@ -363,7 +357,7 @@ struct ds4_external {
         t0=clock_type::now();
         llama_dsv41_sweep::device_state state;success(sweep.device_state_views(state,error),error);
         if(state.bf16){
-            require(x_bind_ex,"ctx-cache-precision bf16 needs a ds4-decode.dll with ds4x_bind_state_ex (BF16 owner caches)");
+            require(x_bind_ex,(std::string("ctx-cache-precision bf16 needs a ")+decode_library_name+" with ds4x_bind_state_ex (BF16 owner caches)").c_str());
             require(!append_multirow_enabled(),"ctx-cache-precision bf16 does not support LLAMADECODE_APPEND_MULTIROW=1 (ds4 multi-row prefill reads F32 owners)");
             require(x_bind_ex(state.raw.data(),state.compressed.data(),state.index.data(),state.rows.data(),state.pool_kv.data(),state.pool_score.data(),1)==1,
                 "ds4x_bind_state_ex refused the canonical BF16 state");
@@ -374,7 +368,7 @@ struct ds4_external {
         // LLAMADECODE_DIRECT_L2=0 keeps the copy-into-L1 path.
         if(x_hook_l2){static const bool direct=[]{const char*e=std::getenv("LLAMADECODE_DIRECT_L2");return !(e&&e[0]=='0'&&!e[1]);}();
             x_hook_l2(direct?&expert_hook_l2:nullptr,this);}
-        // B5: LLAMADECODE_DS4_BIAS=<quality-speed mean> enables ds4-win's own
+        // B5: LLAMADECODE_DS4_BIAS=<quality-speed mean> enables ds4's own
         // cache-affinity bias on this cache (selection only). Spread file and
         // warmup/ramp follow the native engine (DS4_CACHE_AFFINITY_*).
         const char*b=std::getenv("LLAMADECODE_DS4_BIAS");
@@ -395,7 +389,7 @@ struct ds4_external {
         double f0[4]{};uint64_t r0=0,b0=0;wf_extent_fetch_stats(f0,&r0,&b0);
         const auto before=provider->cache_stats();const auto started=std::chrono::steady_clock::now();
         double cpu0[4]{};uint64_t count0[2]{};if(x_host_timing)x_host_timing(cpu0,count0);
-        require(x_decode(token,position,tail.data(),3,logits.data())==1,"ds4-win decode step failed");
+        require(x_decode(token,position,tail.data(),3,logits.data())==1,"ds4 decode step failed");
         const double decode_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
         success(sweep.commit_external_token(token,logits,error),error);
         const auto after=provider->cache_stats();double f1[4]{};uint64_t r1=0,b1=0;wf_extent_fetch_stats(f1,&r1,&b1);
@@ -430,7 +424,7 @@ struct ds4_external {
         ggml_backend_synchronize(backend);check_decode_vram_reserve();
         double f0[4]{};uint64_t r0=0,b0=0;wf_extent_fetch_stats(f0,&r0,&b0);
         const auto before=provider->cache_stats();const auto started=std::chrono::steady_clock::now();
-        require(x_prefill(tokens.data(),uint32_t(tokens.size()),position,tail.data(),3,logits.data())==1,"ds4-win multi-row append failed");
+        require(x_prefill(tokens.data(),uint32_t(tokens.size()),position,tail.data(),3,logits.data())==1,"ds4 multi-row append failed");
         const double prefill_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
         success(sweep.commit_external_tokens(tokens.data(),tokens.size(),logits,error),error);
         const auto after=provider->cache_stats();double f1[4]{};uint64_t r1=0,b1=0;wf_extent_fetch_stats(f1,&r1,&b1);
@@ -439,8 +433,8 @@ struct ds4_external {
             (unsigned long long)(after.hits-before.hits),(unsigned long long)(after.l2_hits-before.l2_hits),(unsigned long long)(after.misses-before.misses),
             (unsigned long long)(r1-r0),(unsigned long long)(b1-b0));
     }
-    // The DLL stays mapped until process exit (never FreeLibrary): no ds4 code may
-    // be unmapped under a thread or CUDA callback it started.
+    // The library stays mapped until process exit (never dlclose/FreeLibrary):
+    // no ds4 code may be unmapped under a thread or CUDA callback it started.
     ~ds4_external(){if(open&&x_close){x_hook(nullptr,nullptr);x_close();open=false;std::fprintf(stderr,"LLAMADECODE_DS4X_CLOSED\n");std::fflush(stderr);}}
 };
 // LLAMADECODE: decode steps use the routed-expert layout (B1). The explicit
@@ -449,7 +443,7 @@ bool routed_decode_layout(){static const bool on=[]{const char*e=std::getenv("LL
     if(e&&e[0]=='0'&&!e[1]){std::fprintf(stderr,"LLAMADECODE_DECODE_LAYOUT=0 whole-layer B0 decode (diagnostic)\n");return false;}return true;}();return on;}
 void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
         const llama_dsv41_weight_provider::config&weights,const llama_dsv41_sweep::config&options,
-        const std::string&session,uint64_t timeout_ms,uint32_t capacity,HANDLE output,uint64_t owner_epoch=0){
+        const std::string&session,uint64_t timeout_ms,uint32_t capacity,producer_wire::handle output,uint64_t owner_epoch=0){
     using namespace llama_dsv41;using dsv41_live::checkpoint;
     require(sweep&&sweep->ready()&&options.fixed&&options.stateful_chunks,
         "Persistent session requires a completed fixed mode1/3 stateful owner");
@@ -550,9 +544,9 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
             generation.begin(command.at("settings"));
             reply({{"generation_control_version",1},{"revision",generation.settings.at("revision")},{"applies","next token boundary"}});
         }else if(operation=="quality_speed"){
-            // LLAMADECODE B5: the live quality-speed control (ds4-win /v1/quality-speed
+            // LLAMADECODE B5: the live quality-speed control (ds4 /v1/quality-speed
             // semantics: 0 = max quality, 1.36125 = max speed). Applies from the next
-            // decode request; the bias keeps ds4-win's warmup/ramp per request.
+            // decode request; the bias keeps ds4's warmup/ramp per request.
             dsv41_live::keys(command,{"session","model_sha256","sequence","operation","value"});
             const auto&v=command.at("value");require(v.is_number(),"Quality-speed value must be a number");
             const double value=v.get<double>();require(value>=0.0&&value<=1.36125,"Quality-speed value outside 0..1.36125");
@@ -742,11 +736,10 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
             dsv41_live::keys(command,{"session","model_sha256","sequence","operation","base","path"});same_base();
             const char*gate=std::getenv("LLAMADECODE_PERFEXP_KV_SAMPLES");
             require(gate&&!std::strcmp(gate,"1"),"Experimental KV sampling is disabled");
-            const auto path=std::filesystem::u8path(command.at("path").get<std::string>());
+            const auto path=native_path(command.at("path").get<std::string>());
             require(path.is_absolute()&&!std::filesystem::exists(path),"KV sample path must be absolute and new");
-            HANDLE file=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
-            require(file!=INVALID_HANDLE_VALUE,"Cannot create KV sample file");
-            struct sample_closer{HANDLE h;~sample_closer(){CloseHandle(h);}}closer{file};
+            exclusive_writer sample;sample.create(path);
+            require(sample.held(),"Cannot create KV sample file");
             llama_dsv41::wire_plan plan;std::string error;
             success(llama_dsv41::make_wire_plan(current.frontier,plan,error),error);
             uint64_t cursor=52+uint64_t(current.frontier.position)*4+129280ull*4,output_offset=0;
@@ -762,7 +755,7 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
                         for(uint64_t off=0;off<bytes;off+=buffer.size()){
                             stop();const size_t n=size_t(std::min<uint64_t>(bytes-off,buffer.size()));
                             if(!r.read(cursor+span.bytes-bytes+off,buffer.data(),n,why))return false;
-                            DWORD written=0;if(!WriteFile(file,buffer.data(),DWORD(n),&written,nullptr)||written!=n){why="KV sample write failed";return false;}
+                            if(!sample.write(buffer.data(),n)){why="KV sample write failed";return false;}
                         }
                         output_offset+=bytes;
                     }
@@ -784,11 +777,10 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
             const auto&ids=command.at("tokens");require(ids.is_array()&&!ids.empty()&&ids.size()<=4096,"Forced decode requires1..4096 tokens");
             std::vector<int32_t>forced;for(const auto&v:ids){const auto n=dsv41_live::u64(v);require(n<129280,"Forced token out of vocabulary");forced.push_back(int32_t(n));}
             require(uint64_t(current.frontier.position)+forced.size()<uint64_t(options.context),"Forced decode exceeds context capacity");
-            const auto path=std::filesystem::u8path(command.at("logits_path").get<std::string>());
+            const auto path=native_path(command.at("logits_path").get<std::string>());
             require(path.is_absolute()&&!std::filesystem::exists(path),"Forced decode logits path must be absolute and new");
-            HANDLE file=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
-            require(file!=INVALID_HANDLE_VALUE,"Cannot create forced decode logits file");
-            struct closer{HANDLE h;~closer(){if(h!=INVALID_HANDLE_VALUE)CloseHandle(h);}}close_file{file};
+            exclusive_writer dump;dump.create(path);
+            require(dump.held(),"Cannot create forced decode logits file");
             std::vector<int32_t>argmax;std::vector<double>step_ms;std::string error;std::vector<float>logits;
             for(size_t index=0;index<forced.size();++index){
                 stop();const auto step_started=clock_type::now();
@@ -796,7 +788,7 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
                 int32_t best=0;for(int32_t i=1;i<int32_t(logits.size());++i)if(logits[size_t(i)]>logits[size_t(best)])best=i;
                 argmax.push_back(best);
                 const auto*bytes=reinterpret_cast<const char*>(logits.data());size_t left=logits.size()*sizeof(float);
-                while(left){DWORD wrote=0;const DWORD n=DWORD(std::min<size_t>(left,1u<<24));require(WriteFile(file,bytes,n,&wrote,nullptr)&&wrote==n,"Forced decode logits write failed");bytes+=n;left-=n;}
+                while(left){const size_t n=std::min<size_t>(left,1u<<24);require(dump.write(bytes,n),"Forced decode logits write failed");bytes+=n;left-=n;}
                 if(index+1==forced.size())break;
                 if(ds4_decode_enabled()){
                     ds4_step(forced[index],index);
@@ -815,8 +807,8 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
                 std::fprintf(stderr,"LLAMADECODE_FORCED_STEP index=%zu forced=%d argmax=%d step_ms=%.3f\n",index,forced[index],best,step_ms.back());std::fflush(stderr);
             }
             // Publish a completed dump only after releasing its exclusive
-            // Windows writer handle; the receiver may open it immediately.
-            require(CloseHandle(close_file.h)!=0,"Forced decode logits close failed");close_file.h=INVALID_HANDLE_VALUE;
+            // writer; the receiver may open it immediately.
+            require(dump.release(),"Forced decode logits close failed");
             current=inspect();double total_ms=0;for(const double v:step_ms)total_ms+=v;
             reply({{"peer_synchronized",have_remote&&remote.describe()==current.describe()},{"argmax",argmax},{"vectors",argmax.size()},
                 {"evaluated_tokens",step_ms.size()},{"step_ms",step_ms},{"decode_ms",total_ms},{"RTX_decode",true}});

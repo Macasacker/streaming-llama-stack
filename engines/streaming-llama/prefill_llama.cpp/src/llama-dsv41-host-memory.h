@@ -1,4 +1,20 @@
 #pragma once
+// Physical host residency and system commitment are independent budgets. A
+// caller supplies its complete bounded host/device plan before CUDA starts.
+//
+// The policy below is the same on both platforms; only the measurements and the
+// process limit differ. Windows reads GlobalMemoryStatusEx, GetPerformanceInfo
+// and GetProcessMemoryInfo and caps the job with a Job Object; Linux reads
+// /proc/meminfo, /proc/self/status and the cgroup v2 memory controller, and has
+// no process-memory limit to set (see begin()).
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -8,16 +24,10 @@
 #define PSAPI_VERSION 2
 #endif
 #include <psapi.h>
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <cstdio>
-#include <cmath>
-#include <cstdlib>
-#include <limits>
+#else
+#include <thread>
+#endif
 
-// Physical host residency and WDDM backing commitment are independent budgets.
-// A caller supplies its complete bounded host/device plan before CUDA starts.
 namespace llama_dsv41_host_memory {
 constexpr uint64_t reserve = UINT64_C(512) << 20;
 struct state {
@@ -26,7 +36,15 @@ struct state {
 };
 inline uint64_t private_limit = 0;
 inline uint64_t runtime_min_free_bytes = UINT64_C(512) << 20;
+// Set once admission succeeds; also the guard against changing the floor after
+// admission. A Job Object handle on Windows, a latch here.
+#if defined(_WIN32)
 inline HANDLE job = nullptr;
+#else
+inline std::atomic<bool> job{false};
+#endif
+
+#if defined(_WIN32)
 inline bool read(state &s) {
     MEMORYSTATUSEX m{}; m.dwLength = sizeof(m);
     PERFORMANCE_INFORMATION p{}; p.cb = sizeof(p);
@@ -37,6 +55,95 @@ inline bool read(state &s) {
         uint64_t(p.CommitLimit) * p.PageSize, c.PrivateUsage, c.PeakPagefileUsage};
     return true;
 }
+inline void emit(const char *text, size_t bytes) {
+    DWORD done; WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, DWORD(bytes), &done, nullptr);
+}
+#else
+// kB-scale field of a procfs line, in bytes.
+inline uint64_t proc_field(const char *path, const char *field, uint64_t scale) {
+    FILE *f = std::fopen(path, "r");
+    if (!f) return 0;
+    char line[256];
+    uint64_t value = 0;
+    const size_t length = std::strlen(field);
+    while (std::fgets(line, sizeof(line), f)) {
+        if (std::strncmp(line, field, length) != 0) continue;
+        unsigned long long v = 0;
+        if (std::sscanf(line + length, "%llu", &v) == 1) value = uint64_t(v) * scale;
+        break;
+    }
+    std::fclose(f);
+    return value;
+}
+// The cgroup this process lives in, when systemd-run --scope gave it one.
+// memory.max reads as no limit when it says "max" or when there is no scope.
+inline int cgroup_self(char *self, size_t cap) {
+    FILE *f = std::fopen("/proc/self/cgroup", "r");
+    if (!f) return 0;
+    char line[512];
+    int found = 0;
+    while (std::fgets(line, sizeof(line), f)) {
+        if (std::strncmp(line, "0::/", 4) != 0) continue;
+        char *nl = std::strchr(line, '\n');
+        if (nl) *nl = '\0';
+        if (std::strlen(line) < cap) { std::snprintf(self, cap, "%s", line); found = 1; }
+    }
+    std::fclose(f);
+    return found;
+}
+inline uint64_t cgroup_limit_bytes() {
+    char self[512] = "0::/";
+    if (!cgroup_self(self, sizeof(self))) return 0;
+    char path[1024];
+    std::snprintf(path, sizeof(path), "/sys/fs/cgroup%s/memory.max", self);
+    FILE *m = std::fopen(path, "r");
+    if (!m) return 0;
+    char value[64] = {};
+    uint64_t limit = 0;
+    if (std::fgets(value, sizeof(value), m) && std::strcmp(value, "max\n") != 0) {
+        unsigned long long v = 0;
+        if (std::sscanf(value, "%llu", &v) == 1) limit = uint64_t(v);
+    }
+    std::fclose(m);
+    return limit;
+}
+inline uint64_t cgroup_current_bytes() {
+    char self[512] = "0::/";
+    if (!cgroup_self(self, sizeof(self))) return 0;
+    char path[1024];
+    std::snprintf(path, sizeof(path), "/sys/fs/cgroup%s/memory.current", self);
+    return proc_field(path, "memory.current", 1);
+}
+inline std::atomic<uint64_t> rss_peak{0};
+inline uint64_t process_rss_bytes() {
+    const uint64_t rss = proc_field("/proc/self/status", "VmRSS:", 1024);
+    uint64_t peak = rss_peak.load();
+    while (rss > peak && !rss_peak.compare_exchange_weak(peak, rss)) {}
+    return rss;
+}
+// MemAvailable is the physical figure ullAvailPhys corresponds to (reclaimable
+// page cache counts as available on both). System commitment is the cgroup
+// memory controller when this process has a scoped cgroup, else MemTotal plus
+// SwapTotal; process private is VmRSS, whose high-water is the peak.
+inline bool read(state &s) {
+    s = state{};
+    s.total = proc_field("/proc/meminfo", "MemTotal:", 1024);
+    s.available = proc_field("/proc/meminfo", "MemAvailable:", 1024);
+    if (!s.total || !s.available) return false;
+    const uint64_t scope = cgroup_limit_bytes();
+    s.commit_limit = scope ? scope : s.total + proc_field("/proc/meminfo", "SwapTotal:", 1024);
+    const uint64_t current = cgroup_current_bytes();
+    s.commit = current ? current : process_rss_bytes();
+    s.private_bytes = process_rss_bytes();
+    s.private_peak = rss_peak.load();
+    return true;
+}
+inline void emit(const char *text, size_t bytes) {
+    std::fwrite(text, 1, bytes, stderr);
+    std::fflush(stderr);
+}
+#endif
+
 inline bool fits(const state &s, uint64_t host, uint64_t device) {
     if (s.available < reserve || host > s.available - reserve ||
         s.commit_limit < reserve || s.commit > s.commit_limit - reserve) return false;
@@ -57,8 +164,7 @@ inline void report(const char *event, const state &s, uint64_t host = 0, uint64_
         (unsigned long long)s.commit, (unsigned long long)s.commit_limit,
         (unsigned long long)s.private_bytes, (unsigned long long)s.private_peak,
         (unsigned long long)private_limit, (unsigned long long)reserve, (unsigned long long)runtime_min_free_bytes);
-    if (n > 0) { DWORD done; WriteFile(GetStdHandle(STD_ERROR_HANDLE), text,
-        DWORD(size_t(n) < sizeof(text) ? size_t(n) : sizeof(text) - 1), &done, nullptr); }
+    if (n > 0) emit(text, size_t(n) < sizeof(text) ? size_t(n) : sizeof(text) - 1);
 }
 // Runtime available physical RAM floor, independent of admission's reserve.
 // Runtime floor defaults to 512 MiB. 0 disables
@@ -99,6 +205,7 @@ inline bool paging_exceeded(uint64_t baseline, uint64_t now, uint64_t limit = pa
     return paging_growth(baseline, now) > limit;
 }
 inline bool low_memory(const state &s) { return !fits(s, 0, 0); }
+#if defined(_WIN32)
 // Global pagefile bytes in use (EnumPageFilesW TotalInUse pages; same source as
 // studio.job_paging.paging_bytes). Private commitment is not paging.
 inline BOOL CALLBACK pagefile_visit(LPVOID context, PENUM_PAGE_FILE_INFORMATION info, LPCWSTR) {
@@ -109,6 +216,25 @@ inline bool pagefile_in_use(uint64_t &bytes) {
     if (!EnumPageFilesW(pagefile_visit, &pages)) return false;
     bytes = pages * uint64_t(si.dwPageSize); return true;
 }
+#else
+// Swap bytes in use: the system-wide paging figure the Windows pagefile count
+// corresponds to. A host with no configured swap reports 0, which can never
+// grow, so the guard stands down rather than failing the run.
+inline bool pagefile_in_use(uint64_t &bytes) {
+    FILE *f = std::fopen("/proc/meminfo", "r");
+    if (!f) return false;
+    char line[256];
+    uint64_t total = 0, free = 0;
+    while (std::fgets(line, sizeof(line), f)) {
+        unsigned long long v = 0;
+        if (std::strncmp(line, "SwapTotal:", 10) == 0 && std::sscanf(line + 10, "%llu", &v) == 1) total = uint64_t(v);
+        else if (std::strncmp(line, "SwapFree:", 9) == 0 && std::sscanf(line + 9, "%llu", &v) == 1) free = uint64_t(v);
+    }
+    std::fclose(f);
+    bytes = (total > free ? total - free : 0) * UINT64_C(1024);
+    return true;
+}
+#endif
 inline void report_paging(const char *event, uint64_t baseline, uint64_t now) {
     std::fprintf(stderr, "DSV41_HOST_MEMORY_%s pagefile_in_use_bytes=%llu baseline_bytes=%llu growth_bytes=%llu limit_bytes=%llu low_memory_events=%llu\n",
         event, (unsigned long long)now, (unsigned long long)baseline, (unsigned long long)paging_growth(baseline, now),
@@ -142,6 +268,7 @@ inline bool live() {
     if (paging_exceeded(base, now)) { report_paging("PAGING_STOP", base, now); paging_stop.store(true); return false; }
     return true;
 }
+#if defined(_WIN32)
 // Samples RAM and paging at 4 Hz. It only flags the stop: the producer stops
 // gracefully at its next boundary (should_stop); never a TerminateProcess.
 inline DWORD WINAPI watch(void *) {
@@ -175,5 +302,31 @@ inline bool begin(uint64_t host, uint64_t device) {
     CloseHandle(thread); report("ADMITTED", s, host, device);
     return true;
 }
+#else
+inline void watch() {
+    for (;;) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        if (!live()) return;
+    }
+}
+inline bool begin(uint64_t host, uint64_t device) {
+    // Single-threaded before CUDA/producer workers; no restart or cap changes.
+    if (job.load()) return false;
+    state s;
+    if (!read(s)) { report("QUERY_FAILED", s); return false; }
+    if (!fits(s, host, device)) { report("REFUSED_PLAN", s, host, device); return false; }
+    if (!set_paging_baseline()) { report("PAGING_QUERY_FAILED", s, host, device); return false; }
+    const uint64_t increment = s.commit_limit - reserve - s.commit;
+    if (increment > UINT64_MAX - s.private_bytes) return false;
+    private_limit = s.private_bytes + increment;
+    // No process-memory limit twin. RLIMIT_AS breaks CUDA's address-space
+    // reservations and a cgroup memory.max is the launcher's scope to create
+    // (docs/linux-port-plan.md Phase 5), so the watchdog is the guard here and
+    // private_limit stays a reported ceiling.
+    job.store(true);
+    std::thread(watch).detach();
+    report("ADMITTED", s, host, device);
+    return true;
 }
 #endif
+}

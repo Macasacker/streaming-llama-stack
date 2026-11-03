@@ -1,10 +1,6 @@
 extern "C" unsigned long long ggml_backend_cuda_dsv41_pv_strided_queued(void);
 #include "ram-output-budget.h"
-#if defined(_WIN32) && defined(GGML_USE_CUDA)
-#define NOMINMAX
-#include <windows.h>
-#include <bcrypt.h>
-#include <dxgi1_4.h>
+#if defined(GGML_USE_CUDA)
 #include "ggml-cuda.h"
 #include "ggml-cpu.h"
 #include <cuda.h>
@@ -24,6 +20,7 @@ extern "C" uint64_t ggml_backend_cuda_dsv41_pv_view_queued(void);
 #include "llama-weight-fetcher.h"
 #include "llama-dsv41-host-memory.h"
 #include "llama-dsv41-test-fault.h"
+#include "producer-platform.h"
 #include "producer-abort.h"
 #include "llama-dsv41-ds4x-keep.h"
 #include "llama-dsv41-native-columns-resource-proof.h"
@@ -68,182 +65,36 @@ constexpr uint64_t reserve=30ull*1024*1024*1024,receipt_limit=64*1024,chunk=1024
 constexpr uint64_t epoch_ticks=116444736000000000ull;
 constexpr uint64_t gib=1024ull*1024*1024,cli_host_bytes=64*1024*1024;
 std::atomic<bool>interrupted{false},memory_abort{false};
-BOOL WINAPI interrupt(DWORD kind){if(kind==CTRL_C_EVENT||kind==CTRL_BREAK_EVENT||kind==CTRL_CLOSE_EVENT){interrupted.store(true);return TRUE;}return FALSE;}
 void require(bool value,const char*message){if(!value)throw std::runtime_error(message);}
 const char*memory_failure_reason(){static thread_local char reason[384];llama_dsv41_host_memory::stop_reason(reason,sizeof(reason));return reason;}
 void success(bool value,const std::string&error){if(!value)throw std::runtime_error(llama_dsv41_host_memory::stopped()?memory_failure_reason():(error.empty()?"Offline producer operation failed":error));}
 uint64_t add(uint64_t a,uint64_t b){require(b<=UINT64_MAX-a,"Producer capacity overflow");return a+b;}
 double ms(clock_type::time_point start){return std::chrono::duration<double,std::milli>(clock_type::now()-start).count();}
-// LLAMADECODE: an external graceful abort. The caller's RAM watch creates this
-// file; the engine then stops at its next stage boundary and tears down normally.
-bool abort_file_present(){
-    static const wchar_t*name=_wgetenv(L"LLAMADECODE_ABORT_FILE");
-    if(!name||!*name)return false;
-    static std::atomic<int64_t>last{0};const int64_t now=std::chrono::duration_cast<std::chrono::milliseconds>(clock_type::now().time_since_epoch()).count();
-    if(now-last.load()<250)return false;last.store(now);
-    return GetFileAttributesW(name)!=INVALID_FILE_ATTRIBUTES;
-}
-bool should_stop(){
-    if(!llama_dsv41_host_memory::live())memory_abort.store(true);
-    if(abort_file_present())interrupted.store(true);
-    return interrupted.load()||memory_abort.load();
-}
-void stop(){const bool stopping=should_stop();require(!stopping,memory_abort.load()?memory_failure_reason():"Producer cancelled; incomplete output retained and not certified");}
-// Both runtime guards publish their settings and latched stop verdicts.
-json host_memory_runtime(){namespace hm=llama_dsv41_host_memory;
-    return json{{"rule","stop below runtime_min_free_gib (0 disables) or when pagefile growth exceeds limit_bytes"},
-        {"runtime_min_free_gib",double(hm::runtime_min_free_bytes)/double(gib)},{"floor_stop",hm::floor_stop.load()},
-        {"memory_query_failed",hm::memory_query_failed.load()},
-        {"limit_bytes",hm::paging_limit},{"pagefile_growth_peak_bytes",hm::paging_growth_peak.load()},{"low_memory_events",hm::low_memory_events.load()},{"paging_stop",hm::paging_stop.load()}};}
-std::string utf8(const std::wstring&s){
-    const int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s.data(),int(s.size()),nullptr,0,nullptr,nullptr);
-    require(n>0,"Invalid Unicode command argument");std::string out(n,'\0');
-    require(WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s.data(),int(s.size()),out.data(),n,nullptr,nullptr)==n,"Cannot encode command argument");return out;
-}
 bool hex_sha(const std::string&s){return s.size()==64&&std::all_of(s.begin(),s.end(),[](unsigned char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');});}
 uint64_t integer(const std::string&s){
     require(!s.empty()&&std::all_of(s.begin(),s.end(),[](unsigned char c){return c>='0'&&c<='9';}),"Expected unsigned decimal integer bytes/count");
     size_t used=0;const auto value=std::stoull(s,&used);require(used==s.size(),"Invalid integer option");return value;
 }
 uint64_t exact_u64(const json&v){require(v.is_number_unsigned(),"Receipt field is not an exact unsigned integer (floating-point receipts are rejected)");return v.get<uint64_t>();}
-struct hash {
-    BCRYPT_ALG_HANDLE algorithm=nullptr;BCRYPT_HASH_HANDLE handle=nullptr;std::vector<uint8_t>object;
-    hash(){
-        require(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)>=0,"Cannot open native SHA256");
-        DWORD bytes=0,n=0;require(BCryptGetProperty(algorithm,BCRYPT_OBJECT_LENGTH,reinterpret_cast<PUCHAR>(&bytes),sizeof(bytes),&n,0)>=0&&bytes<=65536,"Invalid SHA workspace");
-        object.resize(bytes);require(BCryptCreateHash(algorithm,&handle,object.data(),bytes,nullptr,0,0)>=0,"Cannot create native SHA256");
-    }
-    ~hash(){if(handle)BCryptDestroyHash(handle);if(algorithm)BCryptCloseAlgorithmProvider(algorithm,0);}
-    void update(const void*data,size_t bytes){require(bytes<=chunk&&BCryptHashData(handle,(PUCHAR)data,ULONG(bytes),0)>=0,"Native SHA256 update failed");}
-    std::string finish(){std::array<uint8_t,32>out{};require(BCryptFinishHash(handle,out.data(),ULONG(out.size()),0)>=0,"Native SHA256 finish failed");
-        std::ostringstream text;text<<std::hex<<std::setfill('0');for(auto b:out)text<<std::setw(2)<<unsigned(b);return text.str();}
-};
-struct identity {uint64_t volume=0,size=0,mtime=0;std::array<uint8_t,16>id{};};
-identity inspect(HANDLE file){
-    FILE_ID_INFO id{};BY_HANDLE_FILE_INFORMATION info{};LARGE_INTEGER size{};
-    require(GetFileInformationByHandleEx(file,FileIdInfo,&id,sizeof(id))&&GetFileInformationByHandle(file,&info)&&GetFileSizeEx(file,&size),"Cannot inspect native file identity");
-    require(!(info.dwFileAttributes&(FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_SPARSE_FILE|FILE_ATTRIBUTE_COMPRESSED))&&info.nNumberOfLinks==1&&size.QuadPart>=0,
-        "Producer requires a physical single-link ordinary file");
-    identity out;out.volume=id.VolumeSerialNumber;out.size=uint64_t(size.QuadPart);std::memcpy(out.id.data(),id.FileId.Identifier,16);
-    out.mtime=(uint64_t(info.ftLastWriteTime.dwHighDateTime)<<32)|info.ftLastWriteTime.dwLowDateTime;return out;
 }
-bool same(const identity&a,const identity&b){return a.volume==b.volume&&a.id==b.id&&a.size==b.size&&a.mtime==b.mtime;}
-std::string id_hex(const std::array<uint8_t,16>&id){std::ostringstream s;s<<std::hex<<std::setfill('0');for(auto b:id)s<<std::setw(2)<<unsigned(b);return s.str();}
-json describe(const identity&id){return {{"volume_serial_u64",id.volume},{"file_id_le_hex",id_hex(id.id)},{"bytes",id.size},{"mtime_filetime_ticks",id.mtime}};}
 
-// No unlink, replacement, truncation or cleanup operation exists here. The
-// sole rename publishes our new flushed pending receipt with NO REPLACE.
-// Held physical directory handles deny DELETE; before each native file action
-// their identities are rebound to the current named chain as well.
-class native_file {
-    std::filesystem::path path;
-    std::vector<HANDLE>parents;
-    std::vector<std::filesystem::path>names;
-    HANDLE file=INVALID_HANDLE_VALUE;
-    identity owned{};
-    uint64_t limit=0,pending=0,disk_floor=reserve;
-    bool output=false,can_publish=false,flushed=false;
-    void parents_ok()const{
-        for(size_t i=0;i<parents.size();++i){
-            BY_HANDLE_FILE_INFORMATION held{},named{};
-            require(GetFileInformationByHandle(parents[i],&held)&&
-                (held.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)&&!(held.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT),"Held output ancestor changed");
-            HANDLE probe=CreateFileW(names[i].c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-            const bool valid=probe!=INVALID_HANDLE_VALUE&&GetFileInformationByHandle(probe,&named)&&
-                (named.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)&&!(named.dwFileAttributes&FILE_ATTRIBUTE_REPARSE_POINT)&&
-                held.dwVolumeSerialNumber==named.dwVolumeSerialNumber&&held.nFileIndexHigh==named.nFileIndexHigh&&held.nFileIndexLow==named.nFileIndexLow;
-            if(probe!=INVALID_HANDLE_VALUE)CloseHandle(probe);require(valid,"Named output ancestor identity changed");
-        }
-    }
-public:
-    native_file()=default;
-    ~native_file(){if(file!=INVALID_HANDLE_VALUE)CloseHandle(file);for(auto h:parents)CloseHandle(h);}
-    native_file(const native_file&)=delete;native_file&operator=(const native_file&)=delete;
-    static uint64_t volume(const std::filesystem::path&p){
-        require(p.is_absolute()&&p==p.lexically_normal()&&p.has_filename(),"Producer paths must be absolute and normalized");
-        require(GetDriveTypeW(p.root_path().c_str())==DRIVE_FIXED,"Producer requires a fixed local volume");
-        wchar_t device[32768]{};require(QueryDosDeviceW(p.root_name().c_str(),device,32768)&&std::wstring(device).find(L"\\Device\\HarddiskVolume")==0,
-            "Producer requires a physical volume, not UNC/SUBST");
-        HANDLE root=CreateFileW(p.root_path().c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,
-            FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-        require(root!=INVALID_HANDLE_VALUE,"Cannot inspect producer volume");FILE_ID_INFO info{};
-        const bool valid=GetFileInformationByHandleEx(root,FileIdInfo,&info,sizeof(info))!=0;CloseHandle(root);require(valid,"Cannot identify producer volume");return info.VolumeSerialNumber;
-    }
-    void open(const std::filesystem::path&p,bool create,uint64_t expected,uint64_t outstanding=0,bool publishable=false,uint64_t output_floor=reserve){
-        require(file==INVALID_HANDLE_VALUE&&parents.empty(),"Native producer file is single-use");path=p;volume(path);
-        require(path.filename().wstring().find(L':')==std::wstring::npos,"Alternate data streams are forbidden");
-        std::vector<std::filesystem::path>chain;for(auto d=path.parent_path();;d=d.parent_path()){chain.push_back(d);if(d==d.root_path())break;}
-        std::reverse(chain.begin(),chain.end());
-        for(const auto&d:chain){
-            HANDLE h=CreateFileW(d.c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-            require(h!=INVALID_HANDLE_VALUE,"Cannot lease physical producer ancestor");parents.push_back(h);names.push_back(d);parents_ok();
-        }
-        limit=expected;pending=outstanding;disk_floor=output_floor;output=create;can_publish=publishable;parents_ok();if(create)budget();parents_ok();
-        file=CreateFileW(path.c_str(),create?(GENERIC_READ|GENERIC_WRITE|(publishable?DELETE:0)):GENERIC_READ,FILE_SHARE_READ,nullptr,create?CREATE_NEW:OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-        require(file!=INVALID_HANDLE_VALUE,"Cannot open exclusive-new output or read-only physical input");owned=inspect(file);
-        require(create?owned.size==0:owned.size<=limit,"Producer file exceeds its bounded byte limit");check();
-    }
-    void check()const{parents_ok();require(same(owned,inspect(file)),"Native producer file identity/size/mtime changed");}
-    void budget()const{
-        parents_ok();ULARGE_INTEGER free{};require(GetDiskFreeSpaceExW(path.parent_path().c_str(),&free,nullptr,nullptr),"Cannot inspect actual output-volume free bytes");
-        require(ds4perf_output_budget::fits(free.QuadPart,limit,owned.size,pending,disk_floor),"Producer output/carry/other pending bytes exceed actual-volume budget plus selected disk reserve");
-    }
-    void outstanding(uint64_t bytes){pending=bytes;}
-    identity current()const{check();return owned;}
-    size_t read(void*dst,size_t bytes){
-        require(!output&&bytes<=chunk,"Invalid bounded input read");check();DWORD got=0;
-        require(ReadFile(file,dst,DWORD(bytes),&got,nullptr),"Producer input read failed");check();return got;
-    }
-    void write(const void*src,size_t bytes){
-        require(output&&bytes<=chunk&&owned.size<=limit&&bytes<=limit-owned.size,"Producer output exceeds planned bounded size");
-        check();budget();flushed=false;DWORD wrote=0;require(WriteFile(file,src,DWORD(bytes),&wrote,nullptr)&&wrote==bytes,"Native output write failed; incomplete file retained");
-        const auto after=inspect(file);require(after.volume==owned.volume&&after.id==owned.id&&after.size==owned.size+bytes,"Native output ownership or length changed");owned=after;check();
-    }
-    void flush(){check();require(FlushFileBuffers(file),"Native output flush failed; output is not certified");owned=inspect(file);check();flushed=true;}
-    void finalize_read_only(const std::string&expected_sha){
-        require(output&&flushed,"Payload must be flushed before closing its writer");check();const auto before=owned;
-        require(CloseHandle(file),"Cannot close completed payload writer");file=INVALID_HANDLE_VALUE;parents_ok();
-        file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-        require(file!=INVALID_HANDLE_VALUE,"Cannot acquire completed payload readonly lease");const auto final=inspect(file);
-        require(final.volume==before.volume&&final.id==before.id&&final.size==before.size,"Payload identity changed during writer-close/read-lease gap");
-        owned=final;output=false;check();hash digest;std::vector<uint8_t>buffer(chunk);uint64_t count=0;
-        for(;;){stop();const auto got=read(buffer.data(),buffer.size());if(!got)break;digest.update(buffer.data(),got);count+=got;}
-        require(count==owned.size&&digest.finish()==expected_sha,"Closed payload differs from its incremental SHA; no receipt may publish");check();
-    }
-    void publish(const std::filesystem::path&target){
-        require(output&&can_publish&&flushed,"Only an owned fully flushed pending receipt can publish");check();
-        require(target.is_absolute()&&target==target.lexically_normal()&&target.has_filename()&&target.parent_path()==path.parent_path()&&
-            target.filename().wstring().find(L':')==std::wstring::npos,"Receipt publication requires a sibling ordinary path");
-        // Prepare every allocation/validation before publication. ReplaceIfExists
-        // remains FALSE: a concurrent user file can never be overwritten.
-        std::filesystem::path destination=target;const auto name=destination.wstring();
-        // SetFileInformationByHandle reads the NUL-terminated FileName path.
-        // Keep FileNameLength exclusive of NUL, but include NUL in the buffer.
-        const size_t bytes=offsetof(FILE_RENAME_INFO,FileName)+(name.size()+1)*sizeof(wchar_t);
-        require(bytes<=65536,"Receipt publish path exceeds bounded metadata");std::vector<uint8_t>buffer(bytes,0);
-        auto*rename=reinterpret_cast<FILE_RENAME_INFO*>(buffer.data());rename->ReplaceIfExists=FALSE;rename->RootDirectory=nullptr;
-        rename->FileNameLength=DWORD(name.size()*sizeof(wchar_t));std::memcpy(rename->FileName,name.data(),rename->FileNameLength);
-        parents_ok();stop();require(SetFileInformationByHandle(file,FileRenameInfo,rename,DWORD(bytes)),"No-replace receipt publication failed; pending file retained");
-        // No fallible operation follows the atomic publication.
-        path.swap(destination);
-    }
-};
-struct contents {std::vector<uint8_t>bytes;std::string sha;identity id;};
-contents read_small(const std::filesystem::path&path,uint64_t maximum,bool retain=true){
-    native_file file;file.open(path,false,maximum);contents out;out.id=file.current();hash digest;
-    std::vector<uint8_t>buffer(chunk);uint64_t read=0;
-    for(;;){stop();const auto count=file.read(buffer.data(),buffer.size());if(!count)break;read+=count;require(read<=maximum,"Input grew beyond bounded read admission");
-        digest.update(buffer.data(),count);if(retain)out.bytes.insert(out.bytes.end(),buffer.begin(),buffer.begin()+count);}
-    require(read==out.id.size,"Input byte count changed while reading");out.sha=digest.finish();return out;
+// The file, digest, identity, RAM, VRAM, environment and cancellation layer:
+// Win32 primitives beside their POSIX twins, in this same namespace. It needs
+// require(), stop(), add() and the bounded constants above, so stop() is
+// declared here and defined below the include.
+namespace { void stop(); }
+#include "producer-platform.inc"
+
+namespace {
+bool should_stop(){
+    if(!llama_dsv41_host_memory::live())memory_abort.store(true);
+    if(abort_file_present())interrupted.store(true);
+    return interrupted.load()||memory_abort.load();
 }
-std::filesystem::path executable(){wchar_t name[32768]{};const auto n=GetModuleFileNameW(nullptr,name,32768);require(n&&n<32768,"Cannot identify actual producer binary");return std::filesystem::path(std::wstring(name,n));}
-uint64_t ram_admission(uint64_t admitted){MEMORYSTATUSEX memory{};memory.dwLength=sizeof(memory);require(GlobalMemoryStatusEx(&memory),"Cannot inspect available physical RAM");
-    require(memory.ullAvailPhys>=add(admitted,gib),"Producer job host plan exceeds available physicalRAM minus1GiB");return memory.ullAvailPhys;}
+void stop(){const bool stopping=should_stop();require(!stopping,memory_abort.load()?memory_failure_reason():"Producer cancelled; incomplete output retained and not certified");}
+
 const char*usage=
-"Offline original-1017 native producer (Windows CUDA, explicit compatible CUDA device)\n"
+"Offline original-1017 native producer (Linux CUDA, explicit compatible CUDA device)\n"
 "Required --key value pairs:\n"
 " --model --copy-receipt --tokens-le32 --cuda-device --context --build-sha\n"
 " --provider-device-bytes --provider-host-bytes --cache-bytes --graph-bytes\n"
@@ -251,7 +102,7 @@ const char*usage=
 " --runtime-min-free-gib (default 0.5; 0 disables the runtime RAM floor; paging stop remains)\n"
 " --carry-outstanding-bytes --output-outstanding-bytes --payload --receipt\n"
 "Optional --carry-storage file|ram|hybrid (default file; no automatic fallback).\n"
-"Hybrid requires --carry-ram-prefix-tokens and --carry-disk-reserve-bytes; exclusive-new D: overflow, batched unbuffered tiles.\n"
+"Hybrid requires --carry-ram-prefix-tokens and --carry-disk-reserve-bytes; exclusive-new overflow file, batched tiles.\n"
 "Optional --fetch-profile baseline|two-buffer-1500-auto|two-buffer-1500-auto-async (default baseline; qualification remains separate).\n"
 "Optional --direct-carry-budget 0|1 (default0; pinned RAM leases, page-sized vector reads, explicit tighter capacity).\n"
 "Optional --compute-tile 32|128|512|2048|4096 (default32; larger tiles require admitted RAM carry).\n"
@@ -263,14 +114,14 @@ const char*usage=
 "Optional --pv-strided-probabilities 0|1 (default0; native F32 PV without probability copy).\n"
 "Optional --reuse-child-raw-metadata 0|1 (default0; omit unused grouped child arrays).\n"
 "Optional --yoco-keep 0|140|2541 (default0; 140 approximate, 2541 exact dependency cone).\n"
-"Optional --unaligned-append-step-tokens 0|2048 (default0; explicit bounded continuation after Mac decode, unchanged fixed owners).\n"
+"Optional --unaligned-append-step-tokens 0|2048 (default0; explicit bounded continuation after decode, unchanged fixed owners).\n"
 "Optional --resident-pageable-copies 0|1 (default0; resident paired RAM mirrors use existing bounded backend vector copies).\n"
 "Optional --tile-host-registration 0|1 (default0; paired full-resident plan registers only its current RAM lease).\n"
 "Optional --pinned-device-bytes <bytes> (default0; native-expert direct pinned RAM copies/GPU validation; minimum67108864).\n"
 "Optional --reuse-graph 0|1|2 (default0;1 keeps allocator;2 also reuses layer graph variants).\n"
 "Optional --native-base-contract-sha256 <pin> --native-base-owner-epoch <epoch>: mode1 RAM/pipe bootstrap.\n"
 "Optional --cast-device-bytes <bytes> (default0; reuse existing half weight casts in allocator mode1); --cast-audit 0|1.\n"
-"Optional --engram-prefetch-bytes <bytes> (default0; whole-prompt raw row cache on its own IoRing).\n"
+"Optional --engram-prefetch-bytes <bytes> (default0; whole-prompt raw row cache on its own io_uring queue).\n"
 "Optional --prefetch-device-bytes <bytes> (default0; bounded next-tile pinned H2D overlap).\n"
 "Optional --ds-gpu-ring-slots 0|2 (default0; one-shot TEST full-pass queue).\n"
 "Optional --ds-submit-threads 0|1|2|4; --cuda-blocking-sync 0|1 (default0; scheduling TEST).\n"
@@ -282,7 +133,14 @@ const char*usage=
 
 #include "live-session.inc"
 
+// Command arguments are UTF-16 on Windows and bytes here; both are converted
+// once, so the parsing below sees UTF-8 text either way.
+#if defined(_WIN32)
 int wmain(int argc,wchar_t**argv){
+#else
+int main(int argc,char**argv){
+#endif
+    const std::vector<std::string> arguments=[&]{std::vector<std::string> out;for(int i=0;i<argc;++i)out.push_back(argument(argv[i]));return out;}();
     // Backend is declared first so the sweep (which synchronizes on teardown)
     // is destroyed before its externally owned backend on every return path.
     ggml_backend_ptr backend;session_output_redirect session_output;
@@ -292,7 +150,7 @@ int wmain(int argc,wchar_t**argv){
     // CUDA module loading: the driver default (LAZY) unless CUDA_MODULE_LOADING is set.
     // Forced EAGER was measured slower (43K ABAB, 2026-10-25: L0 first-tile stall +26.8/+7.8 s)
     // and dropped; the effective mode is still logged (module_loading=).
-    const wchar_t*module_loading_env=_wgetenv(L"CUDA_MODULE_LOADING");
+    const char*module_loading_env=std::getenv("CUDA_MODULE_LOADING");
     const bool module_loading_default=!module_loading_env||!*module_loading_env;
     try{
         static std::array<char,1024*1024> stderr_storage;
@@ -301,17 +159,17 @@ int wmain(int argc,wchar_t**argv){
         require(!buffer_env||buffered_stderr,"Diagnostic stderr buffer requires exactly1048576bytes");
         if(buffered_stderr)require(std::setvbuf(stderr,stderr_storage.data(),_IOFBF,stderr_storage.size())==0,"Cannot configure existing CRT stderr buffer");
         report["stderr_buffer_bytes"]=buffered_stderr?stderr_storage.size():0;
-        if(argc==2&&std::wstring(argv[1])==L"--help"){std::cout<<usage;return 0;}
+        if(arguments.size()==2&&arguments[1]=="--help"){std::cout<<usage;return 0;}
         // LLAMADECODE: every abort leaves a reason (stderr line + session error reply), including
         // an exception escaping a thread (std::terminate) or an unhandled structured exception.
         producer_abort::install();
         llama_dsv41_test_fault::announce();
-        if(argc==2&&std::wstring(argv[1])==L"--check-native-profiles"){slstack_native_profile_check();return 0;}
+        if(arguments.size()==2&&arguments[1]=="--check-native-profiles"){slstack_native_profile_check();return 0;}
         const std::vector<std::string>keys={"--model","--copy-receipt","--tokens-le32","--cuda-device","--context","--build-sha",
             "--provider-device-bytes","--provider-host-bytes","--cache-bytes","--graph-bytes","--job-device-bytes","--job-host-bytes","--gpu-reserve-bytes",
             "--carry","--carry-file-bytes","--carry-host-bytes","--carry-outstanding-bytes","--output-outstanding-bytes","--payload","--receipt"};
-        require(argc>=1+int(keys.size())*2&&argc<=1+int(keys.size())*2+128*2&&argc%2==1,"Expected every explicit required --key value pair; use --help");std::map<std::string,std::string>args;
-        for(int i=1;i<argc;i+=2){auto key=utf8(argv[i]);require((key=="--yoco-remote-state-version"||key=="--vision-spans-file"||key=="--yoco-keep"||key=="--session-owner-epoch"||key=="--switch-arena"||key=="--native-base-contract-sha256"||key=="--native-base-owner-epoch"||key=="--unaligned-append-step-tokens"||key=="--reuse-child-raw-metadata"||key=="--session-stdio"||key=="--session-id"||key=="--session-control-host-bytes"||key=="--session-idle-timeout-ms"||key=="--native-rhs-pack"||key=="--split-f32-tensor-core-qk"||key=="--split-f32-tensor-core-pv"||key=="--fuse-kv-gather-half"||key=="--ds-zero-padding-only"||key=="--pv-strided-probabilities"||key=="--pv-view-f32"||key=="--compact-kv-gather"||key=="--masked-half-inplace"||key=="--native-loader-unroll"||key=="--native-expert-columns"||key=="--fixed-resident-plan"||key=="--export-hash-only"||key=="--backend-temporary-reserve-bytes"||key=="--compute-step-tokens"||key=="--prefill-chunk-tokens"||key=="--prefill-sweep-tokens"||key=="--prefill-fold-cap-tokens"||key=="--attention-kv-f16-table"||key=="--index-key-windows"||key=="--capture-dspark"||key=="--compressed-cache-bf16"||key=="--ctx-cache-precision"||key=="--ctx-cache-growable"||key=="--dense-activation-q8-1"||key=="--expert-weights-activations-fp4"||key=="--resident-pageable-copies"||key=="--tile-host-registration"||key=="--hc-bf16-epilogue"||key=="--reuse-expert-routing-map"||key=="--sort-expert-routing"||key=="--pair-ffn-tiles"||key=="--engram-tile-lookahead"||key=="--warmup-one-token"||key=="--fixed-direct-open"||key=="--batch-seed-ram"||key=="--carry-compact-record"||key=="--dense-mxfp4"||key=="--hc-projection-f16-gemm"||key=="--merge-attention-selected-rows"||key=="--resident-metadata"||key=="--resident-compact-ids"||key=="--async-input-uploads"||key=="--resident-hidden-bf16"||key=="--resident-hidden-final-readback"||key=="--coalesce-dense-projections"||key=="--direct-carry-budget"||key=="--expert-f16-cublas"||key=="--token-tile-attention-f16-probabilities"||key=="--index-f32-cublas"||key=="--index-bf16"||key=="--dense-inputs-f16"||key=="--shared-flash-attention"||key=="--shared-sparse-attention"||key=="--carry-ram-prefix-tokens"||key=="--carry-disk-reserve-bytes"||key=="--carry-storage"||key=="--fetch-profile"||key=="--compute-tile"||key=="--hidden-device-bytes"||key=="--pinned-device-bytes"||key=="--reuse-graph"||key=="--cast-device-bytes"||key=="--cast-audit"||key=="--engram-prefetch-bytes"||key=="--ds-submit-threads"||key=="--cuda-blocking-sync"||key=="--index-cublas-device-bytes"||key=="--ds-gpu-ring-slots"||key=="--prefetch-device-bytes"||key=="--expert-profile"||key=="--expert-workspace-bytes"||key=="--expert-runtime-bytes"||key=="--runtime-min-free-gib"||std::find(keys.begin(),keys.end(),key)!=keys.end())&&!args.count(key),"Unknown or repeated producer option");args[key]=utf8(argv[i+1]);}
+        require(arguments.size()>=1+keys.size()*2&&arguments.size()<=1+keys.size()*2+128*2&&arguments.size()%2==1,"Expected every explicit required --key value pair; use --help");std::map<std::string,std::string>args;
+        for(size_t i=1;i<arguments.size();i+=2){const std::string&key=arguments[i];require((key=="--yoco-remote-state-version"||key=="--vision-spans-file"||key=="--yoco-keep"||key=="--session-owner-epoch"||key=="--switch-arena"||key=="--native-base-contract-sha256"||key=="--native-base-owner-epoch"||key=="--unaligned-append-step-tokens"||key=="--reuse-child-raw-metadata"||key=="--session-stdio"||key=="--session-id"||key=="--session-control-host-bytes"||key=="--session-idle-timeout-ms"||key=="--native-rhs-pack"||key=="--split-f32-tensor-core-qk"||key=="--split-f32-tensor-core-pv"||key=="--fuse-kv-gather-half"||key=="--ds-zero-padding-only"||key=="--pv-strided-probabilities"||key=="--pv-view-f32"||key=="--compact-kv-gather"||key=="--masked-half-inplace"||key=="--native-loader-unroll"||key=="--native-expert-columns"||key=="--fixed-resident-plan"||key=="--export-hash-only"||key=="--backend-temporary-reserve-bytes"||key=="--compute-step-tokens"||key=="--prefill-chunk-tokens"||key=="--prefill-sweep-tokens"||key=="--prefill-fold-cap-tokens"||key=="--attention-kv-f16-table"||key=="--index-key-windows"||key=="--capture-dspark"||key=="--compressed-cache-bf16"||key=="--ctx-cache-precision"||key=="--ctx-cache-growable"||key=="--dense-activation-q8-1"||key=="--expert-weights-activations-fp4"||key=="--resident-pageable-copies"||key=="--tile-host-registration"||key=="--hc-bf16-epilogue"||key=="--reuse-expert-routing-map"||key=="--sort-expert-routing"||key=="--pair-ffn-tiles"||key=="--engram-tile-lookahead"||key=="--warmup-one-token"||key=="--fixed-direct-open"||key=="--batch-seed-ram"||key=="--carry-compact-record"||key=="--dense-mxfp4"||key=="--hc-projection-f16-gemm"||key=="--merge-attention-selected-rows"||key=="--resident-metadata"||key=="--resident-compact-ids"||key=="--async-input-uploads"||key=="--resident-hidden-bf16"||key=="--resident-hidden-final-readback"||key=="--coalesce-dense-projections"||key=="--direct-carry-budget"||key=="--expert-f16-cublas"||key=="--token-tile-attention-f16-probabilities"||key=="--index-f32-cublas"||key=="--index-bf16"||key=="--dense-inputs-f16"||key=="--shared-flash-attention"||key=="--shared-sparse-attention"||key=="--carry-ram-prefix-tokens"||key=="--carry-disk-reserve-bytes"||key=="--carry-storage"||key=="--fetch-profile"||key=="--compute-tile"||key=="--hidden-device-bytes"||key=="--pinned-device-bytes"||key=="--reuse-graph"||key=="--cast-device-bytes"||key=="--cast-audit"||key=="--engram-prefetch-bytes"||key=="--ds-submit-threads"||key=="--cuda-blocking-sync"||key=="--index-cublas-device-bytes"||key=="--ds-gpu-ring-slots"||key=="--prefetch-device-bytes"||key=="--expert-profile"||key=="--expert-workspace-bytes"||key=="--expert-runtime-bytes"||key=="--runtime-min-free-gib"||std::find(keys.begin(),keys.end(),key)!=keys.end())&&!args.count(key),"Unknown or repeated producer option");args[key]=arguments[i+1];}
         for(const auto&key:keys)require(args.count(key),"Missing explicit producer option");
         require(llama_dsv41_host_memory::configure_runtime_min_free_gib(args.count("--runtime-min-free-gib")?args.at("--runtime-min-free-gib").c_str():"0.5"),
             "--runtime-min-free-gib must be finite and nonnegative (<2**34); 0 disables it");
@@ -351,8 +209,8 @@ int wmain(int argc,wchar_t**argv){
         const auto fetch_profile=args.count("--fetch-profile")?args.at("--fetch-profile"):"baseline";
         require(fetch_profile=="baseline"||fetch_profile=="two-buffer-1500-auto"||fetch_profile=="two-buffer-1500-auto-async"||fetch_profile=="two-buffer-250-auto-async"||fetch_profile=="single-buffer-250-auto-async"||fetch_profile=="two-buffer-direct-auto-async","Unsupported explicit fetch-profile");
         report["declared_fetch_profile"]=fetch_profile;
-        require(SetConsoleCtrlHandler(interrupt,TRUE),"Cannot install producer cancellation handler");
-        auto path=[&](const char*key){return std::filesystem::u8path(args.at(key));};auto number=[&](const char*key){return integer(args.at(key));};
+        install_cancellation();
+        auto path=[&](const char*key){return native_path(args.at(key));};auto number=[&](const char*key){return integer(args.at(key));};
         llama_dsv41_expert_profile::policy expert;
         expert.profile=llama_dsv41_expert_profile::parse(args.count("--expert-profile")?args.at("--expert-profile").c_str():"existing");
         require(!args.count("--shared-sparse-attention")||args.at("--shared-sparse-attention")=="0"||args.at("--shared-sparse-attention")=="1","shared-sparse-attention requires0/1");
@@ -376,7 +234,7 @@ int wmain(int argc,wchar_t**argv){
         require(!index_f32||(!expert.index_bf16&&llama_dsv41_expert_profile::native(expert)&&tile_tokens<=4096&&
             args.count("--index-cublas-device-bytes")&&integer(args.at("--index-cublas-device-bytes"))>=64ull*1024*1024),
             "F32 cuBLAS indexer requires exclusive F32 operands, native expert profile, <=4K tile and explicit 64MiB workspace");
-        require(_putenv_s("LLAMA_DSV41_INDEX_F32_CUBLAS",index_f32?"1":"0")==0,"Cannot bind explicit F32 index selection");
+        require(set_environment("LLAMA_DSV41_INDEX_F32_CUBLAS",index_f32?"1":"0"),"Cannot bind explicit F32 index selection");
         report["indexer_f32_cublas"]={{"enabled",index_f32},{"operands","unconverted F32"},{"accumulation","pedantic F32 GEMM; original ordered F32 head reduction"},{"changed_dot_reduction",index_f32},{"numerically_qualified",false}};
 
         require(!expert.index_bf16||(args.count("--index-cublas-device-bytes")&&integer(args.at("--index-cublas-device-bytes"))>=64ull*1024*1024),"BF16 indexer requires its explicit existing64MiB device admission");
@@ -417,7 +275,7 @@ int wmain(int argc,wchar_t**argv){
         const auto explicit_layout_option=[&](const char*key,const char*env){
             require(!args.count(key)||args.at(key)=="0"||args.at(key)=="1","Explicit producer options require0/1");
             const bool enabled=args.count(key)&&args.at(key)=="1";
-            require(_putenv_s(env,enabled?"1":"0")==0,"Cannot bind explicit producer option");return enabled;
+            require(set_environment(env,enabled?"1":"0"),"Cannot bind explicit producer option");return enabled;
         };
         const bool rhs_pack=explicit_layout_option("--native-rhs-pack","LLAMA_DSV41_NATIVE_RHS_PACK");
         const bool reuse_child=explicit_layout_option("--reuse-child-raw-metadata","LLAMA_DSV41_REUSE_CHILD_RAW_METADATA");
@@ -465,7 +323,7 @@ int wmain(int argc,wchar_t**argv){
         report["producer_binary_sha256"]=built.sha;report["caller_expected_build_sha256"]=args.at("--build-sha");
         report["build_binding_limit"]="Executable SHA only; sharedDLL contents are not independently bound by this receipt";
         const auto copy=read_small(path("--copy-receipt"),chunk);const auto parsed=json::parse(copy.bytes.begin(),copy.bytes.end());
-        const auto model_name=path("--model").filename().u8string();
+        const auto model_name=path_text(path("--model").filename());
         const auto&entry=parsed.at("receipts").at(model_name);
         const auto model_digest=entry.at("sha256").get<std::string>();
         require(hex_sha(model_digest),"No completed lowercase SHA256 receipt for selected weights");
@@ -568,8 +426,11 @@ int wmain(int argc,wchar_t**argv){
             (flashinfer_reserve&&base_backend_reserve==llama_dsv41_flashinfer::reserve_bytes()),"Backend reserve must match the explicit arithmetic/workspace plan");
         require(!flashinfer_reserve||base_backend_reserve==llama_dsv41_flashinfer::reserve_bytes(),"FlashInfer requires its bounded workspace inside the existing graph device cap");
         const auto output_volume=native_file::volume(path("--payload"));
-        require(!hybrid||(path("--carry").root_name()==L"D:"&&llama_dsv41_expert_profile::native(expert)&&disk_reserve==1024ull*1024*1024),
-            "Hybrid TEST requires D: overflow, native experts and explicit1GiB disk reserve");
+        // Windows kept the hybrid overflow file on the dedicated D: volume;
+        // Linux has no drive letters, so the fixed local volume rule above is
+        // the admission and the explicit 1GiB reserve stays required.
+        require(!hybrid||(llama_dsv41_expert_profile::native(expert)&&disk_reserve==1024ull*1024*1024),
+            "Hybrid TEST requires native experts and explicit1GiB disk reserve on a fixed local volume");
         const bool receipt_overlap=native_file::volume(path("--receipt"))==output_volume;
         const bool overlap=!resident_ram&&native_file::volume(path("--carry"))==output_volume;
         const auto carry_other=number("--carry-outstanding-bytes"),output_other=number("--output-outstanding-bytes");
@@ -585,15 +446,15 @@ int wmain(int argc,wchar_t**argv){
         const auto pending_output=add(output_other,overlap?carry_budget.disk_bytes:0);
         const auto output_floor=hybrid?disk_reserve:ds4perf_output_budget::floor(resident_ram,llama_dsv41_expert_profile::native(expert),
             number("--carry-file-bytes"),carry_other,output_other);
-        const auto final_receipt=path("--receipt");require(final_receipt.filename().wstring().find(L':')==std::wstring::npos,"Receipt alternate data streams are forbidden");
-        require(GetFileAttributesW(final_receipt.c_str())==INVALID_FILE_ATTRIBUTES&&GetLastError()==ERROR_FILE_NOT_FOUND,"Final receipt must not exist");
-        const auto nonce=std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(clock_type::now().time_since_epoch().count());
-        const auto pending_receipt=final_receipt.parent_path()/(final_receipt.filename().wstring()+L".pending-"+nonce);
-        report["receipt_path"]=args.at("--receipt");report["pending_receipt_path"]=pending_receipt.u8string();
+        const auto final_receipt=path("--receipt");require(path_text(final_receipt.filename()).find(':')==std::string::npos,"Receipt alternate data streams are forbidden");
+        require(file_absent(final_receipt),"Final receipt must not exist");
+        const auto nonce=std::to_string(process_id())+"-"+std::to_string(clock_type::now().time_since_epoch().count());
+        const auto pending_receipt=final_receipt.parent_path()/(path_text(final_receipt.filename())+".pending-"+nonce);
+        report["receipt_path"]=args.at("--receipt");report["pending_receipt_path"]=path_text(pending_receipt);
         if(!hash_only){payload.reset(new native_file);payload->open(path("--payload"),true,plan.bytes,add(pending_output,receipt_overlap?receipt_limit:0),false,output_floor);}
         receipt.reset(new native_file);receipt->open(pending_receipt,true,receipt_limit,
             receipt_overlap?add(pending_output,plan.bytes):0,true,output_floor);
-        std::cerr<<"Pending receipt (retained on failure): "<<pending_receipt.u8string()<<"\n";
+        std::cerr<<"Pending receipt (retained on failure): "<<path_text(pending_receipt)<<"\n";
         report["model"]={{"path",args.at("--model")},{"sha256",model_sha},{"verified_bytes",model_bytes},{"receipt_identity",id},{"expected_filetime_ticks",mtime_ns/100+epoch_ticks}};
         report["copy_receipt_sha256"]=copy.sha;report["tokens"]={{"path",args.at("--tokens-le32")},{"sha256",tokenfile.sha},{"count",tokens.size()},{"encoding","LE32 unchanged IDs"}};
         report["payload"]={{"path",hash_only?json(nullptr):json(args.at("--payload"))},{"planned_bytes",plan.bytes},{"hash_only",hash_only}};
@@ -919,7 +780,7 @@ int wmain(int argc,wchar_t**argv){
             warm_options.coalesce_dense=false;warm_options.dense_mxfp4=false;warm_options.expert.expert_mxfp4=false;
             if(expert.expert_mxfp4)std::fprintf(stderr,"DS4PERF_EXPERT_MXFP4_WARMUP_ORIGINAL tokens=1 large_batch_only_weight_pack=1 explicit=1\n");
             if(warm_weights.engram_prefetch_host_bytes)warm_weights.engram_prefetch_tokens=1;
-            std::fprintf(stderr,"DS4PERF_WARMUP_BEGIN pid=%lu tokens=1 export=0\n",GetCurrentProcessId());std::fflush(stderr);
+            std::fprintf(stderr,"DS4PERF_WARMUP_BEGIN pid=%lu tokens=1 export=0\n",(unsigned long)process_id());std::fflush(stderr);
             const auto warm_started=clock_type::now();
             warm_request.reset(new llama_dsv41_sweep);
             // LLAMADECODE_ENGRAM_EARLY: the real prompt's rows start inside the
@@ -933,7 +794,7 @@ int wmain(int argc,wchar_t**argv){
             }
             success(warm_request->open(warm_weights,warm_options,error),error);
             // DS4COMBO producer-warm: the prompt's tokens are known now, so its
-            // Engram rows load on their own IoRing during this warmup pass.
+            // Engram rows load on their own io_uring queue during this warmup pass.
             {const char*overlap=std::getenv("LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP");
              // Auto (or a skipped =1 start) that queued nothing: the ordinary producer-warm start.
              if(!(engram_early&&warm_request->early_engram_queued())&&weights.engram_prefetch_host_bytes&&options.engram_tile_lookahead&&overlap&&std::strcmp(overlap,"1")==0){
@@ -946,7 +807,7 @@ int wmain(int argc,wchar_t**argv){
             require(warm_request->ready(),"One-token warmup did not complete its actual40-layer prefill/head");
             ggml_backend_synchronize(backend.get());stop();
             report["phase_ms"]["one_token_warmup_and_retirement"]=ms(warm_started);
-            report["warm_measurement"]={{"enabled",true},{"warmup_tokens",1},{"producer_pid",GetCurrentProcessId()},
+            report["warm_measurement"]={{"enabled",true},{"warmup_tokens",1},{"producer_pid",process_id()},
                 {"same_process_and_CUDA_backend",true},{"request_allocations_recreated",!bool(options.fixed)},{"request_tensor_contexts_recreated",true},{"physical_RAM_bank_reused",bool(options.fixed)},{"large_GPU_buffers_reused",bool(options.fixed)},{"provider_model_lease_heaps_requests_reused",true},{"warmup_exported",false},
                 {"one_token_dense_path","Existing narrow path; F16 dense tags/coalescing/FP4 pack require large batch and are disabled for this one-token request"},
                 {"scope","Prompt run only; model/provider/cache/resident allocation in open excluded; prompt graph work, Engram and required head included; bulk hidden export preparation, serialization and Mac transfer separate"}};
@@ -980,7 +841,7 @@ int wmain(int argc,wchar_t**argv){
                 success(sweep->start_next_engram(first,early_tail,error),error);
             }}
         report["stateful_chunks"]={{"enabled",chunk_option!=0},{"maximum_chunk_tokens",chunk_tokens},{"total_context_tokens",tokens.size()},{"chunks",json::array()},{"canonical_cache_preserved",chunk_option!=0},{"token_history_host_charge_bytes",chunk_option?context*8:tokens.size()*8}};
-        if(warm){std::fprintf(stderr,"DS4PERF_WARM_PROMPT_BEGIN pid=%lu tokens=%zu\n",GetCurrentProcessId(),tokens.size());std::fflush(stderr);}
+        if(warm){std::fprintf(stderr,"DS4PERF_WARM_PROMPT_BEGIN pid=%lu tokens=%zu\n",(unsigned long)process_id(),tokens.size());std::fflush(stderr);}
         started=clock_type::now();double total_prompt_ms=0,total_export_ms=0,append_open_ms=0,total_token_prepare_ms=0;
         for(const auto&extent:sweep_extents){
             const uint32_t first=extent.first,count=extent.count;
@@ -1009,7 +870,7 @@ int wmain(int argc,wchar_t**argv){
         report["phase_ms"]["final_hidden_export_preparation"]=run_timing.export_preparation_ms;
         report["phase_ms"]["run_dispatch_bookkeeping"]=std::max(0.0,enclosing_run_ms-run_timing.prompt_processing_ms-run_timing.export_preparation_ms);
         report["run_timing_scope"]="Actual sequential clock boundary after required head/sync; bulk hidden export readback and certification measured separately; no subtraction of aggregate GPU counters";
-        if(warm){report["warm_measurement"]["prompt_processing_ms"]=report["phase_ms"]["embedding_40_layers_head"];std::fprintf(stderr,"DS4PERF_WARM_PROMPT_END pid=%lu tokens=%zu processing_ms=%.6f export_excluded=1\n",GetCurrentProcessId(),tokens.size(),report["phase_ms"]["embedding_40_layers_head"].get<double>());}
+        if(warm){report["warm_measurement"]["prompt_processing_ms"]=report["phase_ms"]["embedding_40_layers_head"];std::fprintf(stderr,"DS4PERF_WARM_PROMPT_END pid=%lu tokens=%zu processing_ms=%.6f export_excluded=1\n",(unsigned long)process_id(),tokens.size(),report["phase_ms"]["embedding_40_layers_head"].get<double>());}
         auto scheduled_graphs=[&](uint32_t step,bool compressed_only=false){
             uint64_t n=0;
             for(const auto&e:sweep_extents){
@@ -1163,5 +1024,5 @@ int wmain(int argc,wchar_t**argv){
 }
 #else
 #include <cstdio>
-int main(){std::fputs("Offline V4.1 producer requires the opt-in Windows CUDA build; no model or output was opened.\n",stderr);return 2;}
+int main(){std::fputs("Offline V4.1 producer requires a CUDA build (GGML_CUDA=ON); no model or output was opened.\n",stderr);return 2;}
 #endif

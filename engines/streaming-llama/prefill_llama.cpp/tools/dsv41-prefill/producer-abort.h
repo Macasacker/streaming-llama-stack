@@ -5,11 +5,12 @@
 // instead of a silently closed pipe (the client saw "reply truncated").
 // kinds: exception (std::exception on the session thread, including a worker
 // failure marshalled to it), bad_alloc, unknown_exception, terminate (an
-// exception escaped a thread: std::terminate), abort (abort() with no exception), seh (an unhandled structured
-// exception: access violation, stack overflow, ...).
+// exception escaped a thread: std::terminate), abort (abort() with no exception),
+// seh (an unhandled structured exception: access violation, stack overflow, ...),
+// signal (the POSIX twin of seh: SIGSEGV, SIGBUS, SIGFPE, SIGILL).
 // The reply and the reason line are built without heap allocation into fixed
 // buffers, so they still go out under bad_alloc or from the crash handlers.
-#include <windows.h>
+#include "producer-wire.h"
 #include <algorithm>
 #include <atomic>
 #include <csignal>
@@ -20,10 +21,14 @@
 #include <exception>
 #include <new>
 #include <string>
+#if !defined(_WIN32)
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 namespace producer_abort {
 
-inline HANDLE wire = nullptr;                 // private session output once bound (else stderr only)
+inline producer_wire::handle wire = producer_wire::unarmed();    // private session output once bound (else stderr only)
 inline char prefix[512] = {};                 // {"status":"error","session":..,"model_sha256":..[,"owner_epoch":N]
 inline std::atomic<uint64_t> sequence{0};     // the session operation being served (0 = startup / ready)
 inline std::atomic<bool> reported{false};     // one report per process
@@ -46,8 +51,17 @@ inline size_t escape(char *out, size_t cap, const char *in) {
     return n;
 }
 
+// The crashing thread's identity, for the reason line only.
+inline unsigned long thread_id() {
+#if defined(_WIN32)
+    return (unsigned long)GetCurrentThreadId();
+#else
+    return (unsigned long)syscall(SYS_gettid);
+#endif
+}
+
 // Bind the reply to the session pipe (after session_output.bind()).
-inline void arm(HANDLE output, const std::string &session, const char *model_sha, uint64_t owner_epoch) {
+inline void arm(producer_wire::handle output, const std::string &session, const char *model_sha, uint64_t owner_epoch) {
     char s[160], m[160];
     escape(s, sizeof s, session.c_str());
     escape(m, sizeof m, model_sha);
@@ -75,11 +89,10 @@ inline void report(const char *kind, const char *reason, uint32_t code = 0) {
     std::fprintf(stderr, "LLAMADECODE_PRODUCER_ABORT kind=%s code=0x%08lX sequence=%llu reason=%s\n", kind, (unsigned long)code,
                  (unsigned long long)sequence.load(), text);
     std::fflush(stderr);
-    if (!wire) return;
+    if (wire == producer_wire::unarmed()) return;
     char line[4096];
     const int n = reply_line(line, sizeof line, kind, code, reason);
-    DWORD sent = 0;
-    if (n > 0) WriteFile(wire, line, DWORD(std::min<size_t>(size_t(n), sizeof line - 1)), &sent, nullptr);
+    if (n > 0) (void)producer_wire::write_all(wire, line, size_t(n));
 }
 
 // Report the exception being handled (call inside a catch block).
@@ -101,6 +114,7 @@ inline void report_current(const char *context = nullptr, const char *kind_overr
     report(kind_override ? kind_override : kind, reason);
 }
 
+#if defined(_WIN32)
 // Last-chance handlers: an exception escaping any thread (std::terminate) or an
 // unhandled structured exception still leaves the reason line and the reply.
 inline LONG WINAPI unhandled(EXCEPTION_POINTERS *info) {
@@ -108,30 +122,53 @@ inline LONG WINAPI unhandled(EXCEPTION_POINTERS *info) {
     const DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
     const void *address = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionAddress : nullptr;
     std::snprintf(reason, sizeof reason, "unhandled structured exception 0x%08lX at %p (thread %lu)", (unsigned long)code, address,
-                  (unsigned long)GetCurrentThreadId());
+                  thread_id());
     report("seh", reason, code);
     return EXCEPTION_CONTINUE_SEARCH;   // the normal crash path (WER, exit code) continues
 }
+#else
+// The POSIX twin of the structured-exception filter. The reply goes out first;
+// SA_RESETHAND restores the original disposition on entry, so the signal that
+// is raised again after this handler returns takes the normal crash path
+// (exit status, core dump) exactly as EXCEPTION_CONTINUE_SEARCH does.
+inline void unhandled_signal(int number) {
+    char reason[256];
+    std::snprintf(reason, sizeof reason, "unhandled signal %d (thread %lu)", number, thread_id());
+    report("signal", reason, uint32_t(number));
+    raise(number);
+}
+#endif
 inline void terminate_handler() {
     char context[64];
-    std::snprintf(context, sizeof context, "std::terminate on thread %lu", (unsigned long)GetCurrentThreadId());
+    std::snprintf(context, sizeof context, "std::terminate on thread %lu", thread_id());
     if (std::current_exception()) {
         try { std::rethrow_exception(std::current_exception()); } catch (...) { report_current(context, "terminate"); }
     } else report("terminate", context);
     std::abort();
 }
-// MSVC's std::set_terminate is per thread, so an exception escaping a worker
+// std::set_terminate is per thread on MSVC, so an exception escaping a worker
 // thread reaches abort() through the default handler: SIGABRT (process-wide)
 // reports it, with the escaping exception's text when it is still current.
 inline void abort_signal(int) {
     char context[64];
-    std::snprintf(context, sizeof context, "abort() on thread %lu", (unsigned long)GetCurrentThreadId());
+    std::snprintf(context, sizeof context, "abort() on thread %lu", thread_id());
     if (std::current_exception()) {
         try { std::rethrow_exception(std::current_exception()); } catch (...) { report_current(context, "terminate"); }
     } else report("abort", context);
 }
 inline void install() {
+#if defined(_WIN32)
     SetUnhandledExceptionFilter(unhandled);
+#else
+    const int fatal[]{SIGSEGV, SIGBUS, SIGFPE, SIGILL};
+    for(const int number:fatal){
+        struct sigaction action{};
+        action.sa_handler=unhandled_signal;
+        sigemptyset(&action.sa_mask);
+        action.sa_flags=SA_RESETHAND;      // one report, then the original disposition
+        sigaction(number,&action,nullptr);
+    }
+#endif
     std::set_terminate(terminate_handler);
     std::signal(SIGABRT, abort_signal);
 }

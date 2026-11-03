@@ -66,7 +66,7 @@ if [ "$target" = llama ] || [ "$target" = all ]; then
         -DGGML_CUDA_DSV41_SPLIT_F32=ON \
         -DGGML_CUDA_CUTLASS_PATH="$cutlass"
     cmake --build "$root/build/llama" --parallel 2 --target llama-server llama-export-lora slstack-weight-fetcher llama-dsv41-prefill
-    echo 'llama-dsv41-prefill links but its main() is still the non-Windows stub: the offline producer is Windows-guarded in tools/dsv41-prefill/main.cpp.' >&2
+    echo 'llama-dsv41-prefill runs on Linux: --check-native-profiles passes; a prefill still needs qualified weights and the Linux weight-provider lease (docs/linux-port-plan.md chunk 3.1d).' >&2
 fi
 
 echo "Built target '$target' against runtime root $runtime"

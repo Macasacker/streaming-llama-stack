@@ -2,8 +2,21 @@
 // Reuse the native phase tracker and the Studio/native ds4 sampler. No CUDA
 // state is serialized; the side channel contains only a few sampling numbers.
 #include "../../../../ds4/ds4_quality_phase.h"
+#include "producer-platform.h"
 #include <fstream>
 #include <cmath>
+#include <cstdint>
+#include <cstdio>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 extern "C" int slstack_sample_logits(const float*,int,float,int,float,float,uint64_t*);
 
 struct studio_generation {
@@ -40,12 +53,24 @@ struct studio_generation {
     void refresh(){
         if(!configured)return;
         try{
-            // Share delete permits atomic replace while generation is reading.
+            // Reading a fresh descriptor each time is what lets the parent
+            // replace the control file atomically while generation is reading.
+#if defined(_WIN32)
             HANDLE f=CreateFileW(control.c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
                 nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
             check(f!=INVALID_HANDLE_VALUE,"Cannot read live generation control");
             char bytes[16384];DWORD got=0;const DWORD size=GetFileSize(f,nullptr);
             const bool ok=size>0&&size<sizeof(bytes)&&ReadFile(f,bytes,size,&got,nullptr)&&got==size;CloseHandle(f);
+#else
+            const int f=open(control.c_str(),O_RDONLY|O_CLOEXEC);
+            check(f>=0,"Cannot read live generation control");
+            struct stat st{};
+            const int64_t size=fstat(f,&st)==0&&S_ISREG(st.st_mode)?int64_t(st.st_size):-1;
+            char bytes[16384];
+            const bool ok=size>0&&uint64_t(size)<sizeof(bytes)&&::read(f,bytes,size_t(size))==size;
+            close(f);
+            const size_t got=ok?size_t(size):0;
+#endif
             check(ok,"Live generation control exceeds 16 KiB or is truncated");
             auto next=json::parse(bytes,bytes+got);validate(next);
             if(settings.is_null()||next.at("revision")>=settings.at("revision"))settings=std::move(next);
@@ -61,7 +86,7 @@ struct studio_generation {
     }
     void begin(const json&j){
         check(j.is_object()&&j.size()==8,"Invalid generation command");
-        auto path=std::filesystem::u8path(j.at("vocabulary_file").get<std::string>());
+        auto path=producer_text::native_path(j.at("vocabulary_file").get<std::string>());
         if(vocabulary.empty()){
             std::ifstream f(path,std::ios::binary);check(bool(f),"Cannot read generation vocabulary");
             f.seekg(0,std::ios::end);const auto extent=f.tellg();check(extent>0&&extent<=16*1024*1024,"Vocabulary exceeds 16 MiB");f.seekg(0);
@@ -78,7 +103,7 @@ struct studio_generation {
         for(auto it=overrides.begin();it!=overrides.end();++it){
             const auto&k=it.key();check(k=="temperature"||k=="top_p"||k=="top_k"||k=="min_p","Unknown sampler override");
         }
-        control=std::filesystem::u8path(j.at("control_file").get<std::string>());
+        control=producer_text::native_path(j.at("control_file").get<std::string>());
         configured=true;reported_revision=0;reported_phase=-1;settings=nullptr;refresh();
     }
     int phase()const{return ds4_quality_phase_current(&tracker);}
@@ -102,9 +127,19 @@ struct studio_generation {
             (unsigned long long)revision,ds4_quality_phase_names[phase()],k.at("bias").get<double>(),k.at("temperature").get<double>(),
             k.at("top_p").get<double>(),k.at("top_k").get<int>(),k.at("min_p").get<double>(),position);std::fflush(stderr);
         auto state=k;state["revision"]=revision;state["phase"]=ds4_quality_phase_names[phase()];state["position"]=position;
-        auto dst=control;dst+=L".applied.json";auto tmp=dst;tmp+=L".tmp";
+        auto dst=control;dst+=std::string(".applied.json");auto tmp=dst;tmp+=std::string(".tmp");
         {std::ofstream f(tmp,std::ios::binary|std::ios::trunc);f<<state.dump();}
+#if defined(_WIN32)
         MoveFileExW(tmp.c_str(),dst.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
+#else
+        // Best-effort like the Windows call: a lost diagnostic file must not
+        // fail the decode operation that published it. fsync first, so the
+        // replace is durable the way MOVEFILE_WRITE_THROUGH made it.
+        if(const int fd=open(tmp.c_str(),O_RDONLY|O_CLOEXEC);fd>=0){
+            (void)fsync(fd);close(fd);
+            if(std::rename(tmp.c_str(),dst.c_str())!=0)std::fprintf(stderr,"LLAMADECODE_GENERATION_APPLIED_FAILED path=%s\n",dst.string().c_str());
+        } else std::fprintf(stderr,"LLAMADECODE_GENERATION_APPLIED_FAILED path=%s\n",tmp.string().c_str());
+#endif
     }
     int sample(const std::vector<float>&logits,uint32_t position){
         refresh();const auto k=knobs();report(position,k);

@@ -9,7 +9,7 @@ class combo_base_input {
     uint32_t owner=0;uint64_t owner_offset=0,consumed=0;
 public:
     llama_dsv41_sweep::native_base base;
-    combo_base_input(uint64_t timeout,HANDLE output,const std::string&session,
+    combo_base_input(uint64_t timeout,producer_wire::handle output,const std::string&session,
             const std::string&contract_sha,uint64_t epoch,uint32_t context,const std::string&model_sha):io(owned.emplace(timeout,output)){
         load(session,contract_sha,epoch,context,model_sha);
     }

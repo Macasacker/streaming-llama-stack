@@ -497,12 +497,14 @@ bool llama_dsv41_sweep::open(const llama_dsv41_weight_provider::config &input_we
             "V4.1 provider/cache/graph/carry combined job exceeds total resource admission");
         if(row_cache_new)success(p->provider.create_engram_row_cache(row_cache_new,error),error);
         if(options.fixed&&options.fixed->ram&&options.fixed->ram->suspended()){
-#ifdef _WIN32
-            MEMORYSTATUSEX memory{};memory.dwLength=sizeof(memory);
+            // The same budget check on either platform: the RAM the carry bank
+            // needs must be free before its pages return. Windows read it from
+            // GlobalMemoryStatusEx; here from MemAvailable.
+            llama_dsv41_host_memory::state memory;
             const uint64_t floor=std::max<uint64_t>(llama_dsv41_host_memory::runtime_min_free_bytes,512ull<<20);
-            require(GlobalMemoryStatusEx(&memory)&&memory.ullAvailPhys>=floor&&options.fixed->ram->size()<=memory.ullAvailPhys-floor,
+            require(llama_dsv41_host_memory::read(memory)&&memory.available>=floor&&
+                options.fixed->ram->size()<=memory.available-floor,
                 "Restoring prefill carry would cross the physical RAM floor");
-#endif
             options.fixed->ram->resume_pages();
         }
         // LLAMADECODE_ENGRAM_EARLY: tokens known, file verified, job admitted:
