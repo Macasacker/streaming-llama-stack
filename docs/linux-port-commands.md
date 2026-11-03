@@ -177,6 +177,35 @@ whenever `io_uring_queue_init` succeeds. Reads are buffered: `O_DIRECT` is not i
 GGUF tensor offsets are multiples of `general.alignment` (32 bytes by default) and Linux would
 reject the unaligned chunked reads with `EINVAL`.
 
+### The strict extent reader, with no model and no VRAM
+
+Chunk 3.1f gave the fetcher a reader for the provider's named extents (the
+expert-cache pool and the next-tail hint). Its program is committed at
+`docs/evidence/wf-extent-selftest.cpp`; it drives the real `wf_*` API over a
+throwaway 32 MiB file, byte-compares what each extent landed at inside a bank,
+and checks the refusals. It compiles the fetcher **without** `-DGGML_USE_CUDA`, so
+the banks are host buffers and the upload is a `memcpy`: the same reader, bounds
+checks, splitting, generation and accounting as the CUDA build, with no device
+allocation and no model.
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+cp docs/evidence/wf-extent-selftest.cpp build/
+g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I$llama/ggml/src \
+    -c $llama/src/llama-weight-fetcher.cpp -o build/wf-extent-fetcher.o
+g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -o build/wf-extent-selftest \
+    build/wf-extent-selftest.cpp build/wf-extent-fetcher.o \
+    build/llama/ggml/src/libggml-base.a build/llama/ggml/src/libggml-cpu.a -lpthread -luring
+./build/wf-extent-selftest    # 32 checks, "SELFTEST PASSED: 0 failure(s)"
+```
+
+The CUDA arms of that reader (pinned slots, the upload on the caller's stream, one
+`cudaEvent` per ready batch) need VRAM headroom past the ~700 MB a `ggml` CUDA
+backend costs, so they run when the GPU has it: link the same program against
+`build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o` (rebuild it with
+`ninja -C build/llama src/libllama.a` first) and the `libggml-cuda.a` set, as in
+the io_uring section above.
+
 ### Driving the real producer with no model
 
 A throwaway 1 MiB file, a copy receipt naming it and four LE32 tokens take the CLI

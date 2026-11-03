@@ -478,6 +478,33 @@ struct wf_context {
     // failed transfer in every build configuration.
     std::atomic<bool>            ds_failed{false};
 
+    // Strict extent reads: the provider's expert-cache pool and next-tail hint
+    // write named file extents into a compute bank. A pinned window is filled by
+    // io_uring (or pread when no ring is available) and uploaded on the caller's
+    // stream; ready batches hand the consumer one fence to wait on. Without CUDA
+    // the "bank" is host memory and the upload is a memcpy, so the same reader
+    // and the same accounting run - which is how docs/evidence/wf-extent-selftest
+    // exercises it on a host with no free VRAM.
+    static constexpr size_t extent_slot_bytes = 8u << 20;
+    static constexpr int    extent_slots = 4;
+    static constexpr size_t extent_batches = 8;
+    struct extent_batch {
+        uint64_t fence = 0;
+#ifdef WF_HAS_CUDA
+        cudaEvent_t event = nullptr;   // orders the consumer after this batch's uploads
+#endif
+    };
+    std::mutex                   extent_mutex;      // one extent transfer at a time
+    std::vector<char *>          extent_window;     // pinned host slots
+#ifdef WF_HAS_CUDA
+    std::vector<cudaEvent_t>     extent_slot_done;  // slot upload completion
+#endif
+    std::vector<extent_batch>    extent_ready;      // oldest evicted first
+    uint64_t                     extent_fence_next = 1;
+#ifdef WF_HAS_IO_URING
+    struct io_uring *            extent_ring = nullptr;
+#endif
+
 
     // Layer-major mode: when true, skip ubatch boundary reset.
     // The caller manages layer lifecycle directly via wf_wait_layer_gpu /
@@ -1226,6 +1253,16 @@ static int wf_find_free_gpu_buf(wf_context * wf) {
     return -1;
 }
 
+// A stage published GPU_READY owns its bank region until the consumer releases
+// it. The strict provider writes named file extents into that region (the
+// expert-cache pool and the next-tail hint) and pins those writes to a
+// generation, so the publish is where the generation is taken. The counter
+// never resets, not even across wf_start.
+static void wf_publish_direct_generation(wf_context * wf, int layer_idx) {
+    wf->layers[layer_idx].direct_generation.store(
+        wf->direct_generation.fetch_add(1, std::memory_order_relaxed) + 1, std::memory_order_release);
+}
+
 // Submit NVMe read requests for all spans in a layer.
 // Single-pass: handles mmap/skip inline, counts and submits chunks together.
 // Returns total number of async chunks submitted (0 = all data was handled via mmap/memcpy).
@@ -1665,6 +1702,7 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
                         layer.ram_buf_idx = -1;
                     }
                     layer.stage.store(WF_STAGE_GPU_READY);
+                    wf_publish_direct_generation(wf, il);
                     wf->stats.layers_fetched++;
                     any_progress = true;
 
@@ -1739,6 +1777,7 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
                     wf_gds_read_layer(wf, il);
 
                     layer.stage.store(WF_STAGE_GPU_READY);
+                    wf_publish_direct_generation(wf, il);
                     wf->stats.layers_fetched++;
                     any_progress = true;
                     continue;
@@ -2177,6 +2216,8 @@ bool wf_has_failed(const wf_context * wf) {
     return !wf || wf->ds_failed.load(std::memory_order_acquire);
 }
 
+static void wf_extent_window_release(wf_context * wf);
+
 void wf_destroy(wf_context * wf) {
     if (!wf) return;
 
@@ -2185,6 +2226,7 @@ void wf_destroy(wf_context * wf) {
 #ifdef WF_HAS_CUDA
     wf_cuda_device_scope cuda_scope(wf->cuda_device_index);
 #endif
+    wf_extent_window_release(wf);
 
 
     // Close files
@@ -3359,7 +3401,8 @@ int wf_persist_shutdown(const char * why) {
     return 1;
 }
 
-// Demand and one optional tail-hint worker share this accounting and DS slot.
+// Demand reads and the one optional tail-hint worker share this accounting; the
+// extent mutex serialises the transfers themselves.
 static std::mutex g_wf_extent_stats_mutex;
 static struct { double submit_ms, fence_ms, verify_ms, cuda_ms; uint64_t requests, batches; } g_wf_extent_stats = {};
 void wf_extent_fetch_stats(double * out4, uint64_t * requests, uint64_t * batches) {
@@ -3383,17 +3426,266 @@ bool wf_ready_direct_bank(wf_context * wf, int stage, int bank, uint64_t * gener
 static bool wf_ready_generation(wf_context*wf,int stage,int bank,uint64_t generation){
     uint64_t live=0;return generation&&wf_ready_direct_bank(wf,stage,bank,&live)&&live==generation;
 }
+
+// The provider's named-extent writes. The Windows transport was an explicit
+// DirectStorage queue writing into the resident bank; here the same extents are
+// read through io_uring (or the pread baseline) into a pinned window and
+// uploaded into that bank. Uploads go on the caller's stream when it has one, so
+// they are ordered against the compute that reads the bank; the tail-hint worker
+// has no stream of its own, uploads on the fetcher's copy stream and publishes
+// one fence per batch for wf_wait_ready_extents to order compute after. A build
+// without CUDA has host banks and a memcpy upload, so the reader, the bounds
+// checks and the accounting are the same code either way.
+static void wf_extent_fail(wf_context * wf, const char * why) {
+    WF_ERR("Required streaming: extent transfer failed (%s); no fallback", why);
+    wf->ds_failed.store(true, std::memory_order_release);
+}
+
+static bool wf_extent_window_init(wf_context * wf) {
+    if (!wf->extent_window.empty()) return true;
+#ifdef WF_HAS_CUDA
+    wf_cuda_device_scope scope(wf->cuda_device_index);
+#endif
+    for (int i = 0; i < wf_context::extent_slots; i++) {
+        void * p = nullptr;
+#ifdef WF_HAS_CUDA
+        // Pinned so an upload can DMA straight from it, as the relay's own
+        // staging tier is. A host that refuses the pin still reads correctly
+        // through an ordinary aligned buffer.
+        if (cudaHostAlloc(&p, wf_context::extent_slot_bytes, cudaHostAllocDefault) != cudaSuccess) {
+            p = nullptr;
+            (void) cudaGetLastError();
+        }
+#endif
+        if (!p) p = aligned_alloc(4096, wf_context::extent_slot_bytes);
+        if (!p) return false;
+#ifdef WF_HAS_CUDA
+        cudaEvent_t done = nullptr;
+        if (cudaEventCreateWithFlags(&done, cudaEventDisableTiming) != cudaSuccess) {
+            std::free(p);
+            return false;
+        }
+        wf->extent_slot_done.push_back(done);
+#endif
+        wf->extent_window.push_back(static_cast<char *>(p));
+    }
+    return true;
+}
+
+static void wf_extent_window_release(wf_context * wf) {
+#ifdef WF_HAS_IO_URING
+    if (wf->extent_ring) {
+        io_uring_queue_exit(wf->extent_ring);
+        delete wf->extent_ring;
+        wf->extent_ring = nullptr;
+    }
+#endif
+#ifdef WF_HAS_CUDA
+    for (auto * p : wf->extent_window) cudaFreeHost(p);
+    for (auto e : wf->extent_slot_done) if (e) cudaEventDestroy(e);
+    wf->extent_slot_done.clear();
+    for (auto & b : wf->extent_ready) if (b.event) cudaEventDestroy(b.event);
+#else
+    for (auto * p : wf->extent_window) std::free(p);
+#endif
+    wf->extent_window.clear();
+    wf->extent_ready.clear();
+}
+
+struct wf_extent_part { uint64_t file_offset, bank_offset; size_t nbytes; int file_idx; };
+
 static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * extents, int n,
                              void * cuda_stream, uint64_t * bytes, double * milliseconds,
                              int ready_stage, uint64_t generation, uint64_t * deferred_fence,
                              void (*overlap)(void *) = nullptr, void * overlap_user = nullptr) {
-    std::lock_guard<std::mutex> stats_lock(g_wf_extent_stats_mutex);
-    if(deferred_fence)*deferred_fence=0;
     if (bytes) *bytes = 0;
     if (milliseconds) *milliseconds = 0;
-    (void) wf; (void) bank; (void) extents; (void) n; (void) cuda_stream;
-    (void) ready_stage; (void) generation; (void) overlap; (void) overlap_user;
-    return false;
+    if (deferred_fence) *deferred_fence = 0;
+    if (!wf) return false;
+#ifndef WF_HAS_CUDA
+    (void) cuda_stream;
+#endif
+    std::lock_guard<std::mutex> extent_lock(wf->extent_mutex);
+    if (!wf->strict_streaming) { WF_ERR("Extent reads belong to the required streaming caller"); return false; }
+    if (wf->ds_failed.load(std::memory_order_acquire)) return false;
+    if (ready_stage >= 0 && !wf_ready_generation(wf, ready_stage, bank, generation)) {
+        // The stage left its bank while the hint was in flight. Nothing was read
+        // or written, so the fetcher is not poisoned - the caller reports the
+        // hint as not applied.
+        WF_ERR("Required streaming: a ready batch names a stage its bank no longer holds");
+        return false;
+    }
+    if (!extents || n <= 0) { wf_extent_fail(wf, "no extents to transfer"); return false; }
+    if (bank < 0 || bank >= (int) wf->gpu_bufs.size() || !wf->gpu_bufs[bank].ptr) {
+        wf_extent_fail(wf, "the extent target bank is not allocated");
+        return false;
+    }
+    char *const dst = static_cast<char *>(wf->gpu_bufs[bank].ptr);
+    const size_t capacity = wf->gpu_bufs[bank].capacity;
+    uint64_t total = 0;
+    // Every extent is checked before any byte is written, so a refusal cannot
+    // leave part of a bank updated.
+    for (int i = 0; i < n; i++) {
+        const auto & e = extents[i];
+        if (!e.nbytes || e.file_idx < 0 || size_t(e.file_idx) >= wf->files.size()) {
+            wf_extent_fail(wf, "an extent names no opened file");
+            return false;
+        }
+        const uint64_t file_bytes = wf->files[size_t(e.file_idx)].file_size;
+        if (e.file_offset > file_bytes || e.nbytes > file_bytes - e.file_offset) {
+            wf_extent_fail(wf, "an extent runs past its file's end");
+            return false;
+        }
+        if (e.bank_offset > capacity || e.nbytes > capacity - e.bank_offset) {
+            wf_extent_fail(wf, "an extent runs past its compute bank");
+            return false;
+        }
+        total += e.nbytes;
+    }
+    if (!wf_extent_window_init(wf)) {
+        wf_extent_fail(wf, "cannot allocate the pinned extent window");
+        return false;
+    }
+
+    std::vector<wf_extent_part> parts;
+    for (int i = 0; i < n; i++)
+        for (uint64_t at = 0; at < extents[i].nbytes; at += wf_context::extent_slot_bytes) {
+            const size_t take = size_t(std::min<uint64_t>(wf_context::extent_slot_bytes, extents[i].nbytes - at));
+            parts.push_back({extents[i].file_offset + at, extents[i].bank_offset + at, take, extents[i].file_idx});
+        }
+
+#ifdef WF_HAS_CUDA
+    const cudaStream_t upload = cuda_stream ? static_cast<cudaStream_t>(cuda_stream) : wf->copy_stream;
+#endif
+    const auto started = std::chrono::high_resolution_clock::now();
+    size_t next = 0, done = 0;
+    std::vector<bool> busy(size_t(wf_context::extent_slots), false);
+    auto slot_ready = [&](int s) {
+#ifdef WF_HAS_CUDA
+        return !wf->extent_slot_done[size_t(s)] || cudaEventSynchronize(wf->extent_slot_done[size_t(s)]) == cudaSuccess;
+#else
+        (void) s;                    // a memcpy has already finished reading the slot
+        return true;
+#endif
+    };
+    auto upload_part = [&](const wf_extent_part & p, int s) {
+#ifdef WF_HAS_CUDA
+        if (cudaMemcpyAsync(dst + p.bank_offset, wf->extent_window[size_t(s)], p.nbytes,
+                            cudaMemcpyHostToDevice, upload) != cudaSuccess) return false;
+        return cudaEventRecord(wf->extent_slot_done[size_t(s)], upload) == cudaSuccess;
+#else
+        std::memcpy(dst + p.bank_offset, wf->extent_window[size_t(s)], p.nbytes);
+        return true;
+#endif
+    };
+
+#ifdef WF_HAS_IO_URING
+    if (wf->use_io_uring && !wf->extent_ring) {
+        auto * ring = new struct io_uring;
+        if (io_uring_queue_init(2 * wf_context::extent_slots, ring, 0) != 0) {
+            delete ring;
+            wf->use_io_uring = false;
+        } else wf->extent_ring = ring;
+    }
+    if (wf->use_io_uring && wf->extent_ring) {
+        struct io_uring * ring = wf->extent_ring;
+        auto fill = [&]() -> bool {
+            while (next < parts.size()) {
+                const int s = int(next % wf_context::extent_slots);
+                if (busy[size_t(s)]) break;                    // slot still holding an upload
+                if (!slot_ready(s)) { wf_extent_fail(wf, "extent staging wait failed"); return false; }
+                struct io_uring_sqe * sqe = io_uring_get_sqe(ring);
+                if (!sqe) break;                               // SQ full: a completion frees one
+                io_uring_prep_read(sqe, wf->files[size_t(parts[next].file_idx)].fd,
+                                   wf->extent_window[size_t(s)], parts[next].nbytes,
+                                   off_t(parts[next].file_offset));
+                io_uring_sqe_set_data(sqe, reinterpret_cast<void *>(next));
+                busy[size_t(s)] = true;
+                ++next;
+            }
+            if (next > 0 && io_uring_submit(ring) < 0) { wf_extent_fail(wf, "io_uring_submit failed"); return false; }
+            return true;
+        };
+        if (!fill()) return false;
+        if (overlap) overlap(overlap_user);                     // host work while reads are in flight
+        while (done < parts.size()) {
+            struct io_uring_cqe * cqe = nullptr;
+            if (io_uring_wait_cqe(ring, &cqe) != 0) { wf_extent_fail(wf, "io_uring_wait_cqe failed"); return false; }
+            const size_t which = size_t(reinterpret_cast<uintptr_t>(io_uring_cqe_get_data(cqe)));
+            const long res = cqe->res;
+            io_uring_cqe_seen(ring, cqe);
+            const auto & p = parts[which];
+            if (res < 0) { wf_extent_fail(wf, "an extent read failed"); return false; }
+            if (size_t(res) != p.nbytes) { wf_extent_fail(wf, "an extent read was short"); return false; }
+            if (!upload_part(p, int(which % size_t(wf_context::extent_slots)))) {
+                wf_extent_fail(wf, "extent upload failed");
+                return false;
+            }
+            busy[which % size_t(wf_context::extent_slots)] = false;
+            ++done;
+            if (!fill()) return false;
+        }
+    } else
+#endif
+    {
+        // The pread baseline. It overlaps the hook with the uploads of the parts
+        // after the first read, and the remaining reads with those uploads.
+        for (size_t i = 0; i < parts.size(); i++) {
+            const int s = int(i % size_t(wf_context::extent_slots));
+            if (!slot_ready(s)) { wf_extent_fail(wf, "extent staging wait failed"); return false; }
+            const auto & p = parts[i];
+            const int fd = wf->files[size_t(p.file_idx)].fd;
+            size_t got = 0;
+            while (got < p.nbytes) {
+                const ssize_t read = ::pread(fd, wf->extent_window[size_t(s)] + got, p.nbytes - got, off_t(p.file_offset + got));
+                if (read <= 0) { wf_extent_fail(wf, "an extent read failed or was short"); return false; }
+                got += size_t(read);
+            }
+            if (!upload_part(p, s)) { wf_extent_fail(wf, "extent upload failed"); return false; }
+            ++done;
+            if (i == 0 && overlap) overlap(overlap_user);
+        }
+    }
+
+    if (deferred_fence) {
+        // One fence for the whole batch. With CUDA it is one event recorded after
+        // every upload, so the consumer orders compute without waiting on the
+        // host; without CUDA the memcpy uploads are already complete.
+        if (wf->extent_ready.size() >= wf_context::extent_batches) {
+            // The provider holds one hint at a time. A batch it never waited on
+            // is dropped rather than kept alive without bound.
+#ifdef WF_HAS_CUDA
+            if (wf->extent_ready.front().event) cudaEventDestroy(wf->extent_ready.front().event);
+#endif
+            wf->extent_ready.erase(wf->extent_ready.begin());
+        }
+        wf_context::extent_batch batch;
+        batch.fence = wf->extent_fence_next++;
+#ifdef WF_HAS_CUDA
+        if (cudaEventCreateWithFlags(&batch.event, cudaEventDisableTiming) != cudaSuccess) {
+            wf_extent_fail(wf, "extent batch event creation failed");
+            return false;
+        }
+        if (cudaEventRecord(batch.event, upload) != cudaSuccess) {
+            cudaEventDestroy(batch.event);
+            batch.event = nullptr;
+            wf_extent_fail(wf, "extent batch event record failed");
+            return false;
+        }
+#endif
+        *deferred_fence = batch.fence;
+        wf->extent_ready.push_back(batch);
+    }
+    const auto finished = std::chrono::high_resolution_clock::now();
+    if (bytes) *bytes = total;
+    if (milliseconds) *milliseconds = std::chrono::duration<double, std::milli>(finished - started).count();
+    {
+        std::lock_guard<std::mutex> stats_lock(g_wf_extent_stats_mutex);
+        g_wf_extent_stats.batches += 1;
+        g_wf_extent_stats.requests += uint64_t(n);
+        g_wf_extent_stats.cuda_ms += std::chrono::duration<double, std::milli>(finished - started).count();
+    }
+    return true;
 }
 
 bool wf_fetch_extents_direct(wf_context * wf,int bank,const wf_extent * extents,int n,
@@ -3410,5 +3702,20 @@ bool wf_fetch_ready_extents(wf_context * wf,int stage,int bank,uint64_t generati
     return wf_fetch_extents_impl(wf,bank,extents,n,nullptr,bytes,milliseconds,stage,generation,fence);
 }
 bool wf_wait_ready_extents(wf_context * wf,int stage,int bank,uint64_t generation,uint64_t fence,void * stream){
-    (void)wf;(void)stage;(void)bank;(void)generation;(void)fence;(void)stream;return false;
+    if (!wf || !fence) return false;
+#ifdef WF_HAS_CUDA
+    if (!stream) return false;
+#else
+    (void) stream;                    // the uploads were memcpys, already complete
+#endif
+    std::lock_guard<std::mutex> extent_lock(wf->extent_mutex);
+    if (!wf_ready_generation(wf,stage,bank,generation)) return false;
+    for (const auto & b : wf->extent_ready) if (b.fence == fence) {
+#ifdef WF_HAS_CUDA
+        return b.event && cudaStreamWaitEvent(static_cast<cudaStream_t>(stream), b.event, 0) == cudaSuccess;
+#else
+        return true;
+#endif
+    }
+    return false;
 }

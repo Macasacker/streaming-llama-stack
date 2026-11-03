@@ -255,7 +255,7 @@ struct llama_dsv41_weight_provider::implementation {
     }
     // RAMFIX (owner 2026-10-29): RAM-tier data movement off the critical path.
     // LLAMADECODE_HOST_ASYNC: 0 = the original synchronous path; 1 = VRAM->RAM copy-in on
-    // its own non-blocking stream (batched D2H, one event); 2 = also submit the DirectStorage
+    // its own non-blocking stream (batched D2H, one event); 2 = also submit the extent
     // batch first and upload RAM hits on a separate H2D stream while it is in flight, waiting
     // per expert; 3 (default) = as 2 with one event per stream instead of per-expert waits.
     static int host_async_level(){static const int level=[]{const char*v=std::getenv("LLAMADECODE_HOST_ASYNC");
@@ -326,7 +326,7 @@ struct llama_dsv41_weight_provider::implementation {
     }
     // LLAMADECODE B2: LRU over (layer, expert). Hits move to the front first,
     // so a miss never evicts an expert this same request needs. Only misses
-    // are fetched (explicit DirectStorage extents into bank 0).
+    // are fetched (explicit extents into bank 0).
     // direct: second-tier (L2) hits are returned in place as pool_slots + l2 slot
     // (kernels that read both tiers); no L2->L1 copy and no L1 victim for them.
     std::unordered_map<int32_t,int32_t> assign_expert_slots(uint32_t layer,const int32_t*ids,size_t count,void*stream,bool direct=false){
@@ -413,7 +413,7 @@ struct llama_dsv41_weight_provider::implementation {
         }
         if(defer_copies)flush_deferred(stream,copied);
 #ifdef GGML_USE_CUDA
-        // Slot copies complete before DirectStorage overwrites any copied-from L1 slot
+        // Slot copies complete before an extent write overwrites any copied-from L1 slot
         // and before an external decoder (own stream) reads the copied-in slots.
         if(copied){const auto copy_wait=std::chrono::steady_clock::now();
             require(cudaStreamSynchronize(static_cast<cudaStream_t>(stream))==cudaSuccess,"Expert L2 copy synchronization failed");
@@ -432,10 +432,10 @@ struct llama_dsv41_weight_provider::implementation {
         if(defer_copies)finish_host_work(stream);
         return slot_of;
     }
-    // Phase 1-2 (before DirectStorage): victim D2H copy-ins on their own stream after one
-    // event from the provider stream, then the VRAM slot copies ordered after them by one
-    // event. DirectStorage writes are outside CUDA ordering, so the existing host drain covers
-    // any L1 slot a copy reads or a copy-in reads before storage overwrites it.
+    // Phase 1-2 (before the extent transfers): victim D2H copy-ins on their own stream after
+    // one event from the provider stream, then the VRAM slot copies ordered after them by one
+    // event. The extent uploads are ordered on the provider's own stream, so the host drain
+    // below covers any L1 slot a copy or a copy-in reads before an extent write lands in it.
     void flush_deferred(void*stream,bool&copied){
 #ifdef GGML_USE_CUDA
         const auto main=static_cast<cudaStream_t>(stream);
@@ -458,8 +458,9 @@ struct llama_dsv41_weight_provider::implementation {
         (void)stream;(void)copied;
 #endif
     }
-    // Phase 3: RAM-hit uploads on the H2D stream (level 1 keeps them before storage, synchronous
-    // per hit as before), then publish the completed copy-ins. Runs while DirectStorage reads.
+    // Phase 3: RAM-hit uploads on the H2D stream (level 1 keeps them before the extent
+    // transfers, synchronous per hit as before), then publish the completed copy-ins. Runs
+    // while the extent reads are in flight.
     void upload_ram_hits(void*stream,bool async){
 #ifdef GGML_USE_CUDA
         if(pending_ram.empty())return;timer measured(host_upload_ms);
@@ -901,6 +902,9 @@ struct llama_dsv41_weight_provider::implementation {
         // and one slot more than the compute banks so a read can start while the
         // previous layer's upload is still in flight.
         planned.host_bytes=add(planned.host_bytes,uint64_t(staging_buffers())*planned.compute_buffer_bytes);
+        // The named-extent reader's pinned window, allocated by the fetcher on
+        // first use and held for its lifetime.
+        planned.host_bytes=add(planned.host_bytes,32*mib);
         if(options.engram_prefetch_host_bytes){
             require(options.engram_prefetch_tokens&&options.engram_prefetch_tokens<=1048576,
                 "Whole-prompt Engram requires an explicit admitted token count");
@@ -923,12 +927,18 @@ struct llama_dsv41_weight_provider::implementation {
             leased=true;return;
         }
         const auto hinted=adopt_tail(id);
-        auto*base=wf_wait_layer_gpu(fetcher,int(id));require(base,"Required DirectStorage layer transfer failed");
+        auto*base=wf_wait_layer_gpu(fetcher,int(id));require(base,"Required layer transfer failed");
         wf_cuda_wait_upload(fetcher,int(id));
-        require(!wf_has_failed(fetcher),"Required DirectStorage upload synchronization failed");
+        require(!wf_has_failed(fetcher),"Required upload synchronization failed");
         ggml_backend_buffer_t buffer=nullptr;
         for(auto&b:buffers)if(ggml_backend_buffer_get_base(b.get())==base)buffer=b.get();
-        require(buffer,"DirectStorage returned an unowned compute allocation");
+        require(buffer,"The weight stream returned an unowned compute allocation");
+        // Every stage's bytes are planned at a region of bank id%2, and the
+        // extents the provider writes later (expert cache, next-tail hint) name
+        // that same region. A stage that landed in the other bank would bind the
+        // wrong file bytes into the wrong tensors, so the alternation is checked
+        // here rather than assumed.
+        require(buffers.size()<2||buffer==buffers[size_t(id%2)].get(),"Stage landed outside its own bank");
         const bool prebound_routed=decode_layout&&id>=2&&id<=80&&id%2==0&&experts_prebound;
         for(auto&e:stage_at(id).entries){
             if(prebound_routed){require(e.t->buffer==buffer&&e.t->data==static_cast<char*>(base)+e.gpu_offset,"Shared-expert stage landed outside its pre-bound bank");continue;}
@@ -938,7 +948,7 @@ struct llama_dsv41_weight_provider::implementation {
         ggml_backend_synchronize(options.backend);leased=true;
         prefill_loaded=hinted;
         uint64_t fetched=0;double fetch_ms=0;
-        require(wf_get_required_layer_fetch(fetcher,int(id),&fetched,&fetch_ms),"Completed strict DirectStorage timing unavailable");
+        require(wf_get_required_layer_fetch(fetcher,int(id),&fetched,&fetch_ms),"Completed strict layer timing unavailable");
         fetched_total+=fetched;fetch_ms_total+=fetch_ms;
         llama_dsv41_layer_log("[dsv41-fetch] stage=%u bytes=%llu fetch_ms=%.6f decimal_GB_s=%.6f\n",
             id,(unsigned long long)fetched,fetch_ms,double(fetched)/fetch_ms/1e6);
@@ -1153,7 +1163,7 @@ bool llama_dsv41_weight_provider::finish_yoco_encoder(std::string&error){return 
 bool llama_dsv41_weight_provider::start_request(std::string&error){return p->guard([&]{
     require(p->allocated&&!p->device_suspended&&!p->leased&&p->next==0,"Request start requires an admitted resident unleased first stage");p->identity();
     p->fetched_total=0;p->fetch_ms_total=0;if(!p->bound()){p->apply_pause("request_wf_start");wf_start(p->fetcher);p->mark_weight_stream(true);}
-    require(!wf_has_failed(p->fetcher),"Persistent DirectStorage restart failed");
+    require(!wf_has_failed(p->fetcher),"Persistent weight stream restart failed");
 },error);}
 llama_dsv41_weight_provider::capacity llama_dsv41_weight_provider::budget()const{std::lock_guard<std::mutex>lock(p->mutex);return p->inspected&&!p->poisoned?p->planned:capacity{};}
 ggml_backend_t llama_dsv41_weight_provider::backend()const{std::lock_guard<std::mutex>lock(p->mutex);return p->allocated&&!p->poisoned?p->options.backend:nullptr;}
@@ -1439,16 +1449,16 @@ bool llama_dsv41_weight_provider::acquire_layer_dense(uint32_t layer,llama_dsv41
     // now so the layer graph allocates once. Its bytes are present before any
     // post-router node runs (acquire_layer_experts).
     const uint32_t id=2+2*layer;auto*bank=p->buffers[id%2].get();auto*base=static_cast<char*>(ggml_backend_buffer_get_base(bank));
-    require(base==wf_get_gpu_buf_ptr(p->fetcher,int(id%2)),"Shared-expert bank pointer differs from its DirectStorage bank");
+    require(base==wf_get_gpu_buf_ptr(p->fetcher,int(id%2)),"Shared-expert bank pointer differs from its compute bank");
     for(auto&e:p->decode_stages[id].entries){require(!e.t->buffer&&!e.t->data,"Shared-expert tensor already bound");
         require(ggml_backend_tensor_alloc(bank,e.t,base+e.gpu_offset)==GGML_STATUS_SUCCESS,"Cannot pre-bind shared-expert tensor");}
     p->select_pool(layer);p->experts_prebound=true;out=p->layers[layer];
     out.ffn.gate=p->pool[0];out.ffn.up=p->pool[1];out.ffn.down=p->pool[2];
 },error);}
 bool llama_dsv41_weight_provider::acquire_layer_experts(uint32_t layer,const std::vector<int32_t>&ids,std::vector<int32_t>&slots,std::string&error){slots.clear();return p->guard([&]{
-#if !defined(_WIN32) || !defined(GGML_USE_CUDA)
+#ifndef GGML_USE_CUDA
     (void)layer;(void)ids;
-    throw std::runtime_error("V4.1 physical expert cache requires Windows CUDA/DirectStorage");
+    throw std::runtime_error("V4.1 physical expert cache requires a CUDA backend");
 #else
     require(layer<40&&p->decode_layout&&p->leased&&p->next==1+2*layer&&p->experts_prebound,"Routed experts require their leased dense stage");
     require(!p->layers[layer].ffn.native_fp4_layout,"Packed FP4 expert slots are read only by the external decoder's packed kernels");
@@ -1608,7 +1618,7 @@ bool llama_dsv41_weight_provider::release(std::string&error){return p->guard([&]
     p->join_tail(); // no outstanding write may survive any bank release
     if(p->dense_held>=0){ // LLAMADECODE B1: release the held dense stage first (stage order)
         for(auto&e:p->decode_stages[size_t(p->dense_held)].entries){e.t->data=nullptr;e.t->buffer=nullptr;}
-        if(!p->bound())wf_release_layer(p->fetcher,p->dense_held);require(!wf_has_failed(p->fetcher),"Dense stage release failed");p->dense_held=-1;}for(auto&e:p->stage_at(p->next).entries){e.t->data=nullptr;e.t->buffer=nullptr;}if(!p->bound())wf_release_layer(p->fetcher,int(p->next));require(!wf_has_failed(p->fetcher),"Required DirectStorage compute release failed");p->leased=false;++p->next;
+        if(!p->bound())wf_release_layer(p->fetcher,p->dense_held);require(!wf_has_failed(p->fetcher),"Dense stage release failed");p->dense_held=-1;}for(auto&e:p->stage_at(p->next).entries){e.t->data=nullptr;e.t->buffer=nullptr;}if(!p->bound())wf_release_layer(p->fetcher,int(p->next));require(!wf_has_failed(p->fetcher),"Required compute release failed");p->leased=false;++p->next;
     if(p->next==p->stage_count())p->mark_weight_stream(false);
     if(p->decode_layout&&p->next==p->stage_count()&&!p->resident_bound&&p->bind_once_enabled()){p->resident_bound=true;std::fprintf(stderr,"LLAMADECODE_BIND_ONCE stages=%u resident_in_place=1\n",p->stage_count());}},error);}
 void llama_dsv41_weight_provider::invalidate(){if(!p)return;std::lock_guard<std::mutex>lock(p->mutex);p->invalidate();}

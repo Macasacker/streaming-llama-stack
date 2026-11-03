@@ -59,7 +59,7 @@ typedef enum {
     WF_MODE_MMAP       = 0,   // legacy: read from mmap'd region (current behaviour)
     WF_MODE_DIRECT_IO  = 1,   // async reader: NVMe → RAM → pinned → GPU
     WF_MODE_GDS        = 2,   // GPUDirect Storage: NVMe → GPU (requires the nvidia-fs driver)
-    WF_MODE_DSTORAGE   = 3,   // retired: Microsoft DirectStorage, refused on this build
+    WF_MODE_DSTORAGE   = 3,   // retired: Microsoft DirectStorage; a caller asking for it gets DIRECT_IO
     WF_MODE_AUTO       = 4,   // GDS when cuFile reports support, else DIRECT_IO, else MMAP
 } wf_transfer_mode;
 
@@ -254,7 +254,7 @@ WF_API void wf_allocate_prefetch(wf_context * wf);
 
 // Free prefetch buffer (releases VRAM between streaming prefill passes).
 WF_API void wf_free_prefetch(wf_context * wf);
-// Drain DirectStorage and every CUDA consumer before freeing or reusing any
+// Drain the relay and every CUDA consumer before freeing or reusing any
 // WF-owned or WF-targeted GPU allocation. Call after wf_stop() at boundaries.
 WF_API void wf_quiesce(wf_context * wf);
 
@@ -277,35 +277,46 @@ WF_API void wf_stop(wf_context * wf);
 
 // Set which experts are active for a given layer.
 // Only relevant when moe_mode == WF_MOE_FETCH_ACTIVE.
-// Must be called BEFORE wf_wait_layer_gpu() for that layer.
+// Must be called BEFORE wf_wait_layer_gpu() for that layer, and only by the
+// required streaming caller while the pipeline is stopped.
 // expert_ids: array of active expert indices, n_active: count.
-// B1b: a persistent stage occupies its own bank region that no other
-// stage of this fetcher writes. After its first complete transfer it is served
-// from VRAM (no DMA) for the rest of this fetcher's lifetime. Requires the
-// retired DirectStorage path, so it refuses on this build.
+// B1b: a persistent stage occupies its own bank region that no other stage of
+// this fetcher writes. Nothing in the relay reads the flag: the residency is the
+// caller's own bind-once rule (after the first pass it stops asking the fetcher
+// for the stage), so the flag is an admission handshake a non-strict caller must
+// not make.
 // Per-pass omission, set only while stopped. No IO, lease or compute credit.
 WF_API bool wf_set_layer_skipped(wf_context * wf, int layer_idx, bool skipped);
 WF_API bool wf_set_layer_persistent(wf_context * wf, int layer_idx, bool persistent);
-// B2: synchronously fetch explicit file extents into a direct compute
-// bank (retired DirectStorage profile). Serialized with the pipeline's DMA
-// (one submission in flight); the caller's CUDA stream waits on the transfer
-// fence before any consumer. The caller owns the bank region (it must not
-// overlap any pipeline stage written later in the same pass).
+// B2: fetch explicit file extents into a direct compute bank, synchronously from
+// the calling thread. The extents are read through io_uring (or the pread
+// baseline) into a pinned window and uploaded on the caller's CUDA stream, so
+// they are ordered after the compute already queued on that stream. Extent calls
+// are serialised with each other; a short or failed read is sticky. The caller
+// owns the bank region (it must not overlap any pipeline stage written later in
+// the same pass).
 typedef struct { uint64_t file_offset; uint64_t bank_offset; uint64_t nbytes; int file_idx; } wf_extent;
-WF_API // LLAMADECODE: cumulative expert-miss fetch split: submit, fence, verify, CUDA fence (ms).
+WF_API // LLAMADECODE: cumulative extent-fetch counters. out4[3] is the extent
+// transfer wall clock in ms; out4[0..2] were the Windows queue's submit, fence and
+// verify split and stay 0 here, so the diagnostic line keeps its shape and shows
+// nothing was split.
 void wf_extent_fetch_stats(double * out4, uint64_t * requests, uint64_t * batches);
 bool wf_fetch_extents_direct(wf_context * wf, int bank, const wf_extent * extents, int n,
                                     void * cuda_stream, uint64_t * bytes, double * milliseconds);
-// Same, but overlap(overlap_user) runs on this thread after the batch is submitted and
-// before the host waits on its fence (RAM-tier uploads beside the storage reads).
+// Same, but overlap(overlap_user) runs on this thread after the first reads are
+// submitted and before the remaining ones complete (RAM-tier uploads beside the
+// storage reads). The pread baseline calls it after its first part.
 bool wf_fetch_extents_direct_overlap(wf_context * wf, int bank, const wf_extent * extents, int n,
         void * cuda_stream, uint64_t * bytes, double * milliseconds, void (*overlap)(void *), void * overlap_user);
-// Next-tail hints only target an already-ready strict direct bank. The caller
-// must join the hint before acquiring/releasing/restarting that stage/fetcher.
-// A generation is never reused within one fetcher, including across wf_start.
+// Next-tail hints only target a stage already resident in its bank. The fetcher
+// publishes a generation when the stage reaches GPU_READY and never reuses one,
+// including across wf_start. The caller must join the hint before acquiring,
+// releasing or restarting that stage.
 WF_API bool wf_ready_direct_bank(wf_context * wf, int stage, int bank, uint64_t * generation);
-// CPU submit/fence/error verification only: no compute-stream wait is inserted
-// by the worker. The main consumer must call wf_wait_ready_extents before use.
+// Runs on the hint's own worker thread: the reads complete and the uploads are
+// queued on the fetcher's copy stream, and the batch publishes one event. No
+// compute-stream wait is inserted here; the consumer must call
+// wf_wait_ready_extents before reading the bank.
 WF_API bool wf_fetch_ready_extents(wf_context * wf, int stage, int bank, uint64_t generation,
     const wf_extent * extents, int n, uint64_t * fence, uint64_t * bytes, double * milliseconds);
 WF_API bool wf_wait_ready_extents(wf_context * wf, int stage, int bank, uint64_t generation,
@@ -434,8 +445,8 @@ WF_API void * wf_get_gpu_buf_ptr(wf_context * wf, int buf_idx);
 WF_API void   wf_set_gpu_buf_ptr(wf_context * wf, int buf_idx, void * ptr);
 
 // R3: CUDA device index the WF resolved (for ggml_backend_cuda_buffer_from_ptr), and whether
-// direct compute banks were requested (always false while the DirectStorage path
-// is refused).
+// direct compute banks were requested (the strict caller's two-bank profile, or
+// LLAMA_WF_DS_DIRECT).
 WF_API int    wf_get_cuda_device_index(wf_context * wf);
 WF_API bool   wf_is_ds_direct(wf_context * wf);
 
