@@ -71,7 +71,14 @@ model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4)
 (2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), plus the plan/handoff commits.
 `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
-Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
+Working tree is clean apart from scratch under `build/`; the baseline worktree at `build/wt-base`
+used for this session's comparisons is removed, so re-add it with `git worktree add build/wt-base
+HEAD` and move it to whatever commit is the baseline. `engines/ds4` holds `ds4` and
+`ds4-decode.so` built from the pushed tree (CUDA_ARCH=sm_120), so `./ds4 --help` and the
+unknown-option gate can run without a rebuild; `ds4-server`, `ds4-bench`, `ds4-eval` and
+`ds4-agent` are still from the previous session. Nothing they link changed behaviour - 2.2e was
+renames, comments and message text - but rebuild before trusting a gate that runs one of them.
+`python3 -B scripts/release_check.py`
 reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPath` is empty and
 `.git/hooks` holds only the samples, so the check has to be run by hand before committing. Do not
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
@@ -131,7 +138,8 @@ and no supported model weights exist on this box.
    with nothing in the tree changed. The probe is committed at
    `docs/evidence/cuda-headroom-probe.cpp` (`docs/linux-port-commands.md` has the line); run it in
    the same session as the gate, and read a CUDA gate as *unverified* rather than failing when it
-   says no.
+   says no. It said no again at 20:30 on 2026-11-06, so chunk 2.2e's host gates were the compile,
+   the link, `./ds4 --help` and `./ds4 --metal`; `./ds4 --gpu-graph-test` was never run.
 2. **No qualified model file, and the weights that are on this box cannot be made into one.**
    Re-read with `slstack/gguf_header.py` on 2026-11-06 (`read_header` + `validate_dsv41_types`),
    under `qwen38-gyro/Strata/models/`:
