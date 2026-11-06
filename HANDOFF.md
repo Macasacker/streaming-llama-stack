@@ -25,9 +25,21 @@ through io_uring queues, and the carry tier locks as much of its RAM as the kern
 in the streamed prefill path refuses on Linux any more. What it still needs is a qualified GGUF. In
 the order worth doing:
 
-1. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
-   `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
-   profiler. No behaviour attached; regenerate the env table because lines move.
+1. **Chunk 2.2e, prose half - Metal words in comments and in the inert profiler's messages.** The
+   identifier half landed (`b6c6d9c`): the nine `DS4_GLM_METAL_*` constants and the `bool metal`
+   parameter of `qwen4_first_token_test()`, both invisible to chunk 2.2b's gate for the same
+   word-boundary reason 2.2d fixed. No code identifier and no CLI surface names Metal now.
+   285 mentions remain in `engines/ds4`: 112 comment lines and 173 lines inside quoted strings - all
+   printed diagnostics and the expert-locality profiler's JSON text, 249 of them in `ds4.c`. This is
+   a per-line decision, not a substitution: some mentions describe what the *retired* backend did and
+   mislead in a CUDA-only engine (the `ds4.c` header block's "whole-model Metal ...", the `Metal
+   command batch` resume failures, the `Metal SSD streaming` refusal), while others are inherited
+   provenance that chunks 2.2d, 3.1c and 3.1g kept on purpose (`ds4_metal.m` in a `ds4_cuda.cu`
+   comment, the IoRing the loader was ported from). Rewording printed messages changes engine output:
+   two doc lines quote them, and `examples/engine_parity/RESULTS.json` plus
+   `examples/engine_environment/mac-*.json` name Metal as historical Mac measurements that rewording
+   does not invalidate. Regenerate the env table in the same commit anyway - `envvars.json` quotes
+   engine comment text as `consumer` evidence, so comment edits move rows (2.2e 1/3 moved 4).
 
 Also open: 5.1 (Python orchestrator: `guard.py` Job Object -> a cgroup scope,
 `single_runtime.py` PRODUCER_FILES), 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and
@@ -52,7 +64,8 @@ verified by the selftest; a live session against weights is not, and cannot be h
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
 `7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` +
 `1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), `187f2fa` + `09b6158` (the
-model-file claim and the Blackwell plan), `d7eae91` (3.1h), plus the plan/handoff commits.
+model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/3), plus the
+plan/handoff commits.
 `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
@@ -311,9 +324,13 @@ session's (chunk 3.1h):
   (`engines/ds4/external/nlohmann/json.hpp`, `linenoise.c`) are left untouched on purpose - 3 hits
   there are expected, not failures.
 - `_` is a word character. That protects `DS4_METAL_*` from `\bMETAL_` - which is why 2.2b kept all
-  215 names - but it also *hid* the identifiers with a leading underscore (`glm_metal_*`,
+  the env names - but it also *hid* the identifiers with a leading underscore (`glm_metal_*`,
   `g_metal_graph_*`, `ds4_engine_metal_graph_*`) from 2.2b's gate. 2.2d caught them with prefix
-  entries long enough to start at a real boundary.
+  entries long enough to start at a real boundary, and 2.2e caught the same class again on the other
+  side: `DS4_GLM_METAL_*` constants are invisible to `\bMETAL_` because `DS4_GLM_` precedes it, so a
+  Metal-name gate needs entries for *every* prefix, not one. `grep -rhoE
+  "\b[A-Za-z_0-9]*[Mm][Ee][Tt][Aa][Ll][A-Za-z_0-9]*\b"` over the engine source is the honest census;
+  it separates the kept env names from the identifiers by matching `DS4_[A-Z_]*METAL[A-Z_]*` first.
 - **A system header must not be first included inside a namespace.** `struct stat`, `struct
   pollfd` and friends then become members of that namespace and every later `struct stat` at file
   scope is a different, incomplete type. `producer-wire.h` and `producer-platform.inc` include
@@ -405,6 +422,12 @@ session's (chunk 3.1h):
 - `make test` still cannot run: the engine Makefile asks for 10 test sources, only 8 are published.
   The producer CLI has no test target at all; that is why `docs/evidence/platform-selftest.cpp` is
   compiled by hand.
+- `scripts/port/warning_profile.py` reads `build/llama/compile_commands.json`, so it cannot cover the
+  **engine**: `ds4.c` is not in that file. Compare an engine TU by hand instead -
+  `make -C build/wt-base/engines/ds4 ds4.o CUDA_ARCH=sm_120` and the same in the working tree, then
+  `grep "warning:" | sed` away the path, line and column, `sed 's/[0-9]+/N/g'`, sort and diff - and
+  compile `ds4_ext.o` too, because `-DDS4_EXTERNAL_DECODE=1` is a second compilation of the same
+  file with different live arms. Each takes about a minute.
 - `scripts/release_check.py` flags any absolute path under a user's home directory as a "machine
   path", and it scans every tracked blob - including a `.cpp` committed under `docs/evidence/` - so
   docs and evidence files must use repo-relative paths. `git status -sb` is the push check; the

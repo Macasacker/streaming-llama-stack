@@ -592,11 +592,40 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     ds4.c, ds4.h and ds4_cli.c. One `ds4_metal.m` mention stays in a `ds4_cuda.cu` comment as
     inherited provenance.
 
-2.2e Metal words in comments and in the inert subsystem's messages. Open. 310 case-insensitive
-    `metal` mentions remain in `engines/ds4` outside `DS4_METAL_*`, about 190 of them inside quoted
-    strings, mostly in the expert-locality profiler that chunk 2.2c left inert. Rewording them is
-    text work with no behaviour attached; it does not need the equivalence tool, but it does need
-    the env-table regeneration because lines move.
+2.2e Metal words in comments and in the inert subsystem's messages. Partly done (`b6c6d9c`, the
+    identifier half). Re-counted after that commit: 285 case-insensitive `metal` mentions remain in
+    `engines/ds4` outside `DS4_*METAL*` environment names - 112 comment lines and 173 lines inside
+    quoted strings, all of them printed diagnostics or the expert-locality profiler's JSON text
+    (`ds4.c` holds 249 of the 285). No code identifier and no CLI surface names Metal: `\bmetal_` and
+    `\bMETAL_` return 0, `DS4_BACKEND_METAL` returns 0, and `./ds4 --metal` is an unknown option.
+
+    (1/3, done.) Two identifier classes survived chunk 2.2b and 2.2d for the same reason those runs
+    needed prefix entries - `_` is a word character, so `\bMETAL_` cannot see a name whose `METAL_`
+    is preceded by `DS4_GLM_`: the nine `DS4_GLM_METAL_*` compile-time constants (20 lines) and the
+    `bool metal` parameter of `qwen4_first_token_test()`, which the call site already feeds
+    `ds4_backend_uses_graph()`. The constants went through `rename_identifiers.py` with one prefix
+    entry (`DS4_GLM_METAL_` -> `DS4_GLM_`), the map committed at `docs/evidence/rename-2.2e.json` for
+    the same reason 2.2d's is kept: `build/` is scratch and `/tmp` is not dependable here. The
+    parameter became `graph_backend` in its six read/void sites. Proven inert: `preprocess_equiv --rename-file` with the same map reports the
+    same live text on both sides (127,287 live lines, 0 length delta, and the 4 differing positions
+    are only the parameter), and both compilations of `ds4.c` - plain and `-DDS4_EXTERNAL_DECODE=1` -
+    were built in a worktree at the parent commit and here with 23 warnings against 23 and 11
+    against 11, identical texts and identical `-W` sets. The env table was regenerated in the same
+    commit; 4 rows moved, all only in their quoted consumer evidence, and the 2,234-name set is
+    unchanged.
+
+    (2/3 and 3/3, open.) The comment and message halves are text work with no behaviour attached, so
+    `preprocess_equiv` proves nothing about them - but each line needs a decision, not a substitution:
+    some mentions say what the *retired* backend did and are actively misleading in a CUDA-only
+    engine (`"the whole-model Metal ..."` in the `ds4.c` header block, the `Metal command batch`
+    resume failures, the `Metal SSD streaming` refusal), while others are inherited provenance of the
+    kind chunks 2.2d, 3.1c and 3.1g deliberately kept (`ds4_metal.m` named in a `ds4_cuda.cu`
+    comment, the IoRing the loader was ported from). Rewording the printed messages changes engine
+    output: two doc lines quote them (`Metal expert locality`, `Metal streaming prefill`), and
+    `examples/engine_parity/RESULTS.json` plus the two `examples/engine_environment/mac-*.json`
+    receipts name Metal as historical Mac measurements, which rewording does not invalidate.
+    Regenerate the env table in the same commit, because the quoted `consumer` evidence in
+    `envvars.json` contains engine comment text.
 
 3.1a Producer translation units compile with GCC. Done (`3bc184a`, `0265129`). cmake already
     configured; compiling did not. Two includes still named the engine tree deleted in 1.10a
@@ -1127,8 +1156,9 @@ totals read higher than the source alone): 1,109 Apple/MLX references repo-wide,
 producer work, and 504 Windows ones under the same excludes (774 before chunk 3.1d, counted with
 `build/` included, so the two are not directly comparable). Both figures also include this plan's own
 quoted grep patterns and the inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
-(`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 269 Apple/Metal
-matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
+(`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
+matches are the 213 distinct `DS4_METAL_*` environment names (404 occurrences) kept on purpose plus
+the 285 comment and message mentions chunk 2.2e has left.
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in
