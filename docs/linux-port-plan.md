@@ -593,8 +593,8 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     ds4.c, ds4.h and ds4_cli.c. One `ds4_metal.m` mention stays in a `ds4_cuda.cu` comment as
     inherited provenance.
 
-2.2e Metal words in comments and in the inert subsystem's messages. Done in four parts, this
-    session finishing all of them after `b6c6d9c`. Counted by
+2.2e Metal words in comments and in the inert subsystem's messages. Done in four parts:
+    `b6c6d9c` (1/4), `f551a8d` (2/4), `a12383b` (3/4), `76053fc` (4/4). Counted by
     `scripts/port/metal_word_census.py`, which classifies every mention by its position in the file
     rather than by a word-boundary regex: 111 comment lines and 173 lines inside quoted strings
     remain outside `DS4_*METAL*` environment names, of which 26 are kept as provenance and the rest

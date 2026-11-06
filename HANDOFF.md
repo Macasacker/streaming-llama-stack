@@ -22,32 +22,32 @@ carry store and its locked RAM tier are now Linux: the provider holds a POSIX le
 model file, builds the bounded relay, acquires stages in alternating banks, writes named file
 extents into a compute bank, admits its RAM expert tier from `/proc`, loads a prompt's Engram rows
 through io_uring queues, and the carry tier locks as much of its RAM as the kernel allows. Nothing
-in the streamed prefill path refuses on Linux any more. What it still needs is a qualified GGUF. In
-the order worth doing:
+in the streamed prefill path refuses on Linux any more. What it still needs is a qualified GGUF.
+Chunk 2.2e - the Metal-word sweep - is finished this session, in four commits, so the engine has no
+Metal-named identifier, no Metal-named CLI surface and no printed message that names the retired
+backend. In the order worth doing next:
 
-1. **Chunk 2.2e, prose half - Metal words in comments and in the inert profiler's messages.** The
-   identifier half landed (`b6c6d9c`): the nine `DS4_GLM_METAL_*` constants and the `bool metal`
-   parameter of `qwen4_first_token_test()`, both invisible to chunk 2.2b's gate for the same
-   word-boundary reason 2.2d fixed. No code identifier and no CLI surface names Metal now.
-   285 mentions remain in `engines/ds4`: 112 comment lines and 173 lines inside quoted strings - all
-   printed diagnostics and the expert-locality profiler's JSON text, 249 of them in `ds4.c`. This is
-   a per-line decision, not a substitution: some mentions describe what the *retired* backend did and
-   mislead in a CUDA-only engine (the `ds4.c` header block's "whole-model Metal ...", the `Metal
-   command batch` resume failures, the `Metal SSD streaming` refusal), while others are inherited
-   provenance that chunks 2.2d, 3.1c and 3.1g kept on purpose (`ds4_metal.m` in a `ds4_cuda.cu`
-   comment, the IoRing the loader was ported from). Rewording printed messages changes engine
-   output, and the generated env table quotes engine message text as `consumer` evidence
-   (`docs/VARIABLES.md` carries `ds4: Metal mixed batch prefill_rows=%u decode_rows=%d`), so
-   regenerate the table in the same commit - `envvars.json` moved 4 rows for 2.2e's identifier half
-   alone. The Mac receipts under `docs/macdecode-r2/` embed historical `ds4: Metal device ...`
-   stderr verbatim, and `examples/engine_parity/RESULTS.json` plus `examples/engine_environment/
-   mac-*.json` name Metal as Mac measurements; rewording the engine does not invalidate those and
-   they are not a regression signal.
+1. **Chunk 5.1 - the Python orchestrator.** `slstack/guard.py`'s Windows Job Object becomes a cgroup
+   scope, and `slstack/single_runtime.py` stops staging `ds4-server.exe` and
+   `slstack-weight-fetcher.dll`; `scripts/build_combo_runtime.py` builds a preset named
+   "RTX: ULTRA prefill -> ds4-win decode", which 7.1 renames. This is the next chunk that changes a
+   *resource decision* rather than text, so read `code-design` before writing it and note for 5.1
+   that `engines/streaming-llama/prefill_llama.cpp/tools/slstack-weight-fetcher.cpp` is a two-line
+   anchor file: the Linux `.so` exports one data symbol and carries no fetcher API, so there is no
+   DLL twin to stage.
 
-Also open: 5.1 (Python orchestrator: `guard.py` Job Object -> a cgroup scope,
-`single_runtime.py` PRODUCER_FILES), 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and
-8.1 (qualification), all blocked on a qualified GGUF for the last one. Phase 3's remaining Win32 is
-`mtmd`, `server` and `decode-receiver`, none of which the streamed prefill needs.
+Also open: 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and 8.1 (qualification), the last
+blocked on a qualified GGUF. Phase 3's remaining Win32 is `mtmd`, `server` and `decode-receiver`,
+none of which the streamed prefill needs. Three findings from 2.2e that belong to those chunks and
+to no chunk yet: 35 declarations in the engine's GPU headers are dead - declared by the deleted
+Mac backend, defined nowhere, called nowhere (the scan is in this file's method section, and the
+three that named Metal were deleted in 2.2e's comment half); 123 `DS4_METAL_*` environment names
+are read but not documented, because their only reader is a wrapper such as
+`glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` and `envvars.py:inventory()` only sees
+literal `getenv("NAME")` calls, so `docs/VARIABLES.md` understates the engine's knobs; and names
+handed to a folded-to-false stub, such as `DS4_METAL_DISABLE_M5_QKV_PAIR_QUAD_FUSE`, are never read
+at all. Do not "fix" the wrapper reads by renaming the names - 2.2b kept them for recipe
+compatibility - fix the inventory.
 
 What a prefill attempt needs beyond a qualified GGUF: nothing else. The three provider arms
 (`launch_early`, `start_engram_prompt_early`, the synchronous load in `prepare_engram_prompt`) are
@@ -67,8 +67,8 @@ verified by the selftest; a live session against weights is not, and cannot be h
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
 `7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` +
 `1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), `187f2fa` + `09b6158` (the
-model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/3), plus the
-plan/handoff commits.
+model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4), `f551a8d`
+(2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), plus the plan/handoff commits.
 `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
@@ -77,13 +77,18 @@ reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPa
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite:
-**584 tests, 5-6 failures, 5 errors** (fork baseline 585 / 6 / 6), and the
-failing *names* are the plan's list - `test_combo_process` (3), `test_journal_recovery_flags`,
+`python3 -B -m pytest tests/ -q` reports **570 passed, 15 failed, 62 skipped** here, and the
+failing *names* include the plan's list - `test_combo_process` (3), `test_journal_recovery_flags`,
 `test_single_liveness`, `test_shared_guard_adapter` (Windows-only guard and producer paths),
 `test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco` (missing `cosmos_windows` module),
-`test_h3_video_delivery` (video gate). Process tests flip between runs - `test_combo_single_stop`
-and `test_real_owned_child_stops_on_kit11_hold` pass or fail depending on the run. Compare the set
-of names, never the counts. Chunk 5.1 and 8.1 own the survivors.
+`test_h3_video_delivery` (video gate). Four more are box state, not the tree: `test_guard_progress_prefill`
+(2) and `test_single_parent_lease` raise `KeyError: 'STUDIO_RUNTIME_ROOT'` because this shell does
+not export it, `test_shared_prefill_profile` needs `slstack.mac`, which this checkout does not
+publish, and `test_hold_yield::test_real_owned_child_stops_on_kit11_hold` flips between runs. All
+four reproduce at the parent commit - check a suspected regression by running the same file in a
+worktree at the baseline (`git -C build/wt-base checkout <sha>`) rather than by reading the count.
+Process tests flip between runs. Compare the set of names, never the counts. Chunk 5.1 and 8.1 own
+the survivors, and 7.1 owns the missing-module ones.
 
 Five hand-compiled programs cover what has no test target, all passing on this tree:
 `docs/evidence/platform-selftest.cpp` (44 checks, the producer's file/hash/VRAM layer),
@@ -208,7 +213,9 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   which for a rewrite should only *lose* warnings (the deleted stubs' own).
 
 - Sweep inputs a later session may need to re-run are committed under `docs/evidence/` -
-  `rename-2.2d.json` is chunk 2.2d's rename map, `platform-selftest.cpp` is chunk 3.1c's
+  `rename-2.2d.json` is chunk 2.2d's rename map, `rename-2.2e.json` is 2.2e's (both halves: the
+  `DS4_GLM_METAL_` prefix entry and the seven exact macro entries, so re-running it is idempotent),
+  `messages-2.2e.json` is 2.2e's message map, `platform-selftest.cpp` is chunk 3.1c's
   platform-layer program, `wf-io-selftest.cpp` is chunk 3.1e's reader program (io_uring against the
   pread baseline, byte-compared through the real `wf_*` pipeline), `wf-extent-selftest.cpp` is chunk
   3.1f's extent reader (33 checks, including a seven-part batch against four slots),
@@ -222,6 +229,25 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   code with a test source rather than a throwaway program. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
   smoke recipe. Anything written under `build/` is scratch and is not in git; chunk 2.2b's map was
   never saved, so its rename is only reconstructable from its commit message.
+- A **text** chunk (comments, printed messages) is outside `preprocess_equiv`, which keeps comments
+  and therefore reports every reworded line plus the shift of everything below it. Use
+  `scripts/port/comment_code_diff.py`: strip comments from both sides and compare code lines, so a
+  comment-only chunk reports 0 changed lines and a chunk that also deleted declarations reports
+  exactly those. Check `__LINE__` first - `ds4.c` has none, `ds4_cuda.cu` has one at line 4421, so
+  edits above it would move a reported number and edits below it must stay line-count neutral.
+  `scripts/port/string_text_replace.py` is the message sweep: pairs apply inside string literals
+  only, longest first, and a literal naming `DS4_*METAL*` is skipped. `scripts/port/metal_word_census.py`
+  is the gate and the count; it classifies by position, and `--strict` fails on any code-position
+  mention. All three are committed, all three take repo-relative paths.
+- The engine has no test target and is not in `compile_commands.json`, so an engine TU is compared
+  by hand: `make -C build/wt-base/engines/ds4 ds4.o ds4_ext.o ds4_cuda.o ds4_cuda_ext.o CUDA_ARCH=sm_120`
+  and the same in the working tree, then group the warnings by TU (split the log on `-o <name>.o`),
+  strip file/line/column, `sed 's/[0-9]+/N/g'`, sort and diff. `make -C engines/ds4 ds4` builds
+  several TUs at once and links; `ds4-decode.so` is the `-DDS4_EXTERNAL_DECODE=1` compilation. A TU
+  whose source did not change is not rebuilt, so it warns in the baseline log and not in the new one
+  - that is not a lost warning. A worktree for the baseline has to be *moved* to the current HEAD
+  (`git -C build/wt-base checkout <sha>`) before a comparison, or it compares against the previous
+  commit and the earlier chunk's edits show up as changes.
 - When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
   but give it the equivalence commands as evidence. The 2.1 review produced three findings quoting
   text that was not in the working tree (it read the diff base rather than the tree), yet its second
@@ -231,7 +257,7 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 ## Behaviour changes landed this session
 
-Chunks 3.1c through 3.1g's behaviour changes (the CLI running on Linux, the POSIX receipt identity
+Chunks 3.1c through 3.1h's behaviour changes (the CLI running on Linux, the POSIX receipt identity
 fields, `--carry-storage hybrid` without a drive letter, SIGINT/SIGTERM cancellation, the live
 carry-resume RAM floor, no process-memory limit in `host_memory::begin()`, the fetcher's io_uring
 reader and `LLAMA_WF_IO_URING=0`, `WF_MODE_AUTO` probing cuFile, buffered `io_direct`, the deleted
@@ -241,44 +267,33 @@ reads into a compute bank, the RAM expert tier measured from `/proc`, the move o
 staging tier and the extent window into the provider's host plan, the Engram loader's io_uring
 queues with its serial `pread` baseline and `LLAMADECODE_ENGRAM_IO_URING=0`, the deleted
 `LLAMADECODE_ENGRAM_IO_PRIORITY`, the loader's own descriptor checked against the provider's lease,
-`load()`/`load_early()` taking a path and an `int` fd, and the provider's three Engram arms being
-open) are recorded in the plan's entries for those chunks and in their commit messages. This
-session's (chunk 3.1h):
+`load()`/`load_early()` taking a path and an `int` fd, the provider's three Engram arms being open,
+and the carry tier's best-effort `mlock` with `CARRY_RAM_LOCK_PARTIAL`) are recorded in the plan's
+entries for those chunks and in their commit messages. This session's (chunk 2.2e, four commits):
 
-- **The carry RAM tier locks as far as the kernel allows instead of refusing the allocation.**
-  `mlock` is all-or-nothing per call and `RLIMIT_MEMLOCK` here is 8 MiB soft *and* hard, so the
-  previous Linux arm threw `Carry RAM cannot be locked` for any tier past it - which is every real
-  carry tier. It now locks in 64 MiB chunks and halves the chunk at each refusal, retrying the same
-  offset, so the allowance is used rather than skipped; the tail stays allocated and merely
-  pageable. That is option 3 of `docs/blackwell-enablement-plan.md` and Basalt's rule.
-  `state().locked_bytes` sits beside `state().bytes`, per mapping in a `locked` map, and
-  `state().bytes` is still the admission figure - **no admission change**, so the carry budgets in
-  existing recipes still apply. `CARRY_RAM_LOCKED` gained `locked_bytes=`, and a tier that cannot be
-  fully locked also prints `CARRY_RAM_LOCK_PARTIAL bytes= locked_bytes= pageable_tail_bytes=
-  rlimit_memlock_bytes= errno=`. Historical receipt lines in
-  `examples/engine_parity/RESULTS.json` keep the old wording; nothing parses them.
-- **Chunks stay whole pages.** `mlock` accounts rounded-up pages, so a partial-page chunk records
-  fewer bytes than the kernel holds; the first version of this reported 2047 pages for a tier smaps
-  said was 2048. `locked_bytes` is therefore exact against `/proc/self/smaps`.
-- **Suspend is `munlock` of the locked bytes then `MADV_DONTNEED`** (`VirtualUnlock` +
-  `MEM_DECOMMIT`), and resume re-locks best effort at the same address; the suspend line gained
-  `unlocked_bytes=` and the resume line `locked_bytes=`.
-- **The resume refusal on physical memory is kept, not dropped.** The Windows arm refused a resume
-  larger than available physical memory before committing pages; `resume_pages` now reads MemAvailable
-  through `llama_dsv41_host_memory::proc_field`, which is why `llama-dsv41-locked-ram.h` includes
-  `llama-dsv41-host-memory.h`. Pages refault on first touch, so nothing else refuses an oversized
-  resume.
-- **Fixed a leak the collapse exposed.** `allocate` accounted the mapping and then built the
-  `shared_ptr`, so if the control block - or the accounting node inserted before it - threw, no
-  deleter existed: the mapping stayed mapped and `state().bytes` kept the charge. The accounting and
-  the `shared_ptr` are now in one `try`, and the `catch` releases the mapping, the per-mapping entry
-  and both counters before rethrowing.
-- **Allocation still has no fallback.** An `mmap` failure and an admission refusal throw exactly as
-  before; only the *lock* became best effort. `llama-dsv41-carry.cpp` is a pure deletion -
-  `code_line_diff.py` reports 0 changed code lines against its parent - so its lease, identity
-  checks, positioned I/O, flush and ancestor pin are the Linux arms the compiler already took.
-- No environment variable was added or removed: `envvars.json` is still 2,234 names, and the table
-  regenerated with no row moved (the tier reads none).
+- **Engine stderr and stdout changed.** 173 printed lines in `ds4.c` were reworded: graph-path
+  failures say `GPU graph`, streaming and SSD lines drop the backend word, the inert expert-profile
+  lines drop it too (including the `"source"` field of the profile JSON), the GLM lines say
+  `GLM graph`, `Metal command batch` became `the GPU command sequence`, and three refusals no longer
+  name a backend the CLI rejects (`--ssd-streaming ... only with --cuda/--rocm`, `V4.1 requires
+  single-GPU CUDA per rank`, `Qwen3.8 sessions require a graph backend`). **Anything that greps
+  engine output for the old wording will not match it**; nothing in this repo parses these lines,
+  and the Mac receipts are historical. The env table's quoted `consumer` evidence moved for exactly
+  two rows, `DS4_METAL_GRAPH_DUMP_LOGITS` and `DS4_METAL_SESSION_BATCH_LOG`.
+- **No identifier, no CLI surface and no printed message names Metal.** The gate is
+  `python3 scripts/port/metal_word_census.py --strict`, not a grep: `\bMETAL_` cannot see
+  `DS4_METAL_PROFILE_DECODE_STAGE`, and seven such macros were live code until this session renamed
+  them to `DS4_GPU_*`. 26 provenance comments still name the retired backend or its files
+  (`metal/moe.metal`, `metal/norm.metal`, `metal/dense.metal`, `dsv4_hc.metal`, `metal/qwen4.metal`,
+  `ds4_metal.m`) on purpose, and the `DS4_*METAL*` environment names are untouched: 195 documented
+  reads plus 123 wrapper reads, no name added or dropped.
+- **Three dead declarations deleted** - `ds4_gpu_warm_command_queue`,
+  `ds4_gpu_hc_rms_scale_project_f16_tensor`, `ds4_gpu_tp_gate_prefetch_plan` - each with no
+  definition and no caller anywhere in the repo, and both `ds4` and `ds4-decode.so` still link.
+  35 more dead declarations remain in the engine's GPU headers; they name no backend, so they are
+  a separate chunk.
+- No environment variable was added or removed: `envvars.json` is still 2,234 names across all four
+  commits, and `docs/VARIABLES.md` no longer carries the `ds4: Metal mixed batch ...` line.
 - The geometry defaults in `choose_scan()` are still the Windows RAID-0 tuning, untouched.
 
 - Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
@@ -322,7 +337,9 @@ session's (chunk 3.1h):
   reading the diff; 2.2c deleted Metal-only `getenv` sites and no name dropped. Moving a `getenv`
   between files (3.1c moved several into `producer-platform.inc`) moves rows but not names.
   `envvars.py:inventory()` scans only `engines/` and `vendor/`, and treats `setenv("NAME")` as a
-  read - a `setenv` whose name is a variable is invisible to it.
+  read - a `setenv` whose name is a variable is invisible to it. It also misses a read through a
+  wrapper: `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live but undocumented, and 2.2e
+  counted 123 such names. Do not rename them to make the table honest; fix the inventory.
 - Gate greps must be scoped: `grep -rn "..." engines/ds4` also matches build outputs, engine
   binaries, `*.o`, `ds4-decode.so` and `__pycache__`, and `build/wt-base` holds a second copy of
   every engine file. Use `--exclude-dir=build --exclude-dir=.git` plus
@@ -332,11 +349,15 @@ session's (chunk 3.1h):
 - `_` is a word character. That protects `DS4_METAL_*` from `\bMETAL_` - which is why 2.2b kept all
   the env names - but it also *hid* the identifiers with a leading underscore (`glm_metal_*`,
   `g_metal_graph_*`, `ds4_engine_metal_graph_*`) from 2.2b's gate. 2.2d caught them with prefix
-  entries long enough to start at a real boundary, and 2.2e caught the same class again on the other
-  side: `DS4_GLM_METAL_*` constants are invisible to `\bMETAL_` because `DS4_GLM_` precedes it, so a
-  Metal-name gate needs entries for *every* prefix, not one. `grep -rhoE
-  "\b[A-Za-z_0-9]*[Mm][Ee][Tt][Aa][Ll][A-Za-z_0-9]*\b"` over the engine source is the honest census;
-  it separates the kept env names from the identifiers by matching `DS4_[A-Z_]*METAL[A-Z_]*` first.
+  entries long enough to start at a real boundary, and 2.2e caught the same class twice more on the
+  other side: `DS4_GLM_METAL_*` constants are invisible to `\bMETAL_` because `DS4_GLM_` precedes it,
+  and so are the seven `DS4_METAL_PROFILE_*` macros, because `DS4_` does. A gate needs an entry for
+  *every* prefix, so it cannot be a grep. `scripts/port/metal_word_census.py` is the gate now: it
+  classifies each mention by its position in the file, which is the only test that separates a kept
+  environment name from an identifier. The old regex census (`DS4_[A-Z_]*METAL[A-Z_]*` first, then
+  whatever is left) cannot make that separation - it filed `DS4_METAL_PROFILE_DECODE_STAGE` with the
+  environment names, which is exactly how 2.2e's first run concluded that no identifier was left.
+  It also matches uppercase only, so `ds4_metal.m` counts as the comment it is.
 - **A system header must not be first included inside a namespace.** `struct stat`, `struct
   pollfd` and friends then become members of that namespace and every later `struct stat` at file
   scope is a different, incomplete type. `producer-wire.h` and `producer-platform.inc` include
@@ -434,10 +455,15 @@ session's (chunk 3.1h):
   `grep "warning:" | sed` away the path, line and column, `sed 's/[0-9]+/N/g'`, sort and diff - and
   compile `ds4_ext.o` too, because `-DDS4_EXTERNAL_DECODE=1` is a second compilation of the same
   file with different live arms. Each takes about a minute.
-- `scripts/release_check.py` flags any absolute path under a user's home directory as a "machine
-  path", and it scans every tracked blob - including a `.cpp` committed under `docs/evidence/` - so
-  docs and evidence files must use repo-relative paths. `git status -sb` is the push check; the
-  pre-commit hook also scans the commit message, so a message must not quote a machine path either.
+- `python3 -B scripts/release_check.py` flags any absolute path under a user's home directory as a
+  "machine path", and it scans every tracked blob - including a `.cpp` committed under
+  `docs/evidence/` - so docs and evidence files must use repo-relative paths. It also scans the
+  working tree: `python3 -B -m pytest tests/ -q` leaves scratch behind in `jobs/` and
+  `single-parent-*/`, whose job-spec JSON contains this box's home path, and those directories are
+  untracked but *not* gitignored. Delete them before running the check, or the gate reports
+  "machine path" findings the tree did not cause.
+- `git status -sb` is the push check; the pre-commit hook also scans the commit message, so a
+  message must not quote a machine path either.
 - **Locked memory is landed** (chunk 3.1h, option 3 of `docs/blackwell-enablement-plan.md`): chunked
   best-effort `mlock`, the tail allocated and pageable, the shortfall logged as
   `CARRY_RAM_LOCK_PARTIAL`, and the host-memory paging guard as the enforcement. Details in the
@@ -467,6 +493,8 @@ session's (chunk 3.1h):
 
 - `adversarial-code-review` after a deletion or rename chunk, with the `scripts/port/` equivalence
   commands handed to the reviewer as evidence (see the method section for what it caught last time).
+  For a text chunk the evidence is `comment_code_diff.py`, `metal_word_census.py` and the engine's
+  two compilations; 2.2e was verified inline, not by a subagent.
 - The user asked, on 2026-11-06, that this work not be parallelised: subagents are expensive on
   context prefill, and one of them died mid-run with no output anyway. Verify inline - the compile
   checks, the hand-compiled programs and the function-level diff - and ask before fanning out.
