@@ -1,15 +1,21 @@
-// LLAMADECODE_ENGRAM_EARLY: the early multi-IoRing Engram loader against a
+// LLAMADECODE_ENGRAM_EARLY: the early multi-ring Engram loader against a
 // synthetic table file (CPU + disk only; no model, no GPU). Checks that every
 // prompt row read() back from the early cache equals the file bytes and the
-// original single-ring loader's cache, across ring/depth settings, a tight
+// original single-queue loader's cache, across ring/depth settings, a tight
 // admission (shrunken arena), per-table readiness and previous-request reuse.
-// Usage: dsv41_engram_early_io.exe <synthetic-file-path>   (created if absent)
+// The loader's io_uring queues are the default; LLAMADECODE_ENGRAM_IO_URING=0
+// runs the same rows through the serial pread baseline, so this file passes
+// under either reader (its env read is once per process, so run it twice).
+// Usage: dsv41_engram_early_io <synthetic-file-path>   (created if absent)
 #include "llama-dsv41-engram-prefetch.h"
-#include <windows.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <random>
 #include <string>
 #include <thread>
@@ -26,6 +32,9 @@ static uint64_t mix(uint64_t x) {
     x = (x ^ (x >> 27)) * 0x94d049bb133111ebull; return x ^ (x >> 31);
 }
 static uint8_t byte_at(uint64_t offset) { return uint8_t(mix(offset >> 3) >> (8 * (offset & 7))); }
+static void set_env(const char *name, const char *value) {
+    if (value && *value) setenv(name, value, 1); else unsetenv(name);
+}
 
 int main(int argc, char **argv) {
     if (argc != 2) { std::fprintf(stderr, "usage: %s <synthetic-file>\n", argv[0]); return 2; }
@@ -43,27 +52,32 @@ int main(int argc, char **argv) {
     expect(layout.validate(why), "synthetic Engram layout validates");
     const uint64_t base0 = 3 * 4096 + 123, base1 = base0 + uint64_t(layout.rows[0]) * 264 + 777;
     const uint64_t file_bytes = ((base1 + uint64_t(layout.rows[1]) * 264 + 4095) / 4096 + 1) * 4096;
-    const std::wstring path(argv[1], argv[1] + std::strlen(argv[1]));
+    const std::filesystem::path path(argv[1]);
     {   // Create (or reuse) the deterministic file.
-        WIN32_FILE_ATTRIBUTE_DATA info{};
-        const bool reuse = GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &info) &&
-            ((uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow) == file_bytes;
+        std::error_code ec;
+        const auto size = std::filesystem::file_size(path, ec);
+        const bool reuse = !ec && size == file_bytes;
         if (!reuse) {
-            HANDLE f = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-            if (f == INVALID_HANDLE_VALUE) { std::fprintf(stderr, "cannot create file\n"); return 2; }
+            const int f = ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+            if (f < 0) { std::fprintf(stderr, "cannot create file\n"); return 2; }
             std::vector<uint8_t> chunk(8 << 20);
             for (uint64_t at = 0; at < file_bytes; at += chunk.size()) {
                 const size_t n = size_t(std::min<uint64_t>(chunk.size(), file_bytes - at));
                 for (size_t i = 0; i < n; ++i) chunk[i] = byte_at(at + i);
-                DWORD wrote = 0;
-                if (!WriteFile(f, chunk.data(), DWORD(n), &wrote, nullptr) || wrote != n) { std::fprintf(stderr, "write failed\n"); return 2; }
+                size_t wrote = 0;
+                while (wrote < n) {
+                    const ssize_t got = ::write(f, chunk.data() + wrote, n - wrote);
+                    if (got <= 0) { std::fprintf(stderr, "write failed\n"); ::close(f); return 2; }
+                    wrote += size_t(got);
+                }
             }
-            CloseHandle(f);
+            if (::fsync(f) != 0) { std::fprintf(stderr, "write failed\n"); ::close(f); return 2; }
+            ::close(f);
         }
         std::printf("synthetic file bytes=%llu rows=%u+%u reused=%d\n", (unsigned long long)file_bytes, layout.rows[0], layout.rows[1], int(reuse));
     }
-    HANDLE verified = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (verified == INVALID_HANDLE_VALUE) { std::fprintf(stderr, "cannot open file\n"); return 2; }
+    const int verified = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (verified < 0) { std::fprintf(stderr, "cannot open file\n"); return 2; }
     const std::array<uint64_t, 2> offsets{base0, base1};
 
     std::mt19937 rng(77);
@@ -86,10 +100,10 @@ int main(int argc, char **argv) {
     const uint64_t admitted = 636485632; // the Studio profile's --engram-prefetch-bytes
     const auto tokens = make_tokens(3000);
 
-    // Reference: today's single-ring loader.
+    // Reference: the single-queue loader.
     auto reference = std::make_shared<llama_dsv41_engram_prompt_cache>();
     reference->prepare(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted);
-    reference->load(path.c_str(), verified, file_bytes, [] { return false; });
+    reference->load(path, verified, file_bytes, [] { return false; });
     expect(check(*reference, nullptr, tokens, {}), "reference loader rows equal file bytes");
 
     {   // Image masks cross planner blocks and reset all three history slots.
@@ -100,10 +114,10 @@ int main(int argc, char **argv) {
         llama_dsv41::engram_history h; h.tail = {{11, 22, 33}};
         llama_dsv41_engram_prompt_cache ref, cached;
         ref.prepare(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, h, mask.data());
-        ref.load(path.c_str(), verified, file_bytes, [] { return false; });
+        ref.load(path, verified, file_bytes, [] { return false; });
         cached.prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, h, nullptr, mask.data());
         bool ready = false;
-        std::thread loader([&] { cached.load_early(path.c_str(), verified, file_bytes, [] { return false; }); });
+        std::thread loader([&] { cached.load_early(path, verified, file_bytes, [] { return false; }); });
         try { cached.wait_table(0, [] { return false; }); cached.wait_table(1, [] { return false; }); ready = true; } catch (...) {}
         loader.join();
         expect(ready && cached.budget() <= admitted && check(cached, &ref, tokens, h, mask.data()),
@@ -112,11 +126,11 @@ int main(int argc, char **argv) {
 
     struct setting { const char *rings, *depth, *batch; };
     for (const setting s : {setting{"4", "1024", "256"}, setting{"1", "32", "1"}, setting{"8", "4096", "4096"}, setting{"3", "100", "7"}}) {
-        _putenv_s("LLAMADECODE_ENGRAM_RINGS", s.rings); _putenv_s("LLAMADECODE_ENGRAM_DEPTH", s.depth); _putenv_s("LLAMADECODE_ENGRAM_BATCH", s.batch);
+        set_env("LLAMADECODE_ENGRAM_RINGS", s.rings); set_env("LLAMADECODE_ENGRAM_DEPTH", s.depth); set_env("LLAMADECODE_ENGRAM_BATCH", s.batch);
         llama_dsv41_engram_prompt_cache c;
         c.prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, {}, nullptr);
         bool t0 = false, t1 = false;
-        std::thread loader([&] { c.load_early(path.c_str(), verified, file_bytes, [] { return false; }); });
+        std::thread loader([&] { c.load_early(path, verified, file_bytes, [] { return false; }); });
         try { c.wait_table(0, [] { return false; }); t0 = true; c.wait_table(1, [] { return false; }); t1 = true; } catch (...) {}
         loader.join();
         char what[160];
@@ -124,21 +138,21 @@ int main(int argc, char **argv) {
                       s.rings, s.depth, s.batch);
         expect(t0 && t1 && check(c, reference.get(), tokens, {}) && c.budget() <= admitted, what);
     }
-    _putenv_s("LLAMADECODE_ENGRAM_RINGS", ""); _putenv_s("LLAMADECODE_ENGRAM_DEPTH", ""); _putenv_s("LLAMADECODE_ENGRAM_BATCH", "");
+    set_env("LLAMADECODE_ENGRAM_RINGS", ""); set_env("LLAMADECODE_ENGRAM_DEPTH", ""); set_env("LLAMADECODE_ENGRAM_BATCH", "");
     {   // Sparse prompt (~0.9% density, mostly unmerged 4/8 KiB extents).
         const auto sparse = make_tokens(150);
         llama_dsv41_engram_prompt_cache ref, c;
         ref.prepare(layout, sparse.data(), uint32_t(sparse.size()), offsets, admitted);
-        ref.load(path.c_str(), verified, file_bytes, [] { return false; });
+        ref.load(path, verified, file_bytes, [] { return false; });
         c.prepare_early(layout, sparse.data(), uint32_t(sparse.size()), offsets, admitted, {}, nullptr);
-        c.load_early(path.c_str(), verified, file_bytes, [] { return false; });
+        c.load_early(path, verified, file_bytes, [] { return false; });
         expect(check(c, &ref, sparse, {}), "sparse prompt: early rows equal file and reference");
     }
     {   // Tight admission: worst case for this prompt only; the arena shrinks.
         const uint64_t tight = 4ull * 1024 * 1024 + uint64_t(tokens.size()) * 48 * (4 + 264);
         llama_dsv41_engram_prompt_cache c;
         c.prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, tight, {}, nullptr);
-        c.load_early(path.c_str(), verified, file_bytes, [] { return false; });
+        c.load_early(path, verified, file_bytes, [] { return false; });
         expect(c.budget() <= tight && check(c, reference.get(), tokens, {}), "tight admission: arena shrinks inside admission, rows exact");
     }
     {   // Restored history tail.
@@ -147,19 +161,45 @@ int main(int argc, char **argv) {
         expect(llama_dsv41::engram_hash(layout, h, tail, nullptr, 3, scratch, why), "history tail hashes");
         llama_dsv41_engram_prompt_cache c;
         c.prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, h, nullptr);
-        c.load_early(path.c_str(), verified, file_bytes, [] { return false; });
+        c.load_early(path, verified, file_bytes, [] { return false; });
         expect(check(c, nullptr, tokens, h), "restored history: rows exact");
     }
     {   // Previous-request reuse: an append sharing half its tokens.
         auto first = std::make_shared<llama_dsv41_engram_prompt_cache>();
         first->prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, {}, nullptr);
-        first->load_early(path.c_str(), verified, file_bytes, [] { return false; });
+        first->load_early(path, verified, file_bytes, [] { return false; });
         std::vector<int32_t> next(tokens.begin(), tokens.begin() + 1500);
         const auto fresh = make_tokens(1500); next.insert(next.end(), fresh.begin(), fresh.end());
         llama_dsv41_engram_prompt_cache c;
         c.prepare_early(layout, next.data(), uint32_t(next.size()), offsets, admitted - first->budget(), {}, first);
-        c.load_early(path.c_str(), verified, file_bytes, [] { return false; });
+        c.load_early(path, verified, file_bytes, [] { return false; });
         expect(check(c, nullptr, next, {}), "previous-request reuse: copied + read rows exact (see hit_rows in log)");
+    }
+    {   // Row cache: rows it already holds are copied, the rest read, then inserted.
+        auto cache = std::make_shared<llama_dsv41_engram_row_cache>(8ull << 20);
+        llama_dsv41_engram_prompt_cache c;
+        c.set_row_cache(cache);
+        c.prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, {}, nullptr);
+        c.load_early(path, verified, file_bytes, [] { return false; });
+        std::vector<int32_t> again(tokens.begin(), tokens.begin() + 1200);
+        llama_dsv41_engram_prompt_cache warm;
+        warm.set_row_cache(cache);
+        warm.prepare_early(layout, again.data(), uint32_t(again.size()), offsets, admitted, {}, nullptr);
+        warm.load_early(path, verified, file_bytes, [] { return false; });
+        expect(check(c, nullptr, tokens, {}) && check(warm, &c, again, {}) && cache->rows() > 0,
+               "row cache: second prompt hits cached rows and still equals file bytes");
+    }
+    {   // The descriptor the receipt hashed is the only one the loader accepts.
+        llama_dsv41_engram_prompt_cache c;
+        c.prepare_early(layout, tokens.data(), uint32_t(tokens.size()), offsets, admitted, {}, nullptr);
+        const int other = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        bool threw = false;
+        try { c.load_early(std::filesystem::path("/dev/null"), other, file_bytes, [] { return false; }); }
+        catch (const std::exception &) { threw = true; }
+        ::close(other);
+        bool wait_threw = false;
+        try { c.wait_table(0, [] { return false; }); } catch (const std::exception &) { wait_threw = true; }
+        expect(threw && wait_threw, "verified-descriptor mismatch: loader refuses, and the table wait reports the failure");
     }
     {   // Cancellation drains every submitted read and fails wait_table.
         llama_dsv41_engram_prompt_cache c;
@@ -167,11 +207,11 @@ int main(int argc, char **argv) {
         c.prepare_early(layout, big.data(), uint32_t(big.size()), offsets, admitted, {}, nullptr);
         std::atomic<int> polls{0};
         bool threw = false, wait_threw = false;
-        try { c.load_early(path.c_str(), verified, file_bytes, [&] { return ++polls > 3; }); } catch (const std::exception &) { threw = true; }
+        try { c.load_early(path, verified, file_bytes, [&] { return ++polls > 3; }); } catch (const std::exception &) { threw = true; }
         try { c.wait_table(1, [] { return false; }); } catch (const std::exception &) { wait_threw = true; }
         expect(threw && wait_threw, "cancel: load throws after draining, table wait reports failure");
     }
-    CloseHandle(verified);
+    ::close(verified);
     std::printf(failures ? "FAILURES %d\n" : "ALL PASS\n", failures);
     return failures ? 1 : 0;
 }

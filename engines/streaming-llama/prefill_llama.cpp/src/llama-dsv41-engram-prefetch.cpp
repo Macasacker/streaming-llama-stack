@@ -1,30 +1,40 @@
-// IoRing declarations are isolated to this TU. Runtime functions are resolved
-// only for an explicitly enabled cache; ordinary paths gain no Win11 import.
-#ifdef _WIN32
+// Linux: the Engram row loader reads its extents through io_uring, one read
+// queue per ring, and keeps the serial `pread` baseline beside it
+// (LLAMADECODE_ENGRAM_IO_URING=0) so the ring's gain can be measured against
+// the same rows. Ring declarations are isolated to this translation unit, as
+// they are in the weight fetcher's reader.
+#include <fcntl.h>
+#include <poll.h>
+#include <unistd.h>
+#include <sys/eventfd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#if __has_include(<liburing.h>)
+#  define ENGRAM_HAS_IO_URING 1
+#  include <liburing.h>
+#endif
 #include "llama-dsv41-layer-log.h"
-#include <sdkddkver.h>
-#if !defined(NTDDI_VERSION) || NTDDI_VERSION < NTDDI_WIN10_CO
-#undef NTDDI_VERSION
-#define NTDDI_VERSION NTDDI_WIN10_CO
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <ioringapi.h>
-#include <malloc.h>
-#endif
 #include "llama-dsv41-engram-prefetch.h"
 #include "llama-dsv41-engram-plan.h"
 #include "llama-dsv41-engram-early-decision.h"
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
-#include <thread>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
+#include <filesystem>
+#include <functional>
+#include <limits>
+#include <memory>
 #include <stdexcept>
+#include <string>
+#include <thread>
+#include <vector>
 // The early multi-ring loader serves every Engram load (all EARLY arms). =0:
 // no early start, and the weight-stream marker is never set.
 static std::atomic<bool> llama_dsv41_engram_weight_pass{false};
@@ -51,9 +61,214 @@ double llama_dsv41_engram_early_iops(){
     static const double v=llama_dsv41_engram_early::parse_iops(std::getenv("LLAMADECODE_ENGRAM_IOPS"));return v;
 }
 void llama_dsv41_engram_weight_stream(bool active){llama_dsv41_engram_weight_pass.store(active,std::memory_order_relaxed);}
-#ifdef _WIN32
-// Submit/cleanup contracts: https://learn.microsoft.com/windows/win32/api/ioringapi/nf-ioringapi-submitioring
-// https://learn.microsoft.com/windows/win32/api/ioringapi/nf-ioringapi-closeioring
+namespace {
+// LLAMADECODE_ENGRAM_IO_URING=0 selects the serial `pread` baseline; every
+// other value, and an unset environment, keeps the ring reader. Same rule as
+// the weight fetcher's LLAMA_WF_IO_URING, and the same reason: the baseline is
+// what the ring's gain is measured against. Only read when liburing is compiled
+// in - without it the loader has no ring to decline.
+#ifdef ENGRAM_HAS_IO_URING
+bool engram_uring_wanted(){
+    static const bool v=[]{const char*e=std::getenv("LLAMADECODE_ENGRAM_IO_URING");
+        if(!e||!*e||!std::strcmp(e,"1"))return true;
+        if(!std::strcmp(e,"0"))return false;
+        throw std::invalid_argument("LLAMADECODE_ENGRAM_IO_URING must be 0 or 1");}();
+    return v;
+}
+#endif
+using engram_clock=std::chrono::steady_clock;
+void engram_require(bool ok,const char* message){if(!ok)throw std::runtime_error(message);}
+double engram_ms_since(engram_clock::time_point t){
+    return std::chrono::duration<double,std::milli>(engram_clock::now()-t).count();
+}
+// A cancel request is itself a submitted entry, so its CQE is accounted like
+// any other; this user_data marks it as the cancel's own completion rather than
+// a read's, so nothing treats it as a row.
+constexpr uint64_t engram_cancel_nonce=~uint64_t(0);
+
+struct read_queue;
+// Bounded wait for the next completion on any queue sharing one eventfd. The
+// caller flushes every submission queue first, so nothing here relies on a wait
+// also being a submit (the rule the fetcher's reader learned in chunk 3.1f).
+// The eventfd counter is consumed before polling, which can swallow the wake of
+// a completion whose CQE is already queued but not yet peeked; each queue's own
+// CQ ring is therefore checked before the poll, or it runs out its whole
+// timeout and the load loses 100 ms.
+void wait_for_completion(int event_fd,const std::vector<const read_queue*>& queues);
+
+// One read queue: an io_uring ring when the kernel offers one, otherwise the
+// serial `pread` baseline. The Windows loader used one IoRing per queue with
+// the file handle and the slot arena registered through ring operations;
+// here registration is a synchronous syscall, optional, and the arena is named
+// per request instead of registered. `in_sq` counts entries the kernel has not
+// seen, `in_kernel` reads whose completion is still owed.
+struct read_queue {
+    struct completion {uint64_t id=0;int res=0;};
+    int fd=-1;
+    bool uring=false;
+#ifdef ENGRAM_HAS_IO_URING
+    struct io_uring ring{};
+    int fixed=-1;                 // registered file index, -1 when unregistered
+#endif
+    uint32_t in_kernel=0;
+    uint32_t in_sq=0;
+    std::deque<completion> ready; // the baseline's own completions
+    uint32_t outstanding()const{return in_kernel+in_sq+uint32_t(ready.size());}
+    // A ring that cannot start, or cannot report completions to the shared
+    // eventfd, leaves this queue on the baseline; the loader still reads every
+    // row, it just reads one at a time.
+    void open(unsigned entries,int event_fd){
+#ifdef ENGRAM_HAS_IO_URING
+        if(!engram_uring_wanted())return;
+        const int init=io_uring_queue_init(entries,&ring,0);
+        if(init!=0){
+            llama_dsv41_layer_log("LLAMADECODE_ENGRAM_IO_URING ring_init_failed rc=%d reader=pread\n",init);
+            return;
+        }
+        const int posted=io_uring_register_eventfd(&ring,event_fd);
+        if(posted!=0){
+            llama_dsv41_layer_log("LLAMADECODE_ENGRAM_IO_URING eventfd_failed rc=%d reader=pread\n",posted);
+            io_uring_queue_exit(&ring);
+            return;
+        }
+        uring=true;
+        if(io_uring_register_files(&ring,&fd,1)==0)fixed=0;
+#endif
+        (void)entries;(void)event_fd;
+    }
+    void close(){
+#ifdef ENGRAM_HAS_IO_URING
+        if(uring){io_uring_unregister_files(&ring);io_uring_queue_exit(&ring);uring=false;}
+#endif
+    }
+    // Flush the submission queue. A zero return is a legitimate submit of
+    // nothing new; only a negative one is an error. Entries the kernel has not
+    // seen stay in the ring, so a short flush loses nothing.
+    bool flush(){
+#ifdef ENGRAM_HAS_IO_URING
+        if(uring){
+            const int n=io_uring_submit(&ring);
+            if(n<0)return false;
+            const uint32_t moved=std::min<uint32_t>(uint32_t(n),in_sq);
+            in_sq-=moved;in_kernel+=moved;
+        }
+#endif
+        return true;
+    }
+    void request(uint64_t id,void* dst,uint32_t bytes,uint64_t offset){
+#ifdef ENGRAM_HAS_IO_URING
+        if(uring){
+            struct io_uring_sqe* sqe=io_uring_get_sqe(&ring);
+            engram_require(sqe,"Engram read queue overflowed its submission ring");
+            io_uring_prep_read(sqe,fixed>=0?fixed:fd,dst,bytes,offset);
+            io_uring_sqe_set_data(sqe,reinterpret_cast<void*>(id));
+            if(fixed>=0)sqe->flags|=IOSQE_FIXED_FILE;
+            ++in_sq;return;
+        }
+#endif
+        uint32_t done=0;
+        while(done<bytes){
+            const ssize_t got=::pread(fd,static_cast<uint8_t*>(dst)+done,bytes-done,off_t(offset+done));
+            if(got<=0){ready.push_back({id,got<0?-int(errno):-EIO});return;}
+            done+=uint32_t(got);
+        }
+        ready.push_back({id,int(done)});
+    }
+    // True when a completion was taken. Every submitted entry yields exactly
+    // one CQE, so one read (or one cancel request) is retired per CQE; the
+    // caller decides whether it accounts for a row.
+    bool peek(completion& out){
+        if(!ready.empty()){out=ready.front();ready.pop_front();return true;}
+#ifdef ENGRAM_HAS_IO_URING
+        if(uring){
+            struct io_uring_cqe* cqe=nullptr;
+            if(io_uring_peek_cqe(&ring,&cqe)!=0)return false;
+            out.id=reinterpret_cast<uint64_t>(io_uring_cqe_get_data(cqe));
+            out.res=cqe->res;
+            io_uring_cqe_seen(&ring,cqe);
+            --in_kernel;
+            return true;
+        }
+#endif
+        return false;
+    }
+    // The CancelIoEx the Windows cleanup called on the shared handle: every
+    // read still queued on this descriptor, matched by fd rather than nonce.
+    void cancel_outstanding(){
+#ifdef ENGRAM_HAS_IO_URING
+        if(uring&&in_kernel){
+            struct io_uring_sqe* sqe=io_uring_get_sqe(&ring);
+            if(!sqe)return;
+            io_uring_prep_cancel_fd(sqe,fixed>=0?fixed:fd,
+                IORING_ASYNC_CANCEL_ALL|(fixed>=0?IORING_ASYNC_CANCEL_FD_FIXED:0));
+            io_uring_sqe_set_data(sqe,reinterpret_cast<void*>(engram_cancel_nonce));
+            ++in_sq;
+        }
+#endif
+    }
+    [[noreturn]] static void unsafe_cleanup(){
+        std::fputs("DSV41_ENGRAM_RING_CLEANUP_REFUSED: owned process exits before releasing buffers with unconfirmed IO\n",stderr);
+        std::fflush(stderr);_exit(79);std::abort();
+    }
+    // Every submitted read must be accounted for before its buffer is freed.
+    // Unsubmitted SQ entries are abandoned when the ring closes, so only
+    // `in_kernel` reads have to drain here.
+    void settle(int event_fd){
+        if(!flush())unsafe_cleanup();
+        cancel_outstanding();
+        if(!flush())unsafe_cleanup();
+        const auto deadline=engram_clock::now()+std::chrono::seconds(5);
+        while(in_kernel){
+            completion c;
+            if(peek(c))continue;
+            if(engram_clock::now()>=deadline)unsafe_cleanup();
+            wait(event_fd);
+        }
+    }
+    // True when a completion is already accounted for by this queue: a
+    // baseline read in its own list, or a CQE sitting in the ring.
+    bool has_completion()const{
+        if(!ready.empty())return true;
+#ifdef ENGRAM_HAS_IO_URING
+        return uring&&io_uring_cq_ready(&ring)!=0;
+#else
+        return false;
+#endif
+    }
+    void wait(int event_fd){wait_for_completion(event_fd,{this});}
+};
+
+void wait_for_completion(int event_fd,const std::vector<const read_queue*>& queues){
+    uint64_t cleared=0;
+    const ssize_t ignored=::read(event_fd,&cleared,sizeof(cleared));(void)ignored;  // EFD_NONBLOCK: -EAGAIN when nothing posted
+    for(const auto* q:queues)if(q->has_completion())return;
+    struct pollfd p{event_fd,POLLIN,0};
+    engram_require(poll(&p,1,100)>=0,"Engram read queue completion wait failed");
+}
+
+// The loader opens its own descriptor rather than sharing the provider's
+// lease, exactly as the Windows loader opened its own handles: the two reads
+// are different queue depths on different rings, and the identity check below
+// is what proves the name still resolves to the file the receipt hashed.
+// O_NOFOLLOW refuses a swapped leaf; a swapped ancestor directory resolves to
+// a different inode here, which is what the st_dev/st_ino compare refuses, just
+// as FILE_ID_INFO did.
+int open_verified_row_file(const std::filesystem::path& path,int verified_fd,uint64_t verified_file_bytes){
+    engram_require(verified_fd>=0,"Engram loader has no verified model descriptor");
+    const int fd=::open(path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
+    engram_require(fd>=0,"Cannot open original Engram file for its own read queues");
+    struct stat held{},mine{};
+    const bool ok=fstat(verified_fd,&held)==0&&fstat(fd,&mine)==0&&S_ISREG(mine.st_mode)&&mine.st_nlink==1&&
+        mine.st_dev==held.st_dev&&mine.st_ino==held.st_ino&&uint64_t(mine.st_size)==verified_file_bytes;
+    if(!ok){::close(fd);engram_require(false,"Engram read descriptor differs from the verified model");}
+    return fd;
+}
+uint8_t* allocate_arena(size_t bytes){
+    void* p=nullptr;
+    engram_require(posix_memalign(&p,4096,bytes)==0&&p,"Cannot allocate admitted Engram read slots");
+    return static_cast<uint8_t*>(p);
+}
+} // namespace
 struct llama_dsv41_engram_prompt_cache::implementation {
     static constexpr uint32_t depth=256,page_size=8192,row_bytes=264;
     struct table {std::vector<uint32_t> ids;std::vector<uint8_t> data;};
@@ -81,60 +296,26 @@ struct llama_dsv41_engram_prompt_cache::implementation {
     std::shared_ptr<llama_dsv41_engram_row_cache> row_cache;
     static void require(bool ok,const char* message){if(!ok)throw std::runtime_error(message);}
     static uint64_t add(uint64_t a,uint64_t b){require(a<=UINT64_MAX-b,"Engram cache plan overflow");return a+b;}
-    struct api_table {
-        decltype(&::CreateIoRing) CreateIoRing=nullptr;
-        decltype(&::IsIoRingOpSupported) IsIoRingOpSupported=nullptr;
-        decltype(&::SetIoRingCompletionEvent) SetIoRingCompletionEvent=nullptr;
-        decltype(&::BuildIoRingRegisterFileHandles) BuildIoRingRegisterFileHandles=nullptr;
-        decltype(&::BuildIoRingRegisterBuffers) BuildIoRingRegisterBuffers=nullptr;
-        decltype(&::BuildIoRingReadFile) BuildIoRingReadFile=nullptr;
-        decltype(&::SubmitIoRing) SubmitIoRing=nullptr;
-        decltype(&::PopIoRingCompletion) PopIoRingCompletion=nullptr;
-        decltype(&::CloseIoRing) CloseIoRing=nullptr;
-        api_table(){
-            const auto module=GetModuleHandleW(L"KernelBase.dll");require(module,"Required system IoRing module unavailable");
-            CreateIoRing=reinterpret_cast<decltype(CreateIoRing)>(GetProcAddress(module,"CreateIoRing"));
-            IsIoRingOpSupported=reinterpret_cast<decltype(IsIoRingOpSupported)>(GetProcAddress(module,"IsIoRingOpSupported"));
-            SetIoRingCompletionEvent=reinterpret_cast<decltype(SetIoRingCompletionEvent)>(GetProcAddress(module,"SetIoRingCompletionEvent"));
-            BuildIoRingRegisterFileHandles=reinterpret_cast<decltype(BuildIoRingRegisterFileHandles)>(GetProcAddress(module,"BuildIoRingRegisterFileHandles"));
-            BuildIoRingRegisterBuffers=reinterpret_cast<decltype(BuildIoRingRegisterBuffers)>(GetProcAddress(module,"BuildIoRingRegisterBuffers"));
-            BuildIoRingReadFile=reinterpret_cast<decltype(BuildIoRingReadFile)>(GetProcAddress(module,"BuildIoRingReadFile"));
-            SubmitIoRing=reinterpret_cast<decltype(SubmitIoRing)>(GetProcAddress(module,"SubmitIoRing"));
-            PopIoRingCompletion=reinterpret_cast<decltype(PopIoRingCompletion)>(GetProcAddress(module,"PopIoRingCompletion"));
-            CloseIoRing=reinterpret_cast<decltype(CloseIoRing)>(GetProcAddress(module,"CloseIoRing"));
-            require(CreateIoRing&&IsIoRingOpSupported&&SetIoRingCompletionEvent&&BuildIoRingRegisterFileHandles&&BuildIoRingRegisterBuffers&&BuildIoRingReadFile&&SubmitIoRing&&PopIoRingCompletion&&CloseIoRing,"Required IoRing APIs unavailable; no serial fallback");
-        }
-    } api;
+    // One queue plus its slot arena. The arena outlives every read: the
+    // destructor settles the queue before freeing it, and refuses to free it
+    // at all when a read is still owed.
     struct io_scope {
-        api_table &api;
-        explicit io_scope(api_table &a):api(a){}
-        io_scope(const io_scope&)=delete;io_scope&operator=(const io_scope&)=delete;
-        HIORING ring=nullptr;
-        HANDLE file=INVALID_HANDLE_VALUE,event=nullptr;
+        int fd=-1,event_fd=-1;
+        read_queue queue;
         uint8_t* pages=nullptr;
-        uint32_t submitted=0;
-        [[noreturn]] static void unsafe_cleanup(){
-            std::fputs("DSV41_ENGRAM_IORING_CLEANUP_REFUSED: owned process exits before releasing buffers with unconfirmed IO\n",stderr);
-            std::fflush(stderr);TerminateProcess(GetCurrentProcess(),79);std::abort();
+        io_scope(){event_fd=::eventfd(0,EFD_NONBLOCK);require(event_fd>=0,"Cannot create Engram completion event");}
+        io_scope(const io_scope&)=delete;io_scope&operator=(const io_scope&)=delete;
+        void begin(unsigned entries,size_t arena){
+            queue.fd=fd;
+            queue.open(entries,event_fd);
+            pages=allocate_arena(arena);
         }
         ~io_scope(){
-            if(ring){
-                if(submitted&&file!=INVALID_HANDLE_VALUE)CancelIoEx(file,nullptr);
-                const auto deadline=GetTickCount64()+5000;
-                while(submitted){
-                    IORING_CQE c{};const auto hr=api.PopIoRingCompletion(ring,&c);
-                    if(hr==S_OK){--submitted;continue;}
-                    if(hr!=S_FALSE||GetTickCount64()>=deadline)unsafe_cleanup();
-                    const auto status=WaitForSingleObject(event,50);
-                    if(status!=WAIT_OBJECT_0&&status!=WAIT_TIMEOUT)unsafe_cleanup();
-                }
-                // Close abandons unsubmitted SQ entries, but does NOT cancel
-                // submitted reads. Every submitted completion was drained above.
-                if(FAILED(api.CloseIoRing(ring)))unsafe_cleanup();
-            }
-            if(event)CloseHandle(event);
-            if(file!=INVALID_HANDLE_VALUE)CloseHandle(file);
-            if(pages)_aligned_free(pages);
+            queue.settle(event_fd);
+            queue.close();
+            if(pages)std::free(pages);
+            if(fd>=0)::close(fd);
+            if(event_fd>=0)::close(event_fd);
         }
     };
 public:
@@ -185,131 +366,76 @@ public:
         }
         return n;
     }
-    void load(const wchar_t* path,HANDLE verified_file,uint64_t verified_file_bytes,const std::function<bool()>& stopped){
-        require(prepared&&!load_attempted&&path&&verified_file!=INVALID_HANDLE_VALUE,"Engram rows must be prepared/admitted once before load");load_attempted=true;
+    // One 4 KiB-aligned read per row on a single queue, publishing table 0 when
+    // its last row lands. The synchronous arm uses the early loader instead
+    // (prepare_early/load_early); this stays as the reference the early rows are
+    // byte-compared against.
+    void load(const std::filesystem::path& path,int verified_fd,uint64_t verified_file_bytes,const std::function<bool()>& stopped){
+        require(prepared&&!load_attempted&&verified_fd>=0,"Engram rows must be prepared/admitted once before load");load_attempted=true;
         require(!stopped||!stopped(),"Engram preload cancelled before IO");
-        io_scope io(api);
-        io.file=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,
-            FILE_FLAG_NO_BUFFERING|FILE_FLAG_OVERLAPPED|FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-        require(io.file!=INVALID_HANDLE_VALUE,"Cannot open original Engram file for its own IoRing");
-        {   // LLAMADECODE: the overlapped prompt-cache reads yield to the weight
-            // DirectStorage streaming only if LLAMADECODE_ENGRAM_IO_PRIORITY=low (measured: low priority starves
-            // the reads, 43K layers 123 s vs 33 s; default stays normal).
-            const char*e=std::getenv("LLAMADECODE_ENGRAM_IO_PRIORITY");
-            FILE_IO_PRIORITY_HINT_INFO hint{};hint.PriorityHint=e&&!std::strcmp(e,"low")?IoPriorityHintLow:IoPriorityHintNormal; /* low measured 123 s vs 33 s (starved); normal is the default */
-            const BOOL ok=SetFileInformationByHandle(io.file,FileIoPriorityHintInfo,&hint,sizeof(hint));
-            static bool logged=false;if(!logged){logged=true;std::fprintf(stderr,"LLAMADECODE_ENGRAM_IO_PRIORITY hint=%s applied=%d\n",hint.PriorityHint==IoPriorityHintLow?"low":"normal",int(ok));}
-        }
-        FILE_ID_INFO a{},b{};
-        require(GetFileInformationByHandleEx(verified_file,FileIdInfo,&a,sizeof(a))&&
-                GetFileInformationByHandleEx(io.file,FileIdInfo,&b,sizeof(b))&&
-                a.VolumeSerialNumber==b.VolumeSerialNumber&&!std::memcmp(a.FileId.Identifier,b.FileId.Identifier,16),
-                "Engram IoRing descriptor differs from the verified model");
-        IORING_CREATE_FLAGS flags{};
-        require(SUCCEEDED(api.CreateIoRing(IORING_VERSION_1,flags,depth,2*depth,&io.ring)),"Required Engram IoRing unavailable; no serial fallback");
-        require(api.IsIoRingOpSupported(io.ring,IORING_OP_READ),"Engram IoRing read operation unavailable");
-        io.event=CreateEventW(nullptr,FALSE,FALSE,nullptr);
-        require(io.event&&SUCCEEDED(api.SetIoRingCompletionEvent(io.ring,io.event)),"Cannot register Engram IoRing completion event");
-        io.pages=static_cast<uint8_t*>(_aligned_malloc(uint64_t(depth)*page_size,4096));
-        require(io.pages,"Cannot allocate admitted Engram IoRing slots");
-        // Pin this small slot arena and register the read-only file once;
-        // request builders then use indices rather than per-read raw MDLs.
-        require(api.IsIoRingOpSupported(io.ring,IORING_OP_REGISTER_FILES)&&api.IsIoRingOpSupported(io.ring,IORING_OP_REGISTER_BUFFERS),
-                "Required Engram IoRing resource registration unavailable");
-        IORING_BUFFER_INFO registered{io.pages,depth*page_size};
-        require(SUCCEEDED(api.BuildIoRingRegisterFileHandles(io.ring,1,&io.file,1))&&
-                SUCCEEDED(api.BuildIoRingRegisterBuffers(io.ring,1,&registered,2)),"Cannot enqueue Engram IoRing registrations");
-        UINT32 registered_count=0;
-        const auto register_hr=api.SubmitIoRing(io.ring,0,0,&registered_count);
-        if(register_hr==S_OK){if(registered_count!=2)io_scope::unsafe_cleanup();io.submitted=registered_count;}
-        else throw std::runtime_error("Required Engram IoRing registration submit failed");
-        bool registered_file=false,registered_buffer=false;
-        const auto register_deadline=GetTickCount64()+5000;
-        while(io.submitted){
-            IORING_CQE c{};const auto hr=api.PopIoRingCompletion(io.ring,&c);
-            if(hr==S_FALSE){
-                require(GetTickCount64()<register_deadline,"Engram IoRing registration timeout");
-                const auto wait=WaitForSingleObject(io.event,50);
-                require(wait==WAIT_OBJECT_0||wait==WAIT_TIMEOUT,"Engram IoRing registration wait failed");continue;
-            }
-            require(hr==S_OK,"Cannot dequeue Engram IoRing registration");--io.submitted;
-            require(SUCCEEDED(c.ResultCode),"Engram IoRing resource registration failed");
-            if(c.UserData==1){require(!registered_file,"Duplicate Engram file registration");registered_file=true;}
-            else if(c.UserData==2){require(!registered_buffer,"Duplicate Engram buffer registration");registered_buffer=true;}
-            else throw std::runtime_error("Unknown Engram resource registration completion");
-        }
-        require(registered_file&&registered_buffer,"Missing Engram resource registration");
+        io_scope io;
+        io.fd=open_verified_row_file(path,verified_fd,verified_file_bytes);
+        io.begin(2*depth,uint64_t(depth)*page_size);
         for(auto& t:tables){t.data.resize(t.ids.size()*row_bytes);require(t.data.capacity()==t.data.size(),"Unexpected raw-row cache allocation capacity");}
-        struct slot {uint32_t table=0,extent=0,skip=0;size_t row=0;UINT_PTR id=0;bool live=false;};
+        struct slot {uint32_t table=0,extent=0,skip=0;size_t row=0;uint64_t id=0;bool live=false;};
         std::array<slot,depth> slots;
-        std::vector<uint32_t> staged;staged.reserve(depth);
-        size_t next_row=0;uint32_t next_table=0;UINT_PTR sequence=0;
+        size_t next_row=0;uint32_t next_table=0;uint64_t sequence=0;
         uint64_t read_bytes=0,read_requests=0,submits=0;size_t table0_done=0;
         const char*batch_env=std::getenv("LLAMA_DSV41_ENGRAM_SUBMIT_BATCH");
         const bool batch_submits=batch_env&&std::strcmp(batch_env,"1")==0;
         auto issue=[&](uint32_t i){
             while(next_table<2&&next_row==tables[next_table].ids.size()){++next_table;next_row=0;}
             if(next_table==2)return false;
-            auto& s=slots[i];require(!s.live,"Engram IoRing reused a live slot");
+            auto& s=slots[i];require(!s.live,"Engram read queue reused a live slot");
             s.table=next_table;s.row=next_row++;
             const uint64_t offset=add(bases[s.table],uint64_t(tables[s.table].ids[s.row])*row_bytes);
             const uint64_t begin=offset&~uint64_t(4095);s.skip=uint32_t(offset-begin);
             s.extent=(s.skip+row_bytes+4095)&~4095u;
             require(s.extent<=page_size&&begin<=verified_file_bytes&&s.extent<=verified_file_bytes-begin,"Engram aligned read exceeds original file");
-            require(sequence<(UINTPTR_MAX>>9),"Engram operation nonce overflow");s.id=(++sequence<<9)|(i+1);
-            require(SUCCEEDED(api.BuildIoRingReadFile(io.ring,IoRingHandleRefFromIndex(0),
-                IoRingBufferRefFromIndexAndOffset(0,i*page_size),s.extent,begin,s.id,IOSQE_FLAGS_NONE)),
-                "Cannot enqueue required Engram row read");
-            s.live=true;staged.push_back(i);read_bytes+=s.extent;++read_requests;return true;
+            require(sequence<(std::numeric_limits<uint64_t>::max()>>9),"Engram operation nonce overflow");
+            s.id=(++sequence<<9)|(i+1);
+            io.queue.request(s.id,io.pages+uint64_t(i)*page_size,s.extent,begin);
+            s.live=true;read_bytes+=s.extent;++read_requests;return true;
         };
         auto submit=[&]{
-            if(staged.empty())return;
-            UINT32 submitted=0;const auto hr=api.SubmitIoRing(io.ring,0,0,&submitted);
-            // Per the API, non-timeout errors leave all entries in the SQ.
-            // No wait was requested here, so only a full successful submit is valid.
-            if(hr==S_OK){
-                if(submitted!=staged.size())io_scope::unsafe_cleanup();
-                io.submitted+=submitted;staged.clear();++submits;
-            }else throw std::runtime_error("Required Engram IoRing Submit failed; no serial fallback");
+            if(!io.queue.in_sq)return;
+            // The queue keeps entries the kernel has not seen, so a short flush
+            // loses nothing and needs no re-enqueue.
+            require(io.queue.flush(),"Required Engram read queue submit failed; no serial fallback");
+            ++submits;
         };
-        const auto began=GetTickCount64();
+        const auto began=engram_clock::now();
         for(uint32_t i=0;i<depth;++i)if(!issue(i))break;
         submit();
-        while(io.submitted){
-            require((!stopped||!stopped())&&GetTickCount64()-began<120000,"Engram preload cancelled or exceeded120s");
-            uint32_t completed=0;
+        while(io.queue.outstanding()){
+            require((!stopped||!stopped())&&engram_ms_since(began)<120000,"Engram preload cancelled or exceeded120s");
+            uint32_t completed=0;read_queue::completion c;
             for(;completed<64;++completed){
-                IORING_CQE c{};const auto hr=api.PopIoRingCompletion(io.ring,&c);
-                if(hr==S_FALSE)break;
-                require(hr==S_OK&&io.submitted,"Cannot dequeue Engram IoRing completion");
-                --io.submitted;
-                const auto id=uint32_t(c.UserData&511u);
+                if(!io.queue.peek(c))break;
+                const auto id=uint32_t(c.id&511u);
                 require(id&&id<=depth,"Engram completion has an unknown slot");
                 auto& s=slots[id-1];
-                require(s.live&&s.id==c.UserData,"Engram completion nonce/ownership differs");s.live=false;
-                require(SUCCEEDED(c.ResultCode)&&c.Information==s.extent,"Engram IoRing read failed or was short");
+                require(s.live&&s.id==c.id,"Engram completion nonce/ownership differs");s.live=false;
+                require(c.res==int(s.extent),"Engram read failed or was short");
                 std::memcpy(tables[s.table].data.data()+s.row*row_bytes,io.pages+uint64_t(id-1)*page_size+s.skip,row_bytes);
                 if(s.table==0&&++table0_done==tables[0].ids.size()){
                     ready_tables.store(1,std::memory_order_release);
-                    llama_dsv41_layer_log("DS4PERF_ENGRAM_TABLE_LOADED table=0 rows=%zu wall_ms=%llu\n",tables[0].ids.size(),(unsigned long long)(GetTickCount64()-began));
+                    llama_dsv41_layer_log("DS4PERF_ENGRAM_TABLE_LOADED table=0 rows=%zu wall_ms=%.0f\n",tables[0].ids.size(),engram_ms_since(began));
                 }
                 issue(id-1);
             }
-            require(io.submitted+staged.size()<=depth,"Engram queued and submitted slots exceed fixed depth");
+            require(io.queue.outstanding()<=depth,"Engram queued and submitted reads exceed fixed depth");
             // Keep the same bounded slot ring. Amortize tiny completion groups,
             // but replenish before outstanding reads fall below half its depth.
-            if(!batch_submits||staged.size()>=64||io.submitted<=depth/2)submit();
-            if(!completed&&io.submitted){
-                const auto wait=WaitForSingleObject(io.event,100);
-                require(wait==WAIT_OBJECT_0||wait==WAIT_TIMEOUT,"Engram IoRing completion wait failed");
-            }
+            if(!batch_submits||io.queue.in_sq>=64||io.queue.in_kernel<=depth/2)submit();
+            if(!completed&&io.queue.outstanding())io.queue.wait(io.event_fd);
         }
-        require(next_table==2&&staged.empty()&&table0_done==tables[0].ids.size(),"Incomplete whole-prompt Engram preload");
+        require(next_table==2&&io.queue.outstanding()==0&&table0_done==tables[0].ids.size(),"Incomplete whole-prompt Engram preload");
         ready_tables.store(2,std::memory_order_release);
         if(batch_submits)llama_dsv41_layer_log("DS4PERF_ENGRAM_SUBMIT_BATCH requests=%llu submits=%llu depth=256 threshold=64 low_water=128 all_completions_drained=1\n",(unsigned long long)read_requests,(unsigned long long)submits);
-        llama_dsv41_layer_log("[dsv41-engram-prefetch] table0_rows=%zu table1_rows=%zu host_plan_bytes=%llu read_bytes=%llu requests=%llu submits=%llu wall_ms=%llu\n",
+        llama_dsv41_layer_log("[dsv41-engram-prefetch] table0_rows=%zu table1_rows=%zu host_plan_bytes=%llu read_bytes=%llu requests=%llu submits=%llu wall_ms=%.0f reader=%s\n",
             tables[0].ids.size(),tables[1].ids.size(),(unsigned long long)host_plan,(unsigned long long)read_bytes,
-            (unsigned long long)read_requests,(unsigned long long)submits,(unsigned long long)(GetTickCount64()-began));
+            (unsigned long long)read_requests,(unsigned long long)submits,engram_ms_since(began),io.queue.uring?"io_uring":"pread");
         std::fflush(stderr);
     }
     // ---- LLAMADECODE_ENGRAM_EARLY: same rows/ids/order as prepare(); the IO
@@ -400,42 +526,32 @@ public:
     }
     bool scan_geometry()const{return scan;}
     double predicted_seconds()const{return scan?geometry_scan_s:geometry_random_s;}
-    struct early_slot {uint64_t file_offset=0;uint32_t bytes=0,table=0,first=0,last=0,rows=0;UINT_PTR id=0;bool live=false;};
+    struct early_slot {uint64_t file_offset=0;uint32_t bytes=0,table=0,first=0,last=0,rows=0;uint64_t id=0;bool live=false;};
     struct early_ring {
-        HIORING ring=nullptr;HANDLE event=nullptr;uint8_t* arena=nullptr;uint32_t submitted=0,staged=0;
+        read_queue queue;
+        uint8_t* arena=nullptr;
         std::vector<early_slot> slots;std::vector<uint32_t> free_small,free_large;
     };
     struct early_scope {
-        api_table& api;HANDLE file=INVALID_HANDLE_VALUE;std::vector<early_ring> rings;
-        explicit early_scope(api_table& a):api(a){}
+        int fd=-1,event_fd=-1;
+        std::vector<early_ring> rings;
+        early_scope(){event_fd=::eventfd(0,EFD_NONBLOCK);require(event_fd>=0,"Cannot create Engram completion event");}
         early_scope(const early_scope&)=delete;early_scope&operator=(const early_scope&)=delete;
         ~early_scope(){
-            bool any=false;for(const auto& r:rings)any=any||r.submitted;
-            if(any&&file!=INVALID_HANDLE_VALUE)CancelIoEx(file,nullptr);
-            const auto deadline=GetTickCount64()+5000;
-            for(auto& r:rings){
-                if(!r.ring)continue;
-                while(r.submitted){
-                    IORING_CQE c{};const auto hr=api.PopIoRingCompletion(r.ring,&c);
-                    if(hr==S_OK){--r.submitted;continue;}
-                    if(hr!=S_FALSE||GetTickCount64()>=deadline)io_scope::unsafe_cleanup();
-                    const auto status=WaitForSingleObject(r.event,50);
-                    if(status!=WAIT_OBJECT_0&&status!=WAIT_TIMEOUT)io_scope::unsafe_cleanup();
-                }
-                // Staged-but-unsubmitted entries are abandoned by Close; every
-                // submitted read was drained above before its buffer is freed.
-                if(FAILED(api.CloseIoRing(r.ring)))io_scope::unsafe_cleanup();
-            }
-            for(auto& r:rings){if(r.event)CloseHandle(r.event);if(r.arena)_aligned_free(r.arena);}
-            if(file!=INVALID_HANDLE_VALUE)CloseHandle(file);
+            // Unsubmitted entries are abandoned when the ring closes; every
+            // submitted read is settled above before its arena is freed.
+            for(auto& r:rings)r.queue.settle(event_fd);
+            for(auto& r:rings){r.queue.close();if(r.arena)std::free(r.arena);}
+            if(fd>=0)::close(fd);
+            if(event_fd>=0)::close(event_fd);
         }
     };
-    void load_early(const wchar_t* path,HANDLE verified_file,uint64_t verified_file_bytes,const std::function<bool()>& stopped){
+    void load_early(const std::filesystem::path& path,int verified_fd,uint64_t verified_file_bytes,const std::function<bool()>& stopped){
         namespace ep=llama_dsv41_engram_plan;
-        require(prepared&&early_mode&&!load_attempted&&path&&verified_file!=INVALID_HANDLE_VALUE,"Early Engram rows must be prepared/admitted once before load");load_attempted=true;
+        require(prepared&&early_mode&&!load_attempted&&verified_fd>=0,"Early Engram rows must be prepared/admitted once before load");load_attempted=true;
         require(!stopped||!stopped(),"Engram preload cancelled before IO");
-        using clock=std::chrono::steady_clock;const auto began=clock::now();
-        auto since=[&](clock::time_point t){return std::chrono::duration<double,std::milli>(clock::now()-t).count();};
+        const auto began=engram_clock::now();
+        auto since=[&](engram_clock::time_point t){return engram_ms_since(t);};
         const bool weight_at_start=llama_dsv41_engram_weight_pass.load(std::memory_order_relaxed);
         for(auto& t:tables){t.data.resize(t.ids.size()*row_bytes);require(t.data.capacity()==t.data.size(),"Unexpected raw-row cache allocation capacity");}
         // Previous-request reuse (one deep): rows the provider's last completed
@@ -462,7 +578,7 @@ public:
         // copied (and made most recent); only the rest are read below.
         uint64_t cache_hits=0;double cache_lookup_ms=0;
         if(row_cache){
-            const auto looked=clock::now();std::lock_guard<std::mutex> lock(row_cache->mutex);
+            const auto looked=engram_clock::now();std::lock_guard<std::mutex> lock(row_cache->mutex);
             for(size_t t=0;t<2;++t){
                 const auto& mine=tables[t].ids;if(hits[t].empty())hits[t].assign((mine.size()+7)/8,0);
                 for(size_t i=0;i<mine.size();++i){
@@ -476,64 +592,23 @@ public:
         std::array<uint64_t,2> done{};
         double table0_ms=-1;
         if(!need[0]){ready_tables.store(1,std::memory_order_release);table0_ms=since(began);}
-        early_scope io(api);
-        io.file=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,
-            FILE_FLAG_NO_BUFFERING|FILE_FLAG_OVERLAPPED|FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
-        require(io.file!=INVALID_HANDLE_VALUE,"Cannot open original Engram file for its own IoRings");
-        if(engram_read_alignment()!=4096){
-            FILE_STORAGE_INFO storage{};
-            require(GetFileInformationByHandleEx(io.file,FileStorageInfo,&storage,sizeof(storage))&&
-                    storage.LogicalBytesPerSector&&engram_read_alignment()%storage.LogicalBytesPerSector==0,
-                    "E13 read alignment is incompatible with model-file logical sector geometry");
-            std::fprintf(stderr,"PERFEXP_E13 read_alignment=%u logical_sector=%u physical_sector=%u\n",
-                         engram_read_alignment(),storage.LogicalBytesPerSector,storage.PhysicalBytesPerSectorForPerformance);
-        }
-        {   const char*e=std::getenv("LLAMADECODE_ENGRAM_IO_PRIORITY");
-            FILE_IO_PRIORITY_HINT_INFO hint{};hint.PriorityHint=e&&!std::strcmp(e,"low")?IoPriorityHintLow:IoPriorityHintNormal;
-            const BOOL ok=SetFileInformationByHandle(io.file,FileIoPriorityHintInfo,&hint,sizeof(hint));
-            std::fprintf(stderr,"LLAMADECODE_ENGRAM_IO_PRIORITY hint=%s applied=%d early=1\n",hint.PriorityHint==IoPriorityHintLow?"low":"normal",int(ok));
-        }
-        FILE_ID_INFO a{},b{};
-        require(GetFileInformationByHandleEx(verified_file,FileIdInfo,&a,sizeof(a))&&
-                GetFileInformationByHandleEx(io.file,FileIdInfo,&b,sizeof(b))&&
-                a.VolumeSerialNumber==b.VolumeSerialNumber&&!std::memcmp(a.FileId.Identifier,b.FileId.Identifier,16),
-                "Engram IoRing descriptor differs from the verified model");
+        early_scope io;
+        io.fd=open_verified_row_file(path,verified_fd,verified_file_bytes);
+        // LLAMADECODE_ENGRAM_READ_ALIGN=512 asks for the smaller read geometry.
+        // Windows checked it against the volume's logical sector because its
+        // reads were unbuffered; these are buffered, so any alignment the
+        // planner accepts is readable and only the geometry is reported.
+        if(engram_read_alignment()!=4096)
+            std::fprintf(stderr,"PERFEXP_E13 read_alignment=%u extents=buffered\n",engram_read_alignment());
         const uint32_t slots_per_ring=early_small+early_large;
         const uint64_t ring_arena=uint64_t(early_small)*small_slot+uint64_t(early_large)*large_bytes;
-        require(ring_arena<=UINT32_MAX,"Early Engram ring arena exceeds one registered buffer");
+        require(ring_arena<=UINT32_MAX,"Early Engram ring arena exceeds one allocation");
         auto slot_offset=[&](uint32_t s){return s<early_small?uint64_t(s)*small_slot:uint64_t(early_small)*small_slot+uint64_t(s-early_small)*large_bytes;};
         io.rings.resize(early_rings);
         for(auto& r:io.rings){
-            IORING_CREATE_FLAGS flags{};
-            require(SUCCEEDED(api.CreateIoRing(IORING_VERSION_1,flags,slots_per_ring,2*slots_per_ring,&r.ring)),"Required Engram IoRing unavailable; no serial fallback");
-            require(api.IsIoRingOpSupported(r.ring,IORING_OP_READ)&&api.IsIoRingOpSupported(r.ring,IORING_OP_REGISTER_FILES)&&
-                    api.IsIoRingOpSupported(r.ring,IORING_OP_REGISTER_BUFFERS),"Required Engram IoRing operations unavailable");
-            r.event=CreateEventW(nullptr,FALSE,FALSE,nullptr);
-            require(r.event&&SUCCEEDED(api.SetIoRingCompletionEvent(r.ring,r.event)),"Cannot register Engram IoRing completion event");
-            r.arena=static_cast<uint8_t*>(_aligned_malloc(ring_arena,4096));require(r.arena,"Cannot allocate admitted Engram IoRing arena");
-            IORING_BUFFER_INFO registered{r.arena,UINT32(ring_arena)};
-            require(SUCCEEDED(api.BuildIoRingRegisterFileHandles(r.ring,1,&io.file,1))&&
-                    SUCCEEDED(api.BuildIoRingRegisterBuffers(r.ring,1,&registered,2)),"Cannot enqueue Engram IoRing registrations");
-            UINT32 registered_count=0;
-            const auto register_hr=api.SubmitIoRing(r.ring,0,0,&registered_count);
-            if(register_hr==S_OK){if(registered_count!=2)io_scope::unsafe_cleanup();r.submitted=registered_count;}
-            else throw std::runtime_error("Required Engram IoRing registration submit failed");
-            bool registered_file=false,registered_buffer=false;
-            const auto register_deadline=GetTickCount64()+5000;
-            while(r.submitted){
-                IORING_CQE c{};const auto hr=api.PopIoRingCompletion(r.ring,&c);
-                if(hr==S_FALSE){
-                    require(GetTickCount64()<register_deadline,"Engram IoRing registration timeout");
-                    const auto wait=WaitForSingleObject(r.event,50);
-                    require(wait==WAIT_OBJECT_0||wait==WAIT_TIMEOUT,"Engram IoRing registration wait failed");continue;
-                }
-                require(hr==S_OK,"Cannot dequeue Engram IoRing registration");--r.submitted;
-                require(SUCCEEDED(c.ResultCode),"Engram IoRing resource registration failed");
-                if(c.UserData==1){require(!registered_file,"Duplicate Engram file registration");registered_file=true;}
-                else if(c.UserData==2){require(!registered_buffer,"Duplicate Engram buffer registration");registered_buffer=true;}
-                else throw std::runtime_error("Unknown Engram resource registration completion");
-            }
-            require(registered_file&&registered_buffer,"Missing Engram resource registration");
+            r.queue.fd=io.fd;
+            r.queue.open(2*slots_per_ring,io.event_fd);
+            r.arena=allocate_arena(size_t(ring_arena));
             r.slots.resize(slots_per_ring);
             for(uint32_t s=early_small;s-->0;)r.free_small.push_back(s);
             for(uint32_t s=slots_per_ring;s-->early_small;)r.free_large.push_back(s);
@@ -551,7 +626,7 @@ public:
             }
             return false;
         };
-        UINT_PTR sequence=0;uint64_t read_bytes=0,requests=0,submits=0,useful_rows=0,max_inflight=0,replanned=0;
+        uint64_t sequence=0;uint64_t read_bytes=0,requests=0,submits=0,useful_rows=0,max_inflight=0,replanned=0;
         auto issue=[&](early_ring& r){
             while(fetch()){
                 if(pending.bytes>small_slot&&r.free_large.empty()){
@@ -559,7 +634,7 @@ public:
                     // has a quarter of its slots in flight; otherwise re-plan
                     // the same rows from the same index at the small-slot cap
                     // (same rows land, more requests) instead of starving.
-                    if(scan||r.submitted+r.staged>=early_small/4)return; // scan: always wait for a large slot
+                    if(scan||r.queue.outstanding()>=early_small/4)return; // scan: always wait for a large slot
                     const auto& t=tables[pending_table];cur_pos=pending.first;
                     require(ep::next_extent(t.ids.data(),t.ids.size(),hits[pending_table].empty()?nullptr:hits[pending_table].data(),cur_pos,bases[pending_table],row_bytes,small_slot,pending,engram_read_alignment()),"Engram re-plan lost its rows");
                     ++replanned;
@@ -567,45 +642,42 @@ public:
                 auto& pool=pending.bytes>small_slot?r.free_large:r.free_small;
                 if(pool.empty())return;
                 const uint32_t s=pool.back();pool.pop_back();
-                auto& sl=r.slots[s];require(!sl.live,"Engram IoRing reused a live slot");
+                auto& sl=r.slots[s];require(!sl.live,"Engram read queue reused a live slot");
                 require(pending.file_offset<=verified_file_bytes&&pending.bytes<=verified_file_bytes-pending.file_offset,"Engram aligned read exceeds original file");
-                require(sequence<(UINTPTR_MAX>>17),"Engram operation nonce overflow");
+                require(sequence<(std::numeric_limits<uint64_t>::max()>>17),"Engram operation nonce overflow");
                 sl.file_offset=pending.file_offset;sl.bytes=pending.bytes;sl.table=pending_table;sl.first=pending.first;sl.last=pending.last;sl.rows=pending.rows;
                 sl.id=(++sequence<<16)|(s+1);
-                require(SUCCEEDED(api.BuildIoRingReadFile(r.ring,IoRingHandleRefFromIndex(0),
-                    IoRingBufferRefFromIndexAndOffset(0,UINT32(slot_offset(s))),sl.bytes,sl.file_offset,sl.id,IOSQE_FLAGS_NONE)),
-                    "Cannot enqueue required Engram extent read");
-                sl.live=true;++r.staged;read_bytes+=sl.bytes;++requests;useful_rows+=sl.rows;have_pending=false;
+                r.queue.request(sl.id,r.arena+slot_offset(s),sl.bytes,sl.file_offset);
+                sl.live=true;read_bytes+=sl.bytes;++requests;useful_rows+=sl.rows;have_pending=false;
             }
         };
         auto submit=[&](early_ring& r,bool drain){
-            if(!r.staged)return;
-            // Always batched: submit a full batch, or whatever is staged once
+            if(!r.queue.in_sq)return;
+            // Always batched: submit a full batch, or whatever is queued once
             // the ring's in-flight reads fall to half its slots or the plan ends.
-            if(!drain&&r.staged<early_batch&&r.submitted>slots_per_ring/2)return;
-            UINT32 n=0;const auto hr=api.SubmitIoRing(r.ring,0,0,&n);
-            // No wait requested: only a full successful submit is valid.
-            if(hr==S_OK){if(n!=r.staged)io_scope::unsafe_cleanup();r.submitted+=n;r.staged=0;++submits;}
-            else throw std::runtime_error("Required Engram IoRing Submit failed; no serial fallback");
+            if(!drain&&r.queue.in_sq<early_batch&&r.queue.in_kernel>slots_per_ring/2)return;
+            require(r.queue.flush(),"Required Engram read queue submit failed; no serial fallback");
+            ++submits;
         };
-        std::vector<HANDLE> events;for(const auto& r:io.rings)events.push_back(r.event);
-        auto last=clock::now();double overlap_ms=0;bool weight_active=weight_at_start;
+        std::vector<const read_queue*> waiting;
+        for(const auto& r:io.rings)waiting.push_back(&r.queue);
+        auto last=engram_clock::now();double overlap_ms=0;bool weight_active=weight_at_start;
+        bool uring=false;for(const auto& r:io.rings)uring=uring||r.queue.uring;
         while(true){
-            const auto now=clock::now();
+            const auto now=engram_clock::now();
             if(weight_active)overlap_ms+=std::chrono::duration<double,std::milli>(now-last).count();
             last=now;weight_active=llama_dsv41_engram_weight_pass.load(std::memory_order_relaxed);
             require((!stopped||!stopped())&&since(began)<120000,"Engram preload cancelled or exceeded120s");
             bool progress=false;
             for(auto& r:io.rings){
                 for(uint32_t k=0;k<1024;++k){
-                    IORING_CQE c{};const auto hr=api.PopIoRingCompletion(r.ring,&c);
-                    if(hr==S_FALSE)break;
-                    require(hr==S_OK&&r.submitted,"Cannot dequeue Engram IoRing completion");--r.submitted;
-                    const uint32_t s1=uint32_t(c.UserData&0xFFFFu);
+                    read_queue::completion c;
+                    if(!r.queue.peek(c))break;
+                    const uint32_t s1=uint32_t(c.id&0xFFFFu);
                     require(s1&&s1<=slots_per_ring,"Engram completion has an unknown slot");
                     auto& sl=r.slots[s1-1];
-                    require(sl.live&&sl.id==c.UserData,"Engram completion nonce/ownership differs");sl.live=false;
-                    require(SUCCEEDED(c.ResultCode)&&c.Information==sl.bytes,"Engram IoRing read failed or was short");
+                    require(sl.live&&sl.id==c.id,"Engram completion nonce/ownership differs");sl.live=false;
+                    require(c.res==int(sl.bytes),"Engram read failed or was short");
                     auto& t=tables[sl.table];const uint8_t* src=r.arena+slot_offset(s1-1);
                     const uint8_t* bits=hits[sl.table].empty()?nullptr:hits[sl.table].data();
                     for(size_t i=sl.first;i<=sl.last;++i){
@@ -620,19 +692,16 @@ public:
             }
             if(ready_tables.load(std::memory_order_relaxed)==0&&done[0]==need[0]){
                 ready_tables.store(1,std::memory_order_release);table0_ms=since(began);
-                llama_dsv41_layer_log("DS4PERF_ENGRAM_TABLE_LOADED table=0 rows=%zu wall_ms=%llu early=1\n",tables[0].ids.size(),(unsigned long long)table0_ms);
+                llama_dsv41_layer_log("DS4PERF_ENGRAM_TABLE_LOADED table=0 rows=%zu wall_ms=%.3f early=1\n",tables[0].ids.size(),table0_ms);
             }
             for(auto& r:io.rings)issue(r);
             const bool plan_done=!fetch();
             uint64_t inflight=0;
-            for(auto& r:io.rings){submit(r,plan_done);inflight+=r.submitted;}
+            for(auto& r:io.rings){submit(r,plan_done);inflight+=r.queue.in_kernel;}
             max_inflight=std::max(max_inflight,inflight);
-            bool idle=plan_done;for(const auto& r:io.rings)idle=idle&&!r.staged&&!r.submitted;
+            bool idle=plan_done;for(const auto& r:io.rings)idle=idle&&!r.queue.outstanding();
             if(idle)break;
-            if(!progress&&inflight){
-                const auto wait=WaitForMultipleObjects(DWORD(events.size()),events.data(),FALSE,100);
-                require(wait<WAIT_OBJECT_0+events.size()||wait==WAIT_TIMEOUT,"Engram IoRing completion wait failed");
-            }
+            if(!progress&&inflight)wait_for_completion(io.event_fd,waiting);
         }
         require(done[0]==need[0]&&done[1]==need[1]&&useful_rows==need[0]+need[1],"Incomplete whole-prompt Engram early preload");
         ready_tables.store(2,std::memory_order_release);
@@ -640,17 +709,18 @@ public:
         const uint64_t rows=tables[0].ids.size()+tables[1].ids.size();
         llama_dsv41_layer_log("LLAMADECODE_ENGRAM_EARLY_LOAD table0_rows=%zu table1_rows=%zu hit_rows=%llu reuse=%d extents=%llu merged_rows=%llu requests=%llu submits=%llu "
             "read_bytes=%llu useful_bytes=%llu rings=%u slots=%u large_slots=%u batch=%u replanned=%llu arena_bytes=%llu host_plan_bytes=%llu max_inflight=%llu "
-            "setup_ms=%.3f table0_ms=%.3f wall_ms=%.3f weight_pass_at_start=%d weight_pass_overlap_ms=%.3f overlap_frac=%.3f geometry=%s slot_bytes=%u\n",
+            "setup_ms=%.3f table0_ms=%.3f wall_ms=%.3f weight_pass_at_start=%d weight_pass_overlap_ms=%.3f overlap_frac=%.3f geometry=%s slot_bytes=%u reader=%s\n",
             tables[0].ids.size(),tables[1].ids.size(),(unsigned long long)(hit_rows[0]+hit_rows[1]),reuse,(unsigned long long)requests,
             (unsigned long long)(useful_rows-requests),(unsigned long long)requests,(unsigned long long)submits,(unsigned long long)read_bytes,
             (unsigned long long)(rows*row_bytes),early_rings,early_small,early_large,early_batch,(unsigned long long)replanned,(unsigned long long)early_arena,(unsigned long long)host_plan,
-            (unsigned long long)max_inflight,setup_ms,table0_ms,wall,int(weight_at_start),overlap_ms,wall>0?overlap_ms/wall:0.0,scan?"scan":"random",large_bytes);
-        llama_dsv41_layer_log("[dsv41-engram-prefetch] table0_rows=%zu table1_rows=%zu host_plan_bytes=%llu read_bytes=%llu requests=%llu submits=%llu wall_ms=%llu early=1\n",
+            (unsigned long long)max_inflight,setup_ms,table0_ms,wall,int(weight_at_start),overlap_ms,wall>0?overlap_ms/wall:0.0,scan?"scan":"random",large_bytes,
+            uring?"io_uring":"pread");
+        llama_dsv41_layer_log("[dsv41-engram-prefetch] table0_rows=%zu table1_rows=%zu host_plan_bytes=%llu read_bytes=%llu requests=%llu submits=%llu wall_ms=%.0f early=1\n",
             tables[0].ids.size(),tables[1].ids.size(),(unsigned long long)host_plan,(unsigned long long)read_bytes,
-            (unsigned long long)requests,(unsigned long long)submits,(unsigned long long)wall);
+            (unsigned long long)requests,(unsigned long long)submits,wall);
         if(row_cache){
             // Tables are published; insert every row (present keys are only touched).
-            const auto inserting=clock::now();uint64_t evicted=0,cached=0,capacity=0;
+            const auto inserting=engram_clock::now();uint64_t evicted=0,cached=0,capacity=0;
             {   std::lock_guard<std::mutex> lock(row_cache->mutex);const uint64_t before=row_cache->evictions();
                 for(size_t t=0;t<2;++t)for(size_t i=0;i<tables[t].ids.size();++i)row_cache->insert(uint32_t(t),tables[t].ids[i],tables[t].data.data()+i*row_bytes);
                 evicted=row_cache->evictions()-before;cached=row_cache->rows();capacity=row_cache->capacity_row_count();}
@@ -680,88 +750,27 @@ public:
         }
     }
 };
-#else
-struct llama_dsv41_engram_prompt_cache::implementation {};
-#endif
 llama_dsv41_engram_prompt_cache::llama_dsv41_engram_prompt_cache():p(new implementation){}
 llama_dsv41_engram_prompt_cache::~llama_dsv41_engram_prompt_cache()=default;
 void llama_dsv41_engram_prompt_cache::prepare(const llama_dsv41::engram_layout &l,const int32_t*t,uint32_t n,const std::array<uint64_t,2>&o,uint64_t b,llama_dsv41::engram_history initial,const uint8_t* text_mask){
-#ifdef _WIN32
- p->prepare(l,t,n,o,b,initial,text_mask);
-#else
- (void)l;(void)t;(void)n;(void)o;(void)b;(void)initial;(void)text_mask;throw std::runtime_error("Engram IoRing requires Windows");
-#endif
+    p->prepare(l,t,n,o,b,initial,text_mask);
 }
-uint64_t llama_dsv41_engram_prompt_cache::budget()const{
-#ifdef _WIN32
- return p->budget();
-#else
- return 0;
-#endif
-}
-void llama_dsv41_engram_prompt_cache::set_row_cache(std::shared_ptr<llama_dsv41_engram_row_cache> c){
-#ifdef _WIN32
- p->row_cache=std::move(c);
-#else
- (void)c;
-#endif
-}
-bool llama_dsv41_engram_prompt_cache::scan_geometry()const{
-#ifdef _WIN32
- return p->scan_geometry();
-#else
- return false;
-#endif
-}
-double llama_dsv41_engram_prompt_cache::predicted_seconds()const{
-#ifdef _WIN32
- return p->predicted_seconds();
-#else
- return 0;
-#endif
-}
-uint64_t llama_dsv41_engram_prompt_cache::planned_requests()const{
-#ifdef _WIN32
- return p->planned_requests();
-#else
- return 0;
-#endif
-}
+uint64_t llama_dsv41_engram_prompt_cache::budget()const{return p->budget();}
+void llama_dsv41_engram_prompt_cache::set_row_cache(std::shared_ptr<llama_dsv41_engram_row_cache> c){p->row_cache=std::move(c);}
+bool llama_dsv41_engram_prompt_cache::scan_geometry()const{return p->scan_geometry();}
+double llama_dsv41_engram_prompt_cache::predicted_seconds()const{return p->predicted_seconds();}
+uint64_t llama_dsv41_engram_prompt_cache::planned_requests()const{return p->planned_requests();}
 void llama_dsv41_engram_prompt_cache::prepare_early(const llama_dsv41::engram_layout &l,const int32_t*t,uint32_t n,const std::array<uint64_t,2>&o,uint64_t b,llama_dsv41::engram_history initial,
         std::shared_ptr<const llama_dsv41_engram_prompt_cache> prior,const uint8_t* text_mask){
-#ifdef _WIN32
- p->prepare_early(l,t,n,o,b,initial,std::move(prior),text_mask);
-#else
- (void)l;(void)t;(void)n;(void)o;(void)b;(void)initial;(void)prior;(void)text_mask;throw std::runtime_error("Engram IoRing requires Windows");
-#endif
+    p->prepare_early(l,t,n,o,b,initial,std::move(prior),text_mask);
 }
-void llama_dsv41_engram_prompt_cache::load_early(const wchar_t*path,void*file,uint64_t n,const std::function<bool()>&stop){
-#ifdef _WIN32
- try{p->load_early(path,static_cast<HANDLE>(file),n,stop);}
- catch(...){p->failed.store(true,std::memory_order_release);throw;}
-#else
- (void)path;(void)file;(void)n;(void)stop;throw std::runtime_error("Engram IoRing requires Windows");
-#endif
+void llama_dsv41_engram_prompt_cache::load_early(const std::filesystem::path& path,int verified_file,uint64_t n,const std::function<bool()>&stop){
+    try{p->load_early(path,verified_file,n,stop);}
+    catch(...){p->failed.store(true,std::memory_order_release);throw;}
 }
-void llama_dsv41_engram_prompt_cache::load(const wchar_t*path,void*file,uint64_t n,const std::function<bool()>&stop){
-#ifdef _WIN32
- try{p->load(path,static_cast<HANDLE>(file),n,stop);}
- catch(...){p->failed.store(true,std::memory_order_release);throw;}
-#else
- (void)path;(void)file;(void)n;(void)stop;throw std::runtime_error("Engram IoRing requires Windows");
-#endif
+void llama_dsv41_engram_prompt_cache::load(const std::filesystem::path& path,int verified_file,uint64_t n,const std::function<bool()>&stop){
+    try{p->load(path,verified_file,n,stop);}
+    catch(...){p->failed.store(true,std::memory_order_release);throw;}
 }
-bool llama_dsv41_engram_prompt_cache::read(uint32_t table,uint64_t offset,void*dst,size_t n)const{
-#ifdef _WIN32
- return p->read(table,offset,dst,n);
-#else
- (void)table;(void)offset;(void)dst;(void)n;return false;
-#endif
-}
-void llama_dsv41_engram_prompt_cache::wait_table(uint32_t table,const std::function<bool()>&stop)const{
-#ifdef _WIN32
- p->wait_table(table,stop);
-#else
- (void)table;(void)stop;throw std::runtime_error("Engram IoRing requires Windows");
-#endif
-}
+bool llama_dsv41_engram_prompt_cache::read(uint32_t table,uint64_t offset,void*dst,size_t n)const{return p->read(table,offset,dst,n);}
+void llama_dsv41_engram_prompt_cache::wait_table(uint32_t table,const std::function<bool()>&stop)const{p->wait_table(table,stop);}

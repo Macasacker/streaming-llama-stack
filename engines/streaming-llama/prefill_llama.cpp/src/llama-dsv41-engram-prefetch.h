@@ -1,6 +1,7 @@
 #pragma once
 #include "llama-dsv41-engram.h"
 #include "llama-dsv41-engram-row-cache.h"
+#include <filesystem>
 #include <functional>
 #include <memory>
 // LLAMADECODE_ENGRAM_EARLY=1|auto (default auto, read once): the early starts
@@ -17,7 +18,7 @@ bool llama_dsv41_engram_early_auto();
 // LLAMADECODE_ENGRAM_EARLY=pause (forced pause arm).
 bool llama_dsv41_engram_early_pause();
 double llama_dsv41_engram_early_iops();
-// The weight provider marks its DirectStorage pass active/idle; the early
+// The weight provider marks its weight pass active/idle; the early
 // loader reports its time-weighted overlap with it.
 void llama_dsv41_engram_weight_stream(bool active);
 class llama_dsv41_engram_prompt_cache {
@@ -32,14 +33,18 @@ public:
     // as in the synchronous reader. No mask retains the text-only row set.
     void prepare(const llama_dsv41::engram_layout&,const int32_t*,uint32_t,const std::array<uint64_t,2>&,uint64_t,llama_dsv41::engram_history initial={},const uint8_t* text_mask=nullptr);
     uint64_t budget()const;
-    void load(const wchar_t*,void *verified_file,uint64_t,const std::function<bool()>&);
+    // verified_file: the descriptor the provider's lease holds on the file the
+    // receipt hashed. The loader opens the same name on its own descriptor and
+    // refuses it unless st_dev, st_ino and st_size still match that one, then
+    // reads its rows through its own io_uring queue.
+    void load(const std::filesystem::path&,int verified_file,uint64_t verified_file_bytes,const std::function<bool()>&);
     bool read(uint32_t,uint64_t,void*,size_t)const;
     // Table 0's rows complete and publish before table 1's, so a reader of
     // table 0 (layer 1) need not wait for table 1 (layer 14). Throws when the
     // load failed or stop() reports cancellation.
     void wait_table(uint32_t,const std::function<bool()>&)const;
     // LLAMADECODE_ENGRAM_EARLY only: the same rows/ids as prepare(), an IO
-    // arena sized from the admission headroom, and a multi-IoRing extent load
+    // arena sized from the admission headroom, and a multi-queue extent load
     // (planner extents, batched submits, table 0 published before table 1).
     // prior: the provider's last completed cache; its rows are copied, not read.
     void prepare_early(const llama_dsv41::engram_layout&,const int32_t*,uint32_t,const std::array<uint64_t,2>&,uint64_t,
@@ -55,5 +60,5 @@ public:
     // LLAMADECODE_ENGRAM_CACHE_MB: set before prepare_early; load_early copies
     // the cached rows, reads only the missing ones, then inserts them.
     void set_row_cache(std::shared_ptr<llama_dsv41_engram_row_cache>);
-    void load_early(const wchar_t*,void *verified_file,uint64_t,const std::function<bool()>&);
+    void load_early(const std::filesystem::path&,int verified_file,uint64_t verified_file_bytes,const std::function<bool()>&);
 };

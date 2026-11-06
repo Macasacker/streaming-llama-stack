@@ -2,7 +2,7 @@
 // LLAMADECODE_ENGRAM_CACHE_MB: a host-RAM LRU of 264-byte Engram rows keyed by
 // (table, row id), owned by the weight provider and kept across turns and
 // requests in one engine process. The early loader copies cached rows, reads
-// only the missing ones through its existing IoRing extent path, then inserts
+// only the missing ones through its io_uring extent path, then inserts
 // them. Every byte is allocated at construction (the admitted charge is the
 // real footprint); nothing grows later. Not thread-safe: callers hold `mutex`.
 #include <cstdint>
