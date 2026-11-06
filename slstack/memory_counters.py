@@ -1,65 +1,81 @@
 """Read-only OS paging counters; global activity is not process attribution."""
-import ctypes
-import os
-import re
-import subprocess
+import mmap
 import sys
 import time
+from pathlib import Path
+
 import psutil
 
-
-def darwin_reclaimable_bytes(text):
-    """Match native ds4_ns_memory_sample: free + max(file, inactive+speculative).
-
-    File-backed pages may be active; overlapping queues must not be added.
-    """
-    page=re.search(r'page size of (\d+) bytes',text)
-    values={k.strip():int(v) for k,v in re.findall(r'^([^:\n]+):\s+(\d+)\.',text,re.M)}
-    if page is None or not {'Pages free','Pages inactive','Pages speculative','File-backed pages'}<=values.keys():
-        raise RuntimeError('Darwin available-memory counters incomplete')
-    return int(page[1])*(values['Pages free']+max(values['Pages inactive']+values['Pages speculative'],values['File-backed pages']))
+KB = 1024
+# /proc/vmstat's pgpgin/pgpgout are counted in 512-byte blocks, not pages, despite the name.
+VMSTAT_BLOCK = 512
+# Receipt name -> (vmstat field, bytes per counted unit); None means one page. These are
+# Linux cumulative counters since boot, never the per-second rates the PDH counters reported.
+VMSTAT_COUNTERS = {'pages_input': ('pgpgin', VMSTAT_BLOCK), 'pages_output': ('pgpgout', VMSTAT_BLOCK),
+                   'page_reads': ('pswpin', None), 'page_writes': ('pswpout', None)}
+# Disk-backed fault events are a count, not a byte total.
+VMSTAT_EVENTS = {'major_faults': 'pgmajfault'}
 
 
-_darwin_available_sample=(0.,0)
+def _procfs_values(text, *, scale_kb=False):
+    """`name: value [kB]` and `name value` lines as integers; a malformed line is unreadable."""
+    values = {}
+    for line in text.splitlines():
+        name, separator, remainder = line.partition(':')
+        if not separator:
+            name, _, remainder = line.partition(' ')
+        fields = remainder.split()
+        if not fields:
+            continue
+        amount = int(fields[0])
+        values[name.strip()] = amount * KB if scale_kb else amount
+    return values
+
+
+def meminfo_bytes(text=None):
+    """/proc/meminfo in bytes; pass text to read a captured sample instead of the live file."""
+    return _procfs_values(Path('/proc/meminfo').read_text() if text is None else text, scale_kb=True)
+
+
+def vmstat_counters(text=None):
+    """Cumulative kernel paging counters, each with the unit its raw field is in."""
+    raw = _procfs_values(Path('/proc/vmstat').read_text() if text is None else text)
+    page_size = mmap.PAGESIZE
+    counters = {}
+    for name, (field, block) in VMSTAT_COUNTERS.items():
+        if field not in raw:
+            counters[name] = {'error': 'vmstat field missing: ' + field}
+            continue
+        counters[name] = {'bytes': raw[field] * (block or page_size), 'raw': raw[field],
+                          'unit_bytes': block or page_size}
+    for name, field in VMSTAT_EVENTS.items():
+        counters[name] = ({'count': raw[field], 'raw': raw[field]} if field in raw
+                          else {'error': 'vmstat field missing: ' + field})
+    return counters
+
+
+def swap_bytes(info=None):
+    """(used, total) swap slots from /proc/meminfo; a box with no swap is (0, 0)."""
+    info = meminfo_bytes() if info is None else info
+    return info['SwapTotal'] - info['SwapFree'], info['SwapTotal']
+
+
+def swap_device_count():
+    return max(0, len(Path('/proc/swaps').read_text().splitlines()) - 1)
+
+
 def available_physical_bytes():
-    global _darwin_available_sample
-    if sys.platform!='darwin':return psutil.virtual_memory().available
-    now=time.monotonic()
-    if now-_darwin_available_sample[0]>=.25:
-        text=subprocess.check_output(['vm_stat'],text=True,timeout=3)
-        ram=psutil.virtual_memory()
-        _darwin_available_sample=(now,min(ram.total-ram.wired,darwin_reclaimable_bytes(text)))
-    return _darwin_available_sample[1]
+    """MemAvailable: free plus the reclaimable page cache, which is what admission can take."""
+    return psutil.virtual_memory().available
 
 
 def pagefile_used_bytes():
-    """Actual system pagefile slots, rather than the system commit charge.
+    """Actual swap slots in use, rather than the system commitment.
 
-    https://learn.microsoft.com/windows/win32/api/psapi/ns-psapi-enum_page_file_information
+    https://docs.kernel.org/admin-guide/ram-overview.html and /proc/meminfo's SwapTotal/SwapFree
     This counter does not attribute I/O to a process.
     """
-    if os.name != 'nt':
-        return psutil.swap_memory().used
-    import mmap
-    from ctypes import wintypes as w
-    class PageInfo(ctypes.Structure):
-        _fields_ = [('cb', w.DWORD), ('reserved', w.DWORD),
-                    ('total', ctypes.c_size_t), ('used', ctypes.c_size_t),
-                    ('peak', ctypes.c_size_t)]
-    callback_type = ctypes.WINFUNCTYPE(w.BOOL, ctypes.c_void_p,
-                                       ctypes.POINTER(PageInfo), w.LPCWSTR)
-    pages = 0
-    @callback_type
-    def collect(context, info, filename):
-        nonlocal pages
-        pages += info.contents.used
-        return True
-    api = ctypes.WinDLL('psapi', use_last_error=True)
-    api.EnumPageFilesW.argtypes = [callback_type, ctypes.c_void_p]
-    api.EnumPageFilesW.restype = w.BOOL
-    if not api.EnumPageFilesW(collect, None):
-        raise ctypes.WinError(ctypes.get_last_error())
-    return pages * mmap.PAGESIZE
+    return swap_bytes()[0]
 
 
 class PagefilePressure:
@@ -93,89 +109,24 @@ class PagefilePressure:
 
 def diagnostic_snapshot():
     result = {'time_ns': time.time_ns(), 'available_physical_bytes': psutil.virtual_memory().available,
-              'scope': 'system-wide; other processes may contribute'}
-    if os.name == 'nt':
-        from ctypes import wintypes as w
-        class Raw(ctypes.Structure):
-            _fields_ = [('status', w.DWORD), ('stamp', w.FILETIME), ('first', ctypes.c_int64),
-                        ('second', ctypes.c_int64), ('count', w.DWORD)]
-        pdh = ctypes.WinDLL('pdh')
-        pdh.PdhOpenQueryW.argtypes = [w.LPCWSTR, ctypes.c_size_t, ctypes.POINTER(w.HANDLE)]
-        pdh.PdhAddEnglishCounterW.argtypes = [w.HANDLE, w.LPCWSTR, ctypes.c_size_t, ctypes.POINTER(w.HANDLE)]
-        pdh.PdhCollectQueryData.argtypes = [w.HANDLE]
-        pdh.PdhGetRawCounterValue.argtypes = [w.HANDLE, ctypes.POINTER(w.DWORD), ctypes.POINTER(Raw)]
-        pdh.PdhCloseQuery.argtypes = [w.HANDLE]
-        query = w.HANDLE()
-        status = pdh.PdhOpenQueryW(None, 0, ctypes.byref(query))
-        if status:
-            return {**result, 'error': 'PdhOpenQuery: ' + hex(status & 0xffffffff)}
-        paths = {'pages_input': r'\Memory\Pages Input/sec', 'pages_output': r'\Memory\Pages Output/sec',
-                 'page_reads': r'\Memory\Page Reads/sec', 'page_writes': r'\Memory\Page Writes/sec',
-                 'paging_file_usage': r'\Paging File(_Total)\% Usage'}
-        handles = {}
-        try:
-            for name, path in paths.items():
-                handle = w.HANDLE()
-                status = pdh.PdhAddEnglishCounterW(query, path, 0, ctypes.byref(handle))
-                if not status:
-                    handles[name] = handle
-                else:
-                    result[name] = {'error': hex(status & 0xffffffff)}
-            status = pdh.PdhCollectQueryData(query)
-            if status:
-                result['collect_error'] = hex(status & 0xffffffff)
-            for name, handle in handles.items():
-                raw, kind = Raw(), w.DWORD()
-                status = pdh.PdhGetRawCounterValue(handle, ctypes.byref(kind), ctypes.byref(raw))
-                result[name] = ({'first': int(raw.first), 'second': int(raw.second),
-                                 'type': int(kind.value), 'status': int(raw.status)}
-                                if not status else {'error': hex(status & 0xffffffff)})
-        finally:
-            pdh.PdhCloseQuery(query)
-    elif sys.platform == 'darwin':
-        run = subprocess.run(['vm_stat'], capture_output=True, text=True, timeout=10)
-        if run.returncode:
-            result['vm_stat_error'] = run.returncode
-        else:
-            result['vm_stat'] = {key.strip(): int(value) for key, value in
-                re.findall(r'^([^:\n]+):\s+(\d+)\.', run.stdout, re.MULTILINE)}
-            size = re.search(r'page size of (\d+) bytes', run.stdout)
-            result['page_size'] = int(size[1]) if size else None
-    else:
-        swap = psutil.swap_memory()
-        result['swap_in_bytes'], result['swap_out_bytes'] = swap.sin, swap.sout
+              'scope': 'system-wide; other processes may contribute; kernel counters are cumulative since boot',
+              'page_size': mmap.PAGESIZE}
+    used, total = swap_bytes()
+    result['paging_file_usage'] = {'first': used, 'second': total}
+    result.update(vmstat_counters())
     return result
 
 
 def snapshot():
-    """Guardian-safe Windows totals without the PDH counter-provider service.
+    """Global swap totals, read from the same two /proc/meminfo fields every guard poll.
 
-    https://learn.microsoft.com/windows/win32/api/psapi/nf-psapi-enumpagefilesw
-    https://learn.microsoft.com/windows/win32/api/psapi/ns-psapi-enum_page_file_information
-    TotalInUse is allocated pages, not process commitment or disk-I/O proof.
-    The fuller PDH diagnostic remains explicitly available outside the guard.
+    Swap use is allocated pages, not process commitment or disk-I/O proof.
+    The kernel's cumulative counters are explicitly available outside the guard.
     """
-    if os.name!='nt':return diagnostic_snapshot()
-    from ctypes import wintypes as w
-    import mmap
-    class PageFile(ctypes.Structure):
-        _fields_=[('cb',w.DWORD),('reserved',w.DWORD),('total',ctypes.c_size_t),
-                  ('used',ctypes.c_size_t),('peak',ctypes.c_size_t)]
-    callback_type=ctypes.WINFUNCTYPE(w.BOOL,ctypes.c_void_p,ctypes.POINTER(PageFile),w.LPCWSTR)
-    used,total,count,invalid=0,0,0,False
-    @callback_type
-    def collect(context,info,filename):
-        nonlocal used,total,count,invalid
-        row=info.contents
-        if row.cb<ctypes.sizeof(PageFile) or row.used>row.total:
-            invalid=True;return False
-        used+=int(row.used);total+=int(row.total);count+=1;return True
-    api=ctypes.WinDLL('psapi.dll',use_last_error=True,winmode=2048)
-    api.EnumPageFilesW.argtypes=[callback_type,ctypes.c_void_p];api.EnumPageFilesW.restype=w.BOOL
-    started=time.monotonic()
-    if not api.EnumPageFilesW(collect,None) or invalid:
-        raise RuntimeError('Cannot read authoritative global paging totals: '+str(ctypes.get_last_error()))
-    return dict(time_ns=time.time_ns(),available_physical_bytes=psutil.virtual_memory().available,
-                scope='system-wide; other processes may contribute',api='EnumPageFilesW',page_size=mmap.PAGESIZE,
-                pagefile_count=count,paging_file_usage=dict(first=used,second=total),
-                query_seconds=time.monotonic()-started)
+    started = time.monotonic()
+    used, total = swap_bytes()
+    return dict(time_ns=time.time_ns(), available_physical_bytes=psutil.virtual_memory().available,
+                scope='system-wide; other processes may contribute', api='/proc/meminfo',
+                page_size=mmap.PAGESIZE, pagefile_count=swap_device_count(),
+                paging_file_usage=dict(first=used, second=total),
+                query_seconds=time.monotonic() - started)

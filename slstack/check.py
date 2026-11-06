@@ -37,8 +37,11 @@ def check(cfg, *, verify_journal=True):
                          'this fork serves DeepSeek V4.x on the Linux ds4 engine')
     from .memory_counters import diagnostic_snapshot as snapshot
     counters = snapshot()
-    supported = 'error' not in counters and ('pages_output' in counters or 'vm_stat' in counters or 'swap_out_bytes' in counters)
-    record('paging_counter_support', supported, 'OS paging counters are included in engine/GPU guard receipts; system activity is not per-process attribution', required=False)
+    readable = all(isinstance(counters.get(name), dict) and 'error' not in counters[name]
+                   for name in ('pages_input', 'pages_output', 'page_reads', 'page_writes'))
+    record('paging_counter_support', readable and 'paging_file_usage' in counters,
+           'OS paging counters are included in engine/GPU guard receipts; they are cumulative since '
+           'boot and system activity is not per-process attribution', required=False)
     record('core_kv_residency', False, 'Live VRAM/wired/pinned residency and pagefile/expert-miss I/O reconciliation remain unqualified', required=False)
     for name in ('ds4', 'streaming-llama'):
         directory = ROOT / 'engines' / name
