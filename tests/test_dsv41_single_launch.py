@@ -160,14 +160,14 @@ class KeptKeyTests(unittest.TestCase):
     def test_reserve_reaches_the_single_engine_config(self):
         from slstack.single_runtime import serving_config
         row = serving_config({'host_budget_gib': 8, 'producer_host_reserve_gib': 1, 'context': 262144},
-                             runtime_root='r', studio_root='s', llama_producer='p.exe', library_directories=[], revision='x')
+                             runtime_root='r', studio_root='s', llama_producer='p', library_directories=[], revision='x')
         self.assertEqual(row['producer_host_reserve_gib'], 1)
 
     def test_stack_single_engine_uses_the_packaged_spread_file_by_default(self):
         from slstack.single_runtime import stack_config
         with tempfile.TemporaryDirectory() as folder:
-            producer = Path(folder) / 'llama-dsv41-prefill.exe'
-            for name in (producer.name, 'ds4-decode.dll', 'dstorage.dll', 'dstoragecore.dll'):
+            producer = Path(folder) / 'llama-dsv41-prefill'
+            for name in (producer.name, 'ds4-decode.so'):
                 (Path(folder) / name).write_bytes(b'x')
             cfg = {**dsv41_single.overlay('262k'), 'llama_producer': str(producer), 'runtime_root': folder,
                    'ds4_url': 'http://127.0.0.1:8089', 'studio_root': 'vendor/studio', 'host_budget_gib': 8,
@@ -181,8 +181,8 @@ class KeptKeyTests(unittest.TestCase):
     def test_stack_single_engine_creates_its_hold_file_on_a_fresh_runtime(self):
         from slstack.single_runtime import stack_config
         with tempfile.TemporaryDirectory() as folder:
-            producer = Path(folder) / 'llama-dsv41-prefill.exe'
-            for name in (producer.name, 'ds4-decode.dll', 'dstorage.dll', 'dstoragecore.dll'):
+            producer = Path(folder) / 'llama-dsv41-prefill'
+            for name in (producer.name, 'ds4-decode.so'):
                 (Path(folder) / name).write_bytes(b'x')
             runtime = Path(folder) / 'runtime'
             cfg = {**dsv41_single.overlay('262k'), 'llama_producer': str(producer), 'runtime_root': str(runtime),
@@ -197,7 +197,7 @@ class RuntimePythonTests(unittest.TestCase):
     def test_stage_refuses_an_interpreter_other_than_the_runtime_python(self):
         from slstack.single_runtime import require_runtime_python
         with tempfile.TemporaryDirectory() as folder:
-            runtime, other = Path(folder) / 'venv-python.exe', Path(folder) / 'system-python.exe'
+            runtime, other = Path(folder) / 'venv-python', Path(folder) / 'system-python'
             for p in (runtime, other):
                 p.write_bytes(b'x')
             require_runtime_python({'studio_python': str(runtime)}, executable=str(runtime))

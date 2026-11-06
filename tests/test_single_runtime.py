@@ -17,9 +17,9 @@ BASE = dict(gpu_uuid='GPU-1', gpu_idle_max_mib=1024, hold_file=str(FIXTURE / 'gp
             lease_minutes=19, request_timeout_s=1140, host_budget_gib=9.25, min_available_gib=1, job_commit_gib=48,
             context=262144, model=str(FIXTURE / 'models/x.gguf'), model_name='DSV4.1-1017', producer_host_budget_gib=6.25,
             producer_profile='ultra', producer_sha256='a' * 64, producer_source_revision='r',
-            llama_producer=str(FIXTURE / 'scratch/bin/llamadecode-r.exe'), runtime_root=str(FIXTURE / 'scratch/runs'),
+            llama_producer=str(FIXTURE / 'scratch/bin/llama-dsv41-prefill'), runtime_root=str(FIXTURE / 'scratch/runs'),
             producer_library_directories=[str(FIXTURE / 'scratch/engines/ds4'), str(FIXTURE / 'cuda/bin')],
-            cache_affinity_spread_file=str(FIXTURE / 's.txt'), model_receipt=str(FIXTURE / 'scratch/m.json'), ds4_command=['native.exe'],
+            cache_affinity_spread_file=str(FIXTURE / 's.txt'), model_receipt=str(FIXTURE / 'scratch/m.json'), ds4_command=['ds4-server'],
             env_overrides={'CUDA_CACHE_DISABLE': '1'}, host='127.0.0.1', port=18748)
 INSTALLED = FIXTURE / 'installed/0123abcd'
 STUDIO_NATIVE = ROOT.parent / 'front-eagle-stack/backend/studio/ds4_native.py'
@@ -27,20 +27,20 @@ STUDIO_NATIVE = ROOT.parent / 'front-eagle-stack/backend/studio/ds4_native.py'
 
 class RuntimeTests(unittest.TestCase):
     def test_packed_fp4_extension_and_temp_paths_survive_scratch_retirement(self):
-        env=dict(BASE['env_overrides'], LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL=str(FIXTURE/'scratch/bin/native.dll'),
+        env=dict(BASE['env_overrides'], LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL=str(FIXTURE/'scratch/bin/native.so'),
                  LLAMA_DSV41_STORED_MXFP4='1', LLAMADECODE_PREFILL_ROUTED='0',
-                 TEMP=str(FIXTURE/'scratch'), TMP=str(FIXTURE/'scratch'), TMPDIR=str(FIXTURE/'scratch'),
-                 CUDA_CACHE_PATH=str(FIXTURE/'scratch/cache'))
+                 TMPDIR=str(FIXTURE/'scratch'), CUDA_CACHE_PATH=str(FIXTURE/'scratch/cache'))
         cfg=sr.single_config(dict(BASE,env_overrides=env),INSTALLED,'rev')
-        self.assertEqual(Path(cfg['env_overrides']['LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL']),INSTALLED/'native.dll')
+        self.assertEqual(Path(cfg['env_overrides']['LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL']),INSTALLED/'native.so')
         self.assertEqual(cfg['env_overrides']['LLAMA_DSV41_STORED_MXFP4'],'1')
         self.assertEqual(cfg['env_overrides']['LLAMADECODE_PREFILL_ROUTED'],'0')
         self.assertEqual(set(cfg['env_overrides']),set(env)|{'LLAMADECODE_DS4_DECODE'})
-        self.assertTrue(all(Path(cfg['env_overrides'][k])==INSTALLED/'runtime/temp' for k in ('TEMP','TMP','TMPDIR')))
+        self.assertEqual(Path(cfg['env_overrides']['TMPDIR']),INSTALLED/'runtime/temp')
+        self.assertNotIn('TEMP',cfg['env_overrides']);self.assertNotIn('TMP',cfg['env_overrides'])
         self.assertEqual(sr.extension_files(dict(env_overrides=env)),
                          {'LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL':Path(env['LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL'])})
         with self.assertRaises(ValueError):sr.extension_files({'env_overrides':{'LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL':''}})
-        with self.assertRaises(ValueError):sr.extension_files({'env_overrides':{'LLAMA_DSV41_DENSE_FP8_DLL':'wrong.exe'}})
+        with self.assertRaises(ValueError):sr.extension_files({'env_overrides':{'LLAMA_DSV41_DENSE_FP8_DLL':'wrong.dll'}})
 
     def test_runtime_floor_config_default_and_cli_override(self):
         from slstack.config import load
@@ -56,7 +56,7 @@ class RuntimeTests(unittest.TestCase):
         cfg = sr.single_config(BASE, INSTALLED, 'rev')
         self.assertEqual(cfg['serving_mode'], 'single_engine')
         self.assertEqual(cfg['env_overrides'], {'CUDA_CACHE_DISABLE': '1', 'LLAMADECODE_DS4_DECODE': '1'})
-        self.assertEqual(Path(cfg['llama_producer']), INSTALLED / 'llamadecode-r.exe')
+        self.assertEqual(Path(cfg['llama_producer']), INSTALLED / 'llama-dsv41-prefill')
         self.assertEqual([Path(p) for p in cfg['producer_library_directories']], [INSTALLED, FIXTURE / 'cuda/bin'])
         self.assertNotIn('ds4_command', cfg);self.assertEqual(cfg['single_engine_stop_tokens'], [1])
         self.assertEqual(request_worker_config(cfg)['host_budget_gib'], BASE['host_budget_gib'])
@@ -66,7 +66,7 @@ class RuntimeTests(unittest.TestCase):
         preset = sr.preset(BASE, INSTALLED)
         self.assertEqual(preset['name'], 'DSV4.1 1017 (RTX: streaming-llama ULTRA prefill + ds4 decode, single engine)')
         rtx = preset['rtx'];self.assertEqual(rtx['backend'], 'ds4')
-        self.assertEqual(Path(rtx['ds4_binary']), INSTALLED / 'ds4-server.exe')
+        self.assertEqual(Path(rtx['ds4_binary']), INSTALLED / 'ds4-server')
         self.assertEqual(rtx['ds4_env'], {'LLAMADECODE_DS4_DECODE': '1'})
         self.assertTrue(rtx['ds4_cache_affinity_spread_file'])   # Studio offers the quality-speed tool only then
 

@@ -30,12 +30,11 @@ def run(request):
     from .media_tools import directory as tools_directory
     tools=tools_directory(cfg['runtime_root'])
     if tools.is_dir():os.environ['PATH']=str(tools)+os.pathsep+os.environ.get('PATH','')
-    # Source builds put the media streaming DLL beside the producer. Resolve
-    # it before importing any Studio module that captures STUDIO_WF_DLL.
+    # Source builds put the media streaming library under build/llama/bin; only an
+    # explicit weight_fetcher setting selects it. The Linux fetcher library is an anchor
+    # object exporting one data symbol - it carries no fetcher API - so there is no
+    # beside-the-producer twin to guess at the way the retired DLL had.
     media_library=cfg.get('weight_fetcher')
-    if not media_library and cfg.get('llama_producer'):
-        candidate=Path(cfg['llama_producer']).parent/'slstack-weight-fetcher.dll'
-        if candidate.is_file():media_library=str(candidate.resolve())
     if media_library:os.environ['STUDIO_WF_DLL']=str(Path(media_library).resolve(strict=True))
     if cfg.get('comfyui_models'):
         os.environ['STUDIO_COMFYUI_PATH']=cfg['comfyui_models']

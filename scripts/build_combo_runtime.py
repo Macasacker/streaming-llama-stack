@@ -42,7 +42,7 @@ def normal_argv(source,preset):
 
 def profile_producer(name):
     if not re.fullmatch('[a-z0-9]+',name):raise ValueError('Streaming profile names are lower-case words')
-    return 'combo-prefill-'+name+'.exe'
+    return 'combo-prefill-'+name
 
 
 def relocate_runtime(cfg,installed,revision):
@@ -58,11 +58,11 @@ def relocate_runtime(cfg,installed,revision):
         combo_crossover_receipt=str(installed/'qualification/crossover.json'),
         model_receipt=str(installed/'qualification/original-model.json'),
         cache_affinity_spread_file=str(installed/'qualification/affinity-spreads.txt'),
-        llama_producer=str(installed/'combo-prefill.exe'),source_revision=revision,
+        llama_producer=str(installed/'combo-prefill'),source_revision=revision,
         studio_root=str(installed/'vendor/studio'))
     if cfg.get('combo_core_binding'):result['combo_core_binding']=str(installed/'qualification/native-core-binding.json')
     # Per-preset streaming profiles that pin their own producer build run the
-    # installed copy staged as combo-prefill-<profile>.exe.
+    # installed copy staged as combo-prefill-<profile>.
     for name,row in (result.get('combo_crossover_profiles') or {}).items():
         if 'llama_producer' in row:row['llama_producer']=str(installed/profile_producer(name))
         # A profile's own parity evidence is staged under qualification/<profile>/.
@@ -71,10 +71,10 @@ def relocate_runtime(cfg,installed,revision):
             row['combo_qualification_root']=str(proof)
             row['combo_native_binding']=str(proof/'native-parity-binding.json')
             if 'combo_ultra_guard' in row:row['combo_ultra_guard']=str(proof/'ultra-parity.receipt.json')
-    result['ds4_command'][0]=str(installed/'native/ds4-server.exe')
+    result['ds4_command'][0]=str(installed/'native/ds4-server')
     result['producer_library_directories']=[str(installed/'native'),
         *[p for p in cfg['producer_library_directories'] if not Path(p).resolve().is_relative_to(scratch)]]
-    if str(scratch).replace('\\','/').lower() in json.dumps(result).replace('\\\\','/').lower():
+    if str(scratch).lower() in json.dumps(result).lower():
         raise ValueError('Installed configuration still depends on task scratch')
     return result
 
@@ -137,8 +137,8 @@ def stage(args):
     for relative in tracked:
         if (relative.startswith(('slstack/','vendor/studio/')) and Path(relative).suffix in ('.py','.json')) or relative=='envvars.json':
             copy(SOURCE/relative,relative)
-    copy(args.launcher,'ds4-server.exe');copy(cfg['ds4_command'][0],'native/ds4-server.exe')
-    copy(cfg['llama_producer'],'combo-prefill.exe')
+    copy(args.launcher,'ds4-server');copy(cfg['ds4_command'][0],'native/ds4-server')
+    copy(cfg['llama_producer'],'combo-prefill')
     for name,row in (cfg.get('combo_crossover_profiles') or {}).items():
         if 'llama_producer' in row:
             if sha(row['llama_producer'])!=row.get('producer_sha256'):raise ValueError('Profile producer pin differs: '+name)
@@ -150,8 +150,10 @@ def stage(args):
             copy(row['combo_native_binding'],f'qualification/{name}/native-parity-binding.json')
             if 'combo_ultra_guard' in row:copy(row['combo_ultra_guard'],f'qualification/{name}/ultra-parity.receipt.json')
     native=Path(cfg['ds4_command'][0]).parent
-    for name in ('dstorage.dll','dstoragecore.dll'):
-        copy(native/name,name);copy(native/name,'native/'+name)
+    # The decode library belongs beside the staged producer (that is where the vision
+    # bridge and the engine look for it) and beside the native server, whose own
+    # dependency search is the directory it is launched from.
+    copy(native/'ds4-decode.so','ds4-decode.so');copy(native/'ds4-decode.so','native/ds4-decode.so')
     proof_root=Path(cfg.get('combo_qualification_root',cfg['runtime_root']))
     for name in ('native-parity.json','native-parity-binding.json','ultra-parity.json'):
         source=Path(cfg['combo_native_binding']) if name=='native-parity-binding.json' and cfg.get('combo_native_binding') else proof_root/name
@@ -167,7 +169,7 @@ def stage(args):
     result=relocate_runtime(cfg,installed,revision)
     preset=dict(name='DSV4.1 1017 (RTX: ULTRA prefill \u2192 ds4-win decode)',mode='local',mac={},include_previous_reasoning=True,
         rtx=dict(backend='ds4',model='deepseek-reasoner',model_path=cfg['model'],ctx=cfg['context'],
-            ds4_binary=str(installed/'ds4-server.exe'),ds4_chdir=str(installed),ds4_ssd_streaming='1',ds4_cache_experts='24GB',
+            ds4_binary=str(installed/'ds4-server'),ds4_chdir=str(installed),ds4_ssd_streaming='1',ds4_cache_experts='24GB',
             prefill_chunk=cfg['native_prefill_chunk'],ds4_cache_affinity_bias=0,
             ds4_cache_affinity_spread_file=result['cache_affinity_spread_file'],ds4_extra_flags='--cuda',
             ds4_host_memory_budget_mb=int(result['host_budget_gib']*1024),ds4_host_memory_reserve_mb=int(cfg['min_available_gib']*1024)))

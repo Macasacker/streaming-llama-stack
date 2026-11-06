@@ -92,7 +92,7 @@ def apply(env, cfg, scope):
         context.update(runtime_root=str(Path(cfg['runtime_root']).resolve()),
                        studio_root=str(path(cfg.get('studio_root', 'vendor/studio'))),
                        streaming_root=str(path(cfg.get('streaming_root', 'vendor/engines'))),
-                       weight_fetcher=str(path(cfg.get('weight_fetcher', 'build/llama/bin/slstack-weight-fetcher.dll'))),
+                       weight_fetcher=str(path(cfg.get('weight_fetcher', 'build/llama/bin/libslstack-weight-fetcher.so'))),
                        affinity_spread_file=str(path(cfg.get('cache_affinity_spread_file') or 'presets/dsv41-affinity-spreads.txt')),
                        library_pythonpath=os.pathsep.join((str(ROOT), str(path(cfg.get('studio_root', 'vendor/studio'))),
                                                           str(path(cfg.get('streaming_root', 'vendor/engines'))))))

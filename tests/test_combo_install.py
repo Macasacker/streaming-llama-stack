@@ -29,7 +29,7 @@ class InstallTest(unittest.TestCase):
                 ultra=dict(combo_crossover_tokens=3770),
                 fast=dict(combo_crossover_tokens=5395,llama_producer=str(scratch/'combo-prefill-fast.exe'),producer_sha256='b'*64)))
         result=relocate_runtime(cfg,installed,'source')
-        self.assertEqual(result['combo_crossover_profiles']['fast']['llama_producer'],str(installed/'combo-prefill-fast.exe'))
+        self.assertEqual(result['combo_crossover_profiles']['fast']['llama_producer'],str(installed/'combo-prefill-fast'))
         self.assertNotIn('llama_producer',result['combo_crossover_profiles']['ultra'])
         self.assertEqual(cfg['combo_crossover_profiles']['fast']['llama_producer'],str(scratch/'combo-prefill-fast.exe'))
 

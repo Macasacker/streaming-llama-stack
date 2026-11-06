@@ -68,7 +68,7 @@ def install(cfg, *, image=False, video=False, all_engines=False, check=False):
     ready=all(row['ready'] for row in result['media_runtimes']) and result['media_assets']['ready'] and result.get('video_tools',{'ready':True})['ready']
     runtime=Path(cfg['runtime_root'])
     binaries = [path(cfg['ds4_command'][0]), path(cfg['llama_producer']),
-                path(cfg.get('weight_fetcher', 'build/llama/bin/slstack-weight-fetcher.so')), ROOT / 'build/llama/bin/llama-server',
+                path(cfg.get('weight_fetcher', 'build/llama/bin/libslstack-weight-fetcher.so')), ROOT / 'build/llama/bin/llama-server',
                 ROOT / 'build/llama/bin/llama-export-lora', path(cfg['llama_producer']).parent / 'ds4-decode.so']
     if not check and all_engines:
         # The documented install step prepares the native engines and UI too.

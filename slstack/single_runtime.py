@@ -2,19 +2,19 @@
 
 Same shape as scripts/build_combo_runtime.py: an immutable directory that Studio's
 normal ds4 backend launches as its ds4_binary.
-  ds4-server.exe        the existing combo launcher (ds4_combo_launcher.c): runs
-                        <python-path.txt> -B -m slstack.combo_proxy --config combo.json --native-argv <Studio argv>
+  ds4-server            the combo launcher: runs <python-path.txt> -B -m slstack.combo_proxy
+                        --config combo.json --native-argv <Studio argv>
   combo.json            serving_mode=single_engine; every path points inside the install root
   python-path.txt       the interpreter that staged it (needs psutil); must be cfg['studio_python']
   slstack/ vendor/studio/ envvars.json   tracked source at the recorded revision
-  llamadecode-r.exe ds4-decode.dll dstorage.dll dstoragecore.dll   the ULTRA producer (copied, ~120 MB)
+  <producer> ds4-decode.so               the ULTRA producer and its decode library (copied)
   qualification/        affinity-spreads.txt (B5 calibration), original-model.json (model receipt)
   preset.json           the Studio preset definition (scripts/add_llamadecode_single_preset.py posts it)
   manifest.json         SHA-256 and size of every file
 No model weights are copied; the GGUF stays at cfg['model'].
 
   <cfg studio_python> -B -m slstack.single_runtime stage --config CFG --stage NEW_DIR --install-root <Studio runtime root>/ds4/<rev>
-      --launcher <combo-launcher.exe> --studio-native <front-eagle-stack>/backend/studio/ds4_native.py
+      --launcher <combo-launcher> --studio-native <front-eagle-stack>/backend/studio/ds4_native.py
   python -B -m slstack.single_runtime install --stage NEW_DIR      (copies to the install root named in its manifest)
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ import sys
 
 SOURCE = Path(__file__).resolve().parents[1]
 PRESET_NAME = 'DSV4.1 1017 (RTX: streaming-llama ULTRA prefill + ds4 decode, single engine)'
-PRODUCER_FILES = ('ds4-decode.dll', 'dstorage.dll', 'dstoragecore.dll')
+PRODUCER_FILES = ('ds4-decode.so',)
 NATIVE_EXTENSIONS = ('LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL', 'LLAMA_DSV41_DENSE_FP8_DLL')
 DECODE_ENV = {'LLAMADECODE_DS4_DECODE': '1'}
 KEPT = ('generation_control_file', 'stack_preferences_file', 'vision_encoder', 'vision_bridge_version', 'ds4_vision', 'yoco_keep', 'gpu_uuid', 'gpu_idle_max_mib', 'hold_file', 'task', 'lease_minutes', 'request_timeout_s', 'host_budget_gib',
@@ -75,21 +75,21 @@ def single_config(cfg, installed, revision):
     result = serving_config(cfg, runtime_root=installed / 'runtime', studio_root=installed / 'vendor/studio',
         llama_producer=installed / Path(cfg['llama_producer']).name,
         library_directories=[installed, *[p for p in cfg.get('producer_library_directories', [])
-                                          if 'scratch' not in str(p).replace('\\', '/').lower()]],
+                                          if 'scratch' not in str(p).lower()]],
         spread_file=installed / 'qualification/affinity-spreads.txt',
         model_receipt=installed / 'qualification/original-model.json', revision=revision)
     for key, source in extension_files(cfg).items():
         result['env_overrides'][key] = str(installed / source.name)
-    for key, directory in (('TEMP', 'temp'), ('TMP', 'temp'), ('TMPDIR', 'temp'), ('CUDA_CACHE_PATH', 'cuda-cache')):
+    for key, directory in (('TMPDIR', 'temp'), ('CUDA_CACHE_PATH', 'cuda-cache')):
         if key in result['env_overrides']:
             result['env_overrides'][key] = str(installed / 'runtime' / directory)
-    if 'scratch' in json.dumps(result).replace('\\\\', '/').lower():
+    if 'scratch' in json.dumps(result).lower():
         raise ValueError('Installed configuration still depends on task scratch')
     return result
 
 
 def extension_files(cfg):
-    """Carry selected native layouts with their actual pinned DLLs."""
+    """Carry selected native layouts with their actual pinned libraries."""
     result = {}
     names = {}
     for key in NATIVE_EXTENSIONS:
@@ -97,10 +97,10 @@ def extension_files(cfg):
         if value is None:
             continue
         if not isinstance(value, str) or not value:
-            raise ValueError('Native extension requires its DLL path: ' + key)
+            raise ValueError('Native extension requires its library path: ' + key)
         source = Path(value)
-        if source.suffix.lower() != '.dll':
-            raise ValueError('Native extension must be a DLL: ' + key)
+        if source.suffix.lower() != '.so':
+            raise ValueError('Native extension must be a shared library: ' + key)
         if source.name.lower() in names and names[source.name.lower()] != source:
             raise ValueError('Native extension filename collision: ' + source.name)
         names[source.name.lower()] = source
@@ -126,7 +126,7 @@ def receipt_config(cfg):
 
 
 def stack_config(cfg):
-    """The stack's own single-RTX endpoint: the source-built producer, its ds4-decode.dll
+    """The stack's own single-RTX endpoint: the source-built producer, its ds4-decode.so
     beside it, and paths inside the stack runtime. The controller and producer share the
     stack's admitted host budget; the producer pin is the built binary's hash."""
     from .config import path, ROOT
@@ -134,7 +134,7 @@ def stack_config(cfg):
     producer = path(cfg['llama_producer'])
     missing = [str(f) for f in (producer, *[producer.parent / n for n in PRODUCER_FILES]) if not f.is_file()]
     if missing:raise ValueError('Single-engine serving needs the built producer files: ' + ', '.join(missing) +
-                                '; run build.ps1 (or start --serving native)')
+                                '; run build.sh (or start --serving native)')
     runtime = Path(cfg['runtime_root']).resolve()
     if not cfg.get('hold_file'):
         # The stack's own hold file: gpu_lease only creates it when no hold_file is named,
@@ -168,7 +168,7 @@ def preset(cfg, installed):
     installed = Path(installed)
     return dict(name=cfg.get('preset_name', PRESET_NAME), mode='local', include_previous_reasoning=True, tool_call_format='native',
         rtx=dict(backend='ds4', model='deepseek-reasoner', model_path=cfg['model'], ctx=cfg['context'],
-            ds4_binary=str(installed / 'ds4-server.exe'), ds4_chdir=str(installed), ds4_ssd_streaming='1',
+            ds4_binary=str(installed / 'ds4-server'), ds4_chdir=str(installed), ds4_ssd_streaming='1',
             ds4_cache_affinity_bias=0, ds4_cache_affinity_spread_file=str(installed / 'qualification/affinity-spreads.txt'),
             ds4_extra_flags='--cuda', ds4_env=dict(DECODE_ENV),
             ds4_host_memory_budget_mb=int((cfg['host_budget_gib'] + .25) * 1024),
@@ -190,7 +190,7 @@ def require_runtime_python(cfg, executable=None):
     if not want:
         raise ValueError('Config needs studio_python: the interpreter the staged runtime will launch')
     have = Path(executable or sys.executable).resolve()
-    if str(have).lower() != str(Path(want).resolve()).lower():
+    if have != Path(want).resolve():
         raise ValueError(f'Stage with the runtime interpreter: run "{want} -B -m slstack.single_runtime stage ..." '
                          f'(this is {have}); python-path.txt records the staging interpreter')
 
@@ -216,12 +216,10 @@ def stage(args):
     for relative in tracked:
         if (relative.startswith(('slstack/', 'vendor/studio/')) and Path(relative).suffix in ('.py', '.json')) or relative == 'envvars.json':
             copy(SOURCE / relative, relative)
-    copy(args.launcher, 'ds4-server.exe');copy(producer, producer.name)
+    copy(args.launcher, 'ds4-server');copy(producer, producer.name)
     for name in PRODUCER_FILES:copy(producer.parent / name, name)
     for source in extension_files(cfg).values():copy(source, source.name)
     for directory in ('temp', 'cuda-cache'):(target / 'runtime' / directory).mkdir(parents=True, exist_ok=True)
-    media_library=Path(cfg.get('weight_fetcher') or producer.parent/'slstack-weight-fetcher.dll')
-    if media_library.is_file():copy(media_library,'slstack-weight-fetcher.dll')
     copy(cfg['cache_affinity_spread_file'], 'qualification/affinity-spreads.txt')
     copy(cfg['model_receipt'], 'qualification/original-model.json')
     result = single_config(cfg, installed, revision);definition = preset(cfg, installed)
