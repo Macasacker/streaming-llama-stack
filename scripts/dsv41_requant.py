@@ -341,14 +341,8 @@ def main():
     if args.worker:
         if os.environ.get('SLSTACK_REQUANT_PARENT')!=str(psutil.Process().ppid()):raise ValueError('Internal worker only')
         with (args.runtime_root/'requant.lock').open('a+b') as lock:
-            if lock.tell()==0:lock.write(b'0');lock.flush()
-            lock.seek(0)
-            if os.name=='nt':
-                import msvcrt
-                msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
-            else:
-                import fcntl
-                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            import fcntl
+            fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
             if args.conversion_lease:
                 from slstack.lease import gpu_lease
                 row=json.loads(args.conversion_lease.read_text(encoding='utf-8'))

@@ -1,11 +1,12 @@
 from slstack import guard, shared_guard
 
 
-def test_mac_host_budget_does_not_inherit_windows_commit_cap():
+def test_host_budget_is_the_containment_ceiling_not_a_separate_commit_cap():
     from slstack.process import commit_budget_gib
+    # The engine's own --job-commit budget (48 GiB) is not the guardian's ceiling: the
+    # scope caps the tree at what the host may spare.
     cfg=dict(host_budget_gib=400,job_commit_gib=48)
-    assert commit_budget_gib(cfg,windows=False)==400
-    assert commit_budget_gib(cfg,windows=True)==48
+    assert commit_budget_gib(cfg)==400
 
 
 def test_uncertain_identity_cleanup_retains_live_owner_without_killing():

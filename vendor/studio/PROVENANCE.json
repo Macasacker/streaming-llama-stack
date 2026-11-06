@@ -81,6 +81,10 @@
     {
       "path": "dsv41_session_process.py",
       "purpose": "Linux job-tree liveness: /proc/<pid>/io exposes no third byte counter, so other_bytes is read as an optional Windows field and its absence is not counted as zero progress. No change to the progress rule or to any arithmetic."
+    },
+    {
+      "path": "job_paging.py",
+      "purpose": "Linux paging observer: an owned member can exit between the identity check and the /proc/<pid>/status read, and a status with no VmSwap line charges no swap. The read now yields zero for that member instead of raising StopIteration, which the guard monitor previously reported as the job's stop reason. Windows and Darwin observation unchanged."
     }
   ],
   "modules": [

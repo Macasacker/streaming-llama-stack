@@ -10,7 +10,8 @@ from types import SimpleNamespace
 
 import psutil
 from slstack.cooperative_stop import CooperativeOwnedProcesses,validate
-from slstack.guard import _supervise,windows_job
+from slstack.cgroup_scope import open_containment
+from slstack.guard import _supervise
 from slstack.lease import recover_leases
 
 
@@ -55,7 +56,6 @@ class CooperativeStop(unittest.TestCase):
             self.assertNotIn('RELEASED',hold.read_text())
             self.assertFalse(json.loads(record.read_text())['released'])
 
-    @unittest.skipUnless(os.name=='nt','Windows Job contract')
     def test_paging_failure_requests_http_stop_and_child_exits_itself(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);(root/'ultra-fixture').mkdir()
@@ -81,12 +81,20 @@ raise SystemExit(130)
                 owner_pid=os.getpid(),owner_created=psutil.Process().create_time(),stop=str(root/'stop'),
                 log=str(root/'log'),receipt=str(root/'receipt.json'),cooperative_stop=dict(url=f'http://127.0.0.1:{port}/v1/stack/shutdown'))
             def failure(*args,**kwargs):return 'synthetic global paging stop' if (root/'ready').exists() else None
-            with patch('slstack.guard.PagingWatch.check',autospec=True,side_effect=failure),patch('slstack.guard.windows_job',wraps=windows_job) as job,patch('studio.job_guard.OwnedProcesses.stop',side_effect=AssertionError('must never force')):
+            contained=[]
+            def contain(target):
+                result=open_containment(target);contained.append(result[0]);return result
+            with patch('slstack.guard.PagingWatch.check',autospec=True,side_effect=failure),patch('slstack.guard.open_containment',side_effect=contain),patch('studio.job_guard.OwnedProcesses.stop',side_effect=AssertionError('must never force')):
                 self.assertEqual(_supervise(spec),1)
             proof=json.loads((root/'receipt.json').read_text())
             self.assertEqual(proof['exit_code'],130);self.assertIn('paging stop',proof['reason'])
             self.assertTrue(proof['release_allowed']);self.assertFalse(proof['cleanup']['forced_kill'])
-            self.assertFalse(job.call_args.kwargs['kill_on_close'])
+            # The retirement was cooperative: the child exited itself, so the scope it ran
+            # inside was empty at teardown and nothing had to be terminated by the kernel.
+            self.assertEqual(contained[0].memory_bytes,int(.5*2**30))
+            self.assertEqual(proof['memory_scope']['memory_max_bytes'],int(.5*2**30))
+            self.assertEqual(proof['memory_scope']['oom_events']['oom_kill'],0)
+            self.assertTrue(proof['scope_cleanup']['removed'])
             self.assertIn('COOPERATIVE_CHILD_EXIT',(root/'log').read_text())
 
 

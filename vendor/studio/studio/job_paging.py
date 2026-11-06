@@ -1,5 +1,5 @@
 # Derived from Studio backend/studio/job_paging.py at 2774636281ab32bf871497f0a8caae23c6b6cdc7.
-# Source body unchanged; only this two-line provenance header added.
+# Local patch: the Linux per-process swap read tolerates a member that exited mid-read.
 """Shared paging policy and bounded, process-attributed paging observations.
 
 Windows PagefileUsage is commit, not actual swap. Anonymous page locations use
@@ -334,8 +334,12 @@ class JobPaging:
                 if sys.platform=='win32':value=self._windows(item,key,max(1,self.max_pages//len(items)))
                 elif sys.platform=='darwin':value=0
                 else:
+                    # A member can exit between the identity check and this read; a status
+                    # with no VmSwap line is a process that charges no swap, not a failed
+                    # observation. next() without a default raised StopIteration here and
+                    # the monitor thread reported it as the job's stop reason.
                     data=Path(f'/proc/{item.pid}/status').read_text()
-                    value=next(int(line.split()[1])*1024 for line in data.splitlines() if line.startswith('VmSwap:'))
+                    value=next((int(line.split()[1])*1024 for line in data.splitlines() if line.startswith('VmSwap:')), 0)
                 found+=value
                 if value:self.last_processes.append(dict(pid=item.pid,paged_bytes=value))
             except (psutil.NoSuchProcess,ProcessLookupError,FileNotFoundError):pass

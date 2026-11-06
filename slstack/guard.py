@@ -1,9 +1,7 @@
 """Independent process-tree guardian with cooperative retirement and memory checks."""
 from __future__ import annotations
 import argparse
-import ctypes
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -11,6 +9,7 @@ import time
 import psutil
 from .progress import Window, activity
 from .memory_counters import available_physical_bytes
+from .cgroup_scope import open_containment
 from .native_broker import vendor
 vendor()
 from studio.job_guard import OwnedProcesses, OwnedView
@@ -77,47 +76,6 @@ def kill_tree(proc, spec=None):
     return proof
 
 
-def windows_job(proc, commit_gib, *, kill_on_close=True):
-    from ctypes import wintypes as w
-    class Basic(ctypes.Structure):
-        _fields_ = [('PerProcessUserTimeLimit', ctypes.c_int64), ('PerJobUserTimeLimit', ctypes.c_int64),
-                    ('LimitFlags', w.DWORD), ('MinimumWorkingSetSize', ctypes.c_size_t),
-                    ('MaximumWorkingSetSize', ctypes.c_size_t), ('ActiveProcessLimit', w.DWORD),
-                    ('Affinity', ctypes.c_size_t), ('PriorityClass', w.DWORD), ('SchedulingClass', w.DWORD)]
-    class IO(ctypes.Structure):
-        _fields_ = [(x, ctypes.c_uint64) for x in ('ReadOperationCount', 'WriteOperationCount', 'OtherOperationCount',
-                                                  'ReadTransferCount', 'WriteTransferCount', 'OtherTransferCount')]
-    class Extended(ctypes.Structure):
-        _fields_ = [('BasicLimitInformation', Basic), ('IoInfo', IO), ('ProcessMemoryLimit', ctypes.c_size_t),
-                    ('JobMemoryLimit', ctypes.c_size_t), ('PeakProcessMemoryUsed', ctypes.c_size_t),
-                    ('PeakJobMemoryUsed', ctypes.c_size_t)]
-    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-    kernel.CreateJobObjectW.restype = w.HANDLE
-    kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, w.LPCWSTR]
-    kernel.SetInformationJobObject.argtypes = [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD]
-    kernel.AssignProcessToJobObject.argtypes = [w.HANDLE, w.HANDLE]
-    kernel.CloseHandle.argtypes = [w.HANDLE]
-    job = kernel.CreateJobObjectW(None, None)
-    if not job:
-        raise ctypes.WinError(ctypes.get_last_error())
-    limits = Extended()
-    limits.BasicLimitInformation.LimitFlags = (0x2000 if kill_on_close else 0) | 0x200
-    limits.JobMemoryLimit = int(commit_gib * GiB)
-    try:
-        if not kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
-            raise ctypes.WinError(ctypes.get_last_error())
-        if not kernel.AssignProcessToJobObject(job, w.HANDLE(int(proc._handle))):
-            raise ctypes.WinError(ctypes.get_last_error())
-        nt = ctypes.WinDLL('ntdll')
-        nt.NtResumeProcess.argtypes = [w.HANDLE]
-        if nt.NtResumeProcess(w.HANDLE(int(proc._handle))) != 0:
-            raise RuntimeError('Could not resume guarded child')
-    except BaseException:
-        kernel.CloseHandle(job)
-        raise
-    return kernel, job
-
-
 def _supervise(spec):
     # Engine/GPU jobs use the pinned shared Studio guard. A server that opens its own
     # per-request GPU windows (combo_proxy) or a job bound to a named lease stays on
@@ -161,7 +119,7 @@ def _supervise_plain(spec):
     watcher = HoldWatcher(watch['path'], watch['identity'], task=watch.get('task', 'DS4STACK')) if watch else None
     if watcher and watcher.reason():
         raise RuntimeError('Yielding before process creation to shared hold: ' + watcher.reason())
-    flags = subprocess.CREATE_NO_WINDOW | 4 if os.name == 'nt' else 0  # suspended until Job admission
+    scope, scope_absent = open_containment(spec)
     start = time.monotonic()
     peak, minimum, reason = 0, available_physical_bytes(), None
     from .memory_counters import snapshot, PagefilePressure
@@ -173,14 +131,13 @@ def _supervise_plain(spec):
     with open(spec['log'], 'ab', buffering=0) as log:
         child = subprocess.Popen(spec['command'], cwd=spec['cwd'], env=spec['env'],
                                  stdin=subprocess.PIPE if 'stdin' in spec else subprocess.DEVNULL,
-                                 stdout=log, stderr=log, creationflags=flags,
-                                 start_new_session=os.name != 'nt')
-        job = None
+                                 stdout=log, stderr=log, preexec_fn=scope.pre_exec if scope else None,
+                                 start_new_session=True)
+        contained = {'unavailable': scope_absent}
+        scope_closed = None
         owned = GracefulOwnedProcesses(child,spec)
         cleanup = None
         try:
-            if os.name == 'nt':
-                job = windows_job(child, spec['job_commit_gib'], kill_on_close=False)
             if 'stdin' in spec:
                 child.stdin.write(spec['stdin'].encode())
                 child.stdin.close()
@@ -205,11 +162,8 @@ def _supervise_plain(spec):
                             key = f'{member.pid}:{created:.6f}'
                             faults = getattr(info, 'num_page_faults', None)
                             row = process_counters.setdefault(key, {'pid': member.pid, 'created': created,
-                                'name': member.name(), 'first_page_faults': faults, 'last_page_faults': faults,
-                                'peak_private_commit_bytes': 0})
+                                'name': member.name(), 'first_page_faults': faults, 'last_page_faults': faults})
                             row['last_page_faults'] = faults
-                            row['peak_private_commit_bytes'] = max(row['peak_private_commit_bytes'],
-                                getattr(info, 'private', getattr(info, 'pagefile', 0)))
                             row['peak_working_set_bytes'] = max(row.get('peak_working_set_bytes',0),info.rss)
                         except psutil.NoSuchProcess:
                             pass
@@ -244,17 +198,22 @@ def _supervise_plain(spec):
             if code is None:code=1
         finally:
             if cleanup is None:cleanup=owned.stop()
-            if job:
-                job[0].CloseHandle(job[1])
+            if scope: contained = scope.receipt(); scope_closed = scope.close()
+    if reason is None and contained.get('oom_events', {}).get('oom_kill', 0):
+        # The kernel enforced the host limit before the poll could report it. Say so,
+        # because an exit code of -9 alone does not name the budget that refused.
+        reason = ('HOST MEMORY LIMIT: the kernel terminated the guarded tree at the scope ceiling of '
+                  f'{contained["memory_max_bytes"]} bytes (peak {contained["peak_bytes"]})')
     receipt = {'exit_code': code, 'reason': reason, 'peak_tree_rss': peak,
                'min_available': minimum, 'elapsed_s': time.monotonic() - start,
                'host_budget_gib': budget, 'floor_gib': floor,
                'job_commit_gib': spec['job_commit_gib'], 'child_pid': child.pid,
+               'memory_scope': contained, 'scope_cleanup': scope_closed,
                'cleanup':cleanup,'cleanup_confirmed':cleanup['confirmed'],'release_allowed':cleanup['confirmed']}
     receipt.update(paging_before=paging_before, paging_after=snapshot() if spec.get('paging_telemetry') else None,
                    system_pagefile_pressure=pressure.receipt() if pressure else None,
                    process_memory_counters=list(process_counters.values()),
-                   paging_interpretation='Process faults include soft and hard faults. Private commit/pagefile usage is not disk I/O. System counters include other processes; these counters alone do not prove core/KV residency.')
+                   paging_interpretation='Process faults include soft and hard faults. Swap use is not disk I/O. System counters include other processes; these counters alone do not prove core/KV residency.')
     Path(spec['receipt']).write_text(json.dumps(receipt, indent=2))
     if not cleanup['confirmed']:
         error=RuntimeError('Owned cleanup unconfirmed; resource ownership retained')
@@ -274,7 +233,7 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
     watcher = HoldWatcher(watch['path'], watch['identity'], task=watch.get('task', 'DS4STACK')) if watch else None
     if watcher and watcher.reason():
         raise RuntimeError('Yielding before process creation to shared hold: ' + watcher.reason())
-    flags = subprocess.CREATE_NO_WINDOW | 4 if os.name == 'nt' else 0  # suspended until Job admission
+    scope, scope_absent = open_containment(spec)
     start = time.monotonic()
     peak, minimum, reason = 0, available_physical_bytes(), None
     from .memory_counters import snapshot, PagefilePressure
@@ -293,17 +252,16 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
     with open(spec['log'], 'ab', buffering=0) as log:
         child = subprocess.Popen(spec['command'], cwd=spec['cwd'], env=spec['env'],
                                  stdin=subprocess.PIPE if 'stdin' in spec else subprocess.DEVNULL,
-                                 stdout=log, stderr=log, creationflags=flags,
-                                 start_new_session=os.name != 'nt')
-        job = None
+                                 stdout=log, stderr=log, preexec_fn=scope.pre_exec if scope else None,
+                                 start_new_session=True)
+        contained = {'unavailable': scope_absent}
+        scope_closed = None
         if spec.get('cooperative_stop'):
             from .cooperative_stop import CooperativeOwnedProcesses
             owned=CooperativeOwnedProcesses(child,spec)
         else:owned = GracefulOwnedProcesses(child, spec)
         cleanup = None
         try:
-            if os.name == 'nt':
-                job = windows_job(child, spec['job_commit_gib'],kill_on_close=False)
             if 'stdin' in spec:
                 child.stdin.write(spec['stdin'].encode())
                 child.stdin.close()
@@ -321,15 +279,14 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
                         try:
                             info, created = member.memory_info(), member.create_time()
                             rss += info.rss
+                            # psutil exposes no private-commit counter on Linux, so the
+                            # charged quantity here is RSS; the scope ceiling is the cap.
                             commit += getattr(info,'private',info.rss)
                             key = f'{member.pid}:{created:.6f}'
                             faults = getattr(info, 'num_page_faults', None)
                             row = process_counters.setdefault(key, {'pid': member.pid, 'created': created,
-                                'name': member.name(), 'first_page_faults': faults, 'last_page_faults': faults,
-                                'peak_private_commit_bytes': 0})
+                                'name': member.name(), 'first_page_faults': faults, 'last_page_faults': faults})
                             row['last_page_faults'] = faults
-                            row['peak_private_commit_bytes'] = max(row['peak_private_commit_bytes'],
-                                getattr(info, 'private', getattr(info, 'pagefile', 0)))
                             row['peak_working_set_bytes'] = max(row.get('peak_working_set_bytes',0),info.rss)
                         except psutil.NoSuchProcess:
                             pass
@@ -361,8 +318,8 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
                     try:
                         window=window_reader.read()
                         if window is not None and window.get('active'):
-                            # The owner is the guarded child, or the interpreter a venv launcher stub
-                            # (Scripts/python.exe) re-spawned as its direct child.
+                            # The owner is the guarded child itself, or a process the
+                            # child re-spawned as its direct child (a wrapper script).
                             owner=window.get('owner_pid');target=None
                             try:
                                 candidate=psutil.Process(owner) if owner else None
@@ -421,12 +378,15 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
         finally:
             if child.poll() is None and cleanup is None:
                 cleanup=owned.stop();child.wait(timeout=10)
-            if job:
-                job[0].CloseHandle(job[1])
+            if scope: contained = scope.receipt(); scope_closed = scope.close()
             if cleanup is None:cleanup=owned.stop()
+    if reason is None and contained.get('oom_events', {}).get('oom_kill', 0):
+        reason = ('HOST MEMORY LIMIT: the kernel terminated the guarded tree at the scope ceiling of '
+                  f'{contained["memory_max_bytes"]} bytes (peak {contained["peak_bytes"]})')
     receipt = {'exit_code': code, 'reason': reason, 'peak_tree_rss': peak,
                'min_available': minimum, 'elapsed_s': time.monotonic() - start,
                'started_monotonic': start, 'no_progress_window_s': spec['timeout_s'],
+               'memory_scope': contained, 'scope_cleanup': scope_closed,
                'gpu_window_permission_errors': window_reader.permission_errors if window_reader else 0,
                'gpu_window_stall_seconds': window_reader.progress.seconds if window_reader else None,
                'host_budget_gib': budget, 'floor_gib': floor,
@@ -441,7 +401,7 @@ def _supervise_owned(spec,paging_watch,paging_warnings):
                    paging_completed_scans=paging_watch.observer.completed_scans,
                    paging_attribution=paging_watch.observer.attribution,paging_policy=paging_watch.details(),cleanup=cleanup,
                    release_allowed=cleanup['confirmed'],cleanup_confirmed=cleanup['confirmed'],reservation_samples=reservation_samples,
-                   paging_interpretation='Process faults include soft and hard faults. Private commit/pagefile usage is not disk I/O. System counters include other processes; these counters alone do not prove core/KV residency.')
+                   paging_interpretation='Process faults include soft and hard faults. Swap use is not disk I/O. System counters include other processes; these counters alone do not prove core/KV residency.')
     Path(spec['receipt']).write_text(json.dumps(receipt, indent=2))
     if not cleanup['confirmed']:
         error=RuntimeError('Owned cleanup unconfirmed; GPU hold retained')

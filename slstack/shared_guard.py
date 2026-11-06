@@ -1,7 +1,6 @@
 """Stack adapter around the pinned Studio ownership and paging implementation."""
 import json
 import hashlib
-import os
 from pathlib import Path
 import sys
 import threading
@@ -24,9 +23,18 @@ class CleanupUnconfirmed(RuntimeError):
     owned_cleanup_uncertain = True
 
 
+def containment_report(spec):
+    """What the launcher's cgroup scope held, read from the report it wrote beside the spec."""
+    report = Path(spec['_spec_path']).with_suffix('.scope.json')
+    if not report.is_file():
+        return {'memory_scope':{'unavailable':'the shared guard launcher wrote no scope report'},
+                'scope_cleanup':None}
+    return json.loads(report.read_text())
+
+
 def supervise(spec):
     for name, pin in {'job_guard.py':'56d96b556f6b95ba72054100bc8c27a70937cba83a15577a476a1fd1cff87648',
-                      'job_paging.py':'205f347b92be699b4f72863942568cc08d534ac19e8b7b154cad2521d6d2c120'}.items():
+                      'job_paging.py':'0387ed7fbade07d088c6149332c239f7ddfd3b2878f48d3f154c5d5742800c91'}.items():
         source = (ROOT/'vendor/studio/studio'/name).read_bytes().split(b'\n',2)[2].replace(b'\r\n',b'\n')
         if hashlib.sha256(source).hexdigest() != pin:
             raise RuntimeError('Pinned shared guard source changed: ' + name)
@@ -42,16 +50,8 @@ def supervise(spec):
             self.retirement_proof=None
 
         def _cooperative_ownership(self):
-            # Keep memory limits but prevent handle-close/pipe-loss from
-            # bypassing cooperative retirement on either Windows or POSIX.
-            if self.kernel_job:
-                kernel=self.kernel_job
-                limits=kernel.Limits()
-                limits.basic.flags=0x200 | 0x100
-                limits.process=limits.job=int(self.commit_limit)
-                if not kernel.api.SetInformationJobObject(kernel.handle,9,
-                        kernel.c.byref(limits),kernel.c.sizeof(limits)):
-                    raise kernel.c.WinError(kernel.c.get_last_error())
+            # Prevent pipe-loss from bypassing cooperative retirement: the bootstrap
+            # stays the group anchor until this handoff byte says the lease is done.
             if self.child and self.child.stdin and not self.child.stdin.closed:
                 self.child.stdin.write(b'H')
                 self.child.stdin.flush()
@@ -71,9 +71,9 @@ def supervise(spec):
                 owned=ProgressOwnedProcesses.from_owned(self.owned,
                     {**spec,'stop_reason':self.failure or 'shared guarded job retirement'})
                 cleanup=owned.stop()
-                if cleanup['forced_kill'] and self.kernel_job:
-                    # Catch descendants born between ownership polls only after grace.
-                    self.kernel_job.stop()
+                # A straggler born between ownership polls stays inside the launcher's
+                # cgroup scope, whose ceiling survives this adapter; an unconfirmed
+                # cleanup holds the lease instead of releasing it.
                 self.retirement_proof=cleanup
                 return cleanup
 
@@ -106,10 +106,11 @@ def supervise(spec):
     receipt = Path(spec['receipt'])
     certificate = receipt.with_suffix('.shared.json')
     host = spec['host_budget_gib'] * GiB
-    commitment = spec['job_commit_gib'] * GiB if os.name == 'nt' else host
     progress = Window(spec['timeout_s'])
+    # Linux has no private-commit charge: the launcher's cgroup scope is the hard
+    # ceiling and RSS/floor checks are the budget, so both limits are the host budget.
     job = Adapter(rss_limit=host,commit_limit=host,floor=spec['min_available_gib']*GiB,
-                  device_commit_allowance=max(0,commitment-host) if os.name=='nt' else 0,
+                  device_commit_allowance=0,
                   seconds=spec['timeout_s'],receipt=certificate)
     started = time.monotonic()
     code, reason = 1, None
@@ -129,7 +130,7 @@ def supervise(spec):
                   'host_budget_gib':spec['host_budget_gib'],'floor_gib':spec['min_available_gib'],
                   'runtime_min_free_gib':spec.get('runtime_min_free_gib',0),
                   'no_progress_window_s':spec['timeout_s'],
-                  'job_commit_gib':commitment/GiB,
+                  'job_commit_gib':host/GiB,
                   'child_pid':job.child.pid if job.child else None,
                   'shared_guard_commit':'2774636281ab32bf871497f0a8caae23c6b6cdc7',
                   'stack_retirement_policy':'cooperative request, progress-aware grace, logged force fallback',
@@ -142,7 +143,8 @@ def supervise(spec):
                     'completed_scans':job.watcher.observer.completed_scans},
                   'system_pagefile_pressure':{'maximum_growth_bytes':job.watcher.max_global_growth,
                     'kill_above_bytes':GLOBAL_PAGING_LIMIT,'scope':'global; not process attribution'},
-                  'paging_interpretation':'Owned observation is bounded and incremental. Zero observed pages is not an exhaustive zero-I/O proof. Darwin disk-only process attribution is unavailable.'}
+                  'paging_interpretation':'Owned observation is bounded and incremental. Zero observed pages is not an exhaustive zero-I/O proof.',
+                  **containment_report(spec)}
         atomic_json(receipt,record)
         if not certain:
             identities = {(item['pid'],item['created']) for item in job.record.get('cleanup',{}).get('identities',[])}

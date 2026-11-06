@@ -28,6 +28,20 @@ class SharedGuardAdapterTests(unittest.TestCase):
         observed['bytes'] += 4096
         self.assertIn('exceeds 64 MiB', watch.check(None, 0, 0, **limits))
 
+    def test_an_owned_member_that_exits_mid_observation_is_not_a_failure(self):
+        # /proc/<pid>/status loses its VmSwap line the moment the member dies. The observer
+        # must report zero paged bytes for it, not raise StopIteration into the monitor
+        # thread, whose failure the receipt then prints as the job's stop reason.
+        from studio.job_paging import JobPaging
+        class Exited:
+            pid = 4242
+            def create_time(self): return 1.0
+            def children(self, recursive=True): return []
+        class ZombieStatus:
+            def read_text(self): return 'Name:\tpython\nState:\tZ (zombie)\n'
+        with patch('studio.job_paging.Path', lambda path: ZombieStatus()):
+            self.assertEqual(JobPaging().sample(Exited()), 0)
+
     def test_uncertain_cleanup_keeps_lease_and_is_never_auto_recovered(self):
         cfg = load(overrides={'gpu_uuid':'GPU-test','host_budget_gib':.25,'min_available_gib':2})
         runtime = Path(os.environ.get('STUDIO_RUNTIME_ROOT',cfg['runtime_root'])) / ('uncertain-lease-test-' + uuid.uuid4().hex)
@@ -64,10 +78,16 @@ class SharedGuardAdapterTests(unittest.TestCase):
             self.assertTrue(certificate['release_allowed'])
             self.assertTrue(certificate['cleanup']['confirmed'])
             self.assertEqual(certificate['command_exit_code'],0)
-            if sys.platform == 'darwin':
-                self.assertIn('UNAVAILABLE',receipt['owned_paging']['attribution'])
-            else:
-                self.assertGreater(receipt['owned_paging']['scanned_pages'],0)
+            # The pinned observer attributes swap bytes per owned process from /proc here;
+            # the page-level scan is the Windows working-set query, so a zero page count
+            # is not a claim that nothing was observed.
+            self.assertEqual(receipt['owned_paging']['attribution'],'bounded process pagefile observation')
+            self.assertIsInstance(receipt['owned_paging']['observed_paged_bytes'],int)
+            self.assertGreaterEqual(receipt['owned_paging']['observed_paged_bytes'],0)
+            # The launcher contained the whole tree in a cgroup scope of its own.
+            self.assertEqual(receipt['memory_scope']['memory_max_bytes'],int(.5*2**30))
+            self.assertEqual(receipt['memory_scope']['oom_events']['oom_kill'],0)
+            self.assertTrue(receipt['scope_cleanup']['removed'])
         finally:
             if job.proc.poll() is None:
                 job.stop()

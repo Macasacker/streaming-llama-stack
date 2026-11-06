@@ -1,4 +1,4 @@
-"""Actual Windows CPU Jobs; no GPU lease, model, engine or production ledger."""
+"""Actual CPU Jobs on the cgroup scope; no GPU lease, model, engine or production ledger."""
 import json
 import os
 from pathlib import Path
@@ -11,7 +11,6 @@ from slstack.guard import GPUWindowReader, _supervise
 from slstack.lease import active_holds, reservation_admission
 
 
-@unittest.skipUnless(os.name=='nt','Windows Job qualification')
 class GuardTest(unittest.TestCase):
     def test_exact_cpu_reservation_and_outstanding_budget(self):
         line='ACTIVE: KIT11FIX Windows native plugin build; host budget 3 GiB; physical RAM reserve 6 GiB; no GPU or Studio restart requested.'

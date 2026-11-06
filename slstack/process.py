@@ -12,10 +12,14 @@ from .guard import admit
 from .shutdown import wait_for_exit, ProgressOwnedProcesses, gpu_free_reader
 
 
-def commit_budget_gib(cfg, *, windows=None):
-    """The WDDM private-commit allowance is Windows-only."""
-    windows=os.name=='nt' if windows is None else windows
-    return cfg['job_commit_gib'] if windows else cfg['host_budget_gib']
+def commit_budget_gib(cfg):
+    """The containment ceiling for a guarded tree.
+
+    Linux has no separate private-commit allowance, so the cgroup scope caps the tree at
+    the host RSS budget; job_commit_gib stays in the config and the receipt as the key the
+    engine's own job-commit environment variable is derived from.
+    """
+    return cfg['host_budget_gib']
 
 
 class OwnedProcess:
