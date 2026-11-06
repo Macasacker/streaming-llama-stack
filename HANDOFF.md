@@ -5,6 +5,13 @@ Durable plan with the chunk backlog: `docs/linux-port-plan.md`. Commands the use
 `docs/linux-port-commands.md`. Repo review: `linux-port.md`. Port scaffolding: `scripts/port/`
 (its README explains each tool and when to use it).
 
+**After** the legacy removal, the next piece of engineering is planned separately in
+`docs/blackwell-enablement-plan.md` - the Blackwell-only scope and support for the
+`deepseek-v4.1-flash-IST-DAS-2.00bpw` shards on disk, reusing Basalt and Strata kernels rather than
+writing them. It records the decisions taken on 2026-11-06 (reuse into this repo, GGUF stays, both
+prefill and decode are targets, locked memory is best-effort) and the measurements those decisions
+rest on. Read it before starting anything outside the port backlog.
+
 What a chunk landed *is* in its commit message and in the plan; this file only carries what neither
 records - the open decisions, the box's constraints, the verification method, and the traps.
 
@@ -17,12 +24,18 @@ its RAM expert tier from `/proc`, and loads a prompt's Engram rows through io_ur
 streamed prefill still needs the locked-memory decision and the carry lease, and the gate itself
 needs a qualified GGUF. In the order worth doing:
 
-1. **Chunk 3.1h - the locked-memory decision, then `llama-dsv41-locked-ram.h` and the carry lease in
-   `llama-dsv41-carry.cpp`** (Phase 3 item 5). They are the same family, and neither can be written
-   before the decision below: `mlock` of a pinned tier needs an `RLIMIT_MEMLOCK` or a cgroup
-   allowance, and `host_memory::begin()` deliberately does not solve it. `llama-dsv41-carry.cpp`
-   (13 hits) and `llama-dsv41-locked-ram.h` (9) are the last two Windows-shaped files the prefill
-   path needs; the sweep calls both.
+1. **Chunk 3.1h - `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`**
+   (Phase 3 item 5, and chunk B.4 of `docs/blackwell-enablement-plan.md`, which specifies it).
+   The locked-memory decision is made: lock in chunks, keep the tail pageable, report the shortfall,
+   and let the paging guard enforce residency - Basalt's precedent. Both files are already
+   dual-platform, so this is `collapse_conditionals.py` plus replacing the all-or-nothing `mlock`,
+   not new code. Two host-only gates exist and one is red today:
+   `tests/dsv41_carry_release.cpp` fails with `Carry RAM cannot be locked` past ~6 MiB against this
+   box's 8 MiB allowance, and `tests/pinned_carry_memory.cpp` prints
+   `SKIP: Windows working-set lock proof`. Also fix the control-allocation leak the second test
+   would catch: if the `shared_ptr` control block throws, nothing releases the mapping or the
+   accounting. `llama-dsv41-carry.cpp` (13 hits) and `llama-dsv41-locked-ram.h` (9) are the last two
+   Windows-shaped files the prefill path needs; the sweep calls both.
 2. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
    `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
    profiler. No behaviour attached; regenerate the env table because lines move.
@@ -385,11 +398,12 @@ for those chunks and in their commit messages. This session's (chunk 3.1g):
   path", and it scans every tracked blob - including a `.cpp` committed under `docs/evidence/` - so
   docs and evidence files must use repo-relative paths. `git status -sb` is the push check; the
   pre-commit hook also scans the commit message, so a message must not quote a machine path either.
-- `mlock` of the pinned host tier needs an `RLIMIT_MEMLOCK` or cgroup allowance - still undecided
-  (plan's "locked memory" risk). It gates `llama-dsv41-locked-ram.h` and the carry lease (chunk
-  3.1h) and the decode library's host-cache path, and `host_memory.begin()` deliberately does not
-  solve it. Note that `cudaHostAlloc`/`cudaMallocHost`, which the fetcher's staging tier and the
-  extent window use, do not need that allowance - only the engine's `mlock` does.
+- **Locked memory is decided** (option 3, 2026-11-06): chunked best-effort `mlock`, the tail stays
+  allocated and pageable, the shortfall is logged, and the host-memory paging guard enforces it.
+  Details and the precedent are in `docs/blackwell-enablement-plan.md` chunk B.4. Note that
+  `cudaHostAlloc`/`cudaMallocHost`, which the fetcher's staging tier and the extent window use, do
+  not need an `RLIMIT_MEMLOCK` allowance - only the carry tier's `mlock` does, and here the allowance
+  is 8 MiB soft *and* hard, so an unprivileged process can never lock a carry tier in full.
 
 ## Suggested skills
 
