@@ -35,11 +35,14 @@ the order worth doing:
    mislead in a CUDA-only engine (the `ds4.c` header block's "whole-model Metal ...", the `Metal
    command batch` resume failures, the `Metal SSD streaming` refusal), while others are inherited
    provenance that chunks 2.2d, 3.1c and 3.1g kept on purpose (`ds4_metal.m` in a `ds4_cuda.cu`
-   comment, the IoRing the loader was ported from). Rewording printed messages changes engine output:
-   two doc lines quote them, and `examples/engine_parity/RESULTS.json` plus
-   `examples/engine_environment/mac-*.json` name Metal as historical Mac measurements that rewording
-   does not invalidate. Regenerate the env table in the same commit anyway - `envvars.json` quotes
-   engine comment text as `consumer` evidence, so comment edits move rows (2.2e 1/3 moved 4).
+   comment, the IoRing the loader was ported from). Rewording printed messages changes engine
+   output, and the generated env table quotes engine message text as `consumer` evidence
+   (`docs/VARIABLES.md` carries `ds4: Metal mixed batch prefill_rows=%u decode_rows=%d`), so
+   regenerate the table in the same commit - `envvars.json` moved 4 rows for 2.2e's identifier half
+   alone. The Mac receipts under `docs/macdecode-r2/` embed historical `ds4: Metal device ...`
+   stderr verbatim, and `examples/engine_parity/RESULTS.json` plus `examples/engine_environment/
+   mac-*.json` name Metal as Mac measurements; rewording the engine does not invalidate those and
+   they are not a regression signal.
 
 Also open: 5.1 (Python orchestrator: `guard.py` Job Object -> a cgroup scope,
 `single_runtime.py` PRODUCER_FILES), 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and
@@ -116,12 +119,14 @@ and no supported model weights exist on this box.
    memory is still the user's call, and **the headroom moves**: it went from ~900 MB to ~0 mid-session
    on 2026-11-03, which is why a CUDA-needing gate can pass at one hour and fail at the next. Re-run
    before concluding the code broke; a program that only does `cudaMalloc(8 MiB)` says whether the
-   box or the change is at fault. The margin is thin and it moves: on 2026-11-06 morning
-   `cudaFree(0)` and `cudaMemGetInfo` themselves returned `out of memory`, and later the same day
-   `cudaMemGetInfo` reported 116 MiB free, `cudaMalloc(8 MiB)` succeeded, and the two gates that
-   had been unrun - `docs/evidence/wf-io-selftest.cpp` and the producer's no-model receipt smoke -
-   both ran to their documented outcomes. A CUDA gate is therefore *unverified* rather than failing
-   whenever the probe says no; probe first, in the same session, before blaming a change.
+   box or the change is at fault. The margin is thin and it moves within a session: on 2026-11-06
+   `cudaFree(0)` and `cudaMemGetInfo` returned `out of memory` in the morning, reported 116 MiB free
+   mid-session - which is when `docs/evidence/wf-io-selftest.cpp` and the no-model producer receipt
+   smoke both ran to their documented outcomes - and returned `out of memory` again an hour later
+   with nothing in the tree changed. The probe is committed at
+   `docs/evidence/cuda-headroom-probe.cpp` (`docs/linux-port-commands.md` has the line); run it in
+   the same session as the gate, and read a CUDA gate as *unverified* rather than failing when it
+   says no.
 2. **No qualified model file, and the weights that are on this box cannot be made into one.**
    Re-read with `slstack/gguf_header.py` on 2026-11-06 (`read_header` + `validate_dsv41_types`),
    under `qwen38-gyro/Strata/models/`:
@@ -208,8 +213,9 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   pread baseline, byte-compared through the real `wf_*` pipeline), `wf-extent-selftest.cpp` is chunk
   3.1f's extent reader (33 checks, including a seven-part batch against four slots),
   `provider-lease-selftest.cpp` is 3.1f's lease program (14 checks through the public `inspect()`
-  with no backend), and `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait
-  rule. Chunk 3.1g's program is not under `docs/evidence/` but in the test directory -
+  with no backend), `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait rule,
+  and `cuda-headroom-probe.cpp` is the two-call answer to "can this box make a CUDA context right
+  now", which every CUDA gate in `docs/linux-port-commands.md` should be read against. Chunk 3.1g's program is not under `docs/evidence/` but in the test directory -
   `tests/dsv41_engram_early_io.cpp`, ported with the loader, 15 checks over a 208 MB synthetic table
   file, no GPU and no model - and chunk 3.1h's two are there too (`tests/dsv41_carry_release.cpp`,
   which was red before the change, and `tests/pinned_carry_memory.cpp`), because the tier is engine

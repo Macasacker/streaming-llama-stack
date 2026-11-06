@@ -38,7 +38,7 @@ Decisions taken on 2026-11-06, recorded so nobody re-litigates them:
 | GPU link | PCIe 16.0 GT/s x16 (Gen5), max 32.0 GT/s | `/sys/bus/pci/devices/0000:01:00.0` |
 | NVMe | Samsung 990 PRO 2TB, Gen4 x4, **2.6 GB/s** sequential direct | `dd iflag=direct bs=1M` over 3.2 GB |
 | VRAM | 32 GiB; Strata holds ~30 GiB, browser ~230 MB | `nvidia-smi --query-compute-apps` |
-| CUDA context | 116 MiB free with Strata at 30 GiB and the browser beside it on 2026-11-06: `cudaMemGetInfo` and a `cudaMalloc(8 MiB)` succeeded, and the fetcher selftest and the no-model producer smoke both ran. Earlier the same calls returned `out of memory`. The margin moves; probe before planning a CUDA gate | two-call probe |
+| CUDA context | ~120 MB of margin at Strata's occupancy, and it appears and disappears within a session: `cudaMemGetInfo` returned `out of memory` on 2026-11-06 morning, reported 116 MiB free mid-session (both CUDA gates then ran), and `out of memory` again an hour later. Probe with `docs/evidence/cuda-headroom-probe.cpp` in the same session before planning a CUDA run | two-call probe |
 | RAM / swap | 93 GiB total, 38 GiB used, 9 GiB swap unused | `free -h` |
 | `RLIMIT_MEMLOCK` | 8 MiB soft **and** hard; `setrlimit(∞)` → `EINVAL`; `systemd-run --user` cannot raise `LimitMEMLOCK` (property accepted, `ulimit -l` still 8192); no passwordless sudo | probes in `build/` |
 | `mlock` behaviour | all-or-nothing per call: 12 MiB fails with `ENOMEM` and locks 0 bytes; it accounts whole pages, so a partial-page chunk reports fewer bytes than the kernel holds; `/proc/self/smaps` reports `Locked: kB` per VMA and `mlock` splits the VMA at the lock boundary | `build/mlock-probe`, smaps probe, chunk 3.1h's `tests/pinned_carry_memory.cpp` |

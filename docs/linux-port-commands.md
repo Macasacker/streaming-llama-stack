@@ -346,6 +346,24 @@ allowance, partly locked with an untouched tail beyond it, release unmaps the re
 `shared_ptr` control block throws leaves no mapping behind either - the smaps census of anonymous
 mappings of that size is the same after the failure as before.
 
+### Before any CUDA gate: is there headroom
+
+Strata's serve process holds about 30 GiB of the 32 GiB and the browser GPU process a few hundred MB
+more, so what is left for a context is roughly 120 MB - when it is left at all. It moves inside a
+session: on 2026-11-06 `cudaMemGetInfo` reported 116 MiB free in one hour and `out of memory` an hour
+later, with nothing in the tree changed. Run the probe committed at
+`docs/evidence/cuda-headroom-probe.cpp` first; it allocates at most 8 MiB and never touches the
+serve process.
+
+```bash
+g++ -std=gnu++17 -O1 -I/opt/cuda/include -o build/cuda-headroom-probe \
+    docs/evidence/cuda-headroom-probe.cpp -L/opt/cuda/lib64 -lcudart
+./build/cuda-headroom-probe; echo "exit=$?"
+# exit 0: "cudaFree(0)=no error cudaMemGetInfo=no error free=116 MiB total=32193 MiB"
+#         and cudaMalloc(8 MiB)=no error -> the CUDA gates here can run.
+# exit 1: "out of memory" on all three -> every CUDA gate is unrun, not failing.
+```
+
 ### Driving the real producer with no model
 
 A throwaway 1 MiB file, a copy receipt naming it and four LE32 tokens take the CLI

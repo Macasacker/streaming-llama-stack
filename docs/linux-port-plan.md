@@ -621,11 +621,13 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     resume failures, the `Metal SSD streaming` refusal), while others are inherited provenance of the
     kind chunks 2.2d, 3.1c and 3.1g deliberately kept (`ds4_metal.m` named in a `ds4_cuda.cu`
     comment, the IoRing the loader was ported from). Rewording the printed messages changes engine
-    output: two doc lines quote them (`Metal expert locality`, `Metal streaming prefill`), and
-    `examples/engine_parity/RESULTS.json` plus the two `examples/engine_environment/mac-*.json`
-    receipts name Metal as historical Mac measurements, which rewording does not invalidate.
-    Regenerate the env table in the same commit, because the quoted `consumer` evidence in
-    `envvars.json` contains engine comment text.
+    output, and the generated env table quotes engine message text as `consumer` evidence -
+    `docs/VARIABLES.md` carries the `ds4: Metal mixed batch prefill_rows=%u decode_rows=%d` line -
+    so the table must be regenerated in the same commit; 2.2e's identifier half alone moved 4 rows.
+    The Mac receipts under `docs/macdecode-r2/` embed historical `ds4: Metal device ...` stderr
+    verbatim, and `examples/engine_parity/RESULTS.json` plus the two
+    `examples/engine_environment/mac-*.json` name Metal as Mac measurements; rewording the engine
+    does not invalidate those and they are not a regression signal.
 
 3.1a Producer translation units compile with GCC. Done (`3bc184a`, `0265129`). cmake already
     configured; compiling did not. Two includes still named the engine tree deleted in 1.10a
@@ -1037,12 +1039,13 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     Everything else re-run after the tier change: `platform-selftest.cpp` (44 checks),
     `wf-extent-selftest.cpp` (33), `provider-lease-selftest.cpp` (14), `uring-flush-probe.cpp` (3),
     `tests/dsv41_engram_early_io.cpp` (15, ring and `pread`), and `--check-native-profiles`.
-    The box gained just enough VRAM headroom that the two CUDA gates that were unrun also ran:
+    The box had just enough VRAM headroom that the two CUDA gates that were unrun also ran:
     `wf-io-selftest.cpp` (139 checks, one-thread wall x1.69 against the `pread` baseline) and the
     no-model producer receipt smoke, which reached its documented refusal - `Selected GPU free bytes
     do not exceed the explicit reserve`, `out/payload.bin` still 0 bytes, pending receipt retained -
-    instead of aborting in `ggml_backend_cuda_get_device_memory`. `cudaMemGetInfo` reports 116 MiB
-    free; that is the whole margin, so both of those are the box being kind, not a guarantee.
+    instead of aborting in `ggml_backend_cuda_get_device_memory`. That margin was 116 MiB at the
+    time and gone again an hour later; `docs/evidence/cuda-headroom-probe.cpp` is the two-call probe
+    that says whether a CUDA gate can run at all, and it belongs in the same session as the gate.
     The Python suite is unchanged by the chunk: 584 tests, the plan's own list of failing names,
     `release_check` 0 findings, and the env table regenerated with all 2,234 names and no row moved
     (the tier reads no environment variable).
