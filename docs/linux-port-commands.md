@@ -108,8 +108,12 @@ cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 ./build/engram-early-io build/engram/table.bin    # 15 checks, "ALL PASS" - recipe below
 # The provider's physical lease: no CUDA context, no model.
 ./build/provider-lease-selftest                    # 14 checks - recipe below
+# The carry store's release/recommit cycle and the locked RAM tier: host only, no model.
+./build/carry-release                              # recipe below
+./build/pinned                                     # recipe below
 # No Win32 code left in the producer CLI directory (chunk 3.1d), in the weight fetcher
-# (chunk 3.1e), in the weight provider (chunk 3.1f) or in the Engram row loader (chunk 3.1g).
+# (chunk 3.1e), in the weight provider (chunk 3.1f), in the Engram row loader (chunk 3.1g) or in
+# the carry store and its RAM tier (chunk 3.1h).
 # Drop comment lines: the survivors are provenance comments naming the Win32 layer a file was
 # ported from.
 grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
@@ -118,7 +122,9 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
   engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h \
   engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp \
   engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-engram-prefetch.cpp \
-  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-engram-prefetch.h | grep -vE ":[0-9]+:\s*//"
+  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-engram-prefetch.h \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-carry.cpp \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-locked-ram.h | grep -vE ":[0-9]+:\s*//"
 # 0 hits
 ```
 
@@ -300,17 +306,57 @@ load of 131,781 row reads is 51-54 ms on the rings and 50-53 ms with `pread`, an
 loader's 200 extents are 14-20 ms either way. That compares mechanics, not a device: the cold-cache
 number against a real model is Phase 8 item 3.
 
+### The carry RAM tier, and the carry store's release/recommit cycle
+
+Chunk 3.1h made the carry tier a Linux `mlock` tier that locks in chunks instead of refusing the
+whole allocation when `RLIMIT_MEMLOCK` is smaller than it (8 MiB for an unprivileged process here).
+Neither program has a build rule; both need only the carry object, so build `src/libllama.a` first -
+`ninja -C build/llama llama-dsv41-prefill` compiles its own copy of `llama-dsv41-carry.cpp` and does
+**not** rebuild the `src/` one. No CUDA, no model, no VRAM.
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+ninja -C build/llama src/libllama.a
+g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I$llama/ggml/src -I$llama/vendor \
+    -o build/carry-release tests/dsv41_carry_release.cpp \
+    build/llama/src/CMakeFiles/llama.dir/llama-dsv41-carry.cpp.o \
+    build/llama/ggml/src/libggml-base.a build/llama/ggml/src/libggml-cpu.a -lpthread
+./build/carry-release     # sealed certificate, 40 byte-preserving layers, release/recommit/reseed,
+                          # suspended destruction, incomplete refusal
+```
+
+The third of its three ~2.95 MB allocations is the one the all-or-nothing lock used to refuse; it now
+reports `locked_bytes=2478080` and the run passes.
+
+`tests/pinned_carry_memory.cpp` is the tier's own proof. It reads `/proc/self/smaps` for the VMA that
+holds the mapping (no pathname means anonymous, `Locked: kB` is what the kernel holds) and `mincore`
+for residency, so it needs no Windows and no GPU. Its second arm is the case the old code refused
+outright: a tier larger than the allowance, whose VMA `mlock` splits at the lock boundary.
+
+```bash
+g++ -std=gnu++17 -O1 -o build/pinned tests/pinned_carry_memory.cpp
+./build/pinned                                   # 2 MiB tier, plus a tier beyond the allowance
+./build/pinned $((8*1024*1024))                  # exactly the allowance
+./build/pinned 104857600                         # 100 MiB: locks 8 MiB, keeps 96 MiB pageable
+```
+
+What it asserts: zeroed and writable, private and anonymous, fully locked and resident inside the
+allowance, partly locked with an untouched tail beyond it, release unmaps the region, the
+`allocate(bytes, bytes-1)` refusal leaves no accounting, and an allocation whose accounting node or
+`shared_ptr` control block throws leaves no mapping behind either - the smaps census of anonymous
+mappings of that size is the same after the failure as before.
+
 ### Driving the real producer with no model
 
 A throwaway 1 MiB file, a copy receipt naming it and four LE32 tokens take the CLI
 through its whole front half - its own executable SHA, the receipt, the sweep/wire/cache/carry
 plans, the output volume budget, host-memory admission, CUDA enumeration - and it then
-refuses at the VRAM reserve. Reaching that check costs a CUDA context (~160 MB), and **it is the
-one producer gate this box cannot run while another process holds the GPU**: with Strata at
-30 GiB and the browser at 231 MB, a probe that only calls `cudaFree(0)` and `cudaMemGetInfo`
-returns `out of memory`, so this command aborts inside `ggml_backend_cuda_get_device_memory`
-instead of printing the reserve refusal. Free VRAM first, or leave it to the user; the abort is
-the box, not the tree.
+refuses at the VRAM reserve. Reaching that check costs a CUDA context (~120 MB), and **it is a
+producer gate this box can only run while another process leaves that much**: with Strata at
+30 GiB and the browser beside it, a probe that only calls `cudaFree(0)` and `cudaMemGetInfo` can
+return `out of memory`, and then this command aborts inside `ggml_backend_cuda_get_device_memory`
+instead of printing the reserve refusal. Check that two-call probe first and free VRAM if it fails;
+the abort is the box, not the tree.
 
 ```bash
 python3 - <<'SNIPPET'

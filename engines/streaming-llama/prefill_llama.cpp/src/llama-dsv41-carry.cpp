@@ -12,18 +12,10 @@
 #include <stdexcept>
 #include <utility>
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <malloc.h>
-#else
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#endif
 
 namespace {
 constexpr uint64_t alignment = 4096;
@@ -97,36 +89,21 @@ struct llama_dsv41_carry_store::implementation {
     bool lease = false;
     bool ram_direct_lease = false;
     uint64_t ram_generation=0,ram_identity=next_ram_store_identity.fetch_add(1);
-#ifdef _WIN32
-    HANDLE file = INVALID_HANDLE_VALUE;
-    std::vector<HANDLE> parents;
-    DWORD volume = 0, index_high = 0, index_low = 0;
-#else
     int file = -1;
     std::vector<int> parents;
     dev_t device = 0;
     ino_t inode = 0;
     timespec modified {};
-#endif
 
     ~implementation() {
-#ifdef _WIN32
-        if (file != INVALID_HANDLE_VALUE) { CloseHandle(file); }
-        for (auto h : parents) { CloseHandle(h); }
-#else
         if (file >= 0) { close(file); }
         for (auto fd : parents) { close(fd); }
-#endif
         // Intentionally no unlink/remove/truncate, including failed fixtures.
     }
 
     bool open() const {
         if (options.resident_ram) { return bool(resident); }
-#ifdef _WIN32
-        return file != INVALID_HANDLE_VALUE;
-#else
         return file >= 0;
-#endif
     }
     bool hybrid() const {return options.ram_prefix_tokens!=0;}
     uint64_t physical_length() const {
@@ -151,29 +128,11 @@ struct llama_dsv41_carry_store::implementation {
     void check_parents() const {
         require(!parents.empty() && parents.size() == parent_paths.size(), "Carry ancestor lease is incomplete");
         for (size_t i = 0; i < parents.size(); ++i) {
-#ifdef _WIN32
-            BY_HANDLE_FILE_INFORMATION held {}, visible {};
-            require(GetFileInformationByHandle(parents[i], &held) != 0,
-                    "Cannot inspect held carry ancestor");
-            HANDLE named = CreateFileW(parent_paths[i].c_str(), FILE_READ_ATTRIBUTES,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
-            require(named != INVALID_HANDLE_VALUE, "Cannot inspect named carry ancestor");
-            const bool got = GetFileInformationByHandle(named, &visible) != 0;
-            CloseHandle(named);
-            require(got && (held.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-                    (visible.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-                    !((held.dwFileAttributes | visible.dwFileAttributes) & FILE_ATTRIBUTE_REPARSE_POINT) &&
-                    held.dwVolumeSerialNumber == visible.dwVolumeSerialNumber &&
-                    held.nFileIndexHigh == visible.nFileIndexHigh && held.nFileIndexLow == visible.nFileIndexLow,
-                    "Named carry ancestor differs from its held physical directory");
-#else
             struct stat held {}, visible {};
             require(fstat(parents[i], &held) == 0 && lstat(parent_paths[i].c_str(), &visible) == 0 &&
                     S_ISDIR(held.st_mode) && S_ISDIR(visible.st_mode) &&
                     held.st_dev == visible.st_dev && held.st_ino == visible.st_ino,
                     "Named carry ancestor differs from its opened physical directory");
-#endif
         }
     }
     void check_identity() const {
@@ -185,19 +144,6 @@ struct llama_dsv41_carry_store::implementation {
             return;
         }
         check_parents();
-#ifdef _WIN32
-        BY_HANDLE_FILE_INFORMATION info {};
-        require(GetFileInformationByHandle(file, &info) != 0, "Cannot inspect owned carry descriptor");
-        const auto attrs = GetFileAttributesW(path.c_str());
-        require(attrs != INVALID_FILE_ATTRIBUTES && !(attrs & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)),
-                "Carry path changed to nonregular/reparse item");
-        require(info.dwVolumeSerialNumber == volume && info.nFileIndexHigh == index_high &&
-                info.nFileIndexLow == index_low && info.nNumberOfLinks == 1 &&
-                !(info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_SPARSE_FILE | FILE_ATTRIBUTE_COMPRESSED)),
-                "Owned carry identity or physical allocation changed");
-        require((uint64_t(info.nFileSizeHigh) << 32 | info.nFileSizeLow) == physical_length(),
-                "Owned carry size changed");
-#else
         struct stat fd {}, named {};
         require(fstat(file, &fd) == 0 && lstat(path.c_str(), &named) == 0,
                 "Cannot inspect owned carry descriptor/path");
@@ -212,11 +158,9 @@ struct llama_dsv41_carry_store::implementation {
 #endif
         require(now.tv_sec == modified.tv_sec && now.tv_nsec == modified.tv_nsec,
                 "Carry bytes were modified outside the owner");
-#endif
     }
     void remember_write(uint64_t new_length) {
         length = new_length;
-#ifndef _WIN32
         if (!options.resident_ram) {
             struct stat s {};
             require(fstat(file, &s) == 0, "Cannot inspect written carry descriptor");
@@ -226,7 +170,6 @@ struct llama_dsv41_carry_store::implementation {
             modified = s.st_mtim;
 #endif
         }
-#endif
         check_identity();
     }
     void io(bool write, uint64_t offset, size_t bytes) {
@@ -259,14 +202,6 @@ struct llama_dsv41_carry_store::implementation {
         }
         if(!bytes){if(write)remember_write(std::max(length,original_end));return;}
         const uint64_t physical_offset=hybrid()&&offset>=alignment+resident_bytes?offset-resident_bytes:offset;
-#ifdef _WIN32
-        LARGE_INTEGER where; where.QuadPart = static_cast<LONGLONG>(physical_offset);
-        require(SetFilePointerEx(file, where, nullptr, FILE_BEGIN) != 0, "Carry seek failed");
-        DWORD done = 0;
-        const bool ok = write ? WriteFile(file, buffer, DWORD(bytes), &done, nullptr) != 0 :
-                                ReadFile(file, buffer, DWORD(bytes), &done, nullptr) != 0;
-        require(ok && done == bytes, "Carry aligned I/O failed or was short");
-#else
         size_t done = 0;
         while (done != bytes) {
             const auto n = write ? pwrite(file, buffer + done, bytes - done, off_t(physical_offset + done)) :
@@ -275,16 +210,11 @@ struct llama_dsv41_carry_store::implementation {
             require(n > 0, "Carry positioned I/O failed or was short");
             done += size_t(n);
         }
-#endif
         if (write) { remember_write(std::max(length, original_end)); }
     }
     void flush() {
         if (options.resident_ram) { check_identity(); return; }
-#ifdef _WIN32
-        require(FlushFileBuffers(file) != 0, "Carry durability flush failed");
-#else
         require(fsync(file) == 0, "Carry durability flush failed");
-#endif
     }
     void header() {
         std::memset(page, 0, alignment);
@@ -458,11 +388,7 @@ std::shared_ptr<llama_dsv41_carry_store::ram_backing> llama_dsv41_carry_store::r
 }
 
 uint64_t llama_dsv41_carry_store::ram_backing::aligned_bytes()const{
-#ifdef _WIN32
-    SYSTEM_INFO system;GetSystemInfo(&system);const uint64_t page=system.dwPageSize;
-#else
     const uint64_t page=uint64_t(sysconf(_SC_PAGESIZE));
-#endif
     return (bytes+page-1)/page*page;
 }
 void llama_dsv41_carry_store::ram_backing::suspend_pages(){
@@ -567,52 +493,15 @@ bool llama_dsv41_carry_store::create(const config & options, std::string & error
         }
         std::reverse(chain.begin(), chain.end());
         for (const auto & d : chain) {
-#ifdef _WIN32
-            const auto attrs = GetFileAttributesW(d.c_str());
-            require(attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) && !(attrs & FILE_ATTRIBUTE_REPARSE_POINT),
-                    "Carry ancestor must be a physical directory");
-            HANDLE h = CreateFileW(d.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
-            require(h != INVALID_HANDLE_VALUE, "Cannot pin physical carry ancestor against rename");
-            p->parents.push_back(h);
-            p->parent_paths.push_back(d);
-            BY_HANDLE_FILE_INFORMATION opened {};
-            require(GetFileInformationByHandle(h, &opened) != 0 &&
-                    (opened.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-                    !(opened.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT),
-                    "Opened carry ancestor is a reparse/non-directory item");
-#else
             const int fd = ::open(d.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
             require(fd >= 0, "Cannot open physical carry ancestor");
             p->parents.push_back(fd); p->parent_paths.push_back(d);
-#endif
             // Windows denies deletion/rename through the held handle. POSIX
             // descriptors are not rename locks: compare their actual inode to
             // every named ancestor before creation and before each I/O instead.
             p->check_parents();
         }
         p->check_parents(); p->actual_budget();
-#ifdef _WIN32
-        require(p->path.filename().wstring().find(L':') == std::wstring::npos, "Carry alternate data streams are forbidden");
-        require(GetDriveTypeW(p->path.root_path().c_str()) == DRIVE_FIXED, "Carry requires an actual fixed local volume");
-        wchar_t device[32768] {};
-        require(QueryDosDeviceW(p->path.root_name().c_str(), device, 32768) != 0 &&
-                std::wstring(device).find(L"\\Device\\HarddiskVolume") == 0,
-                "Carry drive must be a physical volume, not a substituted path");
-        p->locked_page=llama_dsv41_locked_ram::allocate(p->capacity.page_buffer_bytes,options.admitted_host_bytes);
-        p->page=p->locked_page.get();
-        require(p->page != nullptr, "Carry aligned page allocation failed");
-        p->check_parents(); p->actual_budget();
-        p->file = CreateFileW(p->path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
-            nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_NO_BUFFERING, nullptr);
-        require(p->file != INVALID_HANDLE_VALUE, "Cannot create exclusive owned carry file");
-        BY_HANDLE_FILE_INFORMATION info {};
-        require(GetFileInformationByHandle(p->file, &info) != 0, "Cannot inspect new carry file");
-        p->volume = info.dwVolumeSerialNumber; p->index_high = info.nFileIndexHigh; p->index_low = info.nFileIndexLow;
-        DWORD sectors = 0, sector_bytes = 0, free_clusters = 0, clusters = 0;
-        require(GetDiskFreeSpaceW(p->path.root_path().c_str(), &sectors, &sector_bytes, &free_clusters, &clusters) != 0 &&
-                sector_bytes > 0 && alignment % sector_bytes == 0, "Unsupported carry volume sector alignment");
-#else
         p->locked_page=llama_dsv41_locked_ram::allocate(p->capacity.page_buffer_bytes,options.admitted_host_bytes);
         p->page=p->locked_page.get();
         p->check_parents(); p->actual_budget();
@@ -632,7 +521,6 @@ bool llama_dsv41_carry_store::create(const config & options, std::string & error
         p->modified = info.st_mtimespec;
 #else
         p->modified = info.st_mtim;
-#endif
 #endif
         p->check_identity(); p->actual_budget();
         p->state = implementation::seeding; p->header(); p->flush();
