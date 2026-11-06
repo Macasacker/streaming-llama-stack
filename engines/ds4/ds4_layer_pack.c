@@ -1,7 +1,7 @@
 /* Monotonic-contiguous multi-tier layer placement packer.
  *
  * Pure C99: no CUDA, no platform-specific code. Used by both the CUDA and
- * Metal/CPU builds. See ds4_layer_pack.h for the API contract and the
+ * CPU builds. See ds4_layer_pack.h for the API contract and the
  * design doc docs/superpowers/specs/2026-05-26-multi-gpu-pp-v0-design.md
  * for the rationale. */
 

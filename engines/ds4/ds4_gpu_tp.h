@@ -10,10 +10,11 @@ typedef struct ds4_gpu_tensor ds4_gpu_tensor;
 extern "C" {
 #endif
 
-/* Metal queues each gate on its service thread and orders GPU arrival/release
- * with events or flags. CUDA waits for its local stream and calls the exchange
- * synchronously. Callbacks return nonzero on success; both ranks must issue
- * the same gate sequence. Shutdown precedes transport/slab destruction. */
+/* The retired Metal backend queued each gate on its service thread and ordered
+ * GPU arrival/release with events or flags. CUDA waits for its local stream
+ * and calls the exchange synchronously. Callbacks return nonzero on success;
+ * both ranks must issue the same gate sequence. Shutdown precedes destruction
+ * of the transport and its slabs. */
 typedef int (*ds4_gpu_tp_exchange_fn)(void *ud, uint32_t layer, uint32_t gate, uint64_t seq);
 typedef int (*ds4_gpu_tp_batch_exchange_fn)(void *ud, uint32_t layer,
                                           uint32_t rows, uint64_t seq);
@@ -36,15 +37,11 @@ int ds4_gpu_tp_big_gate_encode(uint32_t layer, uint32_t rows,
                               const ds4_gpu_tensor *out_t,
                               ds4_gpu_tensor *in_t, uint64_t bytes);
 
-/* Metal multi-session tapes reuse slab slots and therefore require event
- * arrival. Single-session flag gates may flush in layer order. */
+/* In the retired Metal build, multi-session tapes reused slab slots and
+ * therefore required event arrival; single-session flag gates flushed in layer
+ * order. On CUDA both entry points are no-ops. */
 void ds4_gpu_tp_set_session_batch_mode(int enabled);
 int ds4_gpu_tp_decode_split_flush_safe(void);
-/* Weight ranges consumed by the next Metal poll gate of the given kind. */
-int ds4_gpu_tp_gate_prefetch_plan(uint32_t gate,
-                                const void *model_map, uint64_t model_size,
-                                const uint64_t *offsets, const uint64_t *bytes,
-                                uint32_t count);
 /* Coordinator-only drafting is replicated; verification remains sharded. */
 void ds4_gpu_tp_suspend_expert_sharding(int suspend);
 /* No-op when TP is not bound. */

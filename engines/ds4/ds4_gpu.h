@@ -231,7 +231,7 @@ void ds4_gpu_release_q8_f16_cache(void);
 #endif
 
 /* Model-file ranges assigned to CUDA devices by the multi-GPU placement
- * planner. Metal keeps these declarations for the shared engine interface. */
+ * planner. These declarations are part of the shared engine interface. */
 #ifndef DS4_MAX_GPUS
 #define DS4_MAX_GPUS 16
 #endif
@@ -487,10 +487,8 @@ void ds4_gpu_print_memory_report(const char *label);
  * owned ranges are warmed; the rest must never be paged in). Call before
  * the model is mapped. */
 void ds4_gpu_model_residency_skip(int skip);
-/* Submit one trivial command buffer (first-submission costs paid at load). */
-int ds4_gpu_warm_command_queue(void);
 
-/* Tensor-parallel sliced projections (Metal decode path only).
+/* Tensor-parallel sliced projections (decode path).
  *
  * ds4_gpu_matmul_q8_0_kslice_tensor computes a k-range partial matvec:
  * out[out_dim] = W[:, k_off : k_off + k_cnt] @ x[x_elem_off : +k_cnt] where
@@ -513,9 +511,9 @@ int ds4_gpu_matmul_q8_0_kslice_tensor(
         uint64_t                out_dim,
         const ds4_gpu_tensor *x,
         uint64_t                x_elem_off);
-/* CUDA input rows contain only the owned contiguous K slice. Metal input
- * rows span full_in_dim and the kernel reads the slice at k_off within them.
- * Both backends produce full-width output rows. */
+/* CUDA input rows contain only the owned contiguous K slice. The retired
+ * Metal input rows spanned full_in_dim and read the slice at k_off within
+ * them. Both produce full-width output rows. */
 int ds4_gpu_matmul_q8_0_kslice_rows_tensor(
         ds4_gpu_tensor       *out,
         const void           *model_map,
@@ -1011,7 +1009,7 @@ int ds4_gpu_matmul_f16_pair_tensor(
         const ds4_gpu_tensor *x,
         uint64_t                n_tok);
 
-/* Optional Metal decode fusion. Returns 1 when the paired projection and
+/* Optional decode fusion. Returns 1 when the paired projection and
  * recurrent compressor-state store were encoded, 0 when the optimized path
  * is unavailable, and -1 on an attempted-path error. */
 int ds4_gpu_matmul_f16_pair_compressor_store_tensor(
@@ -3081,21 +3079,6 @@ int ds4_gpu_hc_rms_norm_mix_f16_tensor(
         uint32_t              out_dim,
         float                 eps);
 
-/* Batched HC RMSNorm followed by its narrow F16 mixer projection. On the
- * tuned Metal path, scale_scratch stores one float per row instead of the
- * full normalized HC tensor; other shapes retain the established fallback. */
-int ds4_gpu_hc_rms_scale_project_f16_tensor(
-        ds4_gpu_tensor       *out,
-        ds4_gpu_tensor       *scale_scratch,
-        const void             *model_map,
-        uint64_t                model_size,
-        uint64_t                weight_offset,
-        uint32_t                in_dim,
-        uint32_t                out_dim,
-        const ds4_gpu_tensor *x,
-        uint32_t                n_rows,
-        float                   eps);
-
 int ds4_gpu_output_hc_weights_tensor(
         ds4_gpu_tensor       *out,
         const ds4_gpu_tensor *pre,
@@ -3421,8 +3404,8 @@ int ds4_gpu_glm53_kda_prefill(
         float                 gate_lower_bound,
         float                 norm_eps);
 
-/* Decode-island CUDA graph capture (CUDA backend; Metal/ROCm/CPU stub it
- * out and stay eager).  Design ported from the Entrpi/ds4 batched-serving
+/* Decode-island CUDA graph capture (CUDA backend; the CPU build stubs it
+ * out and stays eager).  Design ported from the Entrpi/ds4 batched-serving
  * fork's per-layer decode graph capture.  The key identifies a captured
  * island: layer, island index, and the activation buffers whose addresses
  * the captured kernels bake in.  ds4_cuda.cu mirrors this struct
@@ -3449,7 +3432,8 @@ int  ds4_gpu_decode_graph_end(const ds4_decode_graph_key *key);
 void ds4_gpu_decode_graph_abort(const ds4_decode_graph_key *key);
 void ds4_gpu_decode_graphs_invalidate(void);
 
-/* Qwen3.8-Flash-Next kernels (metal/qwen4.metal).  Weights are model-map
+/* Qwen3.8-Flash-Next kernels, ported from the Mac engine's metal/qwen4.metal.
+ * Weights are model-map
  * offsets; f32 transients unless noted.  Layouts: residual [T][hc*E],
  * GDN qkv [T][2*Hk*D + Hv*D] with tiled value heads, GDN state [Hv][D][D]
  * (dv-major), KV cache [cap][Hkv*D] f16, indexer k cache [cap][Di] f32,

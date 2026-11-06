@@ -18,6 +18,8 @@ cannot see `DS4_GLM_METAL_FOO` or `DS4_METAL_PROFILE_X` - the two classes chunks
                    Live reads through a wrapper such as glm_graph_env_present()
                    are invisible to envdocs' inventory, so these are usually
                    readable knobs; a name with no reader anywhere is stale.
+                   The match is uppercase, so a lowercase file name like
+                   ds4_metal.m counts as the comment it is.
   COMMENT          inside a // or /* */ comment.
   STRING           inside a string or character literal, i.e. printed output.
 
@@ -152,7 +154,7 @@ def main():
             tok = owner(text, off)
             if kind == "code":
                 cls = "ENV_NAME" if tok in documented else "IDENTIFIER"
-            elif ENV_PREFIX.match(tok.upper()):
+            elif ENV_PREFIX.match(tok):
                 cls = "ENV_NAME" if tok in documented else "ENV_NAME_CITED"
             elif kind in ("line_comment", "block_comment"):
                 cls = "COMMENT"

@@ -117,7 +117,8 @@ __global__ void tile_max(unsigned *out, const float *scores, unsigned N, unsigne
 }
 
 /* Exact radix threshold and stable gather, with the same greater-than then
- * equal-score ordering as Metal. No context-dependent candidate truncation. */
+ * equal-score ordering as the retired Metal kernels. No context-dependent
+ * candidate truncation. */
 __global__ void idx_select(int *out, const float *score, unsigned N, unsigned K) {
     const unsigned tid = threadIdx.x, t = blockIdx.x;
     __shared__ unsigned hist[256], gt[256], eq[256], threshold, need;
@@ -933,8 +934,8 @@ __global__ void matrix_reg(float *out, const float *x, const char *w0, const cha
 #endif
 }
 
-/* Match the half operands of the production Metal expert tiles. Products
- * accumulate in FP32; only the matrix operands are rounded to half. */
+/* Match the half operands of the retired Metal backend's expert tiles.
+ * Products accumulate in FP32; only the matrix operands are rounded to half. */
 template<unsigned TYPE, bool DOWN, unsigned NT, unsigned NR = 64>
 __global__ void matrix_half_tile(float *out, const float *x, const char *w0, const char *w1,
         const int *lists, const int *counts, const unsigned *tiles, unsigned NE,

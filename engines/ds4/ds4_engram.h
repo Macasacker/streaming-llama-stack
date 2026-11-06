@@ -44,7 +44,7 @@ typedef struct {
     uint32_t rows;
 } ds4_engram_table;
 
-/* A separate uncached file descriptor, never an mmap or Metal model view.
+/* A separate uncached file descriptor, never an mmap or a GPU model view.
  * Each GGUF I8 row is 256 E4M3 bytes followed by 8 original E8M0 scales. */
 bool ds4_engram_table_open(ds4_engram_table *table, const char *path,
                            uint64_t offset, uint32_t rows);

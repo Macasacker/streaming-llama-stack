@@ -38655,8 +38655,8 @@ extern "C" int ds4_gpu_glm53_kda_prefill(
 }
 
 extern "C" int ds4_gpu_flush_encoder(void) {
-    /* Metal encoder flush: CUDA kernels are already queued in stream
-     * order, nothing to split. */
+    /* The retired Metal encoder flush: CUDA kernels are already queued in
+     * stream order, so there is nothing to split. */
     return 1;
 }
 
@@ -39041,8 +39041,8 @@ extern "C" int ds4_gpu_glm_attention_dense_compact_lora_causal_tensor(
 
 /* Scalar-correct MLA attention: one warp per head, grid
  * (ceil(n_head/8), n_tokens). The row loop handles either a contiguous
- * causal range or an explicit selected-row list and mirrors the Metal online
- * softmax so numerics stay comparable. */
+ * causal range or an explicit selected-row list and mirrors the retired Mac
+ * online softmax so numerics stay comparable. */
 template <typename CT, bool selected_rows>
 __global__ static void glm_attention_lora_causal_kernel(
         float *lora_out,
@@ -43094,8 +43094,8 @@ extern "C" int ds4_gpu_glm_value_project_typed_batch_heads_tensor(
     return cuda_ok(cudaGetLastError(), "glm value project launch");
 }
 
-/* Decode-time (n_tok small) quant matvec. The Metal "mpp/model-view"
- * variant is a bandwidth-tuned matvec; on CUDA the generic quant matmul
+/* Decode-time (n_tok small) quant matvec. The retired Mac "mpp/model-view"
+ * variant was a bandwidth-tuned matvec; on CUDA the generic quant matmul
  * already dispatches per type, so delegate. Revisit in the perf pass. */
 extern "C" int ds4_gpu_matmul_quant_tensor(ds4_gpu_tensor *out,
         const void *model_map, uint64_t model_size, uint64_t weight_offset,
@@ -43700,7 +43700,7 @@ extern "C" void ds4_gpu_tp_set_attn_head_split(int enabled) {
     (void)enabled;   /* Mac network-TP head split: no-op on CUDA */
 }
 
-/* Compatibility surface shared with the canonical Metal/ROCm graph. CUDA
+/* Compatibility surface shared with the engine's graph path. CUDA
  * either delegates to its equivalent primitive or reports an unavailable
  * optional fast path so the graph can use its established fallback. */
 

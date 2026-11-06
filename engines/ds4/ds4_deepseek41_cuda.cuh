@@ -988,8 +988,8 @@ extern "C" int ds4_gpu_dsv41_attention_output_tp_batch(
             b, 8192u, 5120u, rank * 4096u, 4096u, low, rows);
 }
 
-/* Metal folds these bf16 roundings into the producing kernels; here the
- * standalone rounding pass follows (or precedes) the unchanged operator. */
+/* The retired Metal backend folded these bf16 roundings into its producing
+ * kernels; here the standalone rounding pass follows (or precedes). */
 static uint32_t ds4_gpu_dsv41_rows_of(const ds4_gpu_tensor *t, uint32_t width) {
     const uint64_t bytes = ds4_gpu_tensor_bytes(t);
     const uint64_t rows = width ? bytes / ((uint64_t)width * sizeof(float)) : 0;

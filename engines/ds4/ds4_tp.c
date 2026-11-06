@@ -3,7 +3,7 @@
  * Wire notes: supported ranks are little-endian; the hello magic
  * doubles as a byte-order check.  The control socket is a plain blocking
  * TCP stream carrying framed commands. Gate traffic uses two-sided RDMA
- * send/recv (Thunderbolt UC on Metal, RoCE RC on Linux) or a separate
+ * send/recv (RoCE RC on Linux) or a separate
  * full-duplex TCP socket. */
 
 #include <errno.h>
@@ -43,9 +43,9 @@
 #define DS4_TP_PROTOCOL_VERSION 14u
 
 #define DS4_TP_DEFAULT_TIMEOUT_SEC 300
-/* Once both ranks enter a Metal gate, a live exchange normally completes in
- * microseconds. Fail well before Metal's command-buffer watchdog if the peer
- * stalls while keeping its sockets open. */
+/* Once both ranks enter a gate, a live exchange normally completes in
+ * microseconds. Fail well before the rank's own queued GPU work makes the wait
+ * expensive if the peer stalls while keeping its sockets open. */
 #define DS4_TP_DEFAULT_GATE_TIMEOUT_MS 750
 
 typedef struct {
@@ -355,7 +355,7 @@ static int tp_tcp_exchange(ds4_tp *tp, ds4_tp_gate_header *header,
 #ifdef DS4_TP_HAVE_VERBS
 /* UC queue pairs do not report a dead remote reliably.  The control socket
  * does, so sample it while polling an RDMA completion and abort before the
- * Metal command-buffer watchdog fires. */
+ * gate timeout fires. */
 static int tp_peer_closed(const ds4_tp *tp) {
     char byte;
     const ssize_t n = recv(tp->control_fd, &byte, 1,
@@ -1700,9 +1700,9 @@ static int tp_rdma_window_barrier(ds4_tp *tp, uint8_t tag) {
 
 /* Big-gate exchange (prefill partials): windows of up to recv_depth
  * messages; every window posts its receives, crosses the barrier, then
- * streams sends in send-depth sub-batches. Metal-owned payloads are staged
- * through the registered slab because Apple's verbs provider rejects direct
- * registration of these buffers. */
+ * streams sends in send-depth sub-batches. Payloads outside the registered
+ * slab are staged through it, because the Mac build's verbs provider rejected
+ * direct registration of these buffers. */
 static int tp_rdma_big_gate_exchange(ds4_tp *tp,
                                      const void *out,
                                      void *in,

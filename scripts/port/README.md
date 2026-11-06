@@ -6,6 +6,9 @@ not part of the engine, the launcher or any build; nothing imports them.
 
 Run them from the repo root. `--apply` writes; without it they only report.
 
+`metal_word_census.py` and `rename_identifiers.py` are the sweeps this port runs on text rather
+than on conditionals; `comment_code_diff.py` is their regression check.
+
 ## collapse_conditionals.py
 
 Collapses a preprocessor conditional to the branch the Linux build already takes. It builds the
@@ -116,3 +119,17 @@ Vendored files (`external/`, `linenoise.c`) are skipped, as everywhere in this p
 mentions are the names `envvars.json` documents; `ENV_NAME_CITED` are `DS4_*METAL*` names the table
 does not document, which is what a wrapper read such as `glm_graph_env_present("A", "B")` produces -
 live knobs, invisible to `envdocs`' inventory.
+
+## comment_code_diff.py
+
+The regression check for a comment sweep. `preprocess_equiv.py` keeps comments, so a reworded
+comment shows up as a changed line and every line below it shifts; `git diff` is then noise.
+This tool strips comments from both files - string literals are kept, including multi-line ones -
+and compares only the remaining code lines, so a comment-only chunk reports 0 changed lines and a
+chunk that also deleted something reports exactly those deletions:
+
+    git worktree add build/wt-base HEAD
+    python3 scripts/port/comment_code_diff.py build/wt-base/engines/ds4/ds4.c engines/ds4/ds4.c
+
+It cannot see `__LINE__`: deleting comment lines moves the number a message reports, so grep for
+`__LINE__` in the file first (ds4.c has none, ds4_cuda.cu has one, well below the edits).

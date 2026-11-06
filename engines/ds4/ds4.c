@@ -3,15 +3,15 @@
  * =========================================================================
  *
  * This file is deliberately vertical: it owns GGUF loading, the fixed
- * DeepSeek V4 tensor layouts, CPU reference kernels, the whole-model Metal
+ * DeepSeek V4 tensor layouts, CPU reference kernels, the whole-model CUDA
  * graph driver, and tokenizer wiring.  Model shape selection is intentionally
  * narrow: validation accepts the known Flash and Pro layouts and fails early
  * for anything else.
  *
  * Loading is mmap based.  The loader parses only the GGUF header, metadata
  * table, and tensor directory.  Tensor data stays in the kernel page cache
- * until inference touches it, or until Metal wraps slices of the mapping as
- * no-copy MTLBuffers.
+ * until inference touches it, or until the graph driver uploads slices of
+ * the mapping to the device.
  */
 
 #include <errno.h>
@@ -1380,12 +1380,14 @@ static void ds4_t1_step0_start(void) {
 }
 
 /* =========================================================================
- * Metal Routed Expert Locality Profiler.
+ * Routed Expert Locality Profiler.
  * =========================================================================
  *
  * SSD streaming decode needs routed-expert locality data before a cache policy
- * is meaningful. This profiler is intentionally Metal-decode-only for now:
- * it reads the tiny selected-expert and route-weight tensors after router
+ * is meaningful. It was written for the retired Metal decode path and never got
+ * a CUDA counterpart: ds4_expert_profile_init() has no caller in this build, so
+ * the collection, the hotlist writer and the JSON report below are inert.
+ * It reads the tiny selected-expert and route-weight tensors after router
  * selection, records histograms, and simulates per-layer latest-N unique expert
  * caches without changing normal inference when disabled.
  */
@@ -2742,10 +2744,10 @@ static uint64_t model_tensor_directory_fingerprint(const ds4_model *m) {
     return h ? h : 1;
 }
 
-/* Open and map the GGUF once.  Metal needs a shared mapping for no-copy
- * MTLBuffers; CPU uses a private read-only mapping to avoid Darwin VM stress.
- * Tokenizer-only callers pass prefetch_cpu=false so inspecting tokens never
- * walks the huge tensor payload. */
+/* Open and map the GGUF once.  The graph backend needs the file-backed shared
+ * mapping it uploads device spans from; the CPU path uses a private read-only
+ * mapping.  Tokenizer-only callers pass prefetch_cpu=false so inspecting tokens
+ * never walks the huge tensor payload. */
 static void model_open(ds4_model *m, const char *path, bool shared_mapping,
                        bool prefetch_cpu) {
     memset(m, 0, sizeof(*m));
@@ -2760,16 +2762,17 @@ static void model_open(ds4_model *m, const char *path, bool shared_mapping,
     if (st.st_size < 32) ds4_die("model file is too small to be GGUF");
 
     /*
-     * Metal wraps slices of this mapping as no-copy MTLBuffers, so the Metal
-     * path keeps the file-backed shared mapping. The CPU path only reads the
-     * weights through normal pointers and should not inherit Metal's VM policy:
-     * use a private read-only mapping there.
+     * The graph backend uploads device spans from this mapping, so it keeps the
+     * file-backed shared mapping. The CPU path only reads the weights through
+     * normal pointers and has no reason to share it: use a private read-only
+     * mapping there.
      *
-     * This is deliberately defensive against an OS-level Darwin VM bug observed
-     * while the CPU backend streams the very large GGUF through a shared mmap:
-     * the kernel can panic in VM map-count accounting instead of returning a
-     * normal user-space failure. Keeping CPU inference off the shared mapping
-     * avoids that VM accounting path while preserving normal file-backed reads.
+     * The split is also deliberately defensive against an OS-level Darwin VM
+     * bug the retired Mac build hit while its CPU backend streamed a very large
+     * GGUF through a shared mmap: the kernel could panic in VM map-count
+     * accounting instead of returning a normal user-space failure. Keeping CPU
+     * inference off the shared mapping avoids that VM accounting path while
+     * preserving normal file-backed reads.
      */
     const int mmap_flags = shared_mapping ? MAP_SHARED : MAP_PRIVATE;
     void *map = mmap(NULL, (size_t)st.st_size, PROT_READ, mmap_flags, fd, 0);
@@ -3541,8 +3544,9 @@ static void model_warm_weights(const ds4_model *m) {
  * Scalar Conversion and Quantized Tensor Kernels.
  * =========================================================================
  *
- * These functions are the CPU reference math used by the C backend and by
- * Metal diagnostics.  They implement only the tensor formats present in the
+ * These functions are the CPU reference math used by the CPU inference path
+ * and by the graph diagnostics that compare against it.  They implement only
+ * the tensor formats present in the
  * DeepSeek V4 Flash GGUF: F16, F32, Q8_0, Q2_K, IQ2_XXS, and Q8_K activation
  * blocks used for expert dot products.
  */
@@ -3697,7 +3701,7 @@ static float dsv4_e4m3fn_dequant_cpu(float x) {
 
 /* DeepSeek V4 stores the non-RoPE part of compressed KV through an E4M3-style
  * round trip.  Keeping this in the CPU reference makes cache values comparable
- * to the Metal graph's compressed-cache behavior. */
+ * to the GPU graph's compressed-cache behavior. */
 static void dsv4_fp8_kv_quantize_row_inplace_cpu(float *x, uint32_t head_dim, uint32_t n_rot) {
     const uint32_t n_nope = head_dim - n_rot;
     for (uint32_t off = 0; off < n_nope; off += 64) {
@@ -8406,7 +8410,7 @@ static void model_map_span_vec_include_one(ds4_model_map_span_vec *spans, const 
          * PRO Q4 routed expert tensors are too large to hide inside broad
          * layer spans. Isolate them so the default selected-expert path does
          * not stack large aliases on top of layer-sized model views. Optional
-         * group splits are enabled by DS4_METAL_Q4_PRO_MAP_GROUPS for Metal
+         * group splits are enabled by DS4_METAL_Q4_PRO_MAP_GROUPS for
          * experiments that bind stable grouped views.
          */
         const uint64_t group_bytes = t->bytes / q4_pro_group_views;
@@ -8948,7 +8952,7 @@ static const uint8_t *tensor_expert_bytes(
 
 /* TP sharding keeps full layers but restricts every routed-expert blob to
  * one contiguous rank range (rank 0 owns the lower expert ids, matching
- * ds4_tp_owns_expert in metal/moe.metal). */
+ * the retired metal/moe.metal kernel's ds4_tp_owns_expert). */
 static DS4_MAYBE_UNUSED bool weights_model_map_sharded_spans(
         const ds4_weights *w,
         const ds4_model   *m,
@@ -17614,11 +17618,11 @@ static int sample_residual_probabilities(float *target_probs,
 #endif
 
 /* =========================================================================
- * Metal Reference Comparison Helpers.
+ * Reference Comparison Helpers.
  * =========================================================================
  *
  * These small scalar helpers are used only by diagnostics that compare the C
- * reference path with the Metal executor.
+ * reference path with the GPU graph executor.
  */
 
 static float max_abs_diff(const float *a, const float *b, uint64_t n) {
@@ -17716,10 +17720,10 @@ static uint64_t gpu_graph_indexer_scores_persistent_values(uint64_t comp_cap) {
 #define DS4_GPU_GLM_COMPACT_CACHE_F16 1
 
 /* =========================================================================
- * Metal Release Graph State.
+ * GPU Release Graph State.
  * =========================================================================
  *
- * The release Metal executor owns one fixed set of tensors for single-token
+ * The release graph executor owns one fixed set of tensors for single-token
  * decode and another for batched prefill.  The structure is DS4-specific:
  * tensor names follow the model stages rather than generic graph nodes.
  */
@@ -18010,7 +18014,8 @@ typedef struct {
     double decode_token_avg_sec;
     bool quality;
     bool mtp_enabled;
-    /* Metal-only prefill helpers retained alongside the CUDA tiered workspace. */
+    /* Prefill helpers inherited from the retired Metal graph, kept alongside
+     * the CUDA tiered workspace. */
     ds4_gpu_tensor *batch_q_half;
     ds4_gpu_tensor *prefill_seed_router_selected;
     uint32_t prefill_seed_tokens;
@@ -18026,7 +18031,7 @@ typedef struct {
     bool streaming_static_decode_map_current;
     float *cpu_router_norm;
 
-    /* Metal network tensor parallelism. These views alias engine-owned
+    /* Network tensor parallelism. These views alias engine-owned
      * transport slabs except tp_logits_half, whose view object is session-owned. */
     uint32_t tp_world;
     uint32_t tp_rank;
@@ -18699,10 +18704,11 @@ static void gpu_graph_prefill_workspace_tier_bytes(
     tier_bytes[0] += ds4_gpu_tensor_bytes(g->prefill_seed_router_selected);
 }
 
-/* The CUDA tier-free-VRAM query deliberately has a zero-returning stub in the
- * Metal build. Zero is a real fail-closed CUDA reading, so do not feed that
- * stub into the CUDA preflight/headroom policy; Metal allocation itself is the
- * capacity authority. Keep the wider prefill-edge policy intact on Metal. */
+/* The prefill-edge policy is the whole of this gate.  The retired Metal build
+ * answered the tier-free-VRAM query with a zero-returning stub, and zero is a
+ * real fail-closed CUDA reading, so a stub like that must never feed the CUDA
+ * preflight/headroom policy.  Nothing here consults free VRAM, and the wider
+ * prefill-edge policy is the capacity authority. */
 static bool gpu_graph_prefill_workspace_vram_preflight_enabled(void) {
     return ds4_prefill_edge_vram_enabled();
 }
@@ -19058,7 +19064,7 @@ static bool gpu_graph_prepare_request_prefill_workspace(
 }
 
 
-/* Release every Metal tensor owned by the whole-model graph runtime. */
+/* Release every GPU tensor owned by the whole-model graph runtime. */
 static void gpu_graph_free(ds4_gpu_graph *g) {
     /* Captured decode-island graphs bake this graph's buffer addresses
      * into their kernel nodes; retire them before the buffers go away. */
@@ -19566,13 +19572,13 @@ static ds4_gpu_tensor *gpu_graph_alloc_kv_cache_tensor(bool managed, uint64_t by
 }
 
 /* =========================================================================
- * Metal Diagnostic Dump Hooks.
+ * GPU Diagnostic Dump Hooks.
  * =========================================================================
  *
  * The release path calls these after important stages, but they are no-ops
  * unless DS4_METAL_GRAPH_DUMP_PREFIX or DS4_ROCM_GRAPH_DUMP_PREFIX is set.
- * Dumping synchronizes and restarts the command batch, so it is intentionally
- * isolated here.
+ * Dumping synchronizes the device and resumes issuing afterwards, so it is
+ * intentionally isolated here.
  */
 
 typedef struct {
@@ -20057,10 +20063,10 @@ static uint64_t gpu_graph_q8_0_row_bytes(uint64_t in_dim) {
 }
 
 /* =========================================================================
- * Metal Release Graph Allocation.
+ * GPU Release Graph Allocation.
  * ========================================================================= */
 
-/* Allocate the Metal graph state for a chosen raw-cache capacity.  The model
+/* Allocate the graph state for a chosen raw-cache capacity.  The model
  * weights are not copied here; tensors reference the mapped GGUF.
  *
  * tier-aware per-layer allocation.
@@ -22968,7 +22974,7 @@ static uint32_t gpu_graph_decode_indexer_sparse_threshold(const ds4_gpu_graph *g
 }
 
 /* =========================================================================
- * Metal Decode Release Helpers and Reference Fallbacks.
+ * Decode Release Helpers and Reference Fallbacks.
  * =========================================================================
  *
  * The normal generation path uses the fused helpers below.  The older unfused
@@ -23414,7 +23420,7 @@ static bool gpu_graph_cuda_tp_attn_cache_sync_all(ds4_gpu_graph *g) {
     return true;
 }
 
-/* Encode one DS4 decode layer on Metal.  This is the release single-token
+/* Encode one DS4 decode layer on the GPU.  This is the release single-token
  * layer path; diagnostics reuse it so they compare exactly what generation
  * runs. */
 static bool gpu_graph_indexer_stage_profile_boundary(
@@ -25003,9 +25009,11 @@ typedef enum {
     GPU_DECODE_LAYER_FROM_ROUTER,
 } gpu_decode_layer_phase;
 
-/* M5 ports default to the existing standard M1-M4 Metal path.  Rollbacks
- * dominate the benchmark force-enables on pre-M5 devices so the aggregate
- * switch is a reliable whole-bundle control. */
+/* In the retired Mac build, M5 ports defaulted to the standard M1-M4 Metal
+ * path and the rollbacks that dominated the benchmark force-enabled the bundle
+ * on pre-M5 devices, so the aggregate switch was a reliable whole-bundle
+ * control.  Neither device class exists here: this is a constant false, and the
+ * two environment names callers hand it are never read. */
 static bool gpu_graph_ported_m5_decode_feature_enabled(
         const char *pre_m5_disable_env,
         const char *m5_disable_env) {
@@ -25050,13 +25058,14 @@ static bool gpu_graph_hc_expand_fusion_eligible(const ds4_gpu_graph *g,
     return false;
 }
 
-/* [2026-08-18] The two "flush" barriers in the selected/shared overlap path are METAL semantics.
+/* [2026-08-18] The two "flush" barriers in the selected/shared overlap path came from the retired
+ * Metal backend.
  *
- * On Metal a flush is how encoded work reaches the GPU at all, so the overlap path flushes twice per
- * expert layer: once so the shared-expert kernels start while the async selected-id load runs, and
- * once before joining that load.  On CUDA a launch is ALREADY submitted when it is issued, so
- * `ds4_gpu_flush_commands()` there is a bare `cudaDeviceSynchronize()` (ds4_cuda.cu:6117) that
- * submits nothing and only drains the device.
+ * On Metal a flush was how encoded work reached the GPU at all, so the overlap path flushed twice
+ * per expert layer: once so the shared-expert kernels started while the async selected-id load ran,
+ * and once before joining that load.  On CUDA a launch is ALREADY submitted when it is issued, so
+ * `ds4_gpu_flush_commands()` there is a bare `cudaDeviceSynchronize()` that submits nothing and only
+ * drains the device.
  *
  * MEASURED: the expert-cache sync profiler reports, per decode token over 43 layers,
  *     command_buffers=1  commits=121  syncs=161  waits=161  wait=6.1-7.9 ms
@@ -25064,13 +25073,13 @@ static bool gpu_graph_hc_expand_fusion_eligible(const ds4_gpu_graph *g,
  * 1 worker wait + 2 flushes) + 1 token end = 161.  These two flushes are 80 of those 161.
  *
  * Ordering on CUDA does not depend on them: the shared kernels are launched immediately after the
- * early flush, the async loader is joined by gpu_graph_selected_async_load_finish() (ds4.c:21772)
- * which blocks on the worker itself, and routed compute is not launched until after that join -
+ * early flush, the async loader is joined by gpu_graph_selected_async_load_finish() which blocks on
+ * the worker itself, and routed compute is not launched until after that join -
  * all on the decode/default stream, so GPU ordering is unchanged.
  *
  * Default is to SKIP them on CUDA.  DS4_CUDA_DECODE_FLUSH_COMMANDS=1 restores the old behaviour in
  * the SAME BINARY, which is the only way to A/B this without a rebuild acting as a second variable.
- * Metal and ROCm are untouched. */
+ * The ROCm branch keeps the old behaviour. */
 static int graph_decode_overlap_flush_commands(void) {
 #if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
     static int keep = -1;
@@ -25280,7 +25289,8 @@ static bool gpu_graph_encode_decode_layer_phase(
     bool attn_hc_producer_pre_norm_fused = false;
     if (ok && !tp_ablate_hcpre) {
         /* Fused norm+mix removes one decode dispatch per layer; the kernel
-         * reproduces both reduction trees bit-exactly (see dsv4_hc.metal). */
+         * reproduces both reduction trees bit-exactly (the kernel mirrors the
+         * retired dsv4_hc.metal). */
         const bool fuse_norm_mix =
             hc_dim == 16384u && mix_hc == 24u &&
             layer->hc_attn_fn->type == DS4_TENSOR_F16 &&
@@ -25581,7 +25591,8 @@ static bool gpu_graph_encode_decode_layer_phase(
             kv_rope_fused = ok;
         } else if (ok) {
             /* Triple fusion: q/kv norm + KV RoPE tail + FP8/raw store in one
-             * dispatch; verbatim arithmetic (see metal/norm.metal). */
+             * dispatch; verbatim arithmetic (the kernel mirrors the retired
+             * metal/norm.metal). */
             if (!gpu_graph_tp_ablate("kv") &&
                 !kvnorm_dump &&
                 !gpu_graph_use_reference_kv_decode() &&
@@ -25925,7 +25936,7 @@ static bool gpu_graph_encode_decode_layer_phase(
         }
         DS4_GPU_PROFILE_DECODE_STAGE("compressor_proj");
         const uint32_t comp_row = g->layer_n_comp[il];
-        /* Eligible Metal decode emit-path fusion: the pooled attention and
+        /* Eligible decode emit-path fusion: the pooled attention and
          * indexer compressor rows each need norm + RoPE + quantize (+ F16
          * commit for attention) — seven tiny single-row dispatches per layer
          * every ratio-th token.  The fused kernel runs them as one
@@ -26954,8 +26965,9 @@ static bool gpu_graph_encode_decode_layer_phase(
     } else {
         if (ok && !gpu_graph_tp_ablate("router")) {
         /* Fused router + shared-expert gate/up: one dispatch instead of two
-         * on the same normalized FFN input; per-row math is unchanged (see
-         * metal/dense.metal).  Restricted to the full single-pass decode
+         * on the same normalized FFN input; per-row math is unchanged (the
+         * kernel mirrors the retired metal/dense.metal).  Restricted to the full
+         * single-pass decode
          * phase so split-phase/graph flows keep the original ordering. */
         if (phase == GPU_DECODE_LAYER_FULL &&
             !g->ssd_streaming &&
@@ -28286,7 +28298,7 @@ static bool gpu_graph_output_logits_head_matmul(
         uint32_t              n_tokens,
         uint64_t              vocab_dim);
 
-/* Encode the final HC collapse, output norm, and vocab projection on Metal. */
+/* Encode the final HC collapse, output norm, and vocab projection on the GPU. */
 static bool gpu_graph_encode_output_head(
         ds4_gpu_graph *g,
         const ds4_model       *model,
@@ -29278,11 +29290,11 @@ static bool gpu_graph_encode_output_head_mtp(
 }
 
 /* =========================================================================
- * Metal Diagnostic Comparisons.
+ * GPU Diagnostic Comparisons.
  * =========================================================================
  *
  * These routines deliberately allocate CPU-side reference buffers and read
- * Metal tensors back.  They are not part of generation; command-line tests use
+ * GPU tensors back.  They are not part of generation; command-line tests use
  * them to localize drift against the C reference pipeline.
  */
 
@@ -29923,10 +29935,10 @@ static int gpu_graph_first_token_full_test(
 }
 
 /* =========================================================================
- * Metal Release Decode and Prefill.
+ * GPU Release Decode and Prefill.
  * =========================================================================
  *
- * Everything below is the user-facing Metal backend.  It uses the same layer
+ * Everything below is the user-facing graph backend.  It uses the same layer
  * encoder as diagnostics, but diagnostics are not required for normal command
  * flow and their CPU reads stay outside these generation entry points.
  */
@@ -30549,7 +30561,7 @@ static bool gpu_graph_dspark_capture_commit_prefix(
     return g->dspark_capture_valid && g->dspark_capture_batch_valid;
 }
 
-/* Encode a full single-token decode step on Metal.  This is the generation
+/* Encode a full single-token decode step on the GPU.  This is the generation
  * hot path: update caches, run all layers, then produce logits. */
 static bool gpu_graph_encode_token_raw_swa(
         ds4_gpu_graph *g,
@@ -30847,7 +30859,7 @@ static bool gpu_graph_upload_visual_prompt_embeddings_hc(
 }
 
 /* Seed the batched HC state from token ids: every HC stream starts as the same
- * 4096-wide embedding.  Long prefill chunks use the Metal get-rows/repeat
+ * 4096-wide embedding.  Long prefill chunks use the GPU get-rows/repeat
  * kernel so the CPU does not build and upload a large [token, HC, dim] tensor. */
 static bool gpu_graph_upload_prompt_embeddings_hc(
         ds4_gpu_tensor   *out_hc,
@@ -30949,9 +30961,10 @@ static bool gpu_graph_warmup_prefill_kernels(
 #endif
 
     /*
-     * The first batched F16 matmul can pay Metal's one-time pipeline execution
-     * cost. Run the same HC attention projection on scratch storage before the
-     * measured prefill. The output is overwritten by the real graph.
+     * The first batched F16 matmul can pay a one-time first-launch cost - the
+     * retired Metal backend's pipeline-execution cost, and CUDA's own module and
+     * kernel setup. Run the same HC attention projection on scratch storage
+     * before the measured prefill. The output is overwritten by the real graph.
      */
     if (n_tokens <= 8) return true;
 
@@ -31110,8 +31123,8 @@ static bool gpu_graph_layer_stage_profile_start(uint32_t il) {
     return ds4_gpu_begin_commands() != 0;
 }
 
-/* Optional prefill stage profiler. It intentionally ends the current Metal
- * command buffer and waits, so the printed number includes encoding plus GPU
+/* Optional prefill stage profiler. It intentionally ends the current command
+ * sequence and waits, so the printed number includes issuing plus GPU
  * execution for the stage just emitted. This is disabled by default because it
  * adds synchronization points and changes scheduling. */
 static bool gpu_graph_layer_stage_profile_boundary(
@@ -31213,8 +31226,8 @@ static const int32_t *gpu_graph_visual_tokens_for_batch(
  * add a whole layer-major pass, measured at ~28 s and ~61-66 GiB of expert re-reads.
  *
  * DS4_CUDA_NO_COMPRESSOR_PREFILL_RAGGED=0 restores the old all-or-nothing batching IN THE SAME
- * BINARY, so the arms can be compared without a rebuild acting as a second variable. Metal and ROCm
- * are untouched. */
+ * BINARY, so the arms can be compared without a rebuild acting as a second variable. The ROCm
+ * branch keeps the old behaviour. */
 static bool gpu_graph_cuda_compressor_prefill_ragged_enabled(void) {
 #if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
     static int cached = -1;
@@ -34348,7 +34361,7 @@ static bool gpu_graph_eval_token_raw_swa_streaming(
     return ok;
 }
 
-/* Execute one Metal decode token and read back logits. */
+/* Execute one GPU decode token and read back logits. */
 static bool gpu_graph_eval_token_raw_swa(
         ds4_gpu_graph *g,
         const ds4_model       *model,
@@ -37473,7 +37486,7 @@ static bool dspark_apply_markov_confidence_lazy_runtime(
 
         int32_t token = -1;
         /* CUDA can apply the Markov bias and argmax without reading back the
-         * full logits row. Metal currently falls through to the CPU path. */
+         * full logits row; the CPU path applies the bias and argmax instead. */
         if (ok && !dspark_markov_bias_disabled() &&
             getenv("DS4_DSPARK_NO_GPU_MARKOV") == NULL &&
             g->dspark_draft_tokens &&
@@ -37778,7 +37791,7 @@ static bool gpu_graph_eval_mtp_draft(
  * The 2-bit DS4 quants care most about routed MoE experts.  For expert gate
  * and up matrices the matmul input is the FFN-normalized activation row.  For
  * expert down matrices the matmul input is the routed SwiGLU row after route
- * weighting.  During Metal prefill those tensors are already materialized as
+ * weighting.  During graph prefill those tensors are already materialized as
  * `batch_ffn_norm`, `batch_router_selected`, and `batch_routed_mid`, so the
  * collector observes the exact release graph without changing inference math.
  *
@@ -39290,7 +39303,7 @@ static bool gpu_graph_prefill_raw_swa(
         return ok;
     }
     /* The layer-major fallback below may submit the whole short prefill as one
-     * Metal command buffer.  Once that command is in flight there is no useful
+     * command sequence.  Once that work is in flight there is no useful
      * safe prefix to expose: by the time cancellation can be observed again,
      * the prompt has already been fully read and the KV is valid.  Let the
      * caller observe the pending interrupt at generation time instead. */
@@ -40040,8 +40053,8 @@ static bool gpu_graph_verify_decode2_exact(
     return ok;
 }
 
-/* Pick a raw SWA cache size for Metal.  During batched prefill it must cover
- * the previous window plus the current ubatch. */
+/* Pick a raw SWA cache size for the graph backend.  During batched prefill it
+ * must cover the previous window plus the current ubatch. */
 static uint32_t gpu_graph_raw_cap_for_context(int ctx_size, uint32_t prefill_cap) {
     uint32_t raw_window = DS4_N_SWA;
     if (raw_window > (uint32_t)ctx_size) raw_window = (uint32_t)ctx_size;
@@ -42036,7 +42049,7 @@ static bool ds41_matmul_batch(ds4_gpu_tensor *out, const ds4_model *m,
     const uint32_t width = (uint32_t)weight->dim[0], outputs = (uint32_t)weight->dim[1];
     bool ok;
     /* Small decode batches retain scalar reductions before BF16 and sparse
-     * routing boundaries. Preserve Metal's separate vocabulary-head dispatch. */
+     * routing boundaries. The vocabulary head keeps its own dispatch. */
     if (count >= 2 && count <= DS4_TP_BATCH_MAX_ROWS &&
         weight->type == DS4_TENSOR_Q8_0) {
         if (round)
@@ -42153,7 +42166,7 @@ static bool ds41_embed(ds41_gpu_graph *g, const ds4_model *m, const ds4_weights 
         ds4_gpu_repeat_hc_tensor(out, scratch, DS4_N_EMBD, DS4_N_HC);
 }
 
-/* The Metal kill switches, read once. */
+/* The engine's kill switches, read once. */
 static bool ds41_env_flag(const char *name, int *cached) {
     if (*cached < 0) *cached = getenv(name) != NULL;
     return *cached != 0;
@@ -42749,8 +42762,9 @@ static bool ds41_graph_before_moe(ds41_gpu_graph *g, const ds4_model *m,
         (g->tp_world == 2 ? ds41_graph_after_attention(g, m, l, il) : ds41_hc_mix(g, m, l, true, g->attn_split));
 }
 
-/* Diagnostic switches compare public large-prefill folds with the parent.
- * Keep small-row kernelpool fusions and non-Metal scheduling unchanged. */
+/* Diagnostic switches compared public large-prefill folds with the parent.
+ * No fold is selected in this build, so this is a constant false; small-row
+ * kernelpool fusions and the graph's own scheduling are unaffected. */
 static bool ds41_prefill_fold(uint32_t count, const char *disable) {
     (void)count; (void)disable;
     return false;
@@ -44256,7 +44270,7 @@ static uint32_t ds41_encoder_chunk_cap(const ds41_gpu_graph *g, uint32_t count) 
  * travel down the stack with their token, while only source layers append KV.
  * A failed partial chunk cannot be snapshotted: its layers have different
  * frontiers, so the caller must rebuild from its retained token history. */
-/* The sweep's model-span installs keep a Metal/ROCm mapping to the layer in
+/* The sweep's model-span installs were a Metal/ROCm mapping to the layer in
  * flight. CUDA SSD streaming already holds every non-routed tensor in its
  * device cache from startup (routed experts go through the selected cache),
  * and a CUDA install releases that whole cache: each layer, and then the first
@@ -44906,8 +44920,9 @@ static bool ds41_draft_verify_impl(ds41_gpu_graph *g, const ds4_model *m, const 
     ds41_gpu_graph *graphs[DS4_TP_BATCH_MAX_ROWS];
     for (uint32_t i = 0; i < n; i++) graphs[i] = g;
     d->rewind_valid = false;
-    /* Allocation is lazy and restricted to local Metal; TP/CUDA retain their
-     * existing paths. These buffers hold only draft state, not the long KV. */
+    /* The retired Metal backend allocated these lazily and restricted them to
+     * local execution; TP/CUDA retain their existing paths, so `retain` is a
+     * constant false here. These buffers hold only draft state, not the long KV. */
     const bool retain = g->tp_world == 1 && !g->streaming
         && false;
     if (retain) {
@@ -48279,7 +48294,7 @@ static bool glm_graph_memory_guard_budget(
 #ifdef DS4_ROCM_BUILD
     if (!ssd_streaming) {
         /* The host baseline already excludes CMA. Reserve usable OS memory,
-         * rather than applying the Metal physical-memory reserve a second time. */
+         * rather than applying the Mac build's physical-memory reserve a second time. */
         double rocm_reserve_gib = glm_graph_bytes_to_gib(budget_base) / 16.0;
         if (rocm_reserve_gib < 8.0) rocm_reserve_gib = 8.0;
         if (rocm_reserve_gib < default_reserve_gib) {
@@ -48699,8 +48714,8 @@ static bool glm_graph_prefill_stage_sync_boundary(void) {
 static bool glm_graph_indexed_prefill_attention_boundary(void) {
 #ifdef DS4_ROCM_BUILD
     /*
-     * ROCm launches in this path are ordered on the default stream. The Metal
-     * backend still needs the encoder flush, but on ROCm it is a full-device
+     * ROCm launches in this path are ordered on the default stream. The retired
+     * Metal backend needed the encoder flush, but on ROCm it is a full-device
      * synchronize and stalls every indexed-prefill layer.
      */
     return true;
@@ -48781,7 +48796,7 @@ static uint32_t glm_graph_limit_indexed_prefill_chunk(
         uint32_t pos,
         uint32_t chunk) {
 #ifndef DS4_ROCM_BUILD
-    /* GLM 5.3's resident Metal/CUDA graph can switch its attention slices
+    /* GLM 5.3's resident CUDA graph can switch its attention slices
      * from causal dense to indexed sparse inside one layer-major chunk. */
     if (g && g->glm53 && glm_graph_indexed_prefill_batch_available(g) &&
         getenv("DS4_GLM53_DISABLE_MIXED_PREFILL") == NULL) {
@@ -58116,9 +58131,9 @@ static bool glm_graph_prefill_range(
 }
 
 /*
- * For very short GLM SSD-streaming prefills, Metal still benefits from the
- * token-major path because it reuses the normal decode graph and warms the
- * decode expert cache. On ROCm/Strix Halo the indexed batch prefill is faster
+ * Very short GLM SSD-streaming prefills use the token-major path because it
+ * reuses the normal decode graph and warms the decode expert cache. On
+ * ROCm/Strix Halo the indexed batch prefill is faster
  * now that streamed batch routing and expert cache seeding are implemented, so
  * ROCm defaults to canonical batch prefill unless the env override below opts
  * token-major prefill back in.
@@ -60141,7 +60156,7 @@ static void *qwen4_ngram_thread(void *context) {
 }
 
 /* Bound sorting memory and I/O concurrency independently of context size.
- * Metal also overlaps the uncached rows of a single decode token. */
+ * The reader also overlaps the uncached rows of a single decode token. */
 static bool qwen4_ngram_read(const ds4_model *m, const uint32_t *rows, size_t count, float *out) {
     if (!m || !m->ngram_tensor || m->ngram_fd < 0 || (count && (!rows || !out)) ||
         count > SIZE_MAX / (160u * sizeof(float))) {
@@ -60390,7 +60405,7 @@ static bool qwen4_graph_expert_ok(const ds4_tensor *t) {
                   (t->dim[0] % 256u) == 0));
 }
 
-/* The Metal graph runs a subset of what the loader accepts. */
+/* The GPU graph runs a subset of what the loader accepts. */
 static bool qwen4_graph_weights_supported(const ds4_weights *w) {
     if (!qwen4_graph_dense_ok(w->token_embd) || !qwen4_graph_dense_ok(w->output) ||
         !qwen4_graph_dense_ok(w->output_hc_down) || !qwen4_graph_dense_ok(w->output_hc_up)) {
@@ -61920,7 +61935,7 @@ static int generate_qwen4_gpu_argmax(
 #endif
 
 #ifndef DS4_NO_GPU
-/* Metal generation entry point.  The model runs as one local whole-graph
+/* GPU graph generation entry point.  The model runs as one local whole-graph
  * pipeline: graph prefill followed by graph decode steps.  Streaming PRO may
  * use decode-style prefill for short prompts. */
 static int generate_gpu_graph_raw_swa(
@@ -62361,8 +62376,8 @@ ds4_context_memory ds4_context_memory_estimate(ds4_backend backend,
 }
 #endif
 
-/* Per-layer KV byte estimate at a given context size for the CUDA /
- * Metal graph backend. Mirrors the per-layer
+/* Per-layer KV byte estimate at a given context size for the CUDA graph
+ * backend. Mirrors the per-layer
  * accounting the graph backend uses at allocation time, so the multi-GPU
  * layer packer (engine_compute_entry_bytes) can price each layer
  * individually instead of dividing a global total uniformly across all
@@ -62384,9 +62399,9 @@ ds4_context_memory ds4_context_memory_estimate(ds4_backend backend,
  *                                            sizeof(float)
  *                                            (uses sizeof(float) rather
  *                                             than the F16/F32 choice
- *                                             made at GPU build time —
- *                                             over-estimates on Apple
- *                                             Metal (F16 cache) which is
+ *                                             made at GPU build time -
+ *                                             over-estimates against an
+ *                                             F16 cache, which is
  *                                             the desired conservative
  *                                             posture for the planner).
  *                                            + (ratio==4 ? (ctx/ratio + 2) *
@@ -62511,7 +62526,7 @@ static size_t engine_per_layer_kv_bytes_planner(uint32_t il,
     size_t bytes = (size_t)raw_cap * DS4_N_HEAD_DIM * sizeof(float);
 
     /* Compressed + indexer for ratio != 0 layers. Uses sizeof(float)
-     * unconditionally (over-estimates on Apple Metal F16 cache, which
+     * unconditionally (over-estimates against an F16 cache, which
      * is the desired conservative posture per spec criterion 8). */
     const uint32_t ratio = ds4_layer_compress_ratio(il);
     if (ratio != 0) {
@@ -63625,7 +63640,7 @@ int ds4_session_ds41_dspark_adaptive_stats(const ds4_session *s, uint64_t out[7]
  * The server disk cache stores a high-level file header, then delegates the
  * graph-specific payload below to the engine.  This payload is intentionally
  * not mmaped: restoring a checkpoint copies bytes back into the already
- * allocated Metal tensors, preserving the same live graph buffers used by
+ * allocated GPU tensors, preserving the same live graph buffers used by
  * normal prefill/decode.  The raw SWA cache is serialized as the last logical
  * window only; suffix prefill writes its own raw rows before attention.  The
  * compressed caches are serialized up to their live row counts because sparse
@@ -63794,7 +63809,7 @@ static DS4_MAYBE_UNUSED uint64_t layer_index_state_bytes(uint32_t ratio) {
 
 #ifndef DS4_NO_GPU
 /* Only the last logical sliding-window rows are needed from the raw cache.
- * The physical Metal tensor is a ring sized for ubatches, but after restore
+ * The physical GPU tensor is a ring sized for ubatches, but after restore
  * the next suffix chunk will write its own raw rows before any attention read.
  * Compressed rows are different: sparse attention can select any row from the
  * prefix, so those are persisted up to their live row counts. */
@@ -67475,10 +67490,11 @@ int ds4_engine_collect_imatrix(ds4_engine *e,
     return 1;
 #else
     if (!e || !dataset_path || !output_path) return 1;
-    /* Routed-expert imatrix collection was the Metal graph path's diagnostic.
-     * Nothing in this build selects that backend, so the CLI's --imatrix-*
-     * flags refuse here exactly as they did before; ds4_engine_collect_
-     * sequential_imatrix is kept as the shape a Linux port would reuse. */
+    /* Routed-expert imatrix collection was the retired Metal graph path's
+     * diagnostic. Nothing in this build collects it, so the CLI's --imatrix-*
+     * flags refuse before the model is opened; ds4_engine_collect_
+     * sequential_imatrix is kept as the reference implementation and has no
+     * caller. */
     (void)ctx_size;
     (void)max_prompts;
     (void)max_tokens;
@@ -68126,7 +68142,7 @@ static int ds4_session_eval_splitkv_spec_after_first(
  * 1. commit the normal target token and use its logits to validate draft[0];
  * 2. let MTP recursively draft a tiny suffix from its own raw-cache frontier;
  * 3. verify the suffix with the target graph, committing only the accepted
- *    prefix and rolling back speculative Metal state on miss;
+ *    prefix and rolling back speculative graph state on miss;
  * 4. fall back to ordinary one-token decode if the fast verifier cannot prove
  *    the target stream. */
 
@@ -70117,7 +70133,7 @@ int ds4_engine_head_test(ds4_engine *e, const ds4_tokens *prompt) {
 /* ------------------------------------------------------------------------
  * Qwen3.8-Flash-Next CPU reference: f32, one token at a time, every
  * projection a plain row dot product over dequantized weights.  It is the
- * parity oracle for the Metal graph, not an
+ * parity oracle for the GPU graph, not an
  * inference path.  Weight layouts follow the llama.cpp qwen4exp GGUF: GDN
  * value heads are tiled (v-head j pairs with k-head j % n_k_heads), norm
  * gammas except ssm_norm are folded to 1+w, ssm_a holds -exp(A_log).
@@ -70827,7 +70843,7 @@ static void qwen4_dump_f32(const char *path, const float *v, uint64_t n) {
 static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab,
                                   const ds4_weights *weights, const ds4_tokens *prompt, bool graph_backend) {
     /* DS4_QWEN4_FT_LIST=<file>: batch mode.  Each line is
-     * "<comma ids>\t<out path>"; every sequence runs through the Metal graph
+     * "<comma ids>\t<out path>"; every sequence runs through the GPU graph
      * (prefill all-rows logits, the production kernel path) and its
      * [n][vocab] f32 logits are written to the path.  One model load covers
      * the whole list. */
@@ -70967,7 +70983,7 @@ static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab
     }
 
 #ifdef DS4_HAS_QWEN4_GPU
-    /* DS4_QWEN4_GPU=1 runs the Metal graph over the same ids (chunks of
+    /* DS4_QWEN4_GPU=1 runs the GPU graph over the same ids (chunks of
      * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU
      * reference; the dumped logits (and MTP drafts) are then the GPU's. */
     if (graph_backend && getenv("DS4_QWEN4_GPU")) {
@@ -71288,7 +71304,7 @@ static bool ds4_engine_configure_streaming_auto_cache(ds4_engine *e, int ctx_siz
         DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA &&
         ds4_backend_supports_glm_streaming_full_layers(e->backend);
     /* GLM's context-aware fitting pass reserves the graph, active model and
-     * prefill windows before allocation; no fixed-size Metal cache cap is needed. */
+     * prefill windows before allocation; no fixed-size cache cap is needed. */
 
 #ifdef DS4_ROCM_BUILD
     uint64_t glm_rocm_guard_cap_bytes = 0;
@@ -87604,9 +87620,9 @@ static int ds4_session_eval_speculative_argmax_impl(
     }
 
     /*
-     * Metal normally benefits from the tiny-batch verifier: it checks two
+     * Off ROCm the tiny-batch verifier is the default: it checks two
      * target positions in one layer-major pass and commits prefix-1 directly
-     * on a partial accept. Like the rest of the non-quality Metal path, it may
+     * on a partial accept. Like the rest of the non-quality graph path, it may
      * pick a different greedy token when batched reductions perturb nearly
      * tied logits.
      *
@@ -87962,7 +87978,7 @@ static int ds4_session_eval_speculative_argmax_impl(
         if (have_frontier) {
             (void)spec_frontier_restore(&frontier, s);
         } else if (!verifier_may_have_mutated) {
-            /* Snapshot setup failed before the verifier touched Metal state.
+            /* Snapshot setup failed before the verifier touched graph state.
              * Fall through to the exact sequential verifier below. */
         } else {
             snprintf(err, errlen, "MTP verifier failed");

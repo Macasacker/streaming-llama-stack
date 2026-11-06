@@ -10856,7 +10856,7 @@ static void apply_anthropic_stream_tool_ids(tool_calls *calls,
  * KV Cache.
  * =========================================================================
  *
- * The server has one live Metal session.  We persist reusable DS4 session
+ * The server has one live session.  We persist reusable DS4 session
  * snapshots when a cold prompt reaches a useful prefix, when a long continued
  * conversation has grown far enough, and when a request evicts the live session.
  * The cache key is the SHA1 of the rendered byte prefix.  The payload still
@@ -14444,7 +14444,7 @@ static void generate_job_inner(server *s, server_slot *slot, job *j) {
     if (!use_peer_decode && cached == 0) slot->continued_last_store_tokens = 0;
     if (!use_peer_decode && !multimodal && s->kv.enabled && cached == 0 &&
         old_pos >= s->kv.opt.min_tokens) {
-        /* Loading a disk snapshot replaces the live Metal session.  Persist the
+        /* Loading a disk snapshot replaces the live session.  Persist the
          * current checkpoint first, otherwise a cache hit for an older prefix
          * would silently discard the newer conversation state. */
         kv_cache_store_current(s, slot, "evict");

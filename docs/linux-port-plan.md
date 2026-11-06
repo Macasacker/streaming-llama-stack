@@ -637,14 +637,35 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     name from an identifier; `--strict` exits nonzero when a code identifier names Metal, and
     `docs/linux-port-commands.md` now gates on it instead of on the greps.
 
-    (3/4 and 4/4, open.) The comment and message halves are text work with no behaviour attached, so
-    `preprocess_equiv` proves nothing about them - but each line needs a decision, not a substitution:
-    some mentions say what the *retired* backend did and are actively misleading in a CUDA-only
-    engine (`"the whole-model Metal ..."` in the `ds4.c` header block, the `Metal command batch`
-    resume failures, the `Metal SSD streaming` refusal), while others are inherited provenance of the
-    kind chunks 2.2d, 3.1c and 3.1g deliberately kept (`ds4_metal.m` named in a `ds4_cuda.cu`
-    comment, the IoRing the loader was ported from). Rewording the printed messages changes engine
-    output, and the generated env table quotes engine message text as `consumer` evidence -
+    (3/4, done.) The comment half: 111 lines decided, 85 rewritten, 26 left as provenance. Each was
+    a decision, not a substitution. A mention that described what the *retired* backend did now says
+    so - `"the whole-model Metal graph driver"` in the `ds4.c` header block is the CUDA graph
+    driver, `Metal needs a shared mapping for no-copy MTLBuffers` is the mapping the graph backend
+    uploads spans from, `Metal currently falls through to the CPU path` is a CPU path with no Metal
+    fall-through, `Allocation is lazy and restricted to local Metal` belongs to a backend whose arm
+    the collapse already folded to `false` - and a mention that is inherited provenance stays: the
+    26 kept lines all read as `the retired Metal backend`, `the deleted Metal backend`, `the Mac
+    engine's`, or a retired source file (`metal/moe.metal`, `metal/norm.metal`, `metal/dense.metal`,
+    `dsv4_hc.metal`, `metal/qwen4.metal`, `ds4_metal.m`).
+    `preprocess_equiv` cannot show a comment edit: it keeps comments, and rewording one shifts every
+    line below it. The proof is `scripts/port/comment_code_diff.py` - strip comments from both sides,
+    compare code lines. Every file this part touched reports 0 changed code lines; the two headers
+    report exactly the 16 lines of the three declarations deleted with it, `ds4_gpu_warm_command_queue`,
+    `ds4_gpu_hc_rms_scale_project_f16_tensor` and `ds4_gpu_tp_gate_prefetch_plan`, each a leftover of
+    the deleted backend with no definition and no caller anywhere in the repo. The same scan finds 35
+    more dead declarations in the engine's GPU headers that name no backend; those are a separate
+    chunk, not this one. Both binaries link (`ds4`, `ds4-decode.so`), every TU that warns has a
+    warning profile identical to a worktree at the parent commit (`ds4.o` 23, `ds4_ext.o` 11,
+    `ds4_cli.o` 1, `ds4_server.o` 2, same texts), and the env table regenerated with the 2,234-name
+    set unchanged: 485 rows moved, 483 of them only their quoted `source`/`reads` line numbers, two
+    because their consumer snippet quotes a comment this part reworded (`DS4_DSPARK_NO_GPU_MARKOV`,
+    `DS4_METAL_NO_PREFILL_KERNEL_WARMUP`). `ds4.c` has no `__LINE__`, so moving its lines changes no
+    message; `ds4_cuda.cu` has one, far below the four comments edited there, and those four edits
+    are line-count neutral.
+
+    (4/4, open.) The message half has the same shape: `preprocess_equiv` proves nothing about the
+    wording, and each line needs a decision. Rewording the printed messages changes engine output,
+    and the generated env table quotes engine message text as `consumer` evidence -
     `docs/VARIABLES.md` carries the `ds4: Metal mixed batch prefill_rows=%u decode_rows=%d` line -
     so the table must be regenerated in the same commit; 2.2e's identifier half alone moved 4 rows.
     The Mac receipts under `docs/macdecode-r2/` embed historical `ds4: Metal device ...` stderr
@@ -1184,7 +1205,7 @@ producer work, and 504 Windows ones under the same excludes (774 before chunk 3.
 quoted grep patterns and the inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
 matches are the 213 distinct `DS4_METAL_*` environment names (404 occurrences) kept on purpose plus
-the 284 comment and message lines chunk 2.2e has left (111 comments, 173 strings).
+the 199 comment and message lines chunk 2.2e has left (26 provenance comments, 173 strings).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in

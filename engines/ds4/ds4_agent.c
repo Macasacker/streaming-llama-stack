@@ -12820,7 +12820,7 @@ typedef enum {
 
 /* Process exit is different from /new or /switch: once the terminal is already
  * restored, declining the save can terminate immediately and let the OS reclaim
- * model/Metal resources instead of waiting for orderly teardown. */
+ * model and GPU resources instead of waiting for orderly teardown. */
 static agent_exit_save_result agent_maybe_save_before_exiting(agent_worker *w) {
     if (!agent_worker_needs_save(w)) return AGENT_EXIT_CLEAN;
     if (!agent_prompt_yes_no("Save current session? (y/n) ")) return AGENT_EXIT_NOW;
@@ -13584,9 +13584,9 @@ int main(int argc, char **argv) {
     }
     agent_apply_model_sampling_defaults(engine, &cfg.gen);
 
-    /* Model paths and Metal kernel sources are resolved from the launch
-     * directory. Tools should run in --chdir, so change directory only after
-     * the inference engine has finished opening. */
+    /* Model paths are resolved from the launch directory. Tools should run in
+     * --chdir, so change directory only after the inference engine has finished
+     * opening. */
     if (cfg.chdir_path && chdir(cfg.chdir_path) != 0) {
         fprintf(stderr, "ds4-agent: failed to chdir to %s: %s\n",
                 cfg.chdir_path, strerror(errno));

@@ -4,7 +4,7 @@
  *
  * The parser does not link CUDA headers directly. On CUDA builds the
  * "auto" path is gated and dispatches to ds4_gpu_args_probe_auto_cuda,
- * which is defined in ds4_cuda.cu. On Metal/CPU builds, "auto" returns
+ * which is defined in ds4_cuda.cu. On a CPU-only build, "auto" returns
  * an error.
  */
 #ifndef DS4_GPU_ARGS_H

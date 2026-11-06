@@ -90,7 +90,8 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
 # 2.2e's first run missed). The census classifies each mention by its position in the file, which is
 # the only honest test, and --strict fails on anything the compiler sees.
 python3 -B scripts/port/metal_word_census.py --strict
-# IDENTIFIER 0, ENV_NAME 195, ENV_NAME_CITED 124, COMMENT 111 lines, STRING 173 lines
+# IDENTIFIER 0, ENV_NAME 195, ENV_NAME_CITED 123, COMMENT 26 lines, STRING 173 lines
+# (the 26 comments are provenance: they name the retired backend or its source files)
 python3 -B scripts/port/metal_word_census.py --strict --list   # names the tokens and the files
 # --strict exit 1 means a code identifier names Metal again.
 grep -rn "\bmetal_\|\bMETAL_" engines/ds4 \
