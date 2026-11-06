@@ -10,36 +10,33 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-Phase 3's producer CLI, its weight fetcher and its native weight provider are now Linux: the
-provider holds a POSIX lease on the verified model file, builds the bounded relay, acquires stages
-in alternating banks, writes named file extents into a compute bank, and admits its RAM expert tier
-from `/proc`. A streamed prefill still needs the Engram row loader, and the gate itself needs a
-qualified GGUF. In the order worth doing:
+Phase 3's producer CLI, its weight fetcher, its native weight provider and its Engram row loader
+are now Linux: the provider holds a POSIX lease on the verified model file, builds the bounded
+relay, acquires stages in alternating banks, writes named file extents into a compute bank, admits
+its RAM expert tier from `/proc`, and loads a prompt's Engram rows through io_uring queues. A
+streamed prefill still needs the locked-memory decision and the carry lease, and the gate itself
+needs a qualified GGUF. In the order worth doing:
 
-1. **Chunk 3.1g - `llama-dsv41-engram-prefetch.cpp` (Phase 3 item 3), and with it the provider's
-   three Engram arms.** All 630 lines of the implementation, including the platform-neutral row
-   planner (hash to row ids, extents, the admission arena, the prior-cache row copy), sit inside
-   `#ifdef _WIN32`: IoRing rings at QD64 over 1 MiB extents, registered files and buffers, a slot
-   table, table-0-before-table-1 publication, and cancellation. io_uring measured against the
-   `pread` baseline is Phase 8 item 3's comparison, and the 76.2 s to 43.2 s figure came from this
-   change on the Windows machine. `load_early()` and `load()` take a `const wchar_t*` and a Windows
-   `HANDLE`; the provider's lease holds an `int fd` and a `std::filesystem::path`, so change the
-   signature in this file rather than adapting at the call site. Nothing else in the Engram family
-   needs porting - `llama-dsv41-engram.{h,cpp}`, `llama-dsv41-engram-row-cache.h` and
-   `llama-dsv41-engram-early-decision.h` are already Win32-free - so opening `launch_early`,
-   `start_engram_prompt_early` and the synchronous load in `prepare_engram_prompt` is the last
-   thing between this tree and a prefill attempt.
-2. **Chunk 3.1h - the locked-memory decision, then `llama-dsv41-locked-ram.h` and the carry lease in
+1. **Chunk 3.1h - the locked-memory decision, then `llama-dsv41-locked-ram.h` and the carry lease in
    `llama-dsv41-carry.cpp`** (Phase 3 item 5). They are the same family, and neither can be written
    before the decision below: `mlock` of a pinned tier needs an `RLIMIT_MEMLOCK` or a cgroup
-   allowance, and `host_memory::begin()` deliberately does not solve it.
-4. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
+   allowance, and `host_memory::begin()` deliberately does not solve it. `llama-dsv41-carry.cpp`
+   (13 hits) and `llama-dsv41-locked-ram.h` (9) are the last two Windows-shaped files the prefill
+   path needs; the sweep calls both.
+2. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
    `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
    profiler. No behaviour attached; regenerate the env table because lines move.
 
 Also open: 5.1 (Python orchestrator: `guard.py` Job Object -> a cgroup scope,
 `single_runtime.py` PRODUCER_FILES), 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and
-8.1 (qualification), all blocked on a qualified GGUF for the last one.
+8.1 (qualification), all blocked on a qualified GGUF for the last one. Phase 3's remaining Win32
+after 3.1h is `mtmd`, `server` and `decode-receiver`, none of which the streamed prefill needs.
+
+What a prefill attempt now needs beyond a qualified GGUF: nothing in the Engram path is refused
+any more. The three provider arms (`launch_early`, `start_engram_prompt_early`, the synchronous
+load in `prepare_engram_prompt`) are live and the loader runs on io_uring, so the first real
+`--engram-prefetch-bytes` run is the test of the geometry defaults, which were tuned on a Windows
+RAID-0 and are still the values in `choose_scan()`.
 
 Chunk 3.2 (the decode library loader) landed inside 3.1c, because `live-session.inc` is part of
 `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable. Its binding is
@@ -50,8 +47,8 @@ verified by the selftest; a live session against weights is not, and cannot be h
 `git log --oneline` from `58ff877` forward is the port, chunk by chunk; `docs/linux-port-plan.md`
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
 `7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` +
-`1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), plus the plan/handoff commits. `git status -sb`
-shows no `[ahead N]` after pushing; check it rather than assuming.
+`1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), plus the plan/handoff commits.
+`git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
 reports 0 findings, so commits need no `--no-verify` (`core.hooksPath` runs it as a pre-commit
@@ -69,26 +66,34 @@ Five hand-compiled programs cover what has no test target, all passing on this t
 pipeline), `docs/evidence/wf-extent-selftest.cpp` (33 checks, the strict extent reader),
 `docs/evidence/provider-lease-selftest.cpp` (14 checks, the provider's lease through `inspect()`
 with no backend), and `docs/evidence/uring-flush-probe.cpp` (3 checks, the io_uring flush rule).
-`docs/linux-port-commands.md` has the exact compile lines.
+A sixth is a real test source rather than an evidence file, and still has no build rule:
+`tests/dsv41_engram_early_io.cpp` (15 checks, chunk 3.1g's row loader over a 208 MB synthetic table
+file, no GPU and no model). `docs/linux-port-commands.md` has the exact compile lines for all six -
+the lease recipe was missing from it until this session, even though the evidence file points at it.
 
 Nothing verified so far is a performance result for a model. The measurements are the fetcher's
 reader comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring x1.04 at four threads, x1.44-x1.67
-at one, 64 MiB across 218 ops, one NVMe, cold cache) - it isolates the reader, not a prefill. No
-supported model weights exist on this box.
+at one, 64 MiB across 218 ops, one NVMe, cold cache) and the Engram loader's
+(`tests/dsv41_engram_early_io.cpp`: ring and `pread` the same within a few ms, because its 208 MB
+fixture fits in the page cache - it compares mechanics, not a device). Neither isolates a prefill,
+and no supported model weights exist on this box.
 
 ## Constraints on this box
 
-1. A Strata serve process (`qwen38-gyro/Strata/build/strata --serve ...`) holds ~29.9 GiB of
+1. A Strata serve process (`qwen38-gyro/Strata/build/strata --serve ...`) holds ~29.9-30.1 GiB of
    32 GiB VRAM, and the user's browser GPU process holds another 170-320 MB. **Both pids change
    between sessions and even within one** - read them from
    `nvidia-smi --query-compute-apps=pid,used_memory`. Stopping Strata also stops this assistant, so
    GPU work is the user's to run by hand. Never kill it to test. Host-only gates work;
-   `llama-server --version`, the producer's CUDA-enumeration path and the fetcher selftests all
-   initialised a context without disturbing it, and NVML queries (`nvmlDeviceGetMemoryInfo`) are
-   read-only. Anything that allocates device memory is still the user's call, and **the headroom
-   moves**: it went from ~900 MB to ~0 mid-session on 2026-11-03, which is why a CUDA-needing gate
-   can pass at one hour and fail at the next. Re-run before concluding the code broke; a program
-   that only does `cudaMalloc(8 MiB)` says whether the box or the change is at fault.
+   `llama-server --version` and the fetcher selftests all initialised a context without disturbing
+   it, and NVML queries (`nvmlDeviceGetMemoryInfo`) are read-only. Anything that allocates device
+   memory is still the user's call, and **the headroom moves**: it went from ~900 MB to ~0 mid-session
+   on 2026-11-03, which is why a CUDA-needing gate can pass at one hour and fail at the next. Re-run
+   before concluding the code broke; a program that only does `cudaMalloc(8 MiB)` says whether the
+   box or the change is at fault. On 2026-11-06 it was worse than "no headroom": `cudaFree(0)` and
+   `cudaMemGetInfo` themselves returned `out of memory`, so the producer's no-model receipt smoke
+   aborts in `ggml_backend_cuda_get_device_memory` instead of reaching its VRAM-reserve refusal -
+   that gate is unrun, not failing.
 2. No supported model file exists. The GGUFs on disk are
    `qwen38-gyro/Strata/models/Qwen3.8-Flash-Next-Gyro-{S,M,L}-TQ1_0/TQ2_0/TQ3_0.gguf`
    (54.5 / 92 / 108 GiB); their metadata matches `DS4_SHAPE_QWEN4_EXP` but they are TQ-quantized
@@ -140,6 +145,13 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   `preprocess_equiv`: the line delta shifts everything and the positional diff is noise. Review
   `git diff -U0 <file> | grep '^+[^+]'` - the insertions - line by line instead, and check
   separately that every `== DEAD` term became false and every `!= DEAD` term became true.
+- A **rewrite** chunk (3.1g replaced one file's IO halves and kept its platform-neutral halves) is
+  outside all three tools: there is nothing to collapse, and the positional diff is mostly the new
+  code. What proved the unchanged half was a scratch function-level comparison - extract each named
+  member from `git show HEAD:<path>` and from the working file by brace matching, drop comments and
+  the guard lines, and require equality (`build/engram-neutral-diff.py`, not committed; rewrite it
+  if you need it). Eleven members reported identical. Pair it with the warning-profile comparison,
+  which for a rewrite should only *lose* warnings (the deleted stubs' own).
 
 - Sweep inputs a later session may need to re-run are committed under `docs/evidence/` -
   `rename-2.2d.json` is chunk 2.2d's rename map, `platform-selftest.cpp` is chunk 3.1c's
@@ -148,7 +160,9 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   3.1f's extent reader (33 checks, including a seven-part batch against four slots),
   `provider-lease-selftest.cpp` is 3.1f's lease program (14 checks through the public `inspect()`
   with no backend), and `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait
-  rule. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
+  rule. Chunk 3.1g's program is not under `docs/evidence/` but in the test directory -
+  `tests/dsv41_engram_early_io.cpp`, ported with the loader, 15 checks over a 208 MB synthetic table
+  file, no GPU and no model. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
   smoke recipe. Anything written under `build/` is scratch and is not in git; chunk 2.2b's map was
   never saved, so its rename is only reconstructable from its commit message.
 - When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
@@ -160,60 +174,51 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 ## Behaviour changes landed this session
 
-Chunks 3.1c/3.1d/3.1e's behaviour changes (the CLI running on Linux, the POSIX receipt identity
+Chunks 3.1c through 3.1f's behaviour changes (the CLI running on Linux, the POSIX receipt identity
 fields, `--carry-storage hybrid` without a drive letter, SIGINT/SIGTERM cancellation, the live
-carry-resume RAM floor, no process-memory limit in `host_memory::begin()`, the io_uring reader and
-`LLAMA_WF_IO_URING=0`, `WF_MODE_AUTO` probing cuFile, buffered `io_direct`, the deleted
-`--ds-gpu-ring-slots`, the sticky failed-read accounting, liburing on the link line) are recorded in
-the plan's own entries for those chunks. This session's (chunk 3.1f):
+carry-resume RAM floor, no process-memory limit in `host_memory::begin()`, the fetcher's io_uring
+reader and `LLAMA_WF_IO_URING=0`, `WF_MODE_AUTO` probing cuFile, buffered `io_direct`, the deleted
+`--ds-gpu-ring-slots`, `--ds-submit-threads` and `--ds-zero-padding-only`, the sticky failed-read
+accounting, the POSIX provider lease, the bounded relay as the strict profile, the named-extent
+reads into a compute bank, the RAM expert tier measured from `/proc`, and the move of the relay's
+staging tier and the extent window into the provider's host plan) are recorded in the plan's entries
+for those chunks and in their commit messages. This session's (chunk 3.1g):
 
-- **The provider's lease is POSIX.** `open(O_RDONLY|O_NOFOLLOW)` relative to the pinned parent
-  directory (`openat`), ancestor descriptors held for the provider's lifetime and rebound to their
-  names by `identity()`, which runs around every file operation. `identity()` checks `st_dev`, the
-  8-byte little-endian `st_ino` inside the 16-byte receipt field, `st_size`, `st_mtime` in Unix ns,
-  `S_ISREG` and `st_nlink==1` - the four keys `slstack/native_broker.py` writes into a copy receipt.
-  `DRIVE_FIXED` + `QueryDosDeviceW` became a `statfs` refusal of network and RAM-backed types; the
-  Engram row reader keeps the 4 KiB-aligned extent but reads it with `pread`, so the
-  `GetDiskFreeSpaceW` sector probe is gone.
-- **The strict profile is the relay, not DirectStorage.** `wf_create_required_dstorage` (it refused
-  unconditionally here) is `wf_create_required_streaming`, and the internal flag is
-  `strict_streaming`. It admits one exact typed geometry - auto request size, bounded staging, async
-  copy ordering, an explicit pinned staging tier - with no ambient env tuning, no expert cache, no
-  relay prefetch buffer, and sticky failures. The provider asks for `WF_MODE_DIRECT_IO` explicitly
-  (not `AUTO`, which could resolve to GDS and register the fetcher's allocations before its bank
-  pointers are replaced) and `io_direct=false`, so the fetcher's banks are exactly the admitted
-  `compute_buffer_bytes`.
-- **Admission moved, so a launch recipe needs a larger `--provider-host-bytes` than the Windows
-  one.** The relay's pinned staging tier (`(buffers+1)` bank-sized buffers) and the extent reader's
-  32 MiB window are charged to the provider's host plan; the GPU-side staging term left the device
-  plan, because nothing here stages on the device. `--fetch-profile baseline` is refused while
-  inspecting, with a message naming the typed profiles, rather than at pipeline creation.
-- **Named extents are io_uring reads into the compute bank.** `wf_fetch_extents_direct`,
-  `..._overlap`, `wf_fetch_ready_extents`, `wf_wait_ready_extents` and `wf_ready_direct_bank` went
-  from `return false` to real: extents are split into parts, read through io_uring (or the `pread`
-  baseline) into a pinned window of four 8 MiB slots, and uploaded on the caller's stream - or the
-  fetcher's copy stream for the tail-hint worker, which publishes one event per batch and hands back
-  a fence. The relay now publishes the per-stage generation where a stage reaches `GPU_READY` (both
-  sites; the deleted queue used to be the only publisher), so `wf_ready_direct_bank` and the hint
-  protocol work. `acquire_layer_experts` and `prefill_experts` are live. Bounds are checked against
-  the file and the bank before any byte is written; a negative or short read poisons the fetcher; a
-  batch naming a stage that left its bank refuses without poisoning (nothing was written).
-- `acquire()` gained a guard that a stage landed in the bank its regions were planned in
-  (`buffers[id%2]`), because the extents name regions of that bank: a stage recycled into the other
-  one would bind the wrong file bytes into the wrong tensors.
-- `configure_host_cache` measures the RAM expert tier from `/proc` (`MemAvailable`, `VmRSS`) through
-  `src/llama-dsv41-host-memory.h`, keeping the Windows reserve and margin arithmetic and the
-  `LLAMADECODE_HOST_CACHE` log line's field names.
-- Deleted rather than faked, as `--ds-gpu-ring-slots` was in 3.1e: `--ds-submit-threads` (no reader
-  since the IOCP workers went) and `--ds-zero-padding-only` are unknown producer options, with their
-  `wf_params` and provider `config` fields, their receipt keys, and
-  `tools/slstack-weight-fetcher.def` - a Windows export list no build rule used, whose names were
-  already stale. Anything mirroring `wf_params` by field order is now doubly stale - notably
-  `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py`, which Phase 6 deletes anyway.
-- **Both io_uring readers wait through `io_uring_submit_and_wait()`.** `io_uring_wait_cqe()` does
-  not flush entries the kernel has not been told about on this liburing, and `io_uring_submit()` can
-  return 0 without being an error, so the old "submit, then wait" pair could leave a layer's reads
-  unseen forever. `docs/evidence/uring-flush-probe.cpp` demonstrates both halves.
+- **The Engram row loader reads through io_uring queues, one per ring, with a serial `pread`
+  baseline** (`LLAMADECODE_ENGRAM_IO_URING=0`, new row; the same convention as `LLAMA_WF_IO_URING`).
+  Both readers run the identical planner extents, slot arena, hit bitmaps, table-publication order
+  and counters, so the comparison isolates the reader. Fixed-file registration is optional and the
+  slot arena is named per request rather than registered; the Windows registration submit and its
+  completion loop are gone, because `io_uring_register_files` is a synchronous syscall.
+- **The wait is a shared `eventfd` plus `poll(..., 100 ms)`, and the submit is always explicit.**
+  It replaces `SetIoRingCompletionEvent` and `WaitForMultipleObjects`. Each queue's submission ring
+  is flushed before waiting. A short or zero flush is legitimate and the unflushed entries stay in
+  the ring (`in_sq` counts them and the batch thresholds read it), so the Windows "the whole batch
+  or nothing" refusal is gone.
+- **Cleanup is `IORING_OP_ASYNC_CANCEL` keyed on the descriptor**, then the same 5 s drain and the
+  same refusal to free an arena an unconfirmed read can still write into; that refusal now prints
+  `DSV41_ENGRAM_RING_CLEANUP_REFUSED` and exits with `_exit(79)` in place of `TerminateProcess`.
+  Unsubmitted entries are flushed and cancelled rather than abandoned.
+- **The loader opens its own descriptor on the model's name** and refuses it unless `st_dev`,
+  `st_ino`, `st_size`, `S_ISREG` and `st_nlink == 1` still match the provider's lease - the fact
+  `FILE_ID_INFO` proved - with `O_NOFOLLOW` where Windows used `FILE_FLAG_OPEN_REPARSE_POINT`.
+  Reads are buffered, so the 4 KiB extent geometry is kept and the `FileStorageInfo` logical-sector
+  probe for `LLAMADECODE_ENGRAM_READ_ALIGN=512` is gone; `PERFEXP_E13` now reports the geometry
+  alone.
+- Deleted rather than faked: **`LLAMADECODE_ENGRAM_IO_PRIORITY`**, which set a per-handle Windows IO
+  priority hint with no Linux per-request equivalent (process scheduling and `ionice` govern) and
+  whose measured `low` value starved the reads. Both reads, both log lines and the env row are gone;
+  `envvars.json` is still 2,234 names, with `LLAMADECODE_ENGRAM_IO_URING` replacing it.
+- `load()` and `load_early()` take `const std::filesystem::path&` and an `int` descriptor instead of
+  a `const wchar_t*` and a `HANDLE`. Two log fields renamed: `own_iorings=1`/`own_ioring=1` became
+  `own_rings=1`/`own_ring=1`, and both load lines gained `reader=io_uring|pread`. **No admission
+  change**: the arena and metadata arithmetic is the Windows one, so the `--engram-prefetch-bytes`
+  values in existing recipes still apply.
+- The provider's three Engram arms are open (`launch_early`, `start_engram_prompt_early`, the
+  synchronous load in `prepare_engram_prompt`), so `src/llama-dsv41-weights.cpp` holds no Win32
+  conditional and nothing in the Engram path refuses on Linux. The geometry defaults in
+  `choose_scan()` are still the Windows RAID-0 tuning, untouched.
+
 - Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
   `slstack-weight-fetcher.dll`, and `scripts/build_combo_runtime.py` builds a preset named
   "RTX: ULTRA prefill -> ds4-win decode". Those are 5.1/7.1. Note for 5.1:
@@ -287,9 +292,33 @@ the plan's own entries for those chunks. This session's (chunk 3.1f):
   full SQ ring puts the remainder back on the queue, and `wf_stop` drains the queue and the
   in-flight reads before joining. `IOSQE_FIXED_FILE` means the SQE's `fd` field is the *registered
   index*, not a descriptor; registration is optional, so both paths must stay wired. And **the wait
-  must also be a submit**: `io_uring_wait_cqe()` does not flush the submission queue here, so every
-  read queue needs `io_uring_submit_and_wait()`, not `io_uring_submit()` plus a wait. Treat only a
-  negative submit return as an error - 0 is legitimate.
+  must never be the only submit**: `io_uring_wait_cqe()` does not flush the submission queue here, so
+  a queue either waits through `io_uring_submit_and_wait()` (the fetcher's reader) or flushes with
+  `io_uring_submit()` and then blocks on something else (the Engram loader's `eventfd` poll, chunk
+  3.1g). Treat only a negative submit return as an error - 0 is legitimate.
+- **One submitted entry yields exactly one CQE - including a cancel request.** `IORING_OP_ASYNC_CANCEL`
+  produces its own completion, so a drain loop that counts only "reads" never reaches zero and the
+  cleanup refusal fires on a healthy queue. The Engram loader marks the cancel with a sentinel
+  `user_data` and retires one `in_kernel` entry per CQE.
+- **Consuming an `eventfd` counter before polling loses a wake.** `io_uring_register_eventfd` posts on
+  every completion; if you `read()` the counter and then `poll()`, a completion whose CQE is already
+  queued but not yet peeked produces no further event and the poll runs its whole timeout - the first
+  version of the Engram loader paid 100 ms on every load (115 ms against 14-20 ms). Check
+  `io_uring_cq_ready()` on every queue sharing that eventfd before sleeping.
+- `io_uring_peek_cqe` does **not** block on this liburing when the CQ ring is empty and the ring has
+  no `IORING_SETUP_IOPOLL`, CQ overflow or pending task work: it returns `-EAGAIN`. A drain-until-empty
+  loop is therefore safe; `io_uring_wait_cqe` is not (it needs the submit, and does not return
+  `-EINTR`).
+- The Engram loader's geometry and reader env reads (`LLAMADECODE_ENGRAM_IO_URING`, `_SCAN`,
+  `_READ_ALIGN`, `LLAMADECODE_ENGRAM_EARLY`, `LLAMADECODE_ENGRAM_IOPS`) are function-local statics:
+  once per process. A ring-vs-`pread` or scan-vs-random comparison is two runs, not one.
+- `tests/dsv41_engram_early_io.cpp` has no build rule and links the `src/` objects, so it needs
+  `ninja -C build/llama src/libllama.a` first for the same stale-object reason as the evidence
+  files - `tools/dsv41-prefill` compiles its own copy of `llama-dsv41-engram-prefetch.cpp` as well
+  as of `llama-weight-fetcher.cpp`, and building the CLI does not rebuild the `src/` one.
+- In C++, `::stat(path, &info)` finds the **type** `struct stat`, not the function, and fails to
+  compile with "too few arguments". Use `std::filesystem::file_size` or `fstatat` in test code; the
+  port of this test hit it.
 - `WF_HAS_IO_URING` comes from `__has_include(<liburing.h>)`, so liburing must be on the link line
   (`LLAMA_URING_LIBRARY`, resolved in the top-level `CMakeLists.txt` and linked into `llama`, the
   producer and the fetcher `.so`). A header-only install would fail at link, not at run time.
@@ -345,12 +374,16 @@ the plan's own entries for those chunks. This session's (chunk 3.1f):
 
 - `adversarial-code-review` after a deletion or rename chunk, with the `scripts/port/` equivalence
   commands handed to the reviewer as evidence (see the method section for what it caught last time).
+- The user asked, on 2026-11-06, that this work not be parallelised: subagents are expensive on
+  context prefill, and one of them died mid-run with no output anyway. Verify inline - the compile
+  checks, the hand-compiled programs and the function-level diff - and ask before fanning out.
 - `add-unit-test` for extending `engines/ds4/tests/test_batch_io.cpp` or `test_decode_library.cpp`.
   The producer's reader is covered by `docs/evidence/wf-io-selftest.cpp`, compiled by hand, because
-  the producer has no test target.
-- `code-design` / `code-reviewer` when porting the weight provider lease and the carry lease
-  (chunk 3.1f), and `adversarial-code-review` after it: that chunk changes admission, not just
-  text.
+  the producer has no test target; the Engram loader by `tests/dsv41_engram_early_io.cpp`, also
+  compiled by hand.
+- `code-design` / `code-reviewer` when porting the carry lease and the locked-memory tier (chunk
+  3.1h), and `adversarial-code-review` after it if the user allows a subagent: that chunk changes
+  admission, not just text.
 - `web-research` for liburing, CCCL 3 / libcudacxx header changes, or llama.cpp cmake details.
 - `unslop` / `writing-style` on docs and commit messages.
 - `handoff` again when this session runs out of context - update this file, don't replace it with

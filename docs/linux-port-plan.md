@@ -319,16 +319,17 @@ tools   54 refs: dsv41-prefill/main.cpp (windows.h, bcrypt.h, dxgi1_4.h), produc
    support, instead of choosing GDS because `cufile.h` exists.
 2. Done (3.1e). `llama-wf-gpu-ring.inl`, the DStorage interop and the `ds_gpu_ring_slots`
    parameter deleted; `--ds-gpu-ring-slots` is gone from the producer rather than faked.
-3. Open. Port `llama-dsv41-engram-prefetch.cpp` to io_uring with 1 MiB extents at QD64, and measure
-   it against the `pread` baseline separately. That change is what took 76.2 s to 43.2 s. Its
-   `prepare_early` row planner (the hash-to-extent work, the admission arena and the prior-cache row
-   copy) is platform-neutral code inside `#ifdef _WIN32` and is the bulk of the port; the rings are
-   the smaller half. `load_early`/`load` take a `const wchar_t*` path and a Windows handle - change
-   them to a path and an fd, which is what the provider's lease now holds.
-4. Done except the Engram arms (3.1f). The provider's physical lease, `inspect`, `create_pipeline`,
-   `acquire_layer_experts` and `configure_host_cache` are Linux. The three refusals that remain are
-   the Engram early-loader arms (`launch_early`, `start_engram_prompt_early`, and the synchronous
-   load in `prepare_engram_prompt`), which cannot be written before 3.1g ports the loader they call.
+3. Done (3.1g). `llama-dsv41-engram-prefetch.cpp` reads its planner extents through io_uring
+   queues, one per ring, with the serial `pread` kept as the baseline
+   (`LLAMADECODE_ENGRAM_IO_URING=0`). Its platform-neutral row half - the hash-to-extent work,
+   the admission arena and the prior-cache row copy - is byte-identical after the port. The
+   cold-cache comparison against `pread` on a qualified GGUF is still Phase 8 item 3's: on this
+   box the fixture is page-cache resident, so the two readers agree. `load_early`/`load` now take
+   a `std::filesystem::path` and an `int` descriptor, which is what the provider's lease holds.
+4. Done (3.1f, 3.1g). The provider's physical lease, `inspect`, `create_pipeline`,
+   `acquire_layer_experts` and `configure_host_cache` are Linux, and the three Engram arms
+   (`launch_early`, `start_engram_prompt_early`, the synchronous load in `prepare_engram_prompt`)
+   are open. `src/llama-dsv41-weights.cpp` holds no Win32 conditional.
 5. Open. Replace `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`. This is
    the locked-memory decision (`mlock` needs an `RLIMIT_MEMLOCK` or cgroup allowance) and it also
    gates the decode library's host-cache path.
@@ -863,9 +864,90 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `llama-dsv41-sweep.cpp`'s combined host budget sums; and a stale or zero ready-batch generation
     refuses without poisoning.
 
+3.1g The Engram row loader, and the provider's three Engram arms. Done (`2f79178`, plus this
+    record commit). Phase 3 items 3 and 4.
+    Every implementation line of `src/llama-dsv41-engram-prefetch.cpp` was inside `#ifdef _WIN32`:
+    IoRing queues at QD64 over 1 MiB extents, file handles and slot arenas registered as ring
+    operations, a slot table, table-0-before-table-1 publication, and `CancelIoEx` cleanup.
+    The row half of that file is platform-neutral and stays byte-identical - a scratch comparison
+    against the parent commit (`build/engram-neutral-diff.py`) checks eleven members and reports no
+    change: `prepare()`, `budget()`, `planned_requests()`, `env_u32()`, `prepare_early()`,
+    `plan_geometry()`, `choose_scan()`, `scan_geometry()`, `predicted_seconds()`, `read()`,
+    `wait_table()`. The IO half is rewritten:
+
+    - One read queue per ring: io_uring when `io_uring_queue_init` succeeds, the serial `pread`
+      baseline when it does not or with `LLAMADECODE_ENGRAM_IO_URING=0` (new documented row, the
+      same convention as `LLAMA_WF_IO_URING`). Both readers run the identical planner extents, slot
+      arena, hit bitmaps, publication order and counters, which is what makes the comparison mean
+      anything. Fixed-file registration is optional, as in the fetcher's reader; the slot arena is
+      named per request instead of registered, so the ring-op registration and its completion
+      accounting loop are gone (`io_uring_register_files` is a synchronous syscall).
+    - Completions are drained with `io_uring_peek_cqe` and waited on through one shared `eventfd`
+      plus `poll(..., 100 ms)`, which replaces `SetIoRingCompletionEvent` and
+      `WaitForMultipleObjects`. The submission queue is flushed before every wait, so no wait
+      relies on a wait also being a submit (3.1f's rule). `io_uring_submit()` returning 0 is a
+      legitimate submit of nothing new, and entries it did not flush stay in the ring, so the
+      Windows "the whole batch or nothing" refusal is gone - `in_sq` counts the unflushed entries
+      and the batching thresholds read it. Completion ownership is unchanged: the same
+      `sequence<<9|slot` and `sequence<<16|slot` nonces.
+    - The first version consumed the eventfd counter before polling, which swallowed the wake of a
+      completion whose CQE was already queued but not yet peeked; every early load then paid one
+      full 100 ms poll. The wait checks each queue's own CQ ring (`io_uring_cq_ready`) first, and
+      the 200-extent early load went from ~115 ms to 14-20 ms.
+    - Cleanup: `CancelIoEx(handle, NULL)` became `IORING_OP_ASYNC_CANCEL` keyed on the descriptor
+      (`IORING_ASYNC_CANCEL_ALL`, plus `_FD_FIXED` when the file is registered), then the same 5 s
+      drain and the same refusal to free an arena an unconfirmed read can still write into. That
+      refusal now prints `DSV41_ENGRAM_RING_CLEANUP_REFUSED` and exits with `_exit(79)` instead of
+      `TerminateProcess(..., 79)`. Unsubmitted SQ entries are flushed and cancelled rather than
+      abandoned, so nothing can write after the arena is freed.
+    - The loader opens its own descriptor on the model's name and refuses it unless `st_dev`,
+      `st_ino`, `st_size`, `S_ISREG` and `st_nlink == 1` still match the provider's lease - the
+      fact `FILE_ID_INFO` proved - with `O_NOFOLLOW` where Windows used
+      `FILE_FLAG_OPEN_REPARSE_POINT`. `FILE_FLAG_NO_BUFFERING` has no twin: the reads are buffered,
+      the 4 KiB-aligned extent geometry is kept, and the `FileStorageInfo` sector probe that
+      `LLAMADECODE_ENGRAM_READ_ALIGN=512` required is gone; the `PERFEXP_E13` line now reports the
+      geometry alone.
+    - Deleted rather than faked, as `--ds-submit-threads` was in 3.1f: `LLAMADECODE_ENGRAM_IO_PRIORITY`
+      set a per-handle Windows IO priority hint, which Linux has no per-request equivalent for
+      (process scheduling and `ionice` govern), and its measured `low` value starved the reads.
+      Both reads, both log lines and the `envvars.json` row are gone; the row set otherwise is
+      unchanged, so `envvars.json` is still 2,234 names, with `LLAMADECODE_ENGRAM_IO_URING`
+      replacing it.
+    - `load()` and `load_early()` take `const std::filesystem::path&` and an `int` descriptor
+      instead of a `const wchar_t*` and a `HANDLE`; the change is in this file, not adapted at the
+      call site. Two log fields naming the old transport changed: `own_iorings=1` and
+      `own_ioring=1` became `own_rings=1` and `own_ring=1`, and both load lines gained
+      `reader=io_uring|pread`.
+    - The provider's three Engram arms are open, which removes the last three `#ifdef _WIN32` in
+      `src/llama-dsv41-weights.cpp`: `launch_early` captures the path and the descriptor and its
+      thread loads on its own queues, and `prepare_engram_prompt` runs its synchronous load on the
+      early loader as it did on Windows.
+
+    Gate met, host-only. `tests/dsv41_engram_early_io.cpp` is ported with the loader - it was the
+    Windows-only synthetic-table test for exactly this file, and 208 MB of generated table file is
+    not a model. 15 checks pass on the ring reader and on the `pread` baseline, with the scan
+    geometry chosen, forced and off, at 1/3/4/8 rings and depth 32..4096 with batch 1..4096, the
+    512 B geometry, the single-queue reference loader, the tight-admission arena that shrinks the
+    IO arena inside admission, prior-request reuse, the row cache, the descriptor refusal, the
+    batched-submit variant and cancellation; two checks were added for the descriptor refusal and
+    the row cache, which the Windows test did not cover. `docs/evidence/uring-flush-probe.cpp`,
+    `wf-extent-selftest.cpp` (33 checks), `provider-lease-selftest.cpp` (14 checks) and
+    `platform-selftest.cpp` (44 checks) still pass. The warning profile for the two touched TUs
+    loses five warnings and adds none (the removed ones are the Windows stubs' own
+    `-Wunused-parameter` and `-Wsuggest-attribute=noreturn`). `release_check` is 0 findings, the
+    env table loses no other name, and `--check-native-profiles` still PASSes.
+    The readers agree on this fixture because it is page-cache resident: the single-queue load of
+    131,781 row reads takes 51-54 ms on the rings and 50-53 ms with `pread`, and the early loader's
+    200 extents 14-20 ms either way. That compares the mechanics, not the device; the 76.2 s to
+    43.2 s figure this change is meant to reproduce is a RAID-0 measurement, and Phase 8 item 3
+    owns the cold-cache number here against a qualified GGUF.
+    Not run: the no-model producer receipt smoke, which reaches `ggml_backend_cuda_get_device_memory`.
+    The box cannot create a CUDA context while Strata holds the VRAM - a probe calling only
+    `cudaFree(0)` and `cudaMemGetInfo` returns `out of memory` - so that gate is the box, not this
+    change. `llama-server --version`, which enumerates without a context, still prints the device.
+
 3.1 Streaming producer on Linux. What is left of Phase 3 is still a port, not a sweep.
-    Port `llama-dsv41-engram-prefetch.cpp` (3.1g), which also opens the provider's three Engram
-    arms; decide the locked-memory mechanism and replace `llama-dsv41-locked-ram.h` and the carry
+    Decide the locked-memory mechanism and replace `llama-dsv41-locked-ram.h` and the carry
     lease; then the Win32 host code in `mtmd`, `server` and `decode-receiver`.
     Gate: a 262K prefill, which needs a qualified GGUF on this box (see the machine facts).
     Findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
@@ -958,10 +1040,16 @@ inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifi
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 269 Apple/Metal
 matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
-comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill` and in
-`src/llama-weight-fetcher.{cpp,h}`: 0 (chunks 3.1d and 3.1e). `src/llama-dsv41-weights.cpp` is down
-to its three Engram early-loader arms, which chunk 3.1g owns. The repo-wide pattern above now
-counts 633. The rest of the producer tree is still Windows-shaped: 17 files under `src/`, 6 under
+comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
+`src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in
+`src/llama-dsv41-engram-prefetch.{cpp,h}`: 0 conditional or include hits (chunks 3.1d, 3.1e, 3.1f,
+3.1g); the one survivor is a provenance comment in the loader that names the IoRing it was ported
+from, so gate greps still need `| grep -vE ":[0-9]+:\s*//"`. `tests/dsv41_engram_early_io.cpp` is
+Linux with the loader; four test sources remain Windows-shaped (`cuda_other22_graph.cpp`,
+`dsv41_producer_abort.cpp`, `pinned_carry_memory.cpp`, `studio_generation.cpp`) and none of them
+has a build rule. The repo-wide pattern above now counts 532, down from 633 before 3.1g. The rest
+of the producer tree is still Windows-shaped: 18 files under `src/` by that pattern (one of them a
+comment), 6 under
 `common/`, 4 under `tools/mtmd`, 3 under `tools/server`, 1 under `tools/decode-receiver`, plus the
 ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 

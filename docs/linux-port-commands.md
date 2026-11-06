@@ -96,13 +96,21 @@ cd engines/ds4 && ./ds4 --help | head -12     # CUDA binary, no model needed
 ./build/llama/bin/llama-dsv41-prefill --check-native-profiles
 # PASS: delivered native-half and rounded expert profiles,4096-row resource policies; no GPU/model
 ./build/llama/bin/llama-dsv41-prefill         # exit 1; the abort line names the parse refusal
-# No Win32 code left in the producer CLI directory (chunk 3.1d) or in the weight fetcher
-# (chunk 3.1e). Drop comment lines: the two survivors are provenance comments in
-# producer-platform.inc that name the Win32 layer it was ported from.
+# The Engram row loader (its io_uring queues and the pread baseline): host only, no model.
+./build/engram-early-io build/engram/table.bin    # 15 checks, "ALL PASS" - recipe below
+# The provider's physical lease: no CUDA context, no model.
+./build/provider-lease-selftest                    # 14 checks - recipe below
+# No Win32 code left in the producer CLI directory (chunk 3.1d), in the weight fetcher
+# (chunk 3.1e), in the weight provider (chunk 3.1f) or in the Engram row loader (chunk 3.1g).
+# Drop comment lines: the survivors are provenance comments naming the Win32 layer a file was
+# ported from.
 grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
   engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill \
   engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp \
-  engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h | grep -vE ":[0-9]+:\s*//"
+  engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-engram-prefetch.cpp \
+  engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-engram-prefetch.h | grep -vE ":[0-9]+:\s*//"
 # 0 hits
 ```
 
@@ -223,13 +231,78 @@ g++ -std=gnu++17 -O1 -o build/uring-flush-probe build/uring-flush-probe.cpp -lur
                              # completion; submit-and-wait delivers it
 ```
 
+### The provider's physical lease, with no model and no CUDA context
+
+Chunk 3.1f gave the provider a POSIX lease on the verified model file. Its program is committed at
+`docs/evidence/provider-lease-selftest.cpp`; `inspect()` takes the lease before it asks anything
+about the device, so the receipt binding, the single-link ordinary-file rule, the symlink refusals
+and the pinned-ancestor checks all run with no backend and no VRAM. It links the CUDA objects but
+never creates a context, so it runs while another process holds the GPU:
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+ninja -C build/llama src/libllama.a      # the four objects below are only rebuilt by this target
+cp docs/evidence/provider-lease-selftest.cpp build/
+g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I$llama/ggml/src -I$llama/vendor \
+    -o build/provider-lease-selftest build/provider-lease-selftest.cpp \
+    build/llama/src/CMakeFiles/llama.dir/llama-dsv41-weights.cpp.o \
+    build/llama/src/CMakeFiles/llama.dir/llama-dsv41-engram.cpp.o \
+    build/llama/src/CMakeFiles/llama.dir/llama-dsv41-engram-prefetch.cpp.o \
+    build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o \
+    build/llama/ggml/src/libggml.a build/llama/ggml/src/libggml-base.a build/llama/ggml/src/libggml-cpu.a \
+    build/llama/ggml/src/ggml-cuda/libggml-cuda.a \
+    -L/opt/cuda/lib64 -lcufile -lcudart -lcublas -lcublasLt -lcuda -luring -lpthread -ldl
+./build/provider-lease-selftest    # 14 checks, "SELFTEST PASSED: 0 failure(s)"
+```
+
+### The Engram row loader, with no model and no GPU
+
+Chunk 3.1g replaced the loader's IoRing queues with io_uring and kept the serial `pread` as the
+baseline. `tests/dsv41_engram_early_io.cpp` is its test - the Windows-only synthetic-table test for
+exactly this file, ported with it. It generates a 208 MB deterministic table file under `build/`,
+hashes prompts to row ids, and byte-compares every loaded row against the file and against the
+single-queue reference loader. No CUDA, no model, no VRAM:
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+ninja -C build/llama src/libllama.a      # the two objects below are only rebuilt by this target
+mkdir -p build/engram
+g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I$llama/vendor \
+    -o build/engram-early-io tests/dsv41_engram_early_io.cpp \
+    build/llama/src/CMakeFiles/llama.dir/llama-dsv41-engram-prefetch.cpp.o \
+    build/llama/src/CMakeFiles/llama.dir/llama-dsv41-engram.cpp.o \
+    build/llama/ggml/src/libggml-base.a build/llama/ggml/src/libggml-cpu.a -lpthread -luring
+./build/engram-early-io build/engram/table.bin                       # 15 checks, "ALL PASS"
+LLAMADECODE_ENGRAM_IO_URING=0 ./build/engram-early-io build/engram/table.bin   # pread baseline
+LLAMADECODE_ENGRAM_SCAN=0 ./build/engram-early-io build/engram/table.bin       # one read per row
+LLAMADECODE_ENGRAM_SCAN=1 ./build/engram-early-io build/engram/table.bin       # forced scan geometry
+LLAMADECODE_ENGRAM_READ_ALIGN=512 ./build/engram-early-io build/engram/table.bin
+LLAMA_DSV41_ENGRAM_SUBMIT_BATCH=1 ./build/engram-early-io build/engram/table.bin
+```
+
+The env reads that choose a reader or a geometry are once per process, so each line above is a
+separate run; the fixture is reused after the first. What the runs cover: per-table publication
+order, the image-mask history resets across planner blocks, restored history tails, the tight
+admission that shrinks the IO arena inside admission, previous-request row reuse, the row cache,
+the refusal of a descriptor that is not the one the receipt hashed, and cancellation draining every
+submitted read before it throws.
+
+Both readers agree on this fixture because 208 MB sits in the page cache here - the single-queue
+load of 131,781 row reads is 51-54 ms on the rings and 50-53 ms with `pread`, and the early
+loader's 200 extents are 14-20 ms either way. That compares mechanics, not a device: the cold-cache
+number against a real model is Phase 8 item 3.
+
 ### Driving the real producer with no model
 
 A throwaway 1 MiB file, a copy receipt naming it and four LE32 tokens take the CLI
 through its whole front half - its own executable SHA, the receipt, the sweep/wire/cache/carry
 plans, the output volume budget, host-memory admission, CUDA enumeration - and it then
-refuses at the VRAM reserve. Reaching that check costs a CUDA context (~160 MB), which
-does not disturb Strata's 30 GiB.
+refuses at the VRAM reserve. Reaching that check costs a CUDA context (~160 MB), and **it is the
+one producer gate this box cannot run while another process holds the GPU**: with Strata at
+30 GiB and the browser at 231 MB, a probe that only calls `cudaFree(0)` and `cudaMemGetInfo`
+returns `out of memory`, so this command aborts inside `ggml_backend_cuda_get_device_memory`
+instead of printing the reserve refusal. Free VRAM first, or leave it to the user; the abort is
+the box, not the tree.
 
 ```bash
 python3 - <<'SNIPPET'
