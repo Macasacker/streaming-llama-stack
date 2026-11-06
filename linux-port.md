@@ -11,6 +11,11 @@ admission instead of Windows job-object limits). `engines/` now holds only `ds4`
 one environment scope (`ds4`). It has never run against model weights — there are none on this
 machine — so the engine is a compile gate, not a performance result.
 
+This page is the review, not the status: the blocker table below was written on 2026-10-30 and its
+`status` column was filled in as chunks landed. `docs/linux-port-plan.md` maps every chunk to its
+commits and `HANDOFF.md` carries the open decisions and the traps; read those before acting on a
+row here.
+
 Repo: https://github.com/fronteagle739/streaming-llama-stack
 Reviewed: 2026-10-30, via `gh` plus a local clone at `/tmp/sl-stack`
 MIT, single author "Front Eagle", created 2026-10-25, last pushed 2026-10-30.
@@ -103,19 +108,20 @@ The streaming prefill producer is hard-gated to Windows. It will not configure, 
 
 ### Blockers, with evidence
 
-| blocker | location |
-|---|---|
-| `if(NOT WIN32 OR NOT GGML_CUDA) message(FATAL_ERROR "The offline V4.1 producer requires Windows and GGML_CUDA")` | `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/CMakeLists.txt:3` |
-| `throw std::runtime_error("V4.1 physical weight provider requires Windows CUDA/DirectStorage")` | `src/llama-dsv41-weights.cpp:923` for inspect, `:1000` for create_pipeline |
-| Throws `"Early Engram IoRing requires Windows"` and `"Whole-prompt Engram IoRing requires Windows"` | `src/llama-dsv41-engram-prefetch.cpp:1164, 1283, 1323`, 108 Win32 references in that file |
-| Win32 file lease and volume identity: `CreateFileW`, `GetDriveTypeW`, `QueryDosDeviceW`, `BY_HANDLE_FILE_INFORMATION`, `GetDiskFreeSpaceW` sector check, `_aligned_malloc` | `llama-dsv41-weights.cpp` lines 30 through 960, `llama-dsv41-carry.cpp:15-219` |
-| Locked carry RAM through `VirtualAlloc(MEM_RESERVE\|MEM_COMMIT)` | `src/llama-dsv41-locked-ram.h` |
-| DirectStorage plus D3D12 and CUDA interop | 3 files, about 32 call sites: `llama-weight-fetcher.cpp`, `llama-wf-gpu-ring.inl`, `tools/dsv41-prefill/carry-copy-bench.cpp` |
-| Windows Job Objects for the child memory guard | `slstack/guard.py:80`, function `windows_job` |
-| Locked shared-RAM checkpoint refuses non-NT | `slstack/combo_ram.py:86`, `raise RuntimeError('The one-RTX shared checkpoint requires Windows')` |
-| Installer and backend gating assume Windows or Apple Silicon | `slstack/install.py:106`, `slstack/backend_setup.py:225` |
-| Every launcher is PowerShell | `build.ps1`, `slstack.ps1`, `scripts/start-dsv41-single-*.ps1`, `engines/ds4-win/windows_build.ps1`, `flashinfer-sm120/build.ps1` |
-| RTX decode kernels ship as `ds4-decode.dll` | `engines/ds4-win/` has 747 Win32 references |
+| blocker | location | status |
+|---|---|---|
+| `if(NOT WIN32 OR NOT GGML_CUDA) message(FATAL_ERROR "The offline V4.1 producer requires Windows and GGML_CUDA")` | `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/CMakeLists.txt:3` | closed (1.x) |
+| `throw std::runtime_error("V4.1 physical weight provider requires Windows CUDA/DirectStorage")` | `src/llama-dsv41-weights.cpp:923` for inspect, `:1000` for create_pipeline | closed (3.1f) |
+| Throws `"Early Engram IoRing requires Windows"` and `"Whole-prompt Engram IoRing requires Windows"` | `src/llama-dsv41-engram-prefetch.cpp:1164, 1283, 1323`, 108 Win32 references in that file | closed (3.1g) |
+| Win32 file lease and volume identity: `CreateFileW`, `GetDriveTypeW`, `QueryDosDeviceW`, `BY_HANDLE_FILE_INFORMATION`, `GetDiskFreeSpaceW` sector check, `_aligned_malloc` | `llama-dsv41-weights.cpp` lines 30 through 960, `llama-dsv41-carry.cpp:15-219` | closed (3.1f, 3.1c) |
+| Locked carry RAM through `VirtualAlloc(MEM_RESERVE\|MEM_COMMIT)` | `src/llama-dsv41-locked-ram.h` | closed (3.1h, `mmap` plus best-effort `mlock`) |
+| DirectStorage plus D3D12 and CUDA interop | 3 files, about 32 call sites: `llama-weight-fetcher.cpp`, `llama-wf-gpu-ring.inl`, `tools/dsv41-prefill/carry-copy-bench.cpp` | closed (3.1e, io_uring) |
+| Windows Job Objects for the child memory guard | `slstack/guard.py:80`, function `windows_job` | **closed (5.1c)** - `slstack/cgroup_scope.py`, a cgroup v2 subgroup entered between fork and exec |
+| Locked shared-RAM checkpoint refuses non-NT | `slstack/combo_ram.py:86`, `raise RuntimeError('The one-RTX shared checkpoint requires Windows')` | open - chunk 5.3, behind 5.2 |
+| The producer launcher refuses non-nt | `vendor/studio/studio/dsv41_windows_runner.py`, `_Native.__init__` (`require(os.name == 'nt' ...)`), imported by `combo_producer`, `combo_native`, `combo_session`, `native_broker` | open - chunk 5.2. **Not in the original list**: the review read `slstack/` only, and this is vendored Studio code. Nothing on the combo/ULTRA path can launch a producer on Linux until it is ported. |
+| Installer and backend gating assume Windows or Apple Silicon | `slstack/install.py:106`, `slstack/backend_setup.py:225` | partly closed (1.10b, 5.1b); `media_tools.py`'s pinned Windows FFmpeg download is open (Phase 6) |
+| Every launcher is PowerShell | `build.ps1`, `slstack.ps1`, `scripts/start-dsv41-single-*.ps1`, `engines/ds4-win/windows_build.ps1`, `flashinfer-sm120/build.ps1` | closed for the build (`build.sh`); the `slstack` launcher is `bin/slstack` |
+| RTX decode kernels ship as `ds4-decode.dll` | `engines/ds4-win/` has 747 Win32 references | closed (1.10a deletes the tree, 3.1c/3.2 build and load `ds4-decode.so`) |
 
 ### Already Linux-ready
 
@@ -149,11 +155,25 @@ The provider deliberately refuses symlinked or redirected volumes, requiring `Qu
 
 ### Locked RAM
 
-`VirtualAlloc` plus working-set locking becomes `mmap` plus `mlock`, which needs `RLIMIT_MEMLOCK` or a cgroup allowance, or `memfd_create`. `SetProcessWorkingSetSizeEx` in `combo_ram.py` has no Linux equivalent, so model it with cgroup v2 `memory.min` and `memory.max` through `systemd-run --scope`.
+`VirtualAlloc` plus working-set locking became `mmap` plus `mlock` in chunk 3.1h, best effort
+against an 8 MiB `RLIMIT_MEMLOCK` on this box, with the shortfall logged as
+`CARRY_RAM_LOCK_PARTIAL` and the paging guard as what actually keeps the tier resident.
+`SetProcessWorkingSetSizeEx` in `combo_ram.py` and `working_set.py` has no Linux equivalent yet:
+model it as cgroup v2 `memory.min` on the child's scope (page-multiple writes - the kernel rounds
+and splits the VMA at the lock boundary), and `LockedRam`'s named section as `shm_open`/`mmap` plus
+`mlock`. That is chunk 5.3, behind 5.2, because both functions take the suspended-handle object
+`_Native` creates.
 
 ### Process guard
 
-`windows_job` uses a Job Object with `JobMemoryLimit` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The Linux equivalent is a cgroup v2 scope whose removal kills the descendants. `lease.py` byte-range locks already work through `flock`.
+`windows_job` used a Job Object with `JobMemoryLimit` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
+Chunk 5.1c replaced it with a cgroup v2 subgroup (`slstack/cgroup_scope.py`): `memory.max` at the
+budget, `memory.swap.max=0` and `memory.oom.group=1`, and the child written to `cgroup.procs`
+from `preexec_fn`, so the ceiling holds from its first instruction and descendants inherit
+membership - which is what the job's containment of short-lived children did. Removal is not the
+kill mechanism here: the guardian retires cooperatively and leaves a scope that still has members,
+still capped. `lease.py`'s admission lock is now `fcntl.flock` on every platform (it was taken only
+on Windows before 5.1b).
 
 ### Build
 

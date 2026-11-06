@@ -570,6 +570,21 @@ This session's (chunk 5.1, four commits):
   directory. `memory.oom.group=1` means one over-budget descendant takes the whole tree down - the
   behaviour a job's memory limit had - so a test that expects the parent to survive a grandchild's
   allocation is testing the wrong thing.
+- **There is no `TerminateJobObject` on the shared path, and that is deliberate.**
+  `shared_guard`'s Adapter overrides `GuardedJob._stop`, so the vendored `os.killpg` on the group
+  anchor never runs and the Windows `kernel_job.stop()` after a forced kill has no Linux counterpart.
+  `cgroup.kill` exists on this kernel and would be the direct equivalent, but it is an immediate
+  SIGKILL of every member: using it would bypass the cooperative request that
+  `ProgressOwnedProcesses.stop()` is built to make first. The containment that the retired job gave
+  a straggler is kept instead - a scope with members is left in place, still capped - and an
+  unconfirmed cleanup holds the lease rather than releasing it. If a later session decides to
+  force-kill through the scope, it belongs after grace, not instead of it.
+- A scope's name carries the pid that created it (`slstack-<hint>-<pid>-<nonce>`), because
+  `open_scope` reaps an *empty* scope whose creating pid is gone before creating the next one - a
+  guardian killed by SIGKILL before its own teardown otherwise accumulates capped directories in
+  the user's slice (twelve had piled up on this box). Two consequences: a live launcher's fresh,
+  still-empty scope is never taken from it, and scopes created before this naming existed match no
+  rule and are never reaped (this box's were removed by hand).
 - `patch('mod.func', wraps=mod.func)` makes attribute lookups on the mock delegate to the wrapped
   function, so `mock.return_value` and `mock.spy_return` are unreachable (the test that asserted the
   scope ceiling through it got `'_SentinelObject' object is not subscriptable`, then `AttributeError:
