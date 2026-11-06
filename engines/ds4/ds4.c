@@ -40142,14 +40142,14 @@ static uint32_t glm53_graph_resume_prefill_min_tokens(void) {
     return glm_graph_resume_prefill_min_tokens();
 }
 
-#define DS4_GLM_METAL_FULL_ATTN_DEFAULT_CONTEXT 4096u
-#define DS4_GLM_METAL_STREAMING_FULL_ATTN_CONTEXT 8192u
-#define DS4_GLM_METAL_FULL_ATTN_LAYER_FLUSH_CONTEXT 2048u
-#define DS4_GLM_METAL_DISPLAY_PROGRESS_LAYER_TOKENS 32u
-#define DS4_GLM_METAL_SMALL_PREFILL_STAGE_SYNC_TOKENS 0u
-#define DS4_GLM_METAL_LONG_CONTEXT_THRESHOLD 65536u
-#define DS4_GLM_METAL_LONG_CONTEXT_FULL_ATTN_CONTEXT 4096u
-#define DS4_GLM_METAL_INDEXED_PREFILL_CHUNK_TOKENS 4096u
+#define DS4_GLM_FULL_ATTN_DEFAULT_CONTEXT 4096u
+#define DS4_GLM_STREAMING_FULL_ATTN_CONTEXT 8192u
+#define DS4_GLM_FULL_ATTN_LAYER_FLUSH_CONTEXT 2048u
+#define DS4_GLM_DISPLAY_PROGRESS_LAYER_TOKENS 32u
+#define DS4_GLM_SMALL_PREFILL_STAGE_SYNC_TOKENS 0u
+#define DS4_GLM_LONG_CONTEXT_THRESHOLD 65536u
+#define DS4_GLM_LONG_CONTEXT_FULL_ATTN_CONTEXT 4096u
+#define DS4_GLM_INDEXED_PREFILL_CHUNK_TOKENS 4096u
 /* [2026-08-16] 256 -> 512 MiB. This scratch budget, not any grid or capacity check, is what capped the
  * prefill chunk at 8192.
  *
@@ -40168,7 +40168,7 @@ static uint32_t glm53_graph_resume_prefill_min_tokens(void) {
  * 28 GiB expert cache, and prefill chunk 4096 -> 8192 alone was worth +54%, so the trade is heavily
  * favourable if the next doubling lands. Raise further only with a measurement - this is a fixed
  * allocation, not a cache. */
-#define DS4_GLM_METAL_INDEXED_PREFILL_SCORE_SCRATCH_MB 256u
+#define DS4_GLM_INDEXED_PREFILL_SCORE_SCRATCH_MB 256u
 #define DS4_GLM53_INDEX_POOL_SIZE 4u
 #define DS4_GLM53_PREFILL_CHUNK_TOKENS 2048u
 
@@ -48595,11 +48595,11 @@ static bool glm_graph_memory_guard_slice_with_transient(
 static uint32_t glm_graph_full_attention_cap(uint32_t ctx_size,
                                              bool     ssd_streaming) {
     uint32_t cap = ssd_streaming ?
-        DS4_GLM_METAL_STREAMING_FULL_ATTN_CONTEXT :
-        DS4_GLM_METAL_FULL_ATTN_DEFAULT_CONTEXT;
-    if (ctx_size >= DS4_GLM_METAL_LONG_CONTEXT_THRESHOLD &&
-        cap > DS4_GLM_METAL_LONG_CONTEXT_FULL_ATTN_CONTEXT) {
-        cap = DS4_GLM_METAL_LONG_CONTEXT_FULL_ATTN_CONTEXT;
+        DS4_GLM_STREAMING_FULL_ATTN_CONTEXT :
+        DS4_GLM_FULL_ATTN_DEFAULT_CONTEXT;
+    if (ctx_size >= DS4_GLM_LONG_CONTEXT_THRESHOLD &&
+        cap > DS4_GLM_LONG_CONTEXT_FULL_ATTN_CONTEXT) {
+        cap = DS4_GLM_LONG_CONTEXT_FULL_ATTN_CONTEXT;
     }
     if (ctx_size > 0 && cap > ctx_size) cap = ctx_size;
     if (cap == 0) cap = 1;
@@ -48614,8 +48614,8 @@ static uint32_t glm_graph_full_prefill_layer_flush_interval(
      * flush per layer: 76 command-buffer round-trips cost ~35ms while the
      * whole pass is ~70ms of GPU work. Real prefill chunks keep the
      * interactive per-layer flush. */
-    return (n_tokens > DS4_GLM_METAL_FULL_ATTN_LAYER_FLUSH_CONTEXT ||
-            command_rows > DS4_GLM_METAL_FULL_ATTN_LAYER_FLUSH_CONTEXT ||
+    return (n_tokens > DS4_GLM_FULL_ATTN_LAYER_FLUSH_CONTEXT ||
+            command_rows > DS4_GLM_FULL_ATTN_LAYER_FLUSH_CONTEXT ||
             (logits_requested && n_tokens > 8u)) ? 1u : 0u;
 }
 
@@ -48667,7 +48667,7 @@ static bool glm_graph_small_prefill_stage_sync(
         bool     logits_requested) {
     return logits_requested &&
            n_tokens > 0 &&
-           n_tokens <= DS4_GLM_METAL_SMALL_PREFILL_STAGE_SYNC_TOKENS;
+           n_tokens <= DS4_GLM_SMALL_PREFILL_STAGE_SYNC_TOKENS;
 }
 
 static uint32_t glm_graph_indexed_decode_split_min_block_rows(void) {
@@ -48809,7 +48809,7 @@ static uint32_t glm_graph_indexed_prefill_chunk_tokens(
         if (compact_cap != 0 && chunk > compact_cap) chunk = compact_cap;
         return chunk;
     }
-    uint32_t chunk = DS4_GLM_METAL_INDEXED_PREFILL_CHUNK_TOKENS;
+    uint32_t chunk = DS4_GLM_INDEXED_PREFILL_CHUNK_TOKENS;
     if (compact_cap > 0 && chunk > compact_cap) chunk = compact_cap;
     if (chunk == 0) chunk = 1;
     return chunk;
@@ -48819,7 +48819,7 @@ static uint32_t glm_graph_indexed_prefill_score_tokens(
         uint32_t indexed_prefill_cap,
         uint32_t compact_cap) {
     if (indexed_prefill_cap == 0 || compact_cap == 0) return 0;
-    const uint32_t scratch_mb = DS4_GLM_METAL_INDEXED_PREFILL_SCORE_SCRATCH_MB;
+    const uint32_t scratch_mb = DS4_GLM_INDEXED_PREFILL_SCORE_SCRATCH_MB;
     const uint64_t budget_bytes = (uint64_t)scratch_mb * 1024ull * 1024ull;
     const uint64_t score_columns = ds4_model_is_glm53() ?
         glm53_graph_indexer_pool_cap(compact_cap) : compact_cap;
@@ -56115,7 +56115,7 @@ glm53_batch_attention_done:
 }
 
 static uint32_t glm_graph_prefill_chunk_tokens(uint32_t full_attention_cap) {
-    return full_attention_cap ? full_attention_cap : DS4_GLM_METAL_FULL_ATTN_DEFAULT_CONTEXT;
+    return full_attention_cap ? full_attention_cap : DS4_GLM_FULL_ATTN_DEFAULT_CONTEXT;
 }
 
 static bool glm_graph_forward_indexed_tokens(
@@ -70825,7 +70825,7 @@ static void qwen4_dump_f32(const char *path, const float *v, uint64_t n) {
  * DS4_QWEN4_MTP_BATCH_CHECK also compares sequential and paired GPU drafts
  * (requires MTP_OUT, GPU=1, and GPU_CHUNK >= 2). */
 static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab,
-                                  const ds4_weights *weights, const ds4_tokens *prompt, bool metal) {
+                                  const ds4_weights *weights, const ds4_tokens *prompt, bool graph_backend) {
     /* DS4_QWEN4_FT_LIST=<file>: batch mode.  Each line is
      * "<comma ids>\t<out path>"; every sequence runs through the Metal graph
      * (prefill all-rows logits, the production kernel path) and its
@@ -70834,7 +70834,7 @@ static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab
     const char *ft_list = getenv("DS4_QWEN4_FT_LIST");
     if (ft_list && ft_list[0]) {
 #ifdef DS4_HAS_QWEN4_GPU
-        if (!metal || !getenv("DS4_QWEN4_GPU")) {
+        if (!graph_backend || !getenv("DS4_QWEN4_GPU")) {
             fprintf(stderr, "ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\n");
             return 1;
         }
@@ -70914,7 +70914,7 @@ static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab
         qwen4_graph_free(g); free(g); fclose(lf);
         return 0;
 #else
-        (void)model; (void)vocab; (void)weights; (void)prompt; (void)metal;
+        (void)model; (void)vocab; (void)weights; (void)prompt; (void)graph_backend;
         fprintf(stderr, "ds4: DS4_QWEN4_FT_LIST needs GPU support\n");
         return 1;
 #endif
@@ -70941,7 +70941,7 @@ static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab
 
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
      * GPU's alone and the comparison lines are against zeros. */
-    const bool gpu_only = metal && getenv("DS4_QWEN4_GPU") && getenv("DS4_QWEN4_GPU_ONLY");
+    const bool gpu_only = graph_backend && getenv("DS4_QWEN4_GPU") && getenv("DS4_QWEN4_GPU_ONLY");
     memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));
     qwen4_ref_state st;
     qwen4_ref_state_init(&st, n_seq);
@@ -70970,7 +70970,7 @@ static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab
     /* DS4_QWEN4_GPU=1 runs the Metal graph over the same ids (chunks of
      * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU
      * reference; the dumped logits (and MTP drafts) are then the GPU's. */
-    if (metal && getenv("DS4_QWEN4_GPU")) {
+    if (graph_backend && getenv("DS4_QWEN4_GPU")) {
         const char *chunk_env = getenv("DS4_QWEN4_GPU_CHUNK");
         uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;
         if (chunk == 0) chunk = 1;
@@ -71082,7 +71082,7 @@ static int qwen4_first_token_test(const ds4_model *model, const ds4_vocab *vocab
         free(g);
     }
 #else
-    (void)metal;
+    (void)graph_backend;
 #endif
 
     const char *out_env = getenv("DS4_QWEN4_FT_OUT");

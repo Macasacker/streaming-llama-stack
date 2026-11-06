@@ -17863,7 +17863,7 @@
         "source": "engines/ds4/ds4.c:70834",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *ft_list = getenv(\"DS4_QWEN4_FT_LIST\");",
-        "consumer": "     * [n][vocab] f32 logits are written to the path.  One model load covers\n     * the whole list. */\n    const char *ft_list = getenv(\"DS4_QWEN4_FT_LIST\");\n    if (ft_list && ft_list[0]) {\n#ifdef DS4_HAS_QWEN4_GPU\n        if (!metal || !getenv(\"DS4_QWEN4_GPU\")) {\n            fprintf(stderr, \"ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\\n\");"
+        "consumer": "     * [n][vocab] f32 logits are written to the path.  One model load covers\n     * the whole list. */\n    const char *ft_list = getenv(\"DS4_QWEN4_FT_LIST\");\n    if (ft_list && ft_list[0]) {\n#ifdef DS4_HAS_QWEN4_GPU\n        if (!graph_backend || !getenv(\"DS4_QWEN4_GPU\")) {\n            fprintf(stderr, \"ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\\n\");"
       }
     ]
   },
@@ -17931,20 +17931,20 @@
       {
         "source": "engines/ds4/ds4.c:70837",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "if (!metal || !getenv(\"DS4_QWEN4_GPU\")) {",
-        "consumer": "    if (ft_list && ft_list[0]) {\n#ifdef DS4_HAS_QWEN4_GPU\n        if (!metal || !getenv(\"DS4_QWEN4_GPU\")) {\n            fprintf(stderr, \"ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\\n\");\n            return 1;\n        }\n        FILE *lf = fopen(ft_list, \"r\");"
+        "read": "if (!graph_backend || !getenv(\"DS4_QWEN4_GPU\")) {",
+        "consumer": "    if (ft_list && ft_list[0]) {\n#ifdef DS4_HAS_QWEN4_GPU\n        if (!graph_backend || !getenv(\"DS4_QWEN4_GPU\")) {\n            fprintf(stderr, \"ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\\n\");\n            return 1;\n        }\n        FILE *lf = fopen(ft_list, \"r\");"
       },
       {
         "source": "engines/ds4/ds4.c:70944",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "const bool gpu_only = metal && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");",
-        "consumer": "    /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the\n     * GPU's alone and the comparison lines are against zeros. */\n    const bool gpu_only = metal && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");\n    memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));\n    qwen4_ref_state st;\n    qwen4_ref_state_init(&st, n_seq);\n    for (uint32_t t = 0; t < n_seq && !gpu_only; t++) {"
+        "read": "const bool gpu_only = graph_backend && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");",
+        "consumer": "    /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the\n     * GPU's alone and the comparison lines are against zeros. */\n    const bool gpu_only = graph_backend && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");\n    memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));\n    qwen4_ref_state st;\n    qwen4_ref_state_init(&st, n_seq);\n    for (uint32_t t = 0; t < n_seq && !gpu_only; t++) {"
       },
       {
         "source": "engines/ds4/ds4.c:70973",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "if (metal && getenv(\"DS4_QWEN4_GPU\")) {",
-        "consumer": "     * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU\n     * reference; the dumped logits (and MTP drafts) are then the GPU's. */\n    if (metal && getenv(\"DS4_QWEN4_GPU\")) {\n        const char *chunk_env = getenv(\"DS4_QWEN4_GPU_CHUNK\");\n        uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;\n        if (chunk == 0) chunk = 1;\n        if (chunk > n_seq) chunk = n_seq;"
+        "read": "if (graph_backend && getenv(\"DS4_QWEN4_GPU\")) {",
+        "consumer": "     * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU\n     * reference; the dumped logits (and MTP drafts) are then the GPU's. */\n    if (graph_backend && getenv(\"DS4_QWEN4_GPU\")) {\n        const char *chunk_env = getenv(\"DS4_QWEN4_GPU_CHUNK\");\n        uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;\n        if (chunk == 0) chunk = 1;\n        if (chunk > n_seq) chunk = n_seq;"
       },
       {
         "source": "engines/ds4/ds4.c:74352",
@@ -17972,7 +17972,7 @@
         "source": "engines/ds4/ds4.c:70974",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *chunk_env = getenv(\"DS4_QWEN4_GPU_CHUNK\");",
-        "consumer": "     * reference; the dumped logits (and MTP drafts) are then the GPU's. */\n    if (metal && getenv(\"DS4_QWEN4_GPU\")) {\n        const char *chunk_env = getenv(\"DS4_QWEN4_GPU_CHUNK\");\n        uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;\n        if (chunk == 0) chunk = 1;\n        if (chunk > n_seq) chunk = n_seq;\n        const bool batch_check = getenv(\"DS4_QWEN4_MTP_BATCH_CHECK\") != NULL;"
+        "consumer": "     * reference; the dumped logits (and MTP drafts) are then the GPU's. */\n    if (graph_backend && getenv(\"DS4_QWEN4_GPU\")) {\n        const char *chunk_env = getenv(\"DS4_QWEN4_GPU_CHUNK\");\n        uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;\n        if (chunk == 0) chunk = 1;\n        if (chunk > n_seq) chunk = n_seq;\n        const bool batch_check = getenv(\"DS4_QWEN4_MTP_BATCH_CHECK\") != NULL;"
       }
     ]
   },
@@ -17993,8 +17993,8 @@
       {
         "source": "engines/ds4/ds4.c:70944",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "const bool gpu_only = metal && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");",
-        "consumer": "    /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the\n     * GPU's alone and the comparison lines are against zeros. */\n    const bool gpu_only = metal && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");\n    memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));\n    qwen4_ref_state st;\n    qwen4_ref_state_init(&st, n_seq);\n    for (uint32_t t = 0; t < n_seq && !gpu_only; t++) {"
+        "read": "const bool gpu_only = graph_backend && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");",
+        "consumer": "    /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the\n     * GPU's alone and the comparison lines are against zeros. */\n    const bool gpu_only = graph_backend && getenv(\"DS4_QWEN4_GPU\") && getenv(\"DS4_QWEN4_GPU_ONLY\");\n    memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));\n    qwen4_ref_state st;\n    qwen4_ref_state_init(&st, n_seq);\n    for (uint32_t t = 0; t < n_seq && !gpu_only; t++) {"
       }
     ]
   },

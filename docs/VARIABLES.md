@@ -16242,7 +16242,7 @@ Source: `engines/ds4/ds4.c:70834`. Unset read: NULL from getenv; the literal con
     const char *ft_list = getenv("DS4_QWEN4_FT_LIST");
     if (ft_list && ft_list[0]) {
 #ifdef DS4_HAS_QWEN4_GPU
-        if (!metal || !getenv("DS4_QWEN4_GPU")) {
+        if (!graph_backend || !getenv("DS4_QWEN4_GPU")) {
             fprintf(stderr, "ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\n");
 ```
 
@@ -16293,7 +16293,7 @@ Source: `engines/ds4/ds4.c:70837`. Unset read: NULL from getenv; the literal con
 ```text
     if (ft_list && ft_list[0]) {
 #ifdef DS4_HAS_QWEN4_GPU
-        if (!metal || !getenv("DS4_QWEN4_GPU")) {
+        if (!graph_backend || !getenv("DS4_QWEN4_GPU")) {
             fprintf(stderr, "ds4: DS4_QWEN4_FT_LIST needs a GPU backend with DS4_QWEN4_GPU set\n");
             return 1;
         }
@@ -16305,7 +16305,7 @@ Source: `engines/ds4/ds4.c:70944`. Unset read: NULL from getenv; the literal con
 ```text
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
      * GPU's alone and the comparison lines are against zeros. */
-    const bool gpu_only = metal && getenv("DS4_QWEN4_GPU") && getenv("DS4_QWEN4_GPU_ONLY");
+    const bool gpu_only = graph_backend && getenv("DS4_QWEN4_GPU") && getenv("DS4_QWEN4_GPU_ONLY");
     memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));
     qwen4_ref_state st;
     qwen4_ref_state_init(&st, n_seq);
@@ -16317,7 +16317,7 @@ Source: `engines/ds4/ds4.c:70973`. Unset read: NULL from getenv; the literal con
 ```text
      * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU
      * reference; the dumped logits (and MTP drafts) are then the GPU's. */
-    if (metal && getenv("DS4_QWEN4_GPU")) {
+    if (graph_backend && getenv("DS4_QWEN4_GPU")) {
         const char *chunk_env = getenv("DS4_QWEN4_GPU_CHUNK");
         uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;
         if (chunk == 0) chunk = 1;
@@ -16346,7 +16346,7 @@ Source: `engines/ds4/ds4.c:70974`. Unset read: NULL from getenv; the literal con
 
 ```text
      * reference; the dumped logits (and MTP drafts) are then the GPU's. */
-    if (metal && getenv("DS4_QWEN4_GPU")) {
+    if (graph_backend && getenv("DS4_QWEN4_GPU")) {
         const char *chunk_env = getenv("DS4_QWEN4_GPU_CHUNK");
         uint32_t chunk = chunk_env ? (uint32_t)atoi(chunk_env) : 1u;
         if (chunk == 0) chunk = 1;
@@ -16365,7 +16365,7 @@ Source: `engines/ds4/ds4.c:70944`. Unset read: NULL from getenv; the literal con
 ```text
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
      * GPU's alone and the comparison lines are against zeros. */
-    const bool gpu_only = metal && getenv("DS4_QWEN4_GPU") && getenv("DS4_QWEN4_GPU_ONLY");
+    const bool gpu_only = graph_backend && getenv("DS4_QWEN4_GPU") && getenv("DS4_QWEN4_GPU_ONLY");
     memset(logits, 0, (uint64_t)n_seq * V * sizeof(float));
     qwen4_ref_state st;
     qwen4_ref_state_init(&st, n_seq);
