@@ -42,6 +42,30 @@ def image_bytes(url,cfg):
     return raw
 
 
+DECODE_LIBRARY = 'ds4-decode.so'
+
+
+def decode_directories(cfg):
+    """Where the producer's libraries live: its own directory, then the configured ones."""
+    return [Path(cfg['llama_producer']).parent,
+            *[Path(p) for p in cfg.get('producer_library_directories', [])]]
+
+
+def decode_library(cfg):
+    """The ds4-decode library, beside the producer or inside a configured search directory.
+
+    A packaged runtime copies the producer and its decode library into one directory;
+    a source build keeps ds4-decode.so under engines/ds4 and names it through
+    producer_library_directories.
+    """
+    for directory in decode_directories(cfg):
+        candidate = directory / DECODE_LIBRARY
+        if candidate.is_file():
+            return candidate
+    raise ValueError('No ' + DECODE_LIBRARY + ' beside the producer or in its search directories: ' +
+                     ', '.join(str(d) for d in decode_directories(cfg)))
+
+
 class Images:
     def __init__(self,cfg):self.cfg=cfg;self.pins={}
 
@@ -57,7 +81,7 @@ class Images:
         return Path(value).resolve(strict=True)
 
     def encode(self,raw,before_encode):
-        encoder=self.encoder();library=Path(self.cfg['llama_producer']).parent/'ds4-decode.dll'
+        encoder=self.encoder();library=decode_library(self.cfg)
         key=hashlib.sha256((hashlib.sha256(raw).hexdigest()+self.pin(encoder)+self.pin(library)).encode()).hexdigest()
         root=Path(self.cfg['runtime_root'])/'vision';root.mkdir(parents=True,exist_ok=True)
         output=root/(key+'.vision');manifest=root/(key+'.json')
@@ -72,12 +96,13 @@ class Images:
             with image.open('xb') as f:f.write(raw)
         before_encode()
         from .config import environment
-        libraries=[str(library.parent),*[str(p) for p in self.cfg.get('producer_library_directories',[])]]
-        request=dict(library=str(library),libraries=libraries,model=self.cfg['model'],encoder=str(encoder),image=str(image),output=str(output))
-        env=environment(self.cfg,'rtx-producer');env['PATH']=os.pathsep.join([*libraries,env.get('PATH','')])
+        libraries=[str(d) for d in decode_directories(self.cfg) if d.is_dir()]
+        request=dict(library=str(library),model=self.cfg['model'],encoder=str(encoder),image=str(image),output=str(output))
+        # The encoder library resolves its own CUDA and ggml dependencies from these
+        # directories; on Linux that search is LD_LIBRARY_PATH, not PATH.
+        env=environment(self.cfg,'rtx-producer');env['LD_LIBRARY_PATH']=os.pathsep.join([*libraries,env.get('LD_LIBRARY_PATH','')])
         proc=subprocess.run([sys.executable,'-B','-m','slstack.vision_worker'],input=json.dumps(request)+'\n',
-                            text=True,encoding='utf-8',errors='replace',capture_output=True,env=env,
-                            creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                            text=True,encoding='utf-8',errors='replace',capture_output=True,env=env)
         (root/(key+'.log')).write_text(proc.stderr,encoding='utf-8')
         rows=[json.loads(line.removeprefix('SLSTACK_VISION ')) for line in proc.stdout.splitlines() if line.startswith('SLSTACK_VISION ')]
         if proc.returncode or len(rows)!=1 or rows[0].get('error'):

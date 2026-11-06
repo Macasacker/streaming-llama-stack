@@ -244,7 +244,9 @@ class Producer:
             for p in [root, *root.children(recursive=True)]:
                 try:
                     t = p.cpu_times();io = p.io_counters()
-                    mark += int((t.user + t.system) * 1000) + io.read_bytes + io.write_bytes + io.other_bytes
+                    # Linux's /proc/<pid>/io has no third byte counter: other_bytes is
+                    # a Windows field, and its absence is not a zero observation.
+                    mark += int((t.user + t.system) * 1000) + io.read_bytes + io.write_bytes + getattr(io, 'other_bytes', 0)
                 except psutil.Error:
                     pass
         except psutil.Error:

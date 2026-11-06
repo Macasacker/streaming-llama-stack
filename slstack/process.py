@@ -66,8 +66,7 @@ class OwnedProcess:
         self.spec.write_text(json.dumps(spec))
         self.guard_log = self.prefix.with_suffix('.guard.log').open('ab')
         self.proc = subprocess.Popen([sys.executable, '-B', '-m', 'slstack.guard', str(self.spec)],
-                                     cwd=ROOT, env={**environment(cfg), **secrets}, stdout=self.guard_log, stderr=self.guard_log,
-                                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                                     cwd=ROOT, env={**environment(cfg), **secrets}, stdout=self.guard_log, stderr=self.guard_log)
 
     def wait(self):
         code = self.proc.wait()

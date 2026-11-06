@@ -87,10 +87,10 @@ class RetirementTests(unittest.TestCase):
             wait_for_thread(thread,None,60,diagnostic=lambda:int(now[0]/40))
         self.assertEqual(now[0],300)
 
-    def test_posix_request_uses_the_python_cleanup_signal(self):
+    def test_request_uses_the_python_cleanup_signal(self):
         import signal
         process=Mock()
-        with patch('slstack.shutdown.os.name','posix'):request_interrupt(process)
+        request_interrupt(process)
         process.send_signal.assert_called_once_with(signal.SIGINT)
         process.terminate.assert_not_called();process.kill.assert_not_called()
 

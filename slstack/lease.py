@@ -9,7 +9,7 @@ import subprocess
 import time
 import uuid
 import psutil
-from .journal import atomic_json
+from .journal import LockUnavailable, advisory_lock, atomic_json
 
 
 class AdmissionRefused(RuntimeError):
@@ -17,7 +17,7 @@ class AdmissionRefused(RuntimeError):
 
 
 def read_hold_text(path):
-    """Wait briefly for another admission's byte-range lock; never use stale holds."""
+    """Wait briefly for another admission's write to land; never use stale holds."""
     for attempt in range(51):
         try:
             return Path(path).read_text(encoding='utf-8-sig')
@@ -189,49 +189,45 @@ def gpu_lease(cfg):
     if not cfg.get('hold_file'):
         hold.parent.mkdir(parents=True, exist_ok=True)
         hold.touch(exist_ok=True)
-    # Windows byte-range lock serializes admission among instances of this stack.
+    # The advisory lock serialises admission among instances of this stack.
     # Other agents' leases are respected via the shared append-only hold file.
     with hold.open('r+', encoding='utf-8-sig') as stream:
-        if os.name == 'nt':
-            import msvcrt
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
         try:
-            lines = stream.read()
-            active = hold_admission(active_holds(lines), budget_gib=cfg['host_budget_gib'],
-                                    floor_gib=cfg['min_available_gib'])
-            if active:
-                raise AdmissionRefused('RTX admission refused: ACTIVE holds exist: ' + '\n'.join(active))
-            # WDDM reports every graphics context as a compute client with N/A memory.
-            # Check the selected GPU's actual baseline instead of rejecting Explorer/Slack.
-            result = subprocess.run(['nvidia-smi', '--id=' + cfg['gpu_uuid'],
-                                     '--query-gpu=memory.used,memory.free,utilization.gpu', '--format=csv,noheader,nounits'],
-                                    capture_output=True, text=True, timeout=10)
-            if result.returncode:
-                raise RuntimeError('Cannot certify GPU ownership: ' + result.stderr)
-            used, free, busy = [int(x.strip()) for x in result.stdout.strip().split(',')]
-            if used > cfg['gpu_idle_max_mib'] or free < int(cfg.get('gpu_min_free_mib', 0)) or busy > 5:
-                raise AdmissionRefused('RTX is not idle enough for exclusive admission; no other process was ejected: ' + result.stdout)
-            identity = uuid.uuid4().hex
-            expiry = datetime.now(timezone.utc) + timedelta(minutes=cfg['lease_minutes'])
-            lease_path = Path(cfg['runtime_root']) / 'state' / 'leases' / (identity + '.json')
-            lease_row = {'task': task, 'id': identity, 'hold_file': str(hold),
-                         'guardian_pid': os.getpid(), 'guardian_created': psutil.Process().create_time(),
-                         'host_budget_gib': cfg['host_budget_gib'],
-                         'min_available_gib': cfg['min_available_gib'], 'expires': expiry.isoformat(),
-                         'released': False,
-                         # Cooperative trees survive a lost guardian. Its death
-                         # alone is never evidence that the GPU owner retired.
-                         'cooperative_retirement': True}
-            atomic_json(lease_path, lease_row)
-            line = f"\nACTIVE: {task} {identity}; exclusive configured GPU; expires {expiry.isoformat()}; host RSS {cfg['host_budget_gib']} GiB; floor {cfg['min_available_gib']} GiB\n"
-            stream.seek(0, 2)
-            stream.write(line)
-            stream.flush()
-            os.fsync(stream.fileno())
-        finally:
-            if os.name == 'nt':
-                stream.seek(0)
-                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            with advisory_lock(stream):
+                lines = stream.read()
+                active = hold_admission(active_holds(lines), budget_gib=cfg['host_budget_gib'],
+                                        floor_gib=cfg['min_available_gib'])
+                if active:
+                    raise AdmissionRefused('RTX admission refused: ACTIVE holds exist: ' + '\n'.join(active))
+                # Other processes hold device memory (a serve process, a browser GPU process),
+                # so the selected GPU's own baseline decides, not the absence of clients.
+                result = subprocess.run(['nvidia-smi', '--id=' + cfg['gpu_uuid'],
+                                         '--query-gpu=memory.used,memory.free,utilization.gpu', '--format=csv,noheader,nounits'],
+                                        capture_output=True, text=True, timeout=10)
+                if result.returncode:
+                    raise RuntimeError('Cannot certify GPU ownership: ' + result.stderr)
+                used, free, busy = [int(x.strip()) for x in result.stdout.strip().split(',')]
+                if used > cfg['gpu_idle_max_mib'] or free < int(cfg.get('gpu_min_free_mib', 0)) or busy > 5:
+                    raise AdmissionRefused('RTX is not idle enough for exclusive admission; no other process was ejected: ' + result.stdout)
+                identity = uuid.uuid4().hex
+                expiry = datetime.now(timezone.utc) + timedelta(minutes=cfg['lease_minutes'])
+                lease_path = Path(cfg['runtime_root']) / 'state' / 'leases' / (identity + '.json')
+                lease_row = {'task': task, 'id': identity, 'hold_file': str(hold),
+                             'guardian_pid': os.getpid(), 'guardian_created': psutil.Process().create_time(),
+                             'host_budget_gib': cfg['host_budget_gib'],
+                             'min_available_gib': cfg['min_available_gib'], 'expires': expiry.isoformat(),
+                             'released': False,
+                             # Cooperative trees survive a lost guardian. Its death
+                             # alone is never evidence that the GPU owner retired.
+                             'cooperative_retirement': True}
+                atomic_json(lease_path, lease_row)
+                line = f"\nACTIVE: {task} {identity}; exclusive configured GPU; expires {expiry.isoformat()}; host RSS {cfg['host_budget_gib']} GiB; floor {cfg['min_available_gib']} GiB\n"
+                stream.seek(0, 2)
+                stream.write(line)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except LockUnavailable as error:
+            raise AdmissionRefused('RTX admission is already in progress: ' + str(error)) from error
     uncertain=False
     try:
         yield identity

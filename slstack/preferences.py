@@ -21,7 +21,7 @@ FIELDS = ('comfyui_models', 'image_model', 'video_model', 'image_arch', 'video_a
 
 def browse(raw=''):
     if not raw:
-        roots=[Path(f'{letter}:/') for letter in 'CDEFGHIJKLMNOPQRSTUVWXYZ'] if os.name=='nt' else [Path('/'),Path.home()]
+        roots=[Path('/'), Path.home()]
         return dict(path='',parent=None,entries=[dict(name=str(p),path=str(p),directory=True) for p in roots if p.is_dir()])
     path=Path(raw).expanduser().resolve(strict=True)
     if not path.is_dir():raise ValueError('Choose a directory')

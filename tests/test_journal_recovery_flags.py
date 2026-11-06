@@ -10,7 +10,9 @@ from slstack.config import ROOT
 class JournalRecoveryFlagTests(unittest.TestCase):
     def test_dead_attachment_and_historical_detach_are_not_applied(self):
         # Preserve this tiny fixture under the task runtime; no cleanup deletion.
-        folder = Path(tempfile.mkdtemp(prefix='journal-recovery-', dir=ROOT.parent / 'runtime'))
+        runtime = Path(os.environ.get('STUDIO_RUNTIME_ROOT') or ROOT / 'runtime')
+        runtime.mkdir(parents=True, exist_ok=True)
+        folder = Path(tempfile.mkdtemp(prefix='journal-recovery-', dir=runtime))
         base = folder / 'base'; base.write_bytes(b'unchanged small TEST base')
         adapter = folder / 'adapter'; adapter.write_bytes(b'TEST adapter')
         journal = Journal(folder)

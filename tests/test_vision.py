@@ -75,6 +75,21 @@ class VisionTests(unittest.TestCase):
         cfg.pop('vision_encoder');cfg['ds4_command']=['server','--vision',str(encoder)]
         configure_vision(cfg);self.assertEqual(cfg['vision_encoder'],str(encoder.resolve()))
 
+    def test_decode_library_is_found_beside_the_producer_then_in_search_directories(self):
+        from slstack.vision import decode_directories, decode_library
+        root=Path(tempfile.mkdtemp(prefix='slstack-decode-library-'))
+        producer=root/'bin/llama-dsv41-prefill';producer.parent.mkdir();producer.write_bytes(b'producer')
+        engines=root/'engines/ds4';engines.mkdir(parents=True);(engines/'ds4-decode.so').write_bytes(b'library')
+        cfg=dict(llama_producer=str(producer),producer_library_directories=[str(engines)])
+        self.assertEqual(decode_library(cfg),engines/'ds4-decode.so')
+        self.assertEqual(decode_directories(cfg),[producer.parent,engines])
+        beside=root/'bin/ds4-decode.so';beside.write_bytes(b'library')
+        self.assertEqual(decode_library(cfg),beside)   # the packaged layout wins over the search list
+        beside.unlink()
+        with self.assertRaises(ValueError) as caught:
+            decode_library(dict(llama_producer=str(producer),producer_library_directories=[str(root/'missing')]))
+        self.assertIn('ds4-decode.so',str(caught.exception))
+
     def test_checkpoint_allows_new_image_but_rejects_changed_prefix_pixels(self):
         cfg=dict(context=999424,producer_sha256='b'*64,yoco_keep=140,ctx_cache_precision='bf16')
         cache=Cache(cfg);cache._identity={k:'a'*64 for k in ('model_sha256','tokenizer_sha256','template_sha256','rope_sha256')}

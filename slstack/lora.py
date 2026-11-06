@@ -16,7 +16,7 @@ from .process import OwnedProcess
 
 
 def parse_lora(raw):
-    # A Windows drive colon is not a scale delimiter.
+    # A colon inside the path (a POSIX file name may contain one) is not a scale delimiter.
     text, sep, tail = raw.rpartition(':')
     if sep:
         try:

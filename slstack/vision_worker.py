@@ -9,10 +9,9 @@ import sys
 
 
 def run(row):
-    if os.name!='nt':raise ValueError('This vision bridge requires the CUDA single engine')
     with ExitStack() as handles:
-        for directory in row['libraries']:
-            if Path(directory).is_dir():handles.enter_context(os.add_dll_directory(directory))
+        # The caller put the encoder's dependency directories in LD_LIBRARY_PATH;
+        # ctypes resolves the absolute path itself.
         library=ctypes.CDLL(row['library']);encode=library.ds4x_vision_file
         encode.argtypes=[ctypes.c_char_p]*4+[ctypes.c_char_p,ctypes.c_size_t];encode.restype=ctypes.c_int
         error=ctypes.create_string_buffer(2048)

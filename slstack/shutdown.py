@@ -1,12 +1,10 @@
 """Cooperative retirement with a renewable silence window before force is allowed."""
 import dataclasses
 import logging
-import os
 from pathlib import Path
 import re
 import signal
 import subprocess
-import sys
 import time
 
 import psutil
@@ -106,14 +104,8 @@ def wait_for_thread(thread, process, seconds=240, *, diagnostic=None,gpu_free=No
 
 
 def request_interrupt(process):
-    """Ctrl-Break on Windows; SIGINT on POSIX (Python runs its finally blocks)."""
-    if os.name == 'nt':
-        from studio.dsv41_windows_runner import _CTRL_BREAK
-        result = subprocess.run([sys.executable, '-I', '-c', _CTRL_BREAK, str(process.pid)],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=0x8, timeout=15)
-        if result.returncode:raise OSError('Owned Ctrl-Break request failed: exit %d' % result.returncode)
-    else:process.send_signal(signal.SIGINT)
+    """SIGINT: Python runs its finally blocks before the interpreter leaves."""
+    process.send_signal(signal.SIGINT)
 
 
 class ProgressOwnedProcesses(OwnedProcesses):

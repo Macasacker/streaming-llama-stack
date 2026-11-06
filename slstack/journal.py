@@ -1,6 +1,7 @@
 from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import fcntl
 import hashlib
 import json
 import os
@@ -8,6 +9,27 @@ from pathlib import Path
 import threading
 import uuid
 import psutil
+
+
+class LockUnavailable(OSError):
+    """Another process holds the advisory lock. The caller decides whether to wait or refuse."""
+
+
+@contextmanager
+def advisory_lock(stream, *, blocking=False):
+    """One exclusive advisory lock on an open file, held for the duration of the block.
+
+    https://man7.org/linux/man-pages/man2/flock.2.html
+    A contended non-blocking attempt raises LockUnavailable rather than waiting.
+    """
+    try:
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as error:
+        raise LockUnavailable(f'{stream.name} is held by another process') from error
+    try:
+        yield
+    finally:
+        fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
 def sha256(path, progress=None):
@@ -79,12 +101,11 @@ def atomic_json(path, data):
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(tmp, p)
-    if os.name != 'nt':
-        fd = os.open(p.parent, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+    fd = os.open(p.parent, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 class Journal:
@@ -113,24 +134,8 @@ class Journal:
         with self.thread_lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.with_suffix('.lock').open('a+b') as lock:
-                lock.seek(0)
-                lock.write(b'0')
-                lock.flush()
-                lock.seek(0)
-                if os.name == 'nt':
-                    import msvcrt
-                    msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    import fcntl
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                try:
+                with advisory_lock(lock):
                     yield
-                finally:
-                    lock.seek(0)
-                    if os.name == 'nt':
-                        msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-                    else:
-                        fcntl.flock(lock, fcntl.LOCK_UN)
 
     def read(self):
         return json.loads(self.path.read_text()) if self.path.exists() else {'version': 1, 'entries': []}

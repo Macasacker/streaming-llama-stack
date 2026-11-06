@@ -77,6 +77,10 @@
     {
       "path": "dsv41_session_process.py, dsv41_windows_runner.py",
       "purpose": "Cooperative abort on paging and host RSS trips; 0.5 GiB runtime floor; progress-aware retirement before logged force fallback, with forced-kill receipt fields. Clear kill-on-close before executing engine code. No model arithmetic or host expert tier."
+    },
+    {
+      "path": "dsv41_session_process.py",
+      "purpose": "Linux job-tree liveness: /proc/<pid>/io exposes no third byte counter, so other_bytes is read as an optional Windows field and its absence is not counted as zero progress. No change to the progress rule or to any arithmetic."
     }
   ],
   "modules": [

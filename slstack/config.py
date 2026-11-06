@@ -63,9 +63,8 @@ def load(path=None, overrides=None):
     cfg.setdefault('generation_control_file', str(root / 'generation' / 'live.json'))
     cfg.setdefault('stack_preferences_file', str(root / 'settings' / 'stack.local.json'))
     if not cfg.get('studio_python'):
-        cfg['studio_python'] = str(root / 'media-venv' /
-                                   ('Scripts/python.exe' if os.name == 'nt' else 'bin/python'))
-    if not cfg.get('gpu_uuid') and os.name == 'nt':
+        cfg['studio_python'] = str(root / 'media-venv' / 'bin/python')
+    if not cfg.get('gpu_uuid'):
         import subprocess
         try:
             result = subprocess.run(['nvidia-smi', '--query-gpu=uuid,memory.total', '--format=csv,noheader,nounits'],

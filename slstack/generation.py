@@ -14,6 +14,7 @@ import struct
 import threading
 import time
 import uuid
+from .journal import advisory_lock
 from .native_broker import vendor
 
 PHASES = ('reasoning', 'answer', 'tool_call', 'code')
@@ -82,19 +83,8 @@ class Store:
         with self.lock:
             # Router and single-engine proxy share this tiny configuration file.
             # Lock publication across processes, independently of generation.
-            if os.name == 'nt':
-                import msvcrt
-                with self.path.with_suffix('.lock').open('a+b') as f:
-                    if f.tell() == 0:f.write(b'0');f.flush()
-                    f.seek(0);msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
-                    try:yield
-                    finally:f.seek(0);msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-                with self.path.with_suffix('.lock').open('a+b') as f:
-                    fcntl.flock(f, fcntl.LOCK_EX)
-                    try:yield
-                    finally:fcntl.flock(f, fcntl.LOCK_UN)
+            with self.path.with_suffix('.lock').open('a+b') as lock, advisory_lock(lock, blocking=True):
+                yield
 
     def get(self):
         deadline = time.monotonic() + 1

@@ -1,6 +1,5 @@
 """Portable family-to-environment routing, matching Studio's isolated workers."""
 from pathlib import Path
-import os
 
 PROFILES = {
     'studio': dict(directory='media-venv', lock='media-win-py312.txt'),
@@ -16,4 +15,4 @@ def python_for(cfg, arch):
     profile=profile_for(arch)
     if profile=='studio' and cfg.get('studio_python'):return cfg['studio_python']
     root=Path(cfg['runtime_root'])/PROFILES[profile]['directory']
-    return str(root/('Scripts/python.exe' if os.name=='nt' else 'bin/python'))
+    return str(root/'bin/python')
