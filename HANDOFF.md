@@ -94,11 +94,32 @@ and no supported model weights exist on this box.
    `cudaMemGetInfo` themselves returned `out of memory`, so the producer's no-model receipt smoke
    aborts in `ggml_backend_cuda_get_device_memory` instead of reaching its VRAM-reserve refusal -
    that gate is unrun, not failing.
-2. No supported model file exists. The GGUFs on disk are
-   `qwen38-gyro/Strata/models/Qwen3.8-Flash-Next-Gyro-{S,M,L}-TQ1_0/TQ2_0/TQ3_0.gguf`
-   (54.5 / 92 / 108 GiB); their metadata matches `DS4_SHAPE_QWEN4_EXP` but they are TQ-quantized
-   (`type 145/146`), outside ds4's tensor type table (`ds4.c` around line 2481), so the loader
-   rejects them. Phase 3's prefill gates and Phase 8 are blocked on a qualified GGUF.
+2. **No qualified model file, and the weights that are on this box cannot be made into one.**
+   Re-read with `slstack/gguf_header.py` on 2026-11-06 (`read_header` + `validate_dsv41_types`),
+   under `qwen38-gyro/Strata/models/`:
+   - `Qwen3.8-Flash-Next-Gyro-{S,M,L}-TQ1_0/TQ2_0/TQ3_0.gguf` (54.5 / 92 / 108 GiB): architecture
+     `qwen4exp`, 48 blocks, and tensor type ids **144-149** (the TQ quants) - outside the engine's
+     type table, so the loader rejects them. Their `Q6_K`/`Q5_K`/`Q8_0`/`BF16`/`F32` tensors are not
+     the problem; the TQ ones are.
+   - `deepseek-v4.1-flash-IST-DAS-2.00bpw/DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-*`: all four
+     shards present (138 GB), architecture `deepseek41`, 40 blocks, `split.count=4`. Refused twice
+     over: it must be assembled first (`merge_deepseek41_shards.py`, not in this checkout), and its
+     per-block expert triplets mix `IQ1_M`/`IQ2_XS`/`IQ2_XXS` while dense tensors are `Q5_K` and
+     `BF16`. `validate_dsv41_types` accepts only `(Q4_K,Q4_K,Q4_K)`, `(IQ2_XXS,IQ2_XXS,Q2_K)` or
+     `(MXFP4,MXFP4,MXFP4)` per block, dense in `Q8_0`/`Q4_K`/`Q4_0`, `engram_embd` in `I8`,
+     `token_embd` in `F16`, everything else `F32`. **Merging would not qualify it** - the quant set
+     itself is what is refused, so no requantization means no run.
+   - `deepseek-v4.1-flash-shared/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf`: 1 of 9
+     shards, 5.7 MB, zero tensors - the download is incomplete, and `Q8_K` is not in the expert set
+     either.
+   - `DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf` (110 GB, 2 tensors) is named by
+     `deepseek41.engram.file`. That is the llama.cpp Engram representation, not the one ds4's row
+     loader reads: the loader takes 264-byte E4M3+E8M0 rows at the `engram_offsets` **inside the
+     model file**. A qualified file needs its Engram tables inline.
+   - `dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf` is the draft; the validator calls it not a native
+     `deepseek41` GGUF.
+   So Phase 3's prefill gate and Phase 8 need a download or a quantize run in the accepted type set,
+   not a merge of what is here. 336 GB free on the NVMe.
 3. The box changed since the plan's earlier notes: kernel 7.2.14, **93 GB RAM** (not 30), 16 cores,
    359 GB free on the NVMe. CUDA, cmake, ninja, nvcc and Python are unchanged apart from
    Python 3.14.9. Re-read `docs/linux-port-plan.md`'s machine block before trusting a limit.

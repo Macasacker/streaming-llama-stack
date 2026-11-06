@@ -999,7 +999,7 @@ Costs that could exceed expectations:
 - Losing decode for Kimi, GLM, MiniMax and Step. That is a feature removal, not a port, so settle
   decision 2 first.
 
-## Machine facts checked on this box (re-checked 2026-11-03)
+## Machine facts checked on this box (re-checked 2026-11-06)
 
 Arch Linux, kernel 7.2.14-arch1-1, RTX 5090 32 GiB (driver 615.78.08), CUDA 13.4 at `/opt/cuda`
 (not `/usr/local/cuda`), nvcc 13.4 with `sm_120`/`sm_121`, cmake 4.4.5, ninja 1.13.2,
@@ -1013,10 +1013,25 @@ links; io_uring is the route.
 Two things limit what a gate can prove here:
 
 - The GPU is occupied by another process (`strata`, ~30 GiB of 32 GiB VRAM, and its pid changes
-  between sessions). Compile and link gates run - `llama-server --version` initialised CUDA while
-  it was up - but anything that allocates VRAM or mlocks large buffers will contend with it.
-- No DeepSeek V4 weights exist locally. Phase 3 and Phase 8 gates cannot run until a qualified
-  GGUF is present.
+  between sessions). Compile and link gates run - `llama-server --version` enumerates a device
+  without a context even with Strata up - but anything that allocates VRAM contends with it, and on
+  2026-11-06 with 630 MiB nominally free, **creating a context itself failed**: a program doing only
+  `cudaFree(0)` and `cudaMemGetInfo` returned `out of memory`, so the producer's no-model receipt
+  smoke aborts in `ggml_backend_cuda_get_device_memory` rather than reaching its reserve refusal.
+  Treat every CUDA gate as unrun until the VRAM is actually free, and check with that two-call
+  probe before blaming a change.
+- No DeepSeek V4 weights exist locally **in a form ds4 can load**. Re-read 2026-11-06 with
+  `slstack/gguf_header.py`: `qwen38-gyro/Strata/models/deepseek-v4.1-flash-IST-DAS-2.00bpw/` holds
+  all four shards (138 GB) of a `deepseek41`, 40-block model with `split.count=4`, but its expert
+  triplets mix `IQ1_M`/`IQ2_XS`/`IQ2_XXS` and its dense tensors are `Q5_K`/`BF16`, which
+  `validate_dsv41_types` refuses - the accepted triplets are `(Q4_K,Q4_K,Q4_K)`,
+  `(IQ2_XXS,IQ2_XXS,Q2_K)` and `(MXFP4,MXFP4,MXFP4)`, dense `Q8_0`/`Q4_K`/`Q4_0`, `engram_embd`
+  `I8`, `token_embd` `F16`, the rest `F32`. Assembling the shards would not qualify it; the quant
+  set is the blocker. The `UD-Q8_K_XL` set is 1 of 9 shards, the Engram table is a separate
+  `IQ4_NL` file (`deepseek41.engram.file`) rather than rows inside the model, and the three Gyro
+  `qwen4exp` files carry TQ tensor types (ids 144-149) outside the engine's table. Phase 3's
+  prefill gate and Phase 8 need a model in the accepted type set - a download or a quantize run -
+  and 336 GB free on the NVMe is enough for either. The HANDOFF records the detail.
 
 ## How to resume this plan
 

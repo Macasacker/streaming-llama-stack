@@ -9,10 +9,18 @@ Two realities that shape every run:
 - Strata (`qwen38-gyro/Strata/build/strata --serve ...`) holds ~30.9 GiB of VRAM, leaving about
   1.3 GiB free. CUDA gates need it stopped, and stopping it also stops this assistant. So the CUDA
   commands below are for you to run by hand, not for the agent.
-- There is no supported model file on this machine. The engine accepts only `deepseek41`,
-  `deepseek4`, `glm-dsa`, `glm5-next`, `qwen4exp` (plus `clip` projectors). The local
-  `qwen38-gyro/Strata/models/Qwen3.8-Flash-Next-Gyro-S-TQ1_0.gguf` is `qwen4exp` metadata but is
-  TQ1_0-quantized, which ds4's tensor type table rejects.
+- There is no model file ds4 can load on this machine. The engine accepts only `deepseek41`,
+  `deepseek4`, `glm-dsa`, `glm5-next`, `qwen4exp` (plus `clip` projectors), and
+  `slstack/gguf_header.py:validate_dsv41_types` is stricter still: per block the expert triplet must
+  be `(Q4_K,Q4_K,Q4_K)`, `(IQ2_XXS,IQ2_XXS,Q2_K)` or `(MXFP4,MXFP4,MXFP4)`, dense projections must
+  be `Q8_0`/`Q4_K`/`Q4_0`, `engram_embd` must be `I8`, `token_embd` `F16`, everything else `F32`,
+  and `split.count` must be 1. What is on disk fails that: the three
+  `Qwen3.8-Flash-Next-Gyro-*.gguf` are `qwen4exp` with TQ tensor types (ids 144-149); the
+  `deepseek-v4.1-flash-IST-DAS-2.00bpw/` shards are `deepseek41` but split four ways with
+  `IQ1_M`/`IQ2_XS` experts and `Q5_K`/`BF16` dense tensors (assembling them would not qualify the
+  quant set); `UD-Q8_K_XL` is 1 of 9 shards; and the Engram table is a separate `IQ4_NL` file
+  (`deepseek41.engram.file`) instead of rows inside the model. Run `read_header` on any candidate
+  before planning a gate around it.
 
 ## Builds
 
