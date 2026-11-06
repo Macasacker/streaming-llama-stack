@@ -14472,7 +14472,7 @@ Source: `engines/ds4/ds4.c:40982`. Unset read: NULL from getenv; the literal con
         const char *dump_gpu = getenv("DS4_METAL_GRAPH_DUMP_LOGITS");
         if (dump_gpu && dump_gpu[0]) {
             if (write_f32_binary_file(dump_gpu, gpu_logits, DS4_N_VOCAB)) {
-                fprintf(stderr, "ds4: wrote Metal graph logits to %s\n", dump_gpu);
+                fprintf(stderr, "ds4: wrote GPU graph logits to %s\n", dump_gpu);
             }
 ```
 
@@ -15095,7 +15095,7 @@ Source: `engines/ds4/ds4.c:82878`. Unset read: NULL from getenv; the literal con
     }
     if (getenv("DS4_METAL_SESSION_BATCH_LOG") != NULL) {
         fprintf(stderr,
-                "ds4: Metal mixed batch prefill_rows=%u decode_rows=%d\n",
+                "ds4: mixed batch prefill_rows=%u decode_rows=%d\n",
                 rows, count);
     }
 ```

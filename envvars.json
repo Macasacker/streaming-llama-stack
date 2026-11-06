@@ -15844,7 +15844,7 @@
         "source": "engines/ds4/ds4.c:40982",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *dump_gpu = getenv(\"DS4_METAL_GRAPH_DUMP_LOGITS\");",
-        "consumer": "\n    if (ok) {\n        const char *dump_gpu = getenv(\"DS4_METAL_GRAPH_DUMP_LOGITS\");\n        if (dump_gpu && dump_gpu[0]) {\n            if (write_f32_binary_file(dump_gpu, gpu_logits, DS4_N_VOCAB)) {\n                fprintf(stderr, \"ds4: wrote Metal graph logits to %s\\n\", dump_gpu);\n            }"
+        "consumer": "\n    if (ok) {\n        const char *dump_gpu = getenv(\"DS4_METAL_GRAPH_DUMP_LOGITS\");\n        if (dump_gpu && dump_gpu[0]) {\n            if (write_f32_binary_file(dump_gpu, gpu_logits, DS4_N_VOCAB)) {\n                fprintf(stderr, \"ds4: wrote GPU graph logits to %s\\n\", dump_gpu);\n            }"
       }
     ]
   },
@@ -16543,7 +16543,7 @@
         "source": "engines/ds4/ds4.c:82878",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"DS4_METAL_SESSION_BATCH_LOG\") != NULL) {",
-        "consumer": "        ds4_session_dspark_capture_note_checkpoint(s);\n    }\n    if (getenv(\"DS4_METAL_SESSION_BATCH_LOG\") != NULL) {\n        fprintf(stderr,\n                \"ds4: Metal mixed batch prefill_rows=%u decode_rows=%d\\n\",\n                rows, count);\n    }"
+        "consumer": "        ds4_session_dspark_capture_note_checkpoint(s);\n    }\n    if (getenv(\"DS4_METAL_SESSION_BATCH_LOG\") != NULL) {\n        fprintf(stderr,\n                \"ds4: mixed batch prefill_rows=%u decode_rows=%d\\n\",\n                rows, count);\n    }"
       }
     ],
     "flag": null,

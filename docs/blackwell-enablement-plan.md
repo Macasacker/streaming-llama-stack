@@ -1,8 +1,8 @@
 # Plan B: Blackwell-only engine, and the DeepSeek V4.1 Flash file that is on disk
 
 Not started. **Gated on the Linux port's legacy removal** (`docs/linux-port-plan.md`): the
-remaining Win32 host code, the Metal comment sweep, the Python orchestrator, the vendor bloat and
-the docs/preset prune. Nothing here needs a Windows or Mac path, so every chunk below is cheaper
+remaining Win32 host code, the Python orchestrator, the vendor bloat and the docs/preset prune.
+Nothing here needs a Windows or Mac path, so every chunk below is cheaper
 after that work is gone, and several of them touch files the port still has to sweep.
 
 Decisions taken on 2026-11-06, recorded so nobody re-litigates them:

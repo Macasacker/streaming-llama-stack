@@ -6,8 +6,8 @@ not part of the engine, the launcher or any build; nothing imports them.
 
 Run them from the repo root. `--apply` writes; without it they only report.
 
-`metal_word_census.py` and `rename_identifiers.py` are the sweeps this port runs on text rather
-than on conditionals; `comment_code_diff.py` is their regression check.
+`metal_word_census.py`, `rename_identifiers.py` and `string_text_replace.py` are the sweeps this
+port runs on text rather than on conditionals; `comment_code_diff.py` is their regression check.
 
 ## collapse_conditionals.py
 
@@ -133,3 +133,18 @@ chunk that also deleted something reports exactly those deletions:
 
 It cannot see `__LINE__`: deleting comment lines moves the number a message reports, so grep for
 `__LINE__` in the file first (ds4.c has none, ds4_cuda.cu has one, well below the edits).
+
+## string_text_replace.py
+
+Rewords printed text without touching identifiers. Each `[old, new]` pair of the map is applied
+inside string literals only, longest pair first, and a literal naming a `DS4_*METAL*` environment
+variable is skipped, which is what keeps a message sweep away from the names the port keeps:
+
+    python3 scripts/port/string_text_replace.py --map docs/evidence/messages-2.2e.json engines/ds4/ds4.c
+    python3 scripts/port/string_text_replace.py --map docs/evidence/messages-2.2e.json --apply engines/ds4/ds4.c
+
+Without `--apply` it prints each pair's hit count and every literal still matching `--report`
+(default `metal`). Rewording a message changes engine output and moves the quoted `consumer` text in
+`envvars.json`, so regenerate the table in the same commit. Verify with `metal_word_census.py`
+(STRING should reach 0) and with `comment_code_diff.py`, which then reports exactly the reworded
+string lines and nothing else.

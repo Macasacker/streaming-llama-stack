@@ -289,12 +289,12 @@ Substitutions:
 | `ds4_tp_win32.c`, `ds4_distributed_win32.c` | pthreads and sockets |
 
 Gate: `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/` returns nothing except
-the three vendored hits. No CLI surface names Metal, and after chunk 2.2e's second identifier run
-no code identifier does either: the gate as first
-written also grepped for `Metal`, which cannot pass: the owner kept the 215 `DS4_METAL_*`
-environment names in chunk 2.2b because they are documented in `docs/VARIABLES.md` and named in
-`docs/macdecode-r6/r6-controls.json`. What is left for those names to sit in is comment text and
-the inert expert-profile subsystem's own messages - chunk 2.2e below.
+the three vendored hits. Chunk 2.2e is finished: no CLI surface, no code identifier and no printed
+message names Metal, and `scripts/port/metal_word_census.py --strict` is the gate for that rather
+than a grep. The gate as first written also grepped for `Metal`, which cannot pass: the owner kept
+the 215 `DS4_METAL_*` environment names in chunk 2.2b because they are documented in
+`docs/VARIABLES.md` and named in `docs/macdecode-r6/r6-controls.json`. What still names Metal is
+those environment names themselves and 26 provenance comments.
 
 ## Phase 3: weight fetcher and producer
 
@@ -593,12 +593,13 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     ds4.c, ds4.h and ds4_cli.c. One `ds4_metal.m` mention stays in a `ds4_cuda.cu` comment as
     inherited provenance.
 
-2.2e Metal words in comments and in the inert subsystem's messages. Identifiers are done
-    (`b6c6d9c` plus this session's commit); the comment and message halves are open. Counted by
+2.2e Metal words in comments and in the inert subsystem's messages. Done in four parts, this
+    session finishing all of them after `b6c6d9c`. Counted by
     `scripts/port/metal_word_census.py`, which classifies every mention by its position in the file
     rather than by a word-boundary regex: 111 comment lines and 173 lines inside quoted strings
-    remain outside `DS4_*METAL*` environment names (`ds4.c` holds 249 of the 284), all of them
-    printed diagnostics or the expert-locality profiler's JSON text. The same census reports 195
+    remain outside `DS4_*METAL*` environment names, of which 26 are kept as provenance and the rest
+    are printed diagnostics or the expert-locality profiler's JSON text (`ds4.c` holds all of the
+    printed ones). The same census reports 195
     mentions of environment names the table documents and 124 of names it does not: their only
     reader is a wrapper such as `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")`, which
     `envdocs`' inventory cannot see, so those knobs are live but undocumented. `DS4_BACKEND_METAL`
@@ -663,15 +664,30 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     message; `ds4_cuda.cu` has one, far below the four comments edited there, and those four edits
     are line-count neutral.
 
-    (4/4, open.) The message half has the same shape: `preprocess_equiv` proves nothing about the
-    wording, and each line needs a decision. Rewording the printed messages changes engine output,
-    and the generated env table quotes engine message text as `consumer` evidence -
-    `docs/VARIABLES.md` carries the `ds4: Metal mixed batch prefill_rows=%u decode_rows=%d` line -
-    so the table must be regenerated in the same commit; 2.2e's identifier half alone moved 4 rows.
-    The Mac receipts under `docs/macdecode-r2/` embed historical `ds4: Metal device ...` stderr
-    verbatim, and `examples/engine_parity/RESULTS.json` plus the two
-    `examples/engine_environment/mac-*.json` name Metal as Mac measurements; rewording the engine
-    does not invalidate those and they are not a regression signal.
+    (4/4, done.) The message half: 173 lines, all in `ds4.c`, reworded through
+    `scripts/port/string_text_replace.py` with the map committed at `docs/evidence/messages-2.2e.json`.
+    That tool applies each pair inside string literals only, longest pair first, and skips any literal
+    naming a `DS4_*METAL*` environment name - which is why 195 documented knob reads survive a sweep
+    that removes every Metal word from engine output. The scheme: a graph-path failure says `GPU graph`,
+    a streaming or SSD path drops the backend word (`ds4: SSD streaming could not build layer %u
+    spans`), the inert expert-profile lines drop it too (`ds4: expert locality profiler active`), the
+    GLM lines say `GLM graph`, and the three refusals that named a backend the CLI no longer accepts
+    name only the ones it does - `--ssd-streaming is currently supported only with --cuda/--rocm`,
+    `V4.1 requires single-GPU CUDA per rank`, `Qwen3.8 sessions require a graph backend`.
+    **Behaviour change:** every one of those lines is engine stderr or stdout, so a receipt that greps
+    for the old wording will not match. Nothing in this repo parses them. The Mac receipts under
+    `docs/macdecode-r2/` embed historical `ds4: Metal device ...` stderr verbatim, and
+    `examples/engine_parity/RESULTS.json` plus the two `examples/engine_environment/mac-*.json` name
+    Metal as Mac measurements; rewording the engine does not invalidate those and they are not a
+    regression signal.
+    Proven inert apart from the text: `comment_code_diff.py` reports exactly 173 changed code lines,
+    every one a string literal, and the warning profiles of every compiled TU are unchanged (`ds4.o`
+    23, `ds4_ext.o` 11, `ds4_cli.o` 1, `ds4_server.o` 2, same texts) with both `ds4` and
+    `ds4-decode.so` linking. The census reports 0 identifiers and 0 string mentions; `docs/VARIABLES.md`
+    no longer carries the `ds4: Metal mixed batch prefill_rows=%u decode_rows=%d` line, and the table
+    regenerated with the 2,234-name set unchanged and exactly 2 rows moved (`DS4_METAL_GRAPH_DUMP_LOGITS`,
+    `DS4_METAL_SESSION_BATCH_LOG`), each only in its quoted consumer text. `./ds4 --help` prints no
+    Metal and `./ds4 --metal` is still an unknown option.
 
 3.1a Producer translation units compile with GCC. Done (`3bc184a`, `0265129`). cmake already
     configured; compiling did not. Two includes still named the engine tree deleted in 1.10a
@@ -1205,7 +1221,7 @@ producer work, and 504 Windows ones under the same excludes (774 before chunk 3.
 quoted grep patterns and the inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
 matches are the 213 distinct `DS4_METAL_*` environment names (404 occurrences) kept on purpose plus
-the 199 comment and message lines chunk 2.2e has left (26 provenance comments, 173 strings).
+the 26 provenance comments chunk 2.2e kept on purpose; no printed message names Metal.
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in

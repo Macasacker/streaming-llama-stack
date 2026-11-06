@@ -1,0 +1,266 @@
+[
+ [
+  "ds4: Metal graph",
+  "ds4: GPU graph"
+ ],
+ [
+  "full Metal graph test",
+  "full GPU graph test"
+ ],
+ [
+  "ds4: Metal full graph layer",
+  "ds4: GPU full graph layer"
+ ],
+ [
+  "Metal full first-token graph",
+  "GPU full first-token graph"
+ ],
+ [
+  "Metal synchronize after",
+  "GPU synchronize after"
+ ],
+ [
+  "ds4: Metal stage layer",
+  "ds4: GPU stage layer"
+ ],
+ [
+  "ds4: Metal shared layer",
+  "ds4: GPU shared layer"
+ ],
+ [
+  "ds4: Metal routed layer",
+  "ds4: GPU routed layer"
+ ],
+ [
+  "ds4: Metal CPU router layer",
+  "ds4: CPU router layer"
+ ],
+ [
+  "ds4: Metal HC norm fusion check",
+  "ds4: HC norm fusion check"
+ ],
+ [
+  "ds4: Metal SSD streaming",
+  "ds4: SSD streaming"
+ ],
+ [
+  "ds4: metal SSD streaming",
+  "ds4: gpu SSD streaming"
+ ],
+ [
+  "ds4: Metal streaming prefill",
+  "ds4: streaming prefill"
+ ],
+ [
+  "ds4: Metal streaming selected readahead",
+  "ds4: streaming selected readahead"
+ ],
+ [
+  "ds4: Metal streaming async selected",
+  "ds4: streaming async selected"
+ ],
+ [
+  "start Metal streaming async selected load worker",
+  "start the streaming async selected load worker"
+ ],
+ [
+  "Metal streaming prefill selected profile",
+  "streaming prefill selected profile"
+ ],
+ [
+  "ds4 Metal expert locality profile",
+  "ds4 expert locality profile"
+ ],
+ [
+  "ds4: Metal expert locality profiler active",
+  "ds4: expert locality profiler active"
+ ],
+ [
+  "ds4: wrote Metal expert hotlist",
+  "ds4: wrote expert hotlist"
+ ],
+ [
+  "ds4: wrote Metal expert locality profile",
+  "ds4: wrote expert locality profile"
+ ],
+ [
+  "read Metal router tensors",
+  "read router tensors"
+ ],
+ [
+  "end Metal command batch",
+  "end the GPU command sequence"
+ ],
+ [
+  "resume Metal command batch",
+  "resume the GPU command sequence"
+ ],
+ [
+  "ds4: metal indexer stage layer",
+  "ds4: gpu indexer stage layer"
+ ],
+ [
+  "ds4: metal layer stage part",
+  "ds4: gpu layer stage part"
+ ],
+ [
+  "ds4: metal Q path stage",
+  "ds4: gpu Q path stage"
+ ],
+ [
+  "ds4: metal graph token pos",
+  "ds4: gpu graph token pos"
+ ],
+ [
+  "ds4: metal layer-major prefill",
+  "ds4: gpu layer-major prefill"
+ ],
+ [
+  "ds4: Metal layer-major prefill",
+  "ds4: layer-major prefill"
+ ],
+ [
+  "ds4: Metal layer-major compressed KV",
+  "ds4: layer-major compressed KV"
+ ],
+ [
+  "ds4: Metal layer-major indexer cache",
+  "ds4: layer-major indexer cache"
+ ],
+ [
+  "ds4: Metal prefill kernel warmup failed",
+  "ds4: prefill kernel warmup failed"
+ ],
+ [
+  "ds4: Metal prefill expert-cache seed",
+  "ds4: prefill expert-cache seed"
+ ],
+ [
+  "initialize Metal graph prompt test runtime",
+  "initialize the GPU graph prompt test runtime"
+ ],
+ [
+  "ds4: Metal prompt graph",
+  "ds4: GPU prompt graph"
+ ],
+ [
+  "before Metal graph allocation",
+  "before GPU graph allocation"
+ ],
+ [
+  "GLM Metal graph",
+  "GLM graph"
+ ],
+ [
+  "GLM Metal all-layer test",
+  "GLM all-layer test"
+ ],
+ [
+  "GLM Metal first-token path",
+  "GLM first-token path"
+ ],
+ [
+  "GLM Metal first-token generation path",
+  "GLM first-token generation path"
+ ],
+ [
+  "GLM Metal generation",
+  "GLM generation"
+ ],
+ [
+  "GLM Metal path",
+  "GLM graph path"
+ ],
+ [
+  "GLM Metal command batch",
+  "GLM GPU command sequence"
+ ],
+ [
+  "GLM Metal batch router tensors",
+  "GLM batch router tensors"
+ ],
+ [
+  "GLM Metal router tensors",
+  "GLM router tensors"
+ ],
+ [
+  "GLM Metal %s mismatch",
+  "GLM graph %s mismatch"
+ ],
+ [
+  "GLM Metal context",
+  "GLM graph context"
+ ],
+ [
+  "GLM Metal full-attention work cap",
+  "GLM full-attention work cap"
+ ],
+ [
+  "GLM Metal",
+  "GLM graph"
+ ],
+ [
+  "read Metal F16 session tensor",
+  "read the GPU F16 session tensor"
+ ],
+ [
+  "restore Metal F16 session tensor",
+  "restore the GPU F16 session tensor"
+ ],
+ [
+  "ds4: Metal failed to preload PRO Q4 expert tables",
+  "ds4: failed to preload PRO Q4 expert tables"
+ ],
+ [
+  "ds4: Metal preloaded PRO Q4 expert tables",
+  "ds4: preloaded PRO Q4 expert tables"
+ ],
+ [
+  "ds4: Metal native shared session batch failed",
+  "ds4: GPU native shared session batch failed"
+ ],
+ [
+  "Metal mixed model batch failed",
+  "GPU mixed model batch failed"
+ ],
+ [
+  "ds4: Metal mixed batch",
+  "ds4: mixed batch"
+ ],
+ [
+  "\"metal graph q\"",
+  "\"gpu graph q\""
+ ],
+ [
+  "\"metal graph kv\"",
+  "\"gpu graph kv\""
+ ],
+ [
+  "\"metal graph routed\"",
+  "\"gpu graph routed\""
+ ],
+ [
+  "ds4: Metal plain matmul",
+  "ds4: graph plain matmul"
+ ],
+ [
+  "ds4: V4.1 requires Metal or single-GPU CUDA per rank",
+  "ds4: V4.1 requires single-GPU CUDA per rank"
+ ],
+ [
+  "only with --metal/--cuda/--rocm",
+  "only with --cuda/--rocm"
+ ],
+ [
+  "requires the Metal or CUDA graph",
+  "requires the CUDA graph"
+ ],
+ [
+  "ds4: Qwen3.8 sessions require Metal or CUDA",
+  "ds4: Qwen3.8 sessions require a graph backend"
+ ],
+ [
+  "wrote Metal graph logits",
+  "wrote GPU graph logits"
+ ]
+]
