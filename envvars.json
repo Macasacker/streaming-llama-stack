@@ -20218,7 +20218,7 @@
         "source": "engines/ds4/ds4.c:31300",
         "unset": "Wrapper/conditional default: see the literal call and consumer below",
         "read": "glm_graph_env_present(\"DS4_ROCM_Q_STAGE_PROFILE\",",
-        "consumer": "    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);\n    const bool q_stage_profile =\n        glm_graph_env_present(\"DS4_ROCM_Q_STAGE_PROFILE\",\n                              \"DS4_METAL_Q_STAGE_PROFILE\");\n    double layer_stage_t0 = layer_stage_profile ? now_sec() : 0.0;\n    double q_stage_t0 = q_stage_profile ? now_sec() : 0.0;\n#define DS4_METAL_PROFILE_ATTN_STAGE(name) do { \\"
+        "consumer": "    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);\n    const bool q_stage_profile =\n        glm_graph_env_present(\"DS4_ROCM_Q_STAGE_PROFILE\",\n                              \"DS4_METAL_Q_STAGE_PROFILE\");\n    double layer_stage_t0 = layer_stage_profile ? now_sec() : 0.0;\n    double q_stage_t0 = q_stage_profile ? now_sec() : 0.0;\n#define DS4_GPU_PROFILE_ATTN_STAGE(name) do { \\"
       }
     ]
   },

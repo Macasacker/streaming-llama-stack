@@ -1,6 +1,6 @@
 # Linux-port scaffolding
 
-Three read-mostly tools for the mechanical sweeps in `docs/linux-port-plan.md` (Phase 2 and 3 are
+Read-mostly tools for the mechanical sweeps in `docs/linux-port-plan.md` (Phase 2 and 3 are
 mostly "delete the branch this build never compiled" and "rename an inherited identifier"). They are
 not part of the engine, the launcher or any build; nothing imports them.
 
@@ -101,3 +101,18 @@ Whole-token rename from a mapping file, with a prefix rule for names like `metal
 `prefix` entries rewrite the head of the identifier and keep its tail. The word boundary matters:
 `_` is a word character, so renaming `METAL_DECODE_LAYER_` cannot touch `DS4_METAL_FOO`, which is
 how chunk 2.2b renamed identifiers while deliberately keeping the environment names.
+
+## metal_word_census.py
+
+The gate for a rename sweep of this kind, and the count of what is still left. It classifies every
+case-insensitive `metal` mention by its position in the file - code, comment, string - and reports
+each bucket, so a `DS4_METAL_PROFILE_X` macro cannot hide behind the same word boundary that hides
+`DS4_METAL_FOO`, the environment name that must stay:
+
+    python3 scripts/port/metal_word_census.py --strict          # exit 1 if an identifier names Metal
+    python3 scripts/port/metal_word_census.py --strict --list   # names the tokens and the files
+
+Vendored files (`external/`, `linenoise.c`) are skipped, as everywhere in this port. `ENV_NAME`
+mentions are the names `envvars.json` documents; `ENV_NAME_CITED` are `DS4_*METAL*` names the table
+does not document, which is what a wrapper read such as `glm_graph_env_present("A", "B")` produces -
+live knobs, invisible to `envdocs`' inventory.

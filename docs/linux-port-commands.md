@@ -84,8 +84,15 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
 
-# No Metal-named identifiers or backend left in the engine. The DS4_METAL_* environment names are
-# kept on purpose and cannot match: `_` is a word character, so \bMETAL_ does not match DS4_METAL_FOO.
+# No Metal-named identifier or backend left in the engine. The word-boundary greps below are cheap
+# but NOT sufficient: `_` is a word character, so \bMETAL_ cannot see DS4_METAL_FOO (an environment
+# name, kept on purpose) and equally cannot see DS4_METAL_PROFILE_DECODE_STAGE (a macro, which chunk
+# 2.2e's first run missed). The census classifies each mention by its position in the file, which is
+# the only honest test, and --strict fails on anything the compiler sees.
+python3 -B scripts/port/metal_word_census.py --strict
+# IDENTIFIER 0, ENV_NAME 195, ENV_NAME_CITED 124, COMMENT 111 lines, STRING 173 lines
+python3 -B scripts/port/metal_word_census.py --strict --list   # names the tokens and the files
+# --strict exit 1 means a code identifier names Metal again.
 grep -rn "\bmetal_\|\bMETAL_" engines/ds4 \
   --include=*.c --include=*.cpp --include=*.h --include=*.hpp \
   --include=*.cu --include=*.cuh --include=*.inc

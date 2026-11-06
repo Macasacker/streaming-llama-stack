@@ -18451,7 +18451,7 @@ Source: `engines/ds4/ds4.c:31300`. Unset read: Wrapper/conditional default: see 
                               "DS4_METAL_Q_STAGE_PROFILE");
     double layer_stage_t0 = layer_stage_profile ? now_sec() : 0.0;
     double q_stage_t0 = q_stage_profile ? now_sec() : 0.0;
-#define DS4_METAL_PROFILE_ATTN_STAGE(name) do { \
+#define DS4_GPU_PROFILE_ATTN_STAGE(name) do { \
 ```
 
 ### DS4_ROCM_STREAMING_EXPERT_HOTLIST

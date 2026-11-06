@@ -289,7 +289,8 @@ Substitutions:
 | `ds4_tp_win32.c`, `ds4_distributed_win32.c` | pthreads and sockets |
 
 Gate: `grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/` returns nothing except
-the three vendored hits, and no code identifier or CLI surface names Metal. The gate as first
+the three vendored hits. No CLI surface names Metal, and after chunk 2.2e's second identifier run
+no code identifier does either: the gate as first
 written also grepped for `Metal`, which cannot pass: the owner kept the 215 `DS4_METAL_*`
 environment names in chunk 2.2b because they are documented in `docs/VARIABLES.md` and named in
 `docs/macdecode-r6/r6-controls.json`. What is left for those names to sit in is comment text and
@@ -592,14 +593,18 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     ds4.c, ds4.h and ds4_cli.c. One `ds4_metal.m` mention stays in a `ds4_cuda.cu` comment as
     inherited provenance.
 
-2.2e Metal words in comments and in the inert subsystem's messages. Partly done (`b6c6d9c`, the
-    identifier half). Re-counted after that commit: 285 case-insensitive `metal` mentions remain in
-    `engines/ds4` outside `DS4_*METAL*` environment names - 112 comment lines and 173 lines inside
-    quoted strings, all of them printed diagnostics or the expert-locality profiler's JSON text
-    (`ds4.c` holds 249 of the 285). No code identifier and no CLI surface names Metal: `\bmetal_` and
-    `\bMETAL_` return 0, `DS4_BACKEND_METAL` returns 0, and `./ds4 --metal` is an unknown option.
+2.2e Metal words in comments and in the inert subsystem's messages. Identifiers are done
+    (`b6c6d9c` plus this session's commit); the comment and message halves are open. Counted by
+    `scripts/port/metal_word_census.py`, which classifies every mention by its position in the file
+    rather than by a word-boundary regex: 111 comment lines and 173 lines inside quoted strings
+    remain outside `DS4_*METAL*` environment names (`ds4.c` holds 249 of the 284), all of them
+    printed diagnostics or the expert-locality profiler's JSON text. The same census reports 195
+    mentions of environment names the table documents and 124 of names it does not: their only
+    reader is a wrapper such as `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")`, which
+    `envdocs`' inventory cannot see, so those knobs are live but undocumented. `DS4_BACKEND_METAL`
+    returns 0 and `./ds4 --metal` is an unknown option.
 
-    (1/3, done.) Two identifier classes survived chunk 2.2b and 2.2d for the same reason those runs
+    (1/4, done.) Two identifier classes survived chunk 2.2b and 2.2d for the same reason those runs
     needed prefix entries - `_` is a word character, so `\bMETAL_` cannot see a name whose `METAL_`
     is preceded by `DS4_GLM_`: the nine `DS4_GLM_METAL_*` compile-time constants (20 lines) and the
     `bool metal` parameter of `qwen4_first_token_test()`, which the call site already feeds
@@ -614,7 +619,25 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     commit; 4 rows moved, all only in their quoted consumer evidence, and the 2,234-name set is
     unchanged.
 
-    (2/3 and 3/3, open.) The comment and message halves are text work with no behaviour attached, so
+    (2/4, done.) A third identifier class, missed by 2.2b, 2.2d and 2.2e's first run for exactly the
+    reason those runs needed prefix entries: seven local `#define`s in the graph path -
+    `DS4_METAL_PROFILE_DECODE_STAGE`, `..._OUTPUT_STAGE`, `..._ATTN_STAGE`, `..._Q_STAGE`,
+    `..._FFN_STAGE`, `DS4_METAL_ENCODE_PREFILL_SHARED_EXPERT` and `DS4_METAL_TRY_SHARED_DOWN_F16` -
+    86 lines, all in `ds4.c`. `\bMETAL_` returns 0 for them because `DS4_` precedes `METAL_`, so the
+    sentence "no code identifier names Metal" was false until this commit; the grep was the gate and
+    the grep could not see the class. Renamed to the `DS4_GPU_*` forms through `rename-2.2e.json`,
+    extended with seven exact entries - exact, not prefix, because a `DS4_METAL_` prefix entry would
+    have rewritten the 164 environment names 2.2b kept. None of the seven is an environment name, so
+    no knob moved. Proven inert: `preprocess_equiv --rename-file` with the same map reports 127,287
+    vs 127,287 live lines, 0 differing positions, 0 length delta, and both compilations of `ds4.c`
+    give warning profiles identical to a worktree at the parent commit (23 and 11 occurrences, same
+    texts). The env table moved 1 row, `DS4_ROCM_Q_STAGE_PROFILE`, and only in its quoted consumer
+    text; the 2,234-name set is unchanged. `scripts/port/metal_word_census.py` is committed with
+    this part, because the position of a mention is the only test that separates a kept environment
+    name from an identifier; `--strict` exits nonzero when a code identifier names Metal, and
+    `docs/linux-port-commands.md` now gates on it instead of on the greps.
+
+    (3/4 and 4/4, open.) The comment and message halves are text work with no behaviour attached, so
     `preprocess_equiv` proves nothing about them - but each line needs a decision, not a substitution:
     some mentions say what the *retired* backend did and are actively misleading in a CUDA-only
     engine (`"the whole-model Metal ..."` in the `ds4.c` header block, the `Metal command batch`
@@ -1161,7 +1184,7 @@ producer work, and 504 Windows ones under the same excludes (774 before chunk 3.
 quoted grep patterns and the inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
 matches are the 213 distinct `DS4_METAL_*` environment names (404 occurrences) kept on purpose plus
-the 285 comment and message mentions chunk 2.2e has left.
+the 284 comment and message lines chunk 2.2e has left (111 comments, 173 strings).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in

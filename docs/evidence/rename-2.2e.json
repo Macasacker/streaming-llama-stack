@@ -1,6 +1,38 @@
 {
-  "exact": [],
+  "exact": [
+    [
+      "DS4_METAL_PROFILE_DECODE_STAGE",
+      "DS4_GPU_PROFILE_DECODE_STAGE"
+    ],
+    [
+      "DS4_METAL_PROFILE_OUTPUT_STAGE",
+      "DS4_GPU_PROFILE_OUTPUT_STAGE"
+    ],
+    [
+      "DS4_METAL_PROFILE_ATTN_STAGE",
+      "DS4_GPU_PROFILE_ATTN_STAGE"
+    ],
+    [
+      "DS4_METAL_PROFILE_Q_STAGE",
+      "DS4_GPU_PROFILE_Q_STAGE"
+    ],
+    [
+      "DS4_METAL_PROFILE_FFN_STAGE",
+      "DS4_GPU_PROFILE_FFN_STAGE"
+    ],
+    [
+      "DS4_METAL_ENCODE_PREFILL_SHARED_EXPERT",
+      "DS4_GPU_ENCODE_PREFILL_SHARED_EXPERT"
+    ],
+    [
+      "DS4_METAL_TRY_SHARED_DOWN_F16",
+      "DS4_GPU_TRY_SHARED_DOWN_F16"
+    ]
+  ],
   "prefix": [
-    ["DS4_GLM_METAL_", "DS4_GLM_"]
+    [
+      "DS4_GLM_METAL_",
+      "DS4_GLM_"
+    ]
   ]
 }
