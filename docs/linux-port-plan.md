@@ -330,9 +330,9 @@ tools   54 refs: dsv41-prefill/main.cpp (windows.h, bcrypt.h, dxgi1_4.h), produc
    `acquire_layer_experts` and `configure_host_cache` are Linux, and the three Engram arms
    (`launch_early`, `start_engram_prompt_early`, the synchronous load in `prepare_engram_prompt`)
    are open. `src/llama-dsv41-weights.cpp` holds no Win32 conditional.
-5. Open. Replace `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`. This is
-   the locked-memory decision (`mlock` needs an `RLIMIT_MEMLOCK` or cgroup allowance) and it also
-   gates the decode library's host-cache path.
+5. Done (3.1h). `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp` are
+   Linux, and the tier locks in chunks instead of all-or-nothing (the locked-memory decision, and
+   chunk B.4 of `docs/blackwell-enablement-plan.md`). Both carry gates pass.
 6. Done (3.1c). BCrypt SHA-256 in `tools/dsv41-prefill/main.cpp` became
    `dsv41_boundary::sha256_native`, whose portable state branch `src/boundary-capture.cpp` already
    had and the producer already links. No OpenSSL, no vendored hasher. The Windows-only replay
@@ -946,19 +946,94 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `cudaFree(0)` and `cudaMemGetInfo` returns `out of memory` - so that gate is the box, not this
     change. `llama-server --version`, which enumerates without a context, still prints the device.
 
-3.1 Streaming producer on Linux. What is left of Phase 3 is still a port, not a sweep.
-    Decide the locked-memory mechanism and replace `llama-dsv41-locked-ram.h` and the carry
-    lease; then the Win32 host code in `mtmd`, `server` and `decode-receiver`.
+3.1h The carry lease and the locked RAM tier. Done. Phase 3 item 5, and chunk B.4 of
+    `docs/blackwell-enablement-plan.md`, which specified it.
+    `src/llama-dsv41-carry.cpp` and `src/llama-dsv41-locked-ram.h` were the last two Windows-shaped
+    files the streamed prefill needs. The mechanical half is `collapse_conditionals.py --tokens
+    _WIN32,windows.h,Win32,VirtualLock,VirtualAlloc,VirtualFree,BY_HANDLE_FILE_INFORMATION
+    --never-defined _WIN32`: 174 deletions, 0 insertions, 0 blocked, and both files then hold no
+    `_WIN32`. Proven as a sweep - `preprocess_equiv.py` reports 0 differing live lines for each
+    file before and after the collapse, `code_line_diff.py` reports 0 changed code lines in
+    `llama-dsv41-carry.cpp` against its parent (a pure deletion), and the warning profile over
+    `llama-dsv41-carry.cpp`, `llama-dsv41-weights.cpp` and `llama-dsv41-sweep.cpp` is 14
+    occurrences against 14, 6 distinct, none added or removed.
+
+    The tier itself then changed, because the Linux arm it collapsed to was all-or-nothing and the
+    allowance on Linux is not a formality: `RLIMIT_MEMLOCK` is 8 MiB soft *and* hard for an
+    unprivileged process here, `mlock` refuses the whole call past it, and `setrlimit` cannot raise
+    the hard limit without privilege. The decision (`docs/blackwell-enablement-plan.md`) is Basalt's
+    rule - lock what the allowance permits, keep the tail allocated and merely pageable, report the
+    shortfall, and let the host-memory paging guard enforce residency:
+
+    - `lock_pages` locks in 64 MiB chunks and halves the chunk at each refusal, retrying the same
+      offset, so a tier far above the allowance still locks what it can. Chunks stay whole pages:
+      `mlock` accounts rounded-up pages, and a partial-page chunk records fewer bytes than the
+      kernel holds (measured: a 12 MiB tier against the 8 MiB allowance reported 2047 pages while
+      `/proc/self/smaps` said 2048).
+    - `locked_bytes` sits beside `bytes` in `lock_state`, per mapping in a `locked` map, so
+      `state().bytes` stays the admission figure the carry tests read. `CARRY_RAM_LOCKED` gained
+      `locked_bytes=`, and a tier that cannot be fully locked also prints
+      `CARRY_RAM_LOCK_PARTIAL bytes= locked_bytes= pageable_tail_bytes= rlimit_memlock_bytes= errno=`.
+      The historical receipt lines in `examples/engine_parity/RESULTS.json` keep the old wording;
+      nothing parses them.
+    - `suspend_pages` unlocks the bytes it holds locked and then `MADV_DONTNEED`s the range, which
+      is what `VirtualUnlock` plus `MEM_DECOMMIT` did; `resume_pages` re-locks best effort and its
+      log line gained `locked_bytes=`, the suspend line `unlocked_bytes=`.
+    - The Windows arm also refused a resume larger than available physical memory before committing
+      pages. That refusal is kept rather than dropped: `resume_pages` reads MemAvailable through
+      `llama_dsv41_host_memory::proc_field`, which is why the header now includes
+      `llama-dsv41-host-memory.h`. Pages refault on first touch, so nothing else refuses an
+      oversized resume.
+    - Fixed a real leak the collapse exposed: `allocate` built the `shared_ptr` after accounting the
+      mapping, so if the control block (or the accounting node) threw, no deleter existed to release
+      the mapping and `state().bytes` kept the charge. The accounting and the `shared_ptr` are now
+      inside one `try`, and the `catch` releases the mapping, the per-mapping entry and both
+      counters and rethrows.
+
+    Gate, host-only, both previously unusable on this box: `tests/dsv41_carry_release.cpp` was red
+    before this chunk - `Carry RAM cannot be locked` past ~6 MiB against the 8 MiB allowance, on its
+    third 2.95 MB allocation - and now prints its PASS line with the third allocation reporting
+    `locked_bytes=2478080 pageable=1`. `tests/pinned_carry_memory.cpp` printed
+    `SKIP: Windows working-set lock proof`; it is ported to `/proc/self/smaps` (per-VMA `Locked:`
+    kB, the VMA has no pathname so it is anonymous) plus `mincore` residency, and keeps the
+    portable assertions the Windows version made - zeroed and writable, private, release unmaps, the
+    `allocate(bytes, bytes-1)` refusal, an accounting-allocation failure leaving
+    `state().bytes == 0` *and* no mapping of that size behind, and the accounting after two
+    allocations and one release. It adds the partial case the Windows tier could not have: a tier
+    beyond the allowance is allocated, `mlock` splits its VMA at the lock boundary, the locked VMAs'
+    `Locked:` sum equals `state().locked_bytes`, and the tail page is neither locked nor faulted in.
+    It passes at 1 MiB, 2 MiB, 4 MiB, 8 MiB (the allowance exactly), 12 MiB, 64 MiB and 100 MiB;
+    a 100 MiB tier locks exactly 8 MiB here. Neither test has a build rule -
+    `docs/linux-port-commands.md` has both compile lines.
+    Everything else re-run after the tier change: `platform-selftest.cpp` (44 checks),
+    `wf-extent-selftest.cpp` (33), `provider-lease-selftest.cpp` (14), `uring-flush-probe.cpp` (3),
+    `tests/dsv41_engram_early_io.cpp` (15, ring and `pread`), and `--check-native-profiles`.
+    The box gained just enough VRAM headroom that the two CUDA gates that were unrun also ran:
+    `wf-io-selftest.cpp` (139 checks, one-thread wall x1.69 against the `pread` baseline) and the
+    no-model producer receipt smoke, which reached its documented refusal - `Selected GPU free bytes
+    do not exceed the explicit reserve`, `out/payload.bin` still 0 bytes, pending receipt retained -
+    instead of aborting in `ggml_backend_cuda_get_device_memory`. `cudaMemGetInfo` reports 116 MiB
+    free; that is the whole margin, so both of those are the box being kind, not a guarantee.
+    The Python suite is unchanged by the chunk: 584 tests, the plan's own list of failing names,
+    `release_check` 0 findings, and the env table regenerated with all 2,234 names and no row moved
+    (the tier reads no environment variable).
+
+3.1 Streaming producer on Linux. The producer's file, fetcher, provider, Engram loader and carry
+    tier are Linux. What is left of Phase 3 is the Win32 host code in `mtmd`, `server` and
+    `decode-receiver`, none of which the streamed prefill needs, and the ggml-side refs Phase 4
+    deletes.
     Gate: a 262K prefill, which needs a qualified GGUF on this box (see the machine facts).
-    Findings for whoever starts it: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
+    Nothing in the prefill path refuses on Linux now: the provider holds the lease, the fetcher and
+    the Engram loader read on io_uring, and the carry tier locks what the allowance permits, so the
+    first real `--engram-prefetch-bytes` run is the test of the geometry defaults in
+    `choose_scan()`, which were tuned on a Windows RAID-0.
+    Findings for whoever continues: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
     file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk
     5.1's `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; and
     `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py` mirrors `wf_params` by ctypes
     field order, which the 3.1e and 3.1f deletions shifted - that module is Phase 6's to delete.
-    Two things need re-running when the GPU has headroom: `docs/evidence/wf-io-selftest.cpp`
-    already passes, and the CUDA arms of the extent reader (`docs/linux-port-commands.md` has the
-    link line) have never executed - a `ggml` CUDA backend wants about 700 MB past what Strata and
-    the browser leave.
+    The CUDA arms of the extent reader (`docs/linux-port-commands.md` has the link line) have still
+    never executed: a `ggml` CUDA backend wants about 700 MB past what Strata and the browser leave.
 
 3.2 Producer decode library wiring. Done as part of 3.1c, because `live-session.inc` is part of
     `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable in place of
@@ -1044,26 +1119,27 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunks 2.2c/2.2d, 3.1b, 3.1c and 3.1d with the commands above, adding
-`--exclude-dir=build --exclude-dir=.git` (the port's own scratch trees and object files now live
-under `build/`, which is gitignored but matched the greps as first written; the engine's own
-binaries, `*.o`, `ds4-decode.so` and the `__pycache__` directories match too, so these totals read
-higher than the source alone): 1,107 Apple/MLX references repo-wide, unchanged by the producer work,
-and 700 Windows ones - down from 774, the drop being `tools/dsv41-prefill` (chunk 3.1d) and the
-comments chunk 3.1c reworded. Both figures also include this plan's own quoted grep patterns and the
-inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
+Counts, re-counted after chunks 2.2c/2.2d, 3.1b, 3.1c, 3.1d and 3.1h with the commands above, adding
+`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__` (the port's own scratch trees and
+object files now live under `build/`, which is gitignored but matched the greps as first written; the
+engine's own binaries, `*.o`, `ds4-decode.so` and the `__pycache__` directories match too, so these
+totals read higher than the source alone): 1,109 Apple/MLX references repo-wide, unchanged by the
+producer work, and 504 Windows ones under the same excludes (774 before chunk 3.1d, counted with
+`build/` included, so the two are not directly comparable). Both figures also include this plan's own
+quoted grep patterns and the inherited measurement history in `docs/`. Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 269 Apple/Metal
 matches are the 215 `DS4_METAL_*` environment names kept on purpose plus comment text (chunk 2.2e).
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in
-`src/llama-dsv41-engram-prefetch.{cpp,h}`: 0 conditional or include hits (chunks 3.1d, 3.1e, 3.1f,
-3.1g); the one survivor is a provenance comment in the loader that names the IoRing it was ported
-from, so gate greps still need `| grep -vE ":[0-9]+:\s*//"`. `tests/dsv41_engram_early_io.cpp` is
-Linux with the loader; four test sources remain Windows-shaped (`cuda_other22_graph.cpp`,
-`dsv41_producer_abort.cpp`, `pinned_carry_memory.cpp`, `studio_generation.cpp`) and none of them
-has a build rule. The repo-wide pattern above now counts 532, down from 633 before 3.1g. The rest
-of the producer tree is still Windows-shaped: 18 files under `src/` by that pattern (one of them a
+`src/llama-dsv41-engram-prefetch.{cpp,h}` and in `src/llama-dsv41-carry.cpp` and
+`src/llama-dsv41-locked-ram.h`: 0 conditional or include hits (chunks 3.1d, 3.1e, 3.1f, 3.1g,
+3.1h); the one survivor is a provenance comment in the loader that names the IoRing it was ported
+from, so gate greps still need `| grep -vE ":[0-9]+:\s*//"`. `tests/dsv41_engram_early_io.cpp` and
+`tests/pinned_carry_memory.cpp` are Linux with the code they test; two test sources remain
+Windows-shaped (`dsv41_producer_abort.cpp`, `studio_generation.cpp`) and none of them has a build
+rule. The repo-wide pattern above now counts 504, down from 532 before 3.1h. The rest
+of the producer tree is still Windows-shaped: 15 files under `src/` by that pattern (one of them a
 comment), 6 under
 `common/`, 4 under `tools/mtmd`, 3 under `tools/server`, 1 under `tools/decode-receiver`, plus the
 ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
@@ -1091,6 +1167,10 @@ scaffolding in `scripts/port/` - `collapse_conditionals.py`, `preprocess_equiv.p
 behaviour-preserving if the rule is "keep the branch the compiler already kept", and a rename is
 only safe if the preprocessed live text is unchanged; do not hand-edit either sweep.
 
-`.githooks` is wired through `core.hooksPath`, so `pre-commit` runs `release_check.py` and will
-refuse a commit while the VARIABLES finding stands. Either regenerate the table first or commit
-the work-in-progress chunks with `--no-verify` and say so in the commit message.
+`.githooks` holds `pre-commit` and `commit-msg`, but **this checkout does not run them**:
+`git config --get core.hooksPath` is empty and `.git/hooks` holds only the samples, so
+`release_check.py` has to be run by hand before committing. Wiring it up would also refuse every
+commit here: `--identities` requires the `Front Eagle <fronteagle739@users.noreply.github.com>`
+identity that the fork's history carries, while this box's git config is `Mac`, and the port's own
+commits are `Mac`-authored. Regenerate the env table before committing work-in-progress chunks
+rather than reaching for `--no-verify` over a hook that is not installed.

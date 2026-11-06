@@ -17,39 +17,30 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-Phase 3's producer CLI, its weight fetcher, its native weight provider and its Engram row loader
-are now Linux: the provider holds a POSIX lease on the verified model file, builds the bounded
-relay, acquires stages in alternating banks, writes named file extents into a compute bank, admits
-its RAM expert tier from `/proc`, and loads a prompt's Engram rows through io_uring queues. A
-streamed prefill still needs the locked-memory decision and the carry lease, and the gate itself
-needs a qualified GGUF. In the order worth doing:
+Phase 3's producer CLI, its weight fetcher, its native weight provider, its Engram row loader, its
+carry store and its locked RAM tier are now Linux: the provider holds a POSIX lease on the verified
+model file, builds the bounded relay, acquires stages in alternating banks, writes named file
+extents into a compute bank, admits its RAM expert tier from `/proc`, loads a prompt's Engram rows
+through io_uring queues, and the carry tier locks as much of its RAM as the kernel allows. Nothing
+in the streamed prefill path refuses on Linux any more. What it still needs is a qualified GGUF. In
+the order worth doing:
 
-1. **Chunk 3.1h - `llama-dsv41-locked-ram.h` and the carry lease in `llama-dsv41-carry.cpp`**
-   (Phase 3 item 5, and chunk B.4 of `docs/blackwell-enablement-plan.md`, which specifies it).
-   The locked-memory decision is made: lock in chunks, keep the tail pageable, report the shortfall,
-   and let the paging guard enforce residency - Basalt's precedent. Both files are already
-   dual-platform, so this is `collapse_conditionals.py` plus replacing the all-or-nothing `mlock`,
-   not new code. Two host-only gates exist and one is red today:
-   `tests/dsv41_carry_release.cpp` fails with `Carry RAM cannot be locked` past ~6 MiB against this
-   box's 8 MiB allowance, and `tests/pinned_carry_memory.cpp` prints
-   `SKIP: Windows working-set lock proof`. Also fix the control-allocation leak the second test
-   would catch: if the `shared_ptr` control block throws, nothing releases the mapping or the
-   accounting. `llama-dsv41-carry.cpp` (13 hits) and `llama-dsv41-locked-ram.h` (9) are the last two
-   Windows-shaped files the prefill path needs; the sweep calls both.
-2. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
+1. **Chunk 2.2e - Metal words in comments.** 310 case-insensitive `metal` mentions remain in
    `engines/ds4` outside `DS4_METAL_*`, ~190 inside strings, mostly the inert expert-locality
    profiler. No behaviour attached; regenerate the env table because lines move.
 
 Also open: 5.1 (Python orchestrator: `guard.py` Job Object -> a cgroup scope,
 `single_runtime.py` PRODUCER_FILES), 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and
-8.1 (qualification), all blocked on a qualified GGUF for the last one. Phase 3's remaining Win32
-after 3.1h is `mtmd`, `server` and `decode-receiver`, none of which the streamed prefill needs.
+8.1 (qualification), all blocked on a qualified GGUF for the last one. Phase 3's remaining Win32 is
+`mtmd`, `server` and `decode-receiver`, none of which the streamed prefill needs.
 
-What a prefill attempt now needs beyond a qualified GGUF: nothing in the Engram path is refused
-any more. The three provider arms (`launch_early`, `start_engram_prompt_early`, the synchronous
-load in `prepare_engram_prompt`) are live and the loader runs on io_uring, so the first real
-`--engram-prefetch-bytes` run is the test of the geometry defaults, which were tuned on a Windows
-RAID-0 and are still the values in `choose_scan()`.
+What a prefill attempt needs beyond a qualified GGUF: nothing else. The three provider arms
+(`launch_early`, `start_engram_prompt_early`, the synchronous load in `prepare_engram_prompt`) are
+live, the loader runs on io_uring, and the carry tier no longer refuses an allocation larger than
+`RLIMIT_MEMLOCK`, so the first real `--engram-prefetch-bytes` run is the test of the geometry
+defaults, which were tuned on a Windows RAID-0 and are still the values in `choose_scan()`. Expect
+`CARRY_RAM_LOCK_PARTIAL` in that run's log on this box: against the 8 MiB allowance a multi-gigabyte
+carry tier is mostly pageable, and the paging guard, not the page lock, is what keeps it resident.
 
 Chunk 3.2 (the decode library loader) landed inside 3.1c, because `live-session.inc` is part of
 `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable. Its binding is
@@ -60,12 +51,17 @@ verified by the selftest; a live session against weights is not, and cannot be h
 `git log --oneline` from `58ff877` forward is the port, chunk by chunk; `docs/linux-port-plan.md`
 maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a), `dcb5666` (2.2c),
 `7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` +
-`1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), plus the plan/handoff commits.
+`1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), `187f2fa` + `09b6158` (the
+model-file claim and the Blackwell plan), `d7eae91` (3.1h), plus the plan/handoff commits.
 `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
 Working tree is clean apart from scratch under `build/`. `python3 -B scripts/release_check.py`
-reports 0 findings, so commits need no `--no-verify` (`core.hooksPath` runs it as a pre-commit
-hook). Python suite: **584 tests, 5-6 failures, 5 errors** (fork baseline 585 / 6 / 6), and the
+reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPath` is empty and
+`.git/hooks` holds only the samples, so the check has to be run by hand before committing. Do not
+wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
+requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
+while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite:
+**584 tests, 5-6 failures, 5 errors** (fork baseline 585 / 6 / 6), and the
 failing *names* are the plan's list - `test_combo_process` (3), `test_journal_recovery_flags`,
 `test_single_liveness`, `test_shared_guard_adapter` (Windows-only guard and producer paths),
 `test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco` (missing `cosmos_windows` module),
@@ -79,10 +75,14 @@ Five hand-compiled programs cover what has no test target, all passing on this t
 pipeline), `docs/evidence/wf-extent-selftest.cpp` (33 checks, the strict extent reader),
 `docs/evidence/provider-lease-selftest.cpp` (14 checks, the provider's lease through `inspect()`
 with no backend), and `docs/evidence/uring-flush-probe.cpp` (3 checks, the io_uring flush rule).
-A sixth is a real test source rather than an evidence file, and still has no build rule:
-`tests/dsv41_engram_early_io.cpp` (15 checks, chunk 3.1g's row loader over a 208 MB synthetic table
-file, no GPU and no model). `docs/linux-port-commands.md` has the exact compile lines for all six -
-the lease recipe was missing from it until this session, even though the evidence file points at it.
+Three more are real test sources rather than evidence files, and all three still have no build
+rule: `tests/dsv41_engram_early_io.cpp` (15 checks, chunk 3.1g's row loader over a 208 MB synthetic
+table file, no GPU and no model), `tests/dsv41_carry_release.cpp` (the carry store's release,
+recommit and reseed cycle over 40 byte-preserving layers) and `tests/pinned_carry_memory.cpp`
+(chunk 3.1h's RAM tier, now a Linux proof rather than the `SKIP` it printed). The last two also
+need no backend: they link only the carry object and two ggml libs. `docs/linux-port-commands.md`
+has the exact compile lines for all eight - the lease recipe was missing from it until the last
+session, and the two carry recipes until this one.
 
 Nothing verified so far is a performance result for a model. The measurements are the fetcher's
 reader comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring x1.04 at four threads, x1.44-x1.67
@@ -103,10 +103,12 @@ and no supported model weights exist on this box.
    memory is still the user's call, and **the headroom moves**: it went from ~900 MB to ~0 mid-session
    on 2026-11-03, which is why a CUDA-needing gate can pass at one hour and fail at the next. Re-run
    before concluding the code broke; a program that only does `cudaMalloc(8 MiB)` says whether the
-   box or the change is at fault. On 2026-11-06 it was worse than "no headroom": `cudaFree(0)` and
-   `cudaMemGetInfo` themselves returned `out of memory`, so the producer's no-model receipt smoke
-   aborts in `ggml_backend_cuda_get_device_memory` instead of reaching its VRAM-reserve refusal -
-   that gate is unrun, not failing.
+   box or the change is at fault. The margin is thin and it moves: on 2026-11-06 morning
+   `cudaFree(0)` and `cudaMemGetInfo` themselves returned `out of memory`, and later the same day
+   `cudaMemGetInfo` reported 116 MiB free, `cudaMalloc(8 MiB)` succeeded, and the two gates that
+   had been unrun - `docs/evidence/wf-io-selftest.cpp` and the producer's no-model receipt smoke -
+   both ran to their documented outcomes. A CUDA gate is therefore *unverified* rather than failing
+   whenever the probe says no; probe first, in the same session, before blaming a change.
 2. **No qualified model file, and the weights that are on this box cannot be made into one.**
    Re-read with `slstack/gguf_header.py` on 2026-11-06 (`read_header` + `validate_dsv41_types`),
    under `qwen38-gyro/Strata/models/`:
@@ -196,7 +198,9 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   with no backend), and `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait
   rule. Chunk 3.1g's program is not under `docs/evidence/` but in the test directory -
   `tests/dsv41_engram_early_io.cpp`, ported with the loader, 15 checks over a 208 MB synthetic table
-  file, no GPU and no model. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
+  file, no GPU and no model - and chunk 3.1h's two are there too (`tests/dsv41_carry_release.cpp`,
+  which was red before the change, and `tests/pinned_carry_memory.cpp`), because the tier is engine
+  code with a test source rather than a throwaway program. Copy them to `build/` and compile them; `docs/linux-port-commands.md` has the exact `g++` lines and the no-model producer
   smoke recipe. Anything written under `build/` is scratch and is not in git; chunk 2.2b's map was
   never saved, so its rename is only reconstructable from its commit message.
 - When subagents are available, `adversarial-code-review` is worth running after a deletion chunk -
@@ -208,50 +212,55 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
 
 ## Behaviour changes landed this session
 
-Chunks 3.1c through 3.1f's behaviour changes (the CLI running on Linux, the POSIX receipt identity
+Chunks 3.1c through 3.1g's behaviour changes (the CLI running on Linux, the POSIX receipt identity
 fields, `--carry-storage hybrid` without a drive letter, SIGINT/SIGTERM cancellation, the live
 carry-resume RAM floor, no process-memory limit in `host_memory::begin()`, the fetcher's io_uring
 reader and `LLAMA_WF_IO_URING=0`, `WF_MODE_AUTO` probing cuFile, buffered `io_direct`, the deleted
 `--ds-gpu-ring-slots`, `--ds-submit-threads` and `--ds-zero-padding-only`, the sticky failed-read
 accounting, the POSIX provider lease, the bounded relay as the strict profile, the named-extent
-reads into a compute bank, the RAM expert tier measured from `/proc`, and the move of the relay's
-staging tier and the extent window into the provider's host plan) are recorded in the plan's entries
-for those chunks and in their commit messages. This session's (chunk 3.1g):
+reads into a compute bank, the RAM expert tier measured from `/proc`, the move of the relay's
+staging tier and the extent window into the provider's host plan, the Engram loader's io_uring
+queues with its serial `pread` baseline and `LLAMADECODE_ENGRAM_IO_URING=0`, the deleted
+`LLAMADECODE_ENGRAM_IO_PRIORITY`, the loader's own descriptor checked against the provider's lease,
+`load()`/`load_early()` taking a path and an `int` fd, and the provider's three Engram arms being
+open) are recorded in the plan's entries for those chunks and in their commit messages. This
+session's (chunk 3.1h):
 
-- **The Engram row loader reads through io_uring queues, one per ring, with a serial `pread`
-  baseline** (`LLAMADECODE_ENGRAM_IO_URING=0`, new row; the same convention as `LLAMA_WF_IO_URING`).
-  Both readers run the identical planner extents, slot arena, hit bitmaps, table-publication order
-  and counters, so the comparison isolates the reader. Fixed-file registration is optional and the
-  slot arena is named per request rather than registered; the Windows registration submit and its
-  completion loop are gone, because `io_uring_register_files` is a synchronous syscall.
-- **The wait is a shared `eventfd` plus `poll(..., 100 ms)`, and the submit is always explicit.**
-  It replaces `SetIoRingCompletionEvent` and `WaitForMultipleObjects`. Each queue's submission ring
-  is flushed before waiting. A short or zero flush is legitimate and the unflushed entries stay in
-  the ring (`in_sq` counts them and the batch thresholds read it), so the Windows "the whole batch
-  or nothing" refusal is gone.
-- **Cleanup is `IORING_OP_ASYNC_CANCEL` keyed on the descriptor**, then the same 5 s drain and the
-  same refusal to free an arena an unconfirmed read can still write into; that refusal now prints
-  `DSV41_ENGRAM_RING_CLEANUP_REFUSED` and exits with `_exit(79)` in place of `TerminateProcess`.
-  Unsubmitted entries are flushed and cancelled rather than abandoned.
-- **The loader opens its own descriptor on the model's name** and refuses it unless `st_dev`,
-  `st_ino`, `st_size`, `S_ISREG` and `st_nlink == 1` still match the provider's lease - the fact
-  `FILE_ID_INFO` proved - with `O_NOFOLLOW` where Windows used `FILE_FLAG_OPEN_REPARSE_POINT`.
-  Reads are buffered, so the 4 KiB extent geometry is kept and the `FileStorageInfo` logical-sector
-  probe for `LLAMADECODE_ENGRAM_READ_ALIGN=512` is gone; `PERFEXP_E13` now reports the geometry
-  alone.
-- Deleted rather than faked: **`LLAMADECODE_ENGRAM_IO_PRIORITY`**, which set a per-handle Windows IO
-  priority hint with no Linux per-request equivalent (process scheduling and `ionice` govern) and
-  whose measured `low` value starved the reads. Both reads, both log lines and the env row are gone;
-  `envvars.json` is still 2,234 names, with `LLAMADECODE_ENGRAM_IO_URING` replacing it.
-- `load()` and `load_early()` take `const std::filesystem::path&` and an `int` descriptor instead of
-  a `const wchar_t*` and a `HANDLE`. Two log fields renamed: `own_iorings=1`/`own_ioring=1` became
-  `own_rings=1`/`own_ring=1`, and both load lines gained `reader=io_uring|pread`. **No admission
-  change**: the arena and metadata arithmetic is the Windows one, so the `--engram-prefetch-bytes`
-  values in existing recipes still apply.
-- The provider's three Engram arms are open (`launch_early`, `start_engram_prompt_early`, the
-  synchronous load in `prepare_engram_prompt`), so `src/llama-dsv41-weights.cpp` holds no Win32
-  conditional and nothing in the Engram path refuses on Linux. The geometry defaults in
-  `choose_scan()` are still the Windows RAID-0 tuning, untouched.
+- **The carry RAM tier locks as far as the kernel allows instead of refusing the allocation.**
+  `mlock` is all-or-nothing per call and `RLIMIT_MEMLOCK` here is 8 MiB soft *and* hard, so the
+  previous Linux arm threw `Carry RAM cannot be locked` for any tier past it - which is every real
+  carry tier. It now locks in 64 MiB chunks and halves the chunk at each refusal, retrying the same
+  offset, so the allowance is used rather than skipped; the tail stays allocated and merely
+  pageable. That is option 3 of `docs/blackwell-enablement-plan.md` and Basalt's rule.
+  `state().locked_bytes` sits beside `state().bytes`, per mapping in a `locked` map, and
+  `state().bytes` is still the admission figure - **no admission change**, so the carry budgets in
+  existing recipes still apply. `CARRY_RAM_LOCKED` gained `locked_bytes=`, and a tier that cannot be
+  fully locked also prints `CARRY_RAM_LOCK_PARTIAL bytes= locked_bytes= pageable_tail_bytes=
+  rlimit_memlock_bytes= errno=`. Historical receipt lines in
+  `examples/engine_parity/RESULTS.json` keep the old wording; nothing parses them.
+- **Chunks stay whole pages.** `mlock` accounts rounded-up pages, so a partial-page chunk records
+  fewer bytes than the kernel holds; the first version of this reported 2047 pages for a tier smaps
+  said was 2048. `locked_bytes` is therefore exact against `/proc/self/smaps`.
+- **Suspend is `munlock` of the locked bytes then `MADV_DONTNEED`** (`VirtualUnlock` +
+  `MEM_DECOMMIT`), and resume re-locks best effort at the same address; the suspend line gained
+  `unlocked_bytes=` and the resume line `locked_bytes=`.
+- **The resume refusal on physical memory is kept, not dropped.** The Windows arm refused a resume
+  larger than available physical memory before committing pages; `resume_pages` now reads MemAvailable
+  through `llama_dsv41_host_memory::proc_field`, which is why `llama-dsv41-locked-ram.h` includes
+  `llama-dsv41-host-memory.h`. Pages refault on first touch, so nothing else refuses an oversized
+  resume.
+- **Fixed a leak the collapse exposed.** `allocate` accounted the mapping and then built the
+  `shared_ptr`, so if the control block - or the accounting node inserted before it - threw, no
+  deleter existed: the mapping stayed mapped and `state().bytes` kept the charge. The accounting and
+  the `shared_ptr` are now in one `try`, and the `catch` releases the mapping, the per-mapping entry
+  and both counters before rethrowing.
+- **Allocation still has no fallback.** An `mmap` failure and an admission refusal throw exactly as
+  before; only the *lock* became best effort. `llama-dsv41-carry.cpp` is a pure deletion -
+  `code_line_diff.py` reports 0 changed code lines against its parent - so its lease, identity
+  checks, positioned I/O, flush and ancestor pin are the Linux arms the compiler already took.
+- No environment variable was added or removed: `envvars.json` is still 2,234 names, and the table
+  regenerated with no row moved (the tier reads none).
+- The geometry defaults in `choose_scan()` are still the Windows RAID-0 tuning, untouched.
 
 - Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
   `slstack-weight-fetcher.dll`, and `scripts/build_combo_runtime.py` builds a preset named
@@ -267,6 +276,8 @@ for those chunks and in their commit messages. This session's (chunk 3.1g):
   linked selftest uses `build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o`, which
   `ninja -C build/llama llama-dsv41-prefill` does **not** rebuild - so it silently links a stale
   object and proves nothing about your edit. Run `ninja -C build/llama src/libllama.a` first.
+  The same trap is on both carry programs, which link
+  `build/llama/src/CMakeFiles/llama.dir/llama-dsv41-carry.cpp.o`.
 - A chunk the reader never accounts does not hang the pipeline: the scheduler polls
   `wf_layer_io_done` with a timeout, so it spins reporting `progress=NO` with the RAM buffers stuck
   `in_use`, and `wf_stop` still joins. That makes a dropped chunk look like a stall, not a deadlock
@@ -398,12 +409,30 @@ for those chunks and in their commit messages. This session's (chunk 3.1g):
   path", and it scans every tracked blob - including a `.cpp` committed under `docs/evidence/` - so
   docs and evidence files must use repo-relative paths. `git status -sb` is the push check; the
   pre-commit hook also scans the commit message, so a message must not quote a machine path either.
-- **Locked memory is decided** (option 3, 2026-11-06): chunked best-effort `mlock`, the tail stays
-  allocated and pageable, the shortfall is logged, and the host-memory paging guard enforces it.
-  Details and the precedent are in `docs/blackwell-enablement-plan.md` chunk B.4. Note that
-  `cudaHostAlloc`/`cudaMallocHost`, which the fetcher's staging tier and the extent window use, do
-  not need an `RLIMIT_MEMLOCK` allowance - only the carry tier's `mlock` does, and here the allowance
-  is 8 MiB soft *and* hard, so an unprivileged process can never lock a carry tier in full.
+- **Locked memory is landed** (chunk 3.1h, option 3 of `docs/blackwell-enablement-plan.md`): chunked
+  best-effort `mlock`, the tail allocated and pageable, the shortfall logged as
+  `CARRY_RAM_LOCK_PARTIAL`, and the host-memory paging guard as the enforcement. Details in the
+  plan's 3.1h entry. `cudaHostAlloc`/`cudaMallocHost`, which the fetcher's staging tier and the
+  extent window use, do **not** need an `RLIMIT_MEMLOCK` allowance - only the carry tier's `mlock`
+  does, and here the allowance is 8 MiB soft *and* hard, `setrlimit(∞)` returns `EINVAL`, and
+  `systemd-run --user` cannot raise `LimitMEMLOCK`, so an unprivileged process can never lock a
+  carry tier in full.
+- **`mlock` splits the VMA at the lock boundary** and accounts whole pages: a partly locked tier is
+  several `/proc/self/smaps` VMAs, each with its own `Locked: kB`, and their sum is what the tier
+  holds. A partial-page chunk therefore under-reports what the kernel locked (measured: 2047 pages
+  recorded against 2048 reported). Keep lock chunks page-multiples.
+- **Parsing `/proc/self/smaps` has two traps.** A VMA header line for an anonymous mapping ends after
+  the inode, and glibc's `%255[^\n]` *assigns an empty string and still counts the conversion*, so
+  counting conversions cannot tell an anonymous mapping from a named one - skip the five known
+  fields and test what is left. And a field line must not be mistaken for a header: parse
+  `%llx-%llx %15s %llx %x:%x %llu` and require all seven.
+- **The tier's `locked` map is keyed by the mapping address.** That is safe only because a suspended
+  mapping stays reserved (its VA cannot be handed to another `mmap` while it is mapped) and because
+  the erase happens on the way out. A change that unmaps without erasing would make the next
+  allocation at the same address inherit the old entry.
+- **`munlock` on pages that are not locked is a no-op success**, so the deleter may unlock the amount
+  it captured at allocation even after a suspend/resume cycle re-locked a different amount. The
+  accounting comes from the map, not from that unlock.
 
 ## Suggested skills
 
@@ -414,11 +443,16 @@ for those chunks and in their commit messages. This session's (chunk 3.1g):
   checks, the hand-compiled programs and the function-level diff - and ask before fanning out.
 - `add-unit-test` for extending `engines/ds4/tests/test_batch_io.cpp` or `test_decode_library.cpp`.
   The producer's reader is covered by `docs/evidence/wf-io-selftest.cpp`, compiled by hand, because
-  the producer has no test target; the Engram loader by `tests/dsv41_engram_early_io.cpp`, also
-  compiled by hand.
-- `code-design` / `code-reviewer` when porting the carry lease and the locked-memory tier (chunk
-  3.1h), and `adversarial-code-review` after it if the user allows a subagent: that chunk changes
-  admission, not just text.
+  the producer has no test target; the Engram loader by `tests/dsv41_engram_early_io.cpp`, the carry
+  store and its RAM tier by `tests/dsv41_carry_release.cpp` and `tests/pinned_carry_memory.cpp`, all
+  three also compiled by hand (`docs/linux-port-commands.md`).
+- `code-design` / `code-reviewer` when a chunk changes admission rather than text - chunk 3.1h was
+  one, and it went through inline verification only. Chunk 5.1 (`guard.py`'s Job Object -> a cgroup
+  scope) is the next one that changes a resource decision.
+- `adversarial-code-review` after a chunk that rewrote behaviour, if the user allows a subagent; the
+  `scripts/port/` equivalence commands are the evidence to hand it. For 3.1h the proof was inline:
+  the collapse report, `preprocess_equiv`, `code_line_diff`, the warning profile, and both carry
+  programs, one of which was red before the change.
 - `web-research` for liburing, CCCL 3 / libcudacxx header changes, or llama.cpp cmake details.
 - `unslop` / `writing-style` on docs and commit messages.
 - `handoff` again when this session runs out of context - update this file, don't replace it with

@@ -25,6 +25,9 @@ Decisions taken on 2026-11-06, recorded so nobody re-litigates them:
   pageable, report the shortfall, and let the host-memory paging guard enforce residency. This is
   what Basalt does (`build/basalt/src/platform/memory.cpp:100-113`: 256 MiB chunks,
   `r.ok = off > 0`, note `mlock failed (raise ulimit -l)`), so it is a precedent and not a guess.
+  Landed as port chunk 3.1h; the tier there locks in 64 MiB chunks and halves the chunk at each
+  refusal down to one page, which locks the whole allowance on this box where Basalt's 256 MiB
+  chunk would lock none of it.
 - **Blackwell only**: `sm_120a`, one CUDA architecture, no other vendor backend. Basalt already
   enforces that shape (`CMakeLists.txt:4` sets arch 120, line 44 `FATAL_ERROR` on anything else).
 
@@ -35,10 +38,10 @@ Decisions taken on 2026-11-06, recorded so nobody re-litigates them:
 | GPU link | PCIe 16.0 GT/s x16 (Gen5), max 32.0 GT/s | `/sys/bus/pci/devices/0000:01:00.0` |
 | NVMe | Samsung 990 PRO 2TB, Gen4 x4, **2.6 GB/s** sequential direct | `dd iflag=direct bs=1M` over 3.2 GB |
 | VRAM | 32 GiB; Strata holds ~30 GiB, browser ~230 MB | `nvidia-smi --query-compute-apps` |
-| CUDA context | cannot be created at that occupancy: `cudaFree(0)` and `cudaMemGetInfo` return `out of memory` | two-call probe |
+| CUDA context | 116 MiB free with Strata at 30 GiB and the browser beside it on 2026-11-06: `cudaMemGetInfo` and a `cudaMalloc(8 MiB)` succeeded, and the fetcher selftest and the no-model producer smoke both ran. Earlier the same calls returned `out of memory`. The margin moves; probe before planning a CUDA gate | two-call probe |
 | RAM / swap | 93 GiB total, 38 GiB used, 9 GiB swap unused | `free -h` |
 | `RLIMIT_MEMLOCK` | 8 MiB soft **and** hard; `setrlimit(∞)` → `EINVAL`; `systemd-run --user` cannot raise `LimitMEMLOCK` (property accepted, `ulimit -l` still 8192); no passwordless sudo | probes in `build/` |
-| `mlock` behaviour | all-or-nothing per call: 12 MiB fails with `ENOMEM` and locks 0 bytes; `/proc/self/smaps` reports `Locked: kB` per VMA | `build/mlock-probe`, smaps probe |
+| `mlock` behaviour | all-or-nothing per call: 12 MiB fails with `ENOMEM` and locks 0 bytes; it accounts whole pages, so a partial-page chunk reports fewer bytes than the kernel holds; `/proc/self/smaps` reports `Locked: kB` per VMA and `mlock` splits the VMA at the lock boundary | `build/mlock-probe`, smaps probe, chunk 3.1h's `tests/pinned_carry_memory.cpp` |
 
 The arithmetic that follows from it. Per expert: 3 matrices x 5120 x 2304 = 35.4M values. Per token:
 6 experts = 212M values, which at this quant's ~2 bpw is **~53 MB of expert bytes per token**. The
@@ -61,7 +64,7 @@ That asymmetry is the whole reason to build A rather than run Basalt: Basalt's d
 
 | Port chunk | What it removes | Needed before |
 |---|---|---|
-| 3.1h | Win32 arms of `llama-dsv41-carry.cpp` and `llama-dsv41-locked-ram.h`, and the all-or-nothing `mlock` | B.5, B.6 (both allocate through that tier) |
+| 3.1h (done) | Win32 arms of `llama-dsv41-carry.cpp` and `llama-dsv41-locked-ram.h`, and the all-or-nothing `mlock` | B.5, B.6 (both allocate through that tier) |
 | 4.1 | ggml's `blas`, `cann`, `hexagon`, `hip`, `metal`, `musa`, `opencl`, `rpc`, `sycl`, `vulkan`, `zendnn` | B.7 |
 | 5.1 | `guard.py` Job Object → cgroup scope, `single_runtime.py` PRODUCER_FILES | the launch recipes B.8 needs |
 | 2.2e, 6.1, 7.1 | Metal words in comments, Mac/MLX vendor and engines, docs/presets/tests | B.8's receipts and the README tables |
@@ -96,24 +99,20 @@ the Engram row type from B.2 - each addition gated on B.5/B.6 existing, in the s
 launcher never admits a file the engine cannot run. Extend the Python tests in `tests/` with the
 real header. **Host-only.**
 
-**B.4 - the locked-memory chunk (this is port 3.1h).** Delete the Windows arms with
-`scripts/port/collapse_conditionals.py --tokens _WIN32,windows.h,Win32,VirtualLock,VirtualAlloc,VirtualFree,BY_HANDLE_FILE_INFORMATION --never-defined _WIN32`
-(verified: 174 deletions, 0 insertions, 0 blocked, both files then free of `_WIN32`). Replace the
-single `mlock` with chunked best-effort locking and track `locked_bytes` beside `bytes`; keep
-`state().bytes` as the admission accounting, because the carry tests read it; make suspend/resume
-use `munlock` + `madvise(MADV_DONTNEED)` and re-lock on resume; keep `mmap` failure and admission
-refusal throwing. Basalt's precedent for partial success is quoted above.
-Gates, both host-only and both already runnable: `tests/dsv41_carry_release.cpp` **fails today**
-with `Carry RAM cannot be locked` after ~6 MiB (measured: allocations of 2.95 MB x 3 against the
-8 MiB allowance), and goes green; `tests/pinned_carry_memory.cpp` currently prints
-`SKIP: Windows working-set lock proof` - port it to `/proc/self/smaps` `Locked:` per VMA plus
-`mincore` residency, keep its portable assertions (zeroed, writable, refusal on
-`allocate(bytes, bytes-1)`, control-allocation failure leaving `state().bytes == 0`, accounting
-after two allocations and one release). Note the control-allocation path is a real bug on the
-current code: if the `shared_ptr` control block throws, nothing releases the mapping or the
-accounting, so `allocate` must clean up and rethrow. A partial 3.1h diff implementing exactly this
-is saved as `build/31h-partial.patch` (scratch, regenerable); it made both tests pass and left the
-build clean.
+**B.4 - the locked-memory chunk (this is port 3.1h). Done**, as port chunk 3.1h. The Windows arms
+went with `scripts/port/collapse_conditionals.py --tokens _WIN32,windows.h,Win32,VirtualLock,
+VirtualAlloc,VirtualFree,BY_HANDLE_FILE_INFORMATION --never-defined _WIN32` (174 deletions, 0
+insertions, 0 blocked, both files then free of `_WIN32`), and the single `mlock` became chunked
+best-effort locking with `locked_bytes` tracked beside `bytes`. `state().bytes` stayed the admission
+accounting, suspend/resume use `munlock` + `MADV_DONTNEED` and re-lock on resume, and `mmap` failure
+and admission refusal still throw. Two things the plan did not name came out of doing it: the
+control-allocation leak was real and is fixed (a `shared_ptr` control block or accounting node that
+throws now releases the mapping and the counters), and the chunk must stay a whole number of pages,
+because `mlock` accounts rounded-up pages and a partial-page chunk under-reports what the kernel
+holds. Both gates are green: `tests/dsv41_carry_release.cpp` (was red past ~6 MiB against the 8 MiB
+allowance) and `tests/pinned_carry_memory.cpp`, ported to `/proc/self/smaps` `Locked:` per VMA plus
+`mincore`, which also proves the partial tier the Windows tier could not have. Recipes in
+`docs/linux-port-commands.md`.
 
 **B.5 - `IQ1_M` and `IQ2_XS` into the engine.** Add `DS4_TENSOR_IQ2_XS = 17` and
 `DS4_TENSOR_IQ1_M = 29` beside the enum at `ds4.c:2228-2243` (ids already match Strata's
@@ -180,7 +179,7 @@ MTP/DSpark-drafting parity with Basalt beyond what this repo already carries.
 
 ## Scratch that exists now
 
-`build/basalt` (shallow clone, 20 MB, MIT) and `build/31h-partial.patch` (the 3.1h collapse plus the
-chunked-lock rewrite and the ported `pinned_carry_memory`, which made both carry tests pass). Both
-are under `build/`, gitignored and not part of the tree; re-create them with the commands above
-rather than trusting they survived - `/tmp` is cleared on this box and `build/` is scratch.
+`build/basalt` (shallow clone, 20 MB, MIT). It is under `build/`, gitignored and not part of the
+tree; re-create it with the commands above rather than trusting it survived - `/tmp` is cleared on
+this box and `build/` is scratch. The 3.1h working diff that used to sit in `build/31h-partial.patch`
+is committed as chunk 3.1h.
