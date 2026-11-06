@@ -23,18 +23,28 @@ model file, builds the bounded relay, acquires stages in alternating banks, writ
 extents into a compute bank, admits its RAM expert tier from `/proc`, loads a prompt's Engram rows
 through io_uring queues, and the carry tier locks as much of its RAM as the kernel allows. Nothing
 in the streamed prefill path refuses on Linux any more. What it still needs is a qualified GGUF.
-Chunk 2.2e - the Metal-word sweep - is finished this session, in four commits, so the engine has no
-Metal-named identifier, no Metal-named CLI surface and no printed message that names the retired
-backend. In the order worth doing next:
+Chunk 5.1 - the Python orchestrator's platform half - is finished this session, in four commits,
+so `slstack/` has no `msvcrt`, no `WinDLL` and no `CREATE_SUSPENDED` left, and the guardian caps
+its tree in the kernel rather than polling it. In the order worth doing next:
 
-1. **Chunk 5.1 - the Python orchestrator.** `slstack/guard.py`'s Windows Job Object becomes a cgroup
-   scope, and `slstack/single_runtime.py` stops staging `ds4-server.exe` and
-   `slstack-weight-fetcher.dll`; `scripts/build_combo_runtime.py` builds a preset named
-   "RTX: ULTRA prefill -> ds4-win decode", which 7.1 renames. This is the next chunk that changes a
-   *resource decision* rather than text, so read `code-design` before writing it and note for 5.1
-   that `engines/streaming-llama/prefill_llama.cpp/tools/slstack-weight-fetcher.cpp` is a two-line
-   anchor file: the Linux `.so` exports one data symbol and carries no fetcher API, so there is no
-   DLL twin to stage.
+1. **Chunk 5.2 - the producer runner.** `vendor/studio/studio/dsv41_windows_runner._Native`
+   refuses non-nt in its constructor and is imported unconditionally by `combo_producer`,
+   `combo_native`, `combo_session` and `native_broker`, so no ULTRA producer can be launched on
+   Linux at all, and nothing that goes through them can be gated here. It is a port of vendored
+   code, not a fold: suspended `CreateProcessW` plus Job admission, `CreateFileW` leases with
+   no-share modes and volume checks, module enumeration, Ctrl-Break. Reuse chunk 5.1's pieces
+   rather than re-implementing them - `slstack/cgroup_scope.py`'s scope is the suspended-then-
+   admitted child, `journal.advisory_lock` is the lease, `shutdown.request_interrupt` is already
+   SIGINT. Record any vendored edit in `vendor/studio/PROVENANCE.json`'s `local_patches`, and
+   note that `slstack/shared_guard.py` hash-pins `job_guard.py` and `job_paging.py`, so editing
+   either means moving that pin too (5.1 did exactly that for one line in `job_paging.py`).
+   Read `code-design` before writing it: this changes admission, not text.
+
+2. **Chunk 5.3 - resident admission and the locked checkpoint**, blocked on 5.2 because
+   `working_set.protect_working_set` and `combo_ram.protect_working_set` take the suspended
+   handle object 5.2 produces. Linux counterparts: `memory.min` on the child's scope (write page
+   multiples - 3.1h learned the kernel rounds and splits the VMA) and `shm_open`/`mmap` plus
+   best-effort `mlock` for `LockedRam`'s named section.
 
 Also open: 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and 8.1 (qualification), the last
 blocked on a qualified GGUF. Phase 3's remaining Win32 is `mtmd`, `server` and `decode-receiver`,
@@ -47,15 +57,31 @@ are read but not documented, because their only reader is a wrapper such as
 literal `getenv("NAME")` calls, so `docs/VARIABLES.md` understates the engine's knobs; and names
 handed to a folded-to-false stub, such as `DS4_METAL_DISABLE_M5_QKV_PAIR_QUAD_FUSE`, are never read
 at all. Do not "fix" the wrapper reads by renaming the names - 2.2b kept them for recipe
-compatibility - fix the inventory.
+compatibility - fix the inventory. Four findings from 5.1 in the same category: `lease.py`'s
+CPU-reservation recognition matches hold lines by their *wording*, including the word Windows, so
+a Linux CPU hold worded differently preempts the engine - settle the wording with the owner of the
+other agent rather than widening the regex; `scripts/perfexp_pair.py` hashes
+`<producer>/ds4-decode.dll` and writes `decode_dll_sha256`, which 8.1 regenerates; `media_tools.py`
+downloads a pinned Windows FFmpeg zip and `test_h3_video_delivery`'s fixture is `.exe`-shaped
+(Phase 6/7.1); and `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp` still
+declares `bool gpu_bufs_via_dstorage = false` and branches on it - a folded-to-false constant with
+no chunk of its own.
 
-What a prefill attempt needs beyond a qualified GGUF: nothing else. The three provider arms
-(`launch_early`, `start_engram_prompt_early`, the synchronous load in `prepare_engram_prompt`) are
-live, the loader runs on io_uring, and the carry tier no longer refuses an allocation larger than
-`RLIMIT_MEMLOCK`, so the first real `--engram-prefetch-bytes` run is the test of the geometry
-defaults, which were tuned on a Windows RAID-0 and are still the values in `choose_scan()`. Expect
-`CARRY_RAM_LOCK_PARTIAL` in that run's log on this box: against the 8 MiB allowance a multi-gigabyte
-carry tier is mostly pageable, and the paging guard, not the page lock, is what keeps it resident.
+What a prefill attempt needs beyond a qualified GGUF depends on how it is driven. Through the
+producer CLI under the guardian (`build/llama/bin/llama-dsv41-prefill` launched as a guarded
+command - the path Phase 3 ported, and the one `docs/linux-port-commands.md` documents): nothing
+else. The three provider arms (`launch_early`, `start_engram_prompt_early`, the synchronous load in
+`prepare_engram_prompt`) are live, the loader runs on io_uring, and the carry tier no longer refuses
+an allocation larger than `RLIMIT_MEMLOCK`, so the first real `--engram-prefetch-bytes` run is the
+test of the geometry defaults, which were tuned on a Windows RAID-0 and are still the values in
+`choose_scan()`. Expect `CARRY_RAM_LOCK_PARTIAL` in that run's log on this box: against the 8 MiB
+allowance a multi-gigabyte carry tier is mostly pageable, and the paging guard, not the page lock,
+is what keeps it resident. Expect also a scope ceiling: the guardian caps the tree at
+`job_commit_gib`, which on Linux is `host_budget_gib`, so a plan whose host tier exceeds the config's
+host budget is now refused by the kernel rather than reported by the poll.
+Through `slstack`'s combo / ULTRA session path, chunk 5.2 first: `studio.dsv41_windows_runner._Native`
+refuses non-nt, and `combo_producer`, `combo_native`, `combo_session` and `native_broker` all import
+it, so nothing on that path reaches the producer at all today.
 
 Chunk 3.2 (the decode library loader) landed inside 3.1c, because `live-session.inc` is part of
 `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable. Its binding is
@@ -68,34 +94,43 @@ maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a),
 `7973c20` (3.1b), `4940201` (2.2d), `3fc4f64` (3.1c), `6fc8cac` (3.1d), `0ffe3ce` + `ff6bb44` +
 `1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), `187f2fa` + `09b6158` (the
 model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4), `f551a8d`
-(2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), plus the plan/handoff commits.
+(2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), `270d7a9` (5.1a), `65e54bd` (5.1b),
+`c17d6a6` (5.1c), `63c8dc1` (5.1d), plus the plan/handoff commits.
 `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
-Working tree is clean apart from scratch under `build/`; the baseline worktree at `build/wt-base`
-used for this session's comparisons is removed, so re-add it with `git worktree add build/wt-base
-HEAD` and move it to whatever commit is the baseline. `engines/ds4` holds `ds4` and
-`ds4-decode.so` built from the pushed tree (CUDA_ARCH=sm_120), so `./ds4 --help` and the
-unknown-option gate can run without a rebuild; `ds4-server`, `ds4-bench`, `ds4-eval` and
-`ds4-agent` are still from the previous session. Nothing they link changed behaviour - 2.2e was
-renames, comments and message text - but rebuild before trusting a gate that runs one of them.
+The Python suite needs `STUDIO_RUNTIME_ROOT` set or five tests raise `KeyError` for it; the repo's
+gitignored `runtime/` works (`mkdir -p runtime` then
+`env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
+this tree reads **625 passed, 5 failed, 41 skipped**; without it, 593 passed, 7 failed, 62 skipped.
+Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
+count - the process tests flip and the skip set changes when a platform gate starts running.
+Chunk 5.1 un-skipped `tests/test_combo_guard.py`, which was `skipUnless(os.name=='nt')`: 21 guardian
+tests that had never run on Linux now do, which is why the skip count fell from 62 to 41.
+
+Working tree is clean apart from scratch under `build/` and `runtime/`; there is no baseline
+worktree, so re-add one with `git worktree add build/wt-base HEAD` and move it to whatever commit is
+the baseline. `engines/ds4` holds `ds4` and `ds4-decode.so` built from the pushed tree
+(CUDA_ARCH=sm_120), so `./ds4 --help` and the unknown-option gate can run without a rebuild;
+`ds4-server`, `ds4-bench`, `ds4-eval` and `ds4-agent` are still from the previous session. Chunk 5.1
+touched no engine source, so nothing they link changed - but rebuild before trusting a gate that
+runs one of them.
 `python3 -B scripts/release_check.py`
 reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPath` is empty and
 `.git/hooks` holds only the samples, so the check has to be run by hand before committing. Do not
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
-while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite:
-`python3 -B -m pytest tests/ -q` reports **570 passed, 15 failed, 62 skipped** here, and the
-failing *names* include the plan's list - `test_combo_process` (3), `test_journal_recovery_flags`,
-`test_single_liveness`, `test_shared_guard_adapter` (Windows-only guard and producer paths),
-`test_streamed_recipe_argv`, `test_dsv41_recipe`, `test_yoco` (missing `cosmos_windows` module),
-`test_h3_video_delivery` (video gate). Four more are box state, not the tree: `test_guard_progress_prefill`
-(2) and `test_single_parent_lease` raise `KeyError: 'STUDIO_RUNTIME_ROOT'` because this shell does
-not export it, `test_shared_prefill_profile` needs `slstack.mac`, which this checkout does not
-publish, and `test_hold_yield::test_real_owned_child_stops_on_kit11_hold` flips between runs. All
-four reproduce at the parent commit - check a suspected regression by running the same file in a
-worktree at the baseline (`git -C build/wt-base checkout <sha>`) rather than by reading the count.
-Process tests flip between runs. Compare the set of names, never the counts. Chunk 5.1 and 8.1 own
-the survivors, and 7.1 owns the missing-module ones.
+while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
+`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **625 passed, 5 failed, 41 skipped**, and the
+five are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing `cosmos_windows` module),
+`test_h3_video_delivery` (that module, plus a `.exe`-shaped fixture),
+`test_shared_prefill_profile` (needs `slstack.mac`, which this checkout does not publish), and
+`test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the 49152 it asserts).
+One more, `test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only`,
+flips between runs and was passing in the run quoted above. Chunk 7.1 owns the missing-module and
+Mac-profile names, 8.1 the recipe default. Chunk 5.1 fixed four names that used to be in this list
+and un-skipped 21 more; check a suspected regression by running the same file in a worktree at the
+baseline (`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
+between runs - compare the set of names, never the counts.
 
 Five hand-compiled programs cover what has no test target, all passing on this tree:
 `docs/evidence/platform-selftest.cpp` (44 checks, the producer's file/hash/VRAM layer),
@@ -111,6 +146,12 @@ recommit and reseed cycle over 40 byte-preserving layers) and `tests/pinned_carr
 need no backend: they link only the carry object and two ggml libs. `docs/linux-port-commands.md`
 has the exact compile lines for all eight - the lease recipe was missing from it until the last
 session, and the two carry recipes until this one.
+
+Chunk 5.1's Linux gates are ordinary pytest files rather than hand-compiled programs:
+`tests/test_cgroup_scope.py` (8 checks, the kernel refusing an oversized tree, a grandchild's
+refusal taking the group, the survivor and stale-launcher rules) and
+`tests/test_advisory_lock.py` (4 checks, one lock across two processes, contended and blocking) both
+run in the suite and need no GPU, no model and no `STUDIO_RUNTIME_ROOT`.
 
 Nothing verified so far is a performance result for a model. The measurements are the fetcher's
 reader comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring x1.04 at four threads, x1.44-x1.67
@@ -277,39 +318,76 @@ queues with its serial `pread` baseline and `LLAMADECODE_ENGRAM_IO_URING=0`, the
 `LLAMADECODE_ENGRAM_IO_PRIORITY`, the loader's own descriptor checked against the provider's lease,
 `load()`/`load_early()` taking a path and an `int` fd, the provider's three Engram arms being open,
 and the carry tier's best-effort `mlock` with `CARRY_RAM_LOCK_PARTIAL`) are recorded in the plan's
-entries for those chunks and in their commit messages. This session's (chunk 2.2e, four commits):
+entries for those chunks and in their commit messages. Chunk 2.2e's (173 printed lines reworded so
+nothing names the retired backend, seven `DS4_METAL_PROFILE_*` macros renamed to `DS4_GPU_*`, three
+dead declarations deleted, no environment name added or dropped) are in its four commit messages and
+in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
+`\bMETAL_` cannot see an identifier with a prefix before it.
 
-- **Engine stderr and stdout changed.** 173 printed lines in `ds4.c` were reworded: graph-path
-  failures say `GPU graph`, streaming and SSD lines drop the backend word, the inert expert-profile
-  lines drop it too (including the `"source"` field of the profile JSON), the GLM lines say
-  `GLM graph`, `Metal command batch` became `the GPU command sequence`, and three refusals no longer
-  name a backend the CLI rejects (`--ssd-streaming ... only with --cuda/--rocm`, `V4.1 requires
-  single-GPU CUDA per rank`, `Qwen3.8 sessions require a graph backend`). **Anything that greps
-  engine output for the old wording will not match it**; nothing in this repo parses these lines,
-  and the Mac receipts are historical. The env table's quoted `consumer` evidence moved for exactly
-  two rows, `DS4_METAL_GRAPH_DUMP_LOGITS` and `DS4_METAL_SESSION_BATCH_LOG`.
-- **No identifier, no CLI surface and no printed message names Metal.** The gate is
-  `python3 scripts/port/metal_word_census.py --strict`, not a grep: `\bMETAL_` cannot see
-  `DS4_METAL_PROFILE_DECODE_STAGE`, and seven such macros were live code until this session renamed
-  them to `DS4_GPU_*`. 26 provenance comments still name the retired backend or its files
-  (`metal/moe.metal`, `metal/norm.metal`, `metal/dense.metal`, `dsv4_hc.metal`, `metal/qwen4.metal`,
-  `ds4_metal.m`) on purpose, and the `DS4_*METAL*` environment names are untouched: 195 documented
-  reads plus 123 wrapper reads, no name added or dropped.
-- **Three dead declarations deleted** - `ds4_gpu_warm_command_queue`,
-  `ds4_gpu_hc_rms_scale_project_f16_tensor`, `ds4_gpu_tp_gate_prefetch_plan` - each with no
-  definition and no caller anywhere in the repo, and both `ds4` and `ds4-decode.so` still link.
-  35 more dead declarations remain in the engine's GPU headers; they name no backend, so they are
-  a separate chunk.
-- No environment variable was added or removed: `envvars.json` is still 2,234 names across all four
-  commits, and `docs/VARIABLES.md` no longer carries the `ds4: Metal mixed batch ...` line.
-- The geometry defaults in `choose_scan()` are still the Windows RAID-0 tuning, untouched.
+This session's (chunk 5.1, four commits):
 
-- Still Windows-shaped and untouched: `slstack/single_runtime.py` stages `ds4-server.exe` and
-  `slstack-weight-fetcher.dll`, and `scripts/build_combo_runtime.py` builds a preset named
-  "RTX: ULTRA prefill -> ds4-win decode". Those are 5.1/7.1. Note for 5.1:
-  `engines/streaming-llama/prefill_llama.cpp/tools/slstack-weight-fetcher.cpp` is a two-line anchor
-  file, so the Linux `.so` exports one data symbol and carries no fetcher API - there is no DLL twin
-  to stage.
+- **The guardian's memory cap is enforced by the kernel, not polled.** `guard.py` created the
+  child suspended, assigned it to a Job whose `JobMemoryLimit` was `job_commit_gib`, and resumed
+  it; on Linux nothing replaced that, so the only rule was a 50 ms RSS poll.
+  `slstack/cgroup_scope.py` creates a cgroup v2 subgroup capped at `job_commit_gib` with
+  `memory.swap.max=0` and `memory.oom.group=1`, and the child is moved in between fork and exec,
+  so the ceiling holds from its first instruction and its descendants inherit it. On Linux
+  `job_commit_gib` *is* `host_budget_gib` (`commit_budget_gib` lost its WDDM arm), so an
+  over-budget allocation is refused rather than noticed afterwards: the receipt gains
+  `memory_scope` (path, ceiling, peak, OOM counters, membership) and `scope_cleanup`, and a
+  kernel termination now reads `HOST MEMORY LIMIT: the kernel terminated the guarded tree at the
+  scope ceiling of N bytes (peak M)` instead of the `exit_code: -9, reason: null` it used to
+  leave. A scope that still has members at teardown is left in place, still capped, and
+  `scope_cleanup.removed` says so. `slstack/guard_child.py` - the shared-guard path's launcher,
+  which had no cap at all here because `GuardedJob` builds a `WindowsJob` only on nt - opens the
+  same scope and writes what it held beside the spec, which `shared_guard` merges into its
+  receipt.
+- **Admission is serialised on Linux.** `lease.gpu_lease` took its ledger lock only on nt, so two
+  instances of this stack could each read an empty hold file and both write an ACTIVE hold for one
+  GPU. One `journal.advisory_lock` (flock) now serves the journal, the live sampler control, the
+  requant lock and the hold ledger; a contended non-blocking attempt raises `LockUnavailable`,
+  which `gpu_lease` maps to `AdmissionRefused` - the guardian's `gpu_wait_seconds` loop already
+  retries that. It is no longer a `PermissionError`.
+- **Receipt shape.** `memory_scope`/`scope_cleanup` are new; `peak_private_commit_bytes` is gone
+  from the per-process rows (the constant zero that psapi's private counter became on Linux);
+  `num_page_faults` stays null because psutil exposes faults per process only on Windows;
+  `paging_interpretation` says swap, not pagefile; `paging_before`/`paging_after` are
+  `/proc/meminfo` totals under the same key names; and `diagnostic_snapshot()`'s four paging names
+  are cumulative-since-boot counters with their units, not PDH per-second rates. **Anything
+  grepping guard receipts for the PDH rates or for `peak_private_commit_bytes` reads nothing.**
+- **Staged runtimes carry Linux names.** `PRODUCER_FILES` is `('ds4-decode.so',)` (the two
+  DirectStorage DLLs exist nowhere here), the launcher is `ds4-server`, the producer builds are
+  `combo-prefill` and `combo-prefill-<profile>`, native extensions must be `.so` (their
+  environment names still end `_DLL` - engine reads, kept), `require_runtime_python` compares
+  interpreter paths exactly rather than case-insensitively, and only TMPDIR and CUDA_CACHE_PATH
+  are remapped now. `stack_config`'s refusal says `build.sh`. The fetcher's real artifact is
+  `build/llama/bin/libslstack-weight-fetcher.so`, which neither the `{weight_fetcher}` default nor
+  `install.py`'s binary check used to name.
+- **The vision bridge is Linux.** It refused non-nt before looking at anything, and
+  `ds4x_vision_file` is exported by the Linux `ds4-decode.so` (verified: `nm -D` lists it and
+  `ctypes.CDLL` binds it without touching CUDA). Library directories now go to `LD_LIBRARY_PATH`,
+  the library is looked for beside the producer or in `producer_library_directories`, and the
+  request no longer carries a field the worker could not use. Encoding a real image is still
+  unrun - there is no qualified model.
+- **Two vendored Studio lines changed and one pin moved with them.**
+  `dsv41_session_process._note_tree_progress` reads `other_bytes` as the Windows-only field it is;
+  `job_paging.JobPaging.sample` reads zero swap for a member whose `/proc/<pid>/status` no longer
+  has a VmSwap line, which fixes an intermittent `StopIteration` the monitor thread reported as
+  the job's stop reason. Both are recorded in `vendor/studio/PROVENANCE.json`'s `local_patches`,
+  and `shared_guard.py`'s pinned hash for `job_paging.py` is now
+  `0387ed7fbade07d088c6149332c239f7ddfd3b2878f48d3f154c5d5742800c91`.
+- No environment variable was added or removed (`envdocs --check` still reports 2,234 documented
+  variables), no engine source changed, and the geometry defaults in `choose_scan()` are still the
+  Windows RAID-0 tuning, untouched.
+
+- Still Windows-shaped and untouched: `combo_ram.py`'s `LockedRam` and both copies of
+  `protect_working_set` (5.2 then 5.3), `media_tools.py`'s pinned Windows FFmpeg download with
+  `test_h3_video_delivery`'s `.exe` fixture (Phase 6/7.1), `scripts/perfexp_pair.py`'s
+  `ds4-decode.dll` hash and its `decode_dll_sha256` receipt key (8.1), and
+  `scripts/build_combo_runtime.py`'s preset name `... -> ds4-win decode` with its `mac={}` field
+  (7.1). The producer launcher itself - `studio.dsv41_windows_runner._Native`, which refuses
+  non-nt in its constructor and is imported unconditionally by `combo_producer`, `combo_native`,
+  `combo_session` and `native_broker` - is chunk 5.2: a port of vendored code, not a fold.
 
 ## Gotchas
 
@@ -469,9 +547,51 @@ entries for those chunks and in their commit messages. This session's (chunk 2.2
   working tree: `python3 -B -m pytest tests/ -q` leaves scratch behind in `jobs/` and
   `single-parent-*/`, whose job-spec JSON contains this box's home path, and those directories are
   untracked but *not* gitignored. Delete them before running the check, or the gate reports
-  "machine path" findings the tree did not cause.
+  "machine path" findings the tree did not cause. Pointing `STUDIO_RUNTIME_ROOT` at the repo's
+  gitignored `runtime/` keeps that scratch out of the check's way, which is why the suite is run
+  that way here.
 - `git status -sb` is the push check; the pre-commit hook also scans the commit message, so a
   message must not quote a machine path either.
+- **Never move your own shell into a capped cgroup.** `echo $$ > cgroup.procs` under a 60 MiB scope
+  OOM-killed the whole command line (exit 137, output lost) rather than the allocating program.
+  Join a scope from the child (`preexec_fn`) or from a subprocess you can afford to lose, and probe
+  ceilings with a throwaway `python3 -c` inside `systemd-run --user --scope`.
+- **A cgroup is not a process attribute.** Membership is inherited across fork and exec, so the
+  launcher must move the child in *before* exec (`preexec_fn` writes its own pid to
+  `cgroup.procs`) or move itself in and let the command inherit - but if the launcher joins the
+  scope it can never `rmdir` it, because it is still a member. That is why `guard_child.py` uses
+  `preexec_fn` on the command rather than joining itself: the first version left a scope that could
+  not be removed.
+- `preexec_fn` runs between fork and exec, so it must not allocate, and it is unsafe in a
+  multithreaded process. `open_containment` refuses to build a scope when
+  `threading.active_count() > 1` rather than forking anyway; `shared_guard`'s Adapter runs its
+  monitor thread, which is why the shared path gets its scope from `guard_child`, a fresh process.
+- Read `memory.peak` and `memory.events` **before** `close()`: `rmdir` takes the counters with the
+  directory. `memory.oom.group=1` means one over-budget descendant takes the whole tree down - the
+  behaviour a job's memory limit had - so a test that expects the parent to survive a grandchild's
+  allocation is testing the wrong thing.
+- `patch('mod.func', wraps=mod.func)` makes attribute lookups on the mock delegate to the wrapped
+  function, so `mock.return_value` and `mock.spy_return` are unreachable (the test that asserted the
+  scope ceiling through it got `'_SentinelObject' object is not subscriptable`, then `AttributeError:
+  'function' object has no attribute 'spy_return'`). Record the return value in a `side_effect`
+  closure instead.
+- This box's Python 3.14.9 has **no `sys.environ`** (`dir(sys)` lacks it); `os.environ` works. Test
+  helpers that build a child environment must use `os.environ`.
+- `/proc/vmstat`'s `pgpgin`/`pgpgout` are 512-byte blocks despite the names, `pswpin`/`pswpout` are
+  pages, and `pgmajfault` is a count, not bytes. `/proc/meminfo` is in kB; `/proc/vmstat` lines have
+  no colon, so one parser has to accept both `name: value` and `name value`.
+- **The pinned shared guard is a hash, not a filename.** `slstack/shared_guard.py` refuses to run if
+  `vendor/studio/studio/job_guard.py` or `job_paging.py` no longer hashes to its pin (computed over
+  the bytes after the two-line provenance header). Editing either therefore needs three changes at
+  once: the patch, the pin, and a `local_patches` entry in `vendor/studio/PROVENANCE.json` saying
+  what changed and why. Chunk 5.1 did that for two one-line Linux fixes. `dsv41_session_process.py`
+  is not pinned, but its provenance header claims "Source body unchanged", so reword the header too
+  when you patch it.
+- **Un-skipping a platform's tests changes the counts without changing the failures.** 5.1 removed
+  `skipUnless(os.name=='nt')` from `tests/test_combo_guard.py` and 21 tests started running; the
+  skip total moved 62 -> 41 and one of those newly-running tests exposed a bug that had been hidden
+  by the skip. Read the failing *names* against a baseline worktree, and expect the skip line to move
+  whenever a platform gate is ported.
 - **Locked memory is landed** (chunk 3.1h, option 3 of `docs/blackwell-enablement-plan.md`): chunked
   best-effort `mlock`, the tail allocated and pageable, the shortfall logged as
   `CARRY_RAM_LOCK_PARTIAL`, and the host-memory paging guard as the enforcement. Details in the
@@ -511,14 +631,21 @@ entries for those chunks and in their commit messages. This session's (chunk 2.2
   the producer has no test target; the Engram loader by `tests/dsv41_engram_early_io.cpp`, the carry
   store and its RAM tier by `tests/dsv41_carry_release.cpp` and `tests/pinned_carry_memory.cpp`, all
   three also compiled by hand (`docs/linux-port-commands.md`).
-- `code-design` / `code-reviewer` when a chunk changes admission rather than text - chunk 3.1h was
-  one, and it went through inline verification only. Chunk 5.1 (`guard.py`'s Job Object -> a cgroup
-  scope) is the next one that changes a resource decision.
+- `code-design` / `code-reviewer` when a chunk changes admission rather than text - chunk 3.1h,
+  chunk 5.1's cgroup scope, and chunk 5.2 (`_Native`: suspended launch, leases, ownership) are the
+  three so far. 5.1 went through inline verification only.
 - `adversarial-code-review` after a chunk that rewrote behaviour, if the user allows a subagent; the
   `scripts/port/` equivalence commands are the evidence to hand it. For 3.1h the proof was inline:
   the collapse report, `preprocess_equiv`, `code_line_diff`, the warning profile, and both carry
-  programs, one of which was red before the change.
-- `web-research` for liburing, CCCL 3 / libcudacxx header changes, or llama.cpp cmake details.
+  programs, one of which was red before the change. For 5.1 there is no C equivalence to prove - the
+  evidence was the suite plus `tests/test_cgroup_scope.py`, which shows the kernel refusing an
+  oversized tree and a grandchild's refusal taking the whole group.
+- `web-research` for liburing, CCCL 3 / libcudacxx header changes, llama.cpp cmake details, and the
+  cgroup v2 interface (`Documentation/admin-guide/cgroup-v2.rst`: what a subgroup sees, the
+  no-internal-processes rule, `memory.oom.group`, `cgroup.kill`).
+- `add-unit-test` for the Python side too: `tests/test_cgroup_scope.py` and
+  `tests/test_advisory_lock.py` are the pattern for a gate that needs no model and no GPU - drive
+  the real kernel mechanism and assert on the counters it reports.
 - `unslop` / `writing-style` on docs and commit messages.
 - `handoff` again when this session runs out of context - update this file, don't replace it with
   chat recap.

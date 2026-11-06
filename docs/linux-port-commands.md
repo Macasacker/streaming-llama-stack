@@ -72,6 +72,28 @@ timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'tes
 # The survivors are Windows-only guard paths, the missing cosmos_windows vendor module,
 # and GPU/video gates with no model on disk.
 
+# Chunk 5.1's gate. Set STUDIO_RUNTIME_ROOT or five process tests raise KeyError for it; the
+# repo's gitignored runtime/ is the right target. Compare failing names, never counts: the
+# process tests flip, and un-skipping a platform's tests moves the skip total.
+mkdir -p runtime
+timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q
+# 625 passed, 5 failed, 41 skipped. The five are the missing cosmos_windows module (2), its
+# video gate, the deleted slstack.mac profile, and test_yoco's preset default.
+
+# The guardian's kernel containment and the admission lock: no GPU, no model.
+timeout 300 env PYTHONPATH=.:tests python3 -B -m pytest tests/test_cgroup_scope.py tests/test_advisory_lock.py -q
+# 12 passed. The cgroup one creates real subgroups under the user's app.slice and lets the
+# kernel SIGKILL an oversized child, so it needs the memory controller delegated there - it
+# skips with the reason printed if it is not.
+
+# The check gate the plan's Phase 5 names. Runs here; model/vram rows fail for box reasons.
+timeout 120 ./bin/slstack --config config.example.json check
+
+# Which cgroup subgroup the guardian can create, and what it delegates.
+cat /sys/fs/cgroup$(awk -F: '{print $3}' /proc/self/cgroup)/cgroup.subtree_control
+# Empty in this process's own scope; the walk in slstack/cgroup_scope.py goes up to app.slice,
+# which shows "memory pids". Exceeding a scope's memory.max with memory.swap.max=0 SIGKILLs it.
+
 # io_uring expert-read transport against pread: no GPU, no model, runs while Strata is up.
 make -C engines/ds4 test-batch-io            # needs /tmp/ds4-batch-io.bin (64 MiB); the target creates it
 
@@ -83,6 +105,14 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.c --include=*.cpp --include=*.h --include=*.hpp \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
+
+# The orchestrator has no Win32 bindings left either, except the two files chunk 5.2/5.3 own
+# and the media installer. Note -I (the built engine binaries and *.o match these patterns) and
+# --exclude-dir=port, because scripts/port's own sweep token list is not platform code.
+grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel32\|add_dll_directory" \
+  slstack scripts --include=*.py --exclude-dir=__pycache__ --exclude-dir=port
+# 3 hits: combo_ram.py and working_set.py (chunks 5.2 and 5.3). media_tools.py's Windows
+# FFmpeg download does not match this pattern - it keys on os.name and .exe names.
 
 # No Metal-named identifier or backend left in the engine. The word-boundary greps below are cheap
 # but NOT sufficient: `_` is a word character, so \bMETAL_ cannot see DS4_METAL_FOO (an environment
