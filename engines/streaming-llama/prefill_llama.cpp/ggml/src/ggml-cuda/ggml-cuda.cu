@@ -849,22 +849,6 @@ static cudaError_t ggml_cuda_device_malloc(void ** ptr, size_t size, int device)
     cudaError_t err;
     if (getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY") != nullptr) {
         err = cudaMallocManaged(ptr, size);
-#if defined(GGML_USE_HIP)
-        if (err == hipSuccess) {
-            CUDA_CHECK(cudaMemAdvise(*ptr, size, hipMemAdviseSetCoarseGrain, device));
-        }
-
-        // fall back to cudaMalloc if not supported (e.g. on Windows)
-        if (err == hipErrorNotSupported) {
-            static bool warned_unsupported = false;
-            if (!warned_unsupported) {
-                GGML_LOG_WARN("hipMallocManaged unsupported, falling back to hipMalloc.\n");
-                warned_unsupported = true;
-            }
-
-            err = cudaMalloc(ptr, size);
-        }
-#endif // defined(GGML_USE_HIP)
     } else if (ds4_switch::enabled) {
         err = ds4_switch::alloc(ptr, size, device);
     } else {
@@ -885,54 +869,6 @@ static cudaError_t ggml_cuda_device_malloc(void ** ptr, size_t size, int device)
     return err;
 }
 
-#if defined(GGML_USE_HIP)
-static int ggml_cuda_parse_id(char devName[]) {
-    // A list of possible Target IDs can be found under the rocclr/clr repo in device.cpp
-    // these values are not stable so this is susceptible to breakage
-    // https://github.com/ROCm/clr/blob/amd-staging/rocclr/device/device.cpp
-    int archMajor = 0x0;
-    int archMinor = 0x0;
-    int archNum = GGML_CUDA_CC_OFFSET_AMD;
-    int archLen = strlen(devName);
-    char archName[archLen + 1];
-
-    // strip leading 'gfx' while copying into our buffer
-    if (archLen > 3) {
-        strcpy(archName, &devName[3]);
-        archLen -= 3;
-    }
-
-    // trim trailing :xnack- or :sramecc- statuses
-    archLen = strcspn(archName, ":");
-    archName[archLen] = '\0';
-
-    // tease out the version information
-    if (archLen > 8) {
-        // versions labeled generic use '-' as delimiter
-        // strip the trailing "-generic" then iterate through what remains
-        if ((strstr(archName, "-generic"))) {
-            archName[archLen - 8] = '\0';
-            char * pch;
-            if ((pch = strtok(archName, "-"))) {
-                archMajor = (int)strtoul(pch, 0, 16);
-                if ((pch = strtok(NULL, "-"))) {
-                    archMinor = 0x10 * (int)strtoul(pch, 0, 16);
-                }
-            }
-        }
-    } else if (archLen >= 3) {
-        // last two digits should be the minor * 0x10 + stepping
-        archMinor = (int)strtoul(&archName[archLen - 2], 0, 16);
-        archName[archLen - 2] = '\0';
-
-        // only the major version remains
-        archMajor = (int)strtoul(archName, 0, 16);
-    }
-    archNum += archMajor * 0x100;
-    archNum += archMinor;
-    return archNum;
-}
-#endif // defined(GGML_USE_HIP)
 
 static ggml_cuda_device_info ggml_cuda_init() {
     ggml_cuda_device_info info = {};
@@ -977,39 +913,9 @@ static ggml_cuda_device_info ggml_cuda_init() {
         info.devices[id].smpb       = prop.sharedMemPerBlock;
         info.devices[id].warp_size  = prop.warpSize;
 
-#ifndef GGML_USE_MUSA
         int supports_coop_launch = 0;
         CUDA_CHECK(cudaDeviceGetAttribute(&supports_coop_launch, cudaDevAttrCooperativeLaunch, id));
         info.devices[id].supports_cooperative_launch = !!supports_coop_launch;
-#else
-        info.devices[id].supports_cooperative_launch = false;
-#endif // !(GGML_USE_MUSA)
-#if defined(GGML_USE_HIP)
-        info.devices[id].smpbo = prop.sharedMemPerBlock;
-
-        info.devices[id].cc = ggml_cuda_parse_id(prop.gcnArchName);
-        if ((info.devices[id].cc & 0xff00) == 0x0) {
-            GGML_LOG_WARN("invalid architecture ID received for device %d %s: %s  cc %d.%d\n",
-                            id, prop.name, prop.gcnArchName, prop.major, prop.minor);
-
-            // Fallback to prop.major and prop.minor
-            if (prop.major > 0) {
-                info.devices[id].cc = GGML_CUDA_CC_OFFSET_AMD + prop.major * 0x100;
-                info.devices[id].cc += prop.minor * 0x10;
-            }
-        }
-        GGML_LOG_INFO("  Device %d: %s, %s (0x%x), VMM: %s, Wave Size: %d\n",
-                      id, prop.name, prop.gcnArchName, info.devices[id].cc & 0xffff,
-                      device_vmm ? "yes" : "no", prop.warpSize);
-#elif defined(GGML_USE_MUSA)
-        // FIXME: Ensure compatibility with varying warp sizes across different MUSA archs.
-        info.devices[id].warp_size = 32;
-        info.devices[id].smpbo = prop.sharedMemPerBlockOptin;
-        info.devices[id].cc = GGML_CUDA_CC_OFFSET_MTHREADS + prop.major * 0x100;
-        info.devices[id].cc += prop.minor * 0x10;
-        GGML_LOG_INFO("  Device %d: %s, compute capability %d.%d, VMM: %s\n",
-                        id, prop.name, prop.major, prop.minor, device_vmm ? "yes" : "no");
-#else
         info.devices[id].smpbo = prop.sharedMemPerBlockOptin;
         info.devices[id].cc = 100*prop.major + 10*prop.minor;
         GGML_LOG_INFO("  Device %d: %s, compute capability %d.%d, VMM: %s\n",
@@ -1031,7 +937,6 @@ static ggml_cuda_device_info ggml_cuda_init() {
             CUDA_CHECK(cudaSetDeviceFlags(cudaDeviceScheduleSpin));
         }
 
-#endif  // defined(GGML_USE_HIP)
     }
 
     if (ggml_cuda_highest_compiled_arch(GGML_CUDA_CC_TURING) >= GGML_CUDA_CC_TURING && !turing_devices_without_mma.empty()) {
@@ -1191,9 +1096,6 @@ struct ggml_cuda_pool_vmm : public ggml_cuda_pool {
     size_t pool_used = 0;
     size_t pool_size = 0;
     size_t granularity;
-#if defined(GGML_USE_HIP)
-    std::vector<std::pair<CUdeviceptr, size_t>> mappings;
-#endif
 
     explicit ggml_cuda_pool_vmm(int device) :
         device(device),
@@ -1203,14 +1105,7 @@ struct ggml_cuda_pool_vmm : public ggml_cuda_pool {
     ~ggml_cuda_pool_vmm() {
         ds4_switch::unregister_pool(&pool_addr);
         if (pool_addr != 0) {
-#if defined(GGML_USE_HIP)
-            // Workaround for https://github.com/ROCm/ROCR-Runtime/issues/285
-            for (std::pair<CUdeviceptr, size_t> & mapping : mappings) {
-                CU_CHECK(cuMemUnmap(mapping.first, mapping.second));
-            }
-#else
             CU_CHECK(cuMemUnmap(pool_addr, pool_size));
-#endif
             CU_CHECK(cuMemAddressFree(pool_addr, CUDA_POOL_VMM_MAX_SIZE));
         }
     }
@@ -1256,9 +1151,6 @@ struct ggml_cuda_pool_vmm : public ggml_cuda_pool {
             // map at the end of the pool
             CUdeviceptr start_ptr = (CUdeviceptr)((char *)(pool_addr) + pool_size);
             CU_CHECK(cuMemMap(start_ptr, reserve_size, 0, handle, 0));
-#if defined(GGML_USE_HIP)
-            mappings.push_back({start_ptr, reserve_size});
-#endif
 
             // the memory allocation handle is no longer needed after mapping
             CU_CHECK(cuMemRelease(handle));
@@ -2453,7 +2345,6 @@ static void ggml_cuda_set_peer_access(const int n_tokens, int main_device) {
 static cudaError_t ggml_cuda_Memcpy2DPeerAsync(
     void * dst, int dstDevice, size_t dpitch, void * src, int srcDevice, size_t spitch, size_t width, size_t height, cudaStream_t stream) {
 
-#if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
     // cudaMemcpy2DAsync may fail with copies between vmm pools of different devices
     cudaMemcpy3DPeerParms p = {};
     p.dstDevice = dstDevice;
@@ -2462,12 +2353,6 @@ static cudaError_t ggml_cuda_Memcpy2DPeerAsync(
     p.srcPtr = make_cudaPitchedPtr(src, spitch, spitch, height);
     p.extent = make_cudaExtent(width, height, 1);
     return cudaMemcpy3DPeerAsync(&p, stream);
-#else
-    // HIP does not support cudaMemcpy3DPeerAsync or vmm pools
-    GGML_UNUSED(dstDevice);
-    GGML_UNUSED(srcDevice);
-    return cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, stream);
-#endif // !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
 }
 
 static void ggml_cuda_op_mul_mat(
@@ -6695,7 +6580,7 @@ bool ggml_backend_cuda_register_host_buffer(void * buffer, size_t size) {
         return false;
     }
 
-#if CUDART_VERSION >= 11010 || defined(GGML_USE_MUSA) || defined(GGML_USE_HIP)
+#if CUDART_VERSION >= 11010
     cudaError_t err = cudaHostRegister(buffer, size, cudaHostRegisterPortable | cudaHostRegisterReadOnly);
     if (err != cudaSuccess) {
         // clear the error
@@ -6710,7 +6595,7 @@ bool ggml_backend_cuda_register_host_buffer(void * buffer, size_t size) {
     GGML_UNUSED(buffer);
     GGML_UNUSED(size);
     return false;
-#endif // CUDART_VERSION >= 11010 || defined(GGML_USE_MUSA)
+#endif // CUDART_VERSION >= 11010
 }
 
 void ggml_backend_cuda_unregister_host_buffer(void * buffer) {
@@ -7471,19 +7356,6 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                 if (b->type == GGML_TYPE_F16 && a->type != GGML_TYPE_F16) {
                     return false;
                 }
-#ifdef GGML_USE_MUSA
-                const int cc = ggml_cuda_info().devices[dev_ctx->device].cc;
-                if (b->ne[2]*b->ne[3] > 1 && !ggml_is_transposed(a) && !ggml_is_transposed(b)) {
-                    if (GGML_CUDA_CC_IS_QY1(cc) && op->op == GGML_OP_MUL_MAT &&
-                            a->type == GGML_TYPE_F16 && b->type == GGML_TYPE_F16) {
-                        return false;
-                    }
-                    if (GGML_CUDA_CC_IS_QY2(cc) && op->op == GGML_OP_MUL_MAT_ID &&
-                            a->type == GGML_TYPE_Q2_K && b->type == GGML_TYPE_F32) {
-                        return false;
-                    }
-                }
-#endif // GGML_USE_MUSA
                 switch (a->type) {
                     case GGML_TYPE_F32:
                     case GGML_TYPE_F16:

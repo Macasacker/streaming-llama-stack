@@ -177,39 +177,33 @@ struct tile_x_sizes {
 #define GGML_CUDA_CC_IS_QY2(cc)      (cc >= GGML_CUDA_CC_QY2 && cc < GGML_CUDA_CC_NG)
 #define GGML_CUDA_CC_IS_NG(cc)       (cc >= GGML_CUDA_CC_NG)
 
-#if CUDART_VERSION >= 11010 || defined(GGML_USE_MUSA)
+#if CUDART_VERSION >= 11010
 #define GGML_CUDA_ASSUME(x) __builtin_assume(x)
 #else
 #define GGML_CUDA_ASSUME(x)
 #endif // CUDART_VERSION >= 11010
 
-#if (!defined(GGML_USE_HIP) && !defined(GGML_CUDA_NO_VMM)) || (defined(GGML_USE_HIP) && !defined(GGML_HIP_NO_VMM))
+#if !defined(GGML_CUDA_NO_VMM)
 #define GGML_USE_VMM
-#endif // (!defined(GGML_USE_HIP) && !defined(GGML_CUDA_NO_VMM)) || (defined(GGML_USE_HIP) && !defined(GGML_HIP_NO_VMM))
+#endif // !defined(GGML_CUDA_NO_VMM)
 
-#if (!defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA) || defined(GGML_USE_MUSA)
+#if (__CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA)
 #define FP16_MMA_AVAILABLE
-#endif // (!defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA) || defined(GGML_USE_MUSA)
+#endif // (__CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA)
 
-#if defined(GGML_HIP_ROCWMMA_FATTN) && (defined(CDNA) || defined(RDNA3) || (defined(GGML_HIP_ROCWMMA_FATTN_GFX12) && defined(RDNA4)))
-#define FP16_MMA_AVAILABLE
-#endif // defined(GGML_HIP_ROCWMMA_FATTN) && (defined(CDNA) || defined(RDNA3) || (defined(GGML_HIP_ROCWMMA_FATTN_GFX12) && defined(RDNA4)))
 
-#if defined(GGML_USE_HIP) && defined(CDNA) && !defined(GGML_HIP_NO_MMQ_MFMA)
-#define AMD_MFMA_AVAILABLE
-#endif // defined(GGML_USE_HIP) && defined(CDNA) && !defined(GGML_HIP_NO_MMQ_MFMA)
 
-#if !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_TURING
+#if __CUDA_ARCH__ >= GGML_CUDA_CC_TURING
 #define TURING_MMA_AVAILABLE
-#endif // !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_TURING
+#endif // __CUDA_ARCH__ >= GGML_CUDA_CC_TURING
 
-#if !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
+#if __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
 #define AMPERE_MMA_AVAILABLE
-#endif // !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
+#endif // __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
 
-#if !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
+#if __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
 #define CP_ASYNC_AVAILABLE
-#endif // !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
+#endif // __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
 
 #ifdef __CUDACC__
 template<typename... Args>
@@ -229,11 +223,7 @@ __host__ __device__ constexpr inline void ggml_unused_vars_impl(Args&&...) noexc
 #ifndef GGML_CUDA_COMMON_HELPERS_DEFINED
 
 static bool amd_mfma_available(const int cc) {
-#if !defined(GGML_HIP_NO_MMQ_MFMA)
     return GGML_CUDA_CC_IS_CDNA(cc);
-#else
-    return false;
-#endif //!defined(GGML_HIP_NO_MMQ_MFMA)
 }
 static bool turing_mma_available(const int cc) {
     return GGML_CUDA_CC_IS_NVIDIA(cc) && ggml_cuda_highest_compiled_arch(cc) >= GGML_CUDA_CC_TURING;
@@ -256,21 +246,13 @@ static int get_mmq_x_max_host(const int cc) {
 // Sub-block B: conflicts with common.cuh
 #ifndef GGML_CUDA_COMMON_HELPERS_DEFINED
 static constexpr __device__ int ggml_cuda_get_physical_warp_size() {
-#if defined(GGML_USE_HIP) && (defined(__GFX9__) || defined(__GFX8__))
-    return 64;
-#else
     return 32;
-#endif // defined(GGML_USE_HIP) && (defined(__GFX9__) || defined(__GFX8__))
 }
 #endif // !GGML_CUDA_COMMON_HELPERS_DEFINED (sub-block B)
 
 // ggml_cuda_get_physical_warp_size_host: NOT in common.cuh; keep unconditionally.
 static constexpr int ggml_cuda_get_physical_warp_size_host() {
-#if defined(GGML_USE_HIP) && (defined(__GFX9__) || defined(__GFX8__))
-    return 64;
-#else
     return 32;
-#endif // defined(GGML_USE_HIP) && (defined(__GFX9__) || defined(__GFX8__))
 }
 
 // Sub-block C: ggml_cuda_e8m0_to_fp32, warp_reduce_*, fp16_mma_hardware_available
@@ -308,7 +290,7 @@ static __device__ __forceinline__ int warp_reduce_any(int x) {
 }
 template<int width = WARP_SIZE>
 static __device__ __forceinline__ int warp_reduce_sum(int x) {
-#if !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
+#if __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
     return __reduce_add_sync(0xffffffff, x);
 #else
 #pragma unroll
@@ -316,7 +298,7 @@ static __device__ __forceinline__ int warp_reduce_sum(int x) {
         x += __shfl_xor_sync(0xffffffff, x, offset, width);
     }
     return x;
-#endif // !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
+#endif // __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE
 }
 template<int width = WARP_SIZE>
 static __device__ __forceinline__ float2 warp_reduce_sum(float2 a) {
@@ -355,9 +337,6 @@ static constexpr __device__ int get_mmq_x_max_device() {
     return 128;
 #else // defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
 
-#if defined(GGML_USE_HIP)
-    return 64;
-#else // defined(GGML_USE_HIP)
 
 #if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
 #ifdef GGML_CUDA_FORCE_MMQ
@@ -369,7 +348,6 @@ static constexpr __device__ int get_mmq_x_max_device() {
     return 64;
 #endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
 
-#endif // defined(GGML_USE_HIP)
 #endif // defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
 }
 
@@ -384,13 +362,6 @@ static int get_mmq_y_host(const int cc) {
 }
 
 static constexpr __device__ int get_mmq_y_device() {
-#if defined(GGML_USE_HIP)
-#if defined(RDNA1)
-    return 64;
-#else
-    return 128;
-#endif // defined RDNA1
-#else
 #if GGML_CUDA_MMQ_ID_TILE_Y > 0 && __CUDA_ARCH__ >= GGML_CUDA_CC_BLACKWELL
     return GGML_CUDA_MMQ_ID_TILE_Y;
 #elif __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
@@ -398,7 +369,6 @@ static constexpr __device__ int get_mmq_y_device() {
 #else
     return 64;
 #endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
-#endif // defined(GGML_USE_HIP)
 }
 
 // Decouple shared memory tile sizes from WARP_SIZE to allow for different warp sizes.
@@ -556,11 +526,6 @@ static constexpr __device__ int mmq_get_granularity_device(const int /*mmq_x*/) 
 }
 #endif // AMD_MFMA_AVAILABLE
 
-#if defined(GGML_USE_HIP)
-static int mmq_get_nwarps_host(const int cc, const int warp_size) {
-    return amd_mfma_available(cc) ? 8 : 256/warp_size;
-}
-#else
 static int mmq_get_nwarps_host(const int cc, const int warp_size) {
 #if GGML_CUDA_MMQ_ID_NWARPS > 0
     if (GGML_CUDA_CC_IS_NVIDIA(cc) && ggml_cuda_highest_compiled_arch(cc) >= GGML_CUDA_CC_BLACKWELL) {
@@ -571,7 +536,6 @@ static int mmq_get_nwarps_host(const int cc, const int warp_size) {
 #endif
     return 256/warp_size;
 }
-#endif // (GGML_USE_HIP)
 
 static constexpr __device__ int mmq_get_nwarps_device() {
 #if defined(AMD_MFMA_AVAILABLE)
@@ -3603,17 +3567,11 @@ static __device__ __forceinline__ void mul_mat_q_process_tile_id(
 // The mul_mat_q_id kernel implements "stream-k" work partitioning as described in https://arxiv.org/abs/2301.03598
 
 template <ggml_type type, int mmq_x, bool need_check>
-#if defined(GGML_USE_HIP)
-#if defined(RDNA4) || defined(RDNA3) || defined(RDNA2) || defined(CDNA) || defined(GCN)
-    __launch_bounds__(ggml_cuda_get_physical_warp_size()*mmq_get_nwarps_device(), 2)
-#endif // defined(RDNA4) || defined(RDNA3) || defined(RDNA2) || defined(CDNA) || defined(GCN)
-#else
 #if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
     __launch_bounds__(ggml_cuda_get_physical_warp_size()*mmq_get_nwarps_device(), 1)
 #else
     __launch_bounds__(ggml_cuda_get_physical_warp_size()*mmq_get_nwarps_device(), 2)
 #endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
-#endif // defined(GGML_USE_HIP)
 static __global__ void mul_mat_q_id(
         const char * __restrict__ x, const int * __restrict__ y, const int32_t * __restrict__ ids_dst,
         const int32_t * __restrict__ expert_bounds, float * __restrict__ dst, float * __restrict__ tmp_fixup,
@@ -3654,7 +3612,7 @@ static __global__ void mul_mat_q_id(
     __syncthreads();
 
     // On non-CDNA AMD or old CUDA the performance with stream-k was worse, use conventional tiling instead:
-#if (defined(GGML_USE_HIP) && !defined(CDNA)) || __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
+#if __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
     {
         const int wt = blockIdx.z / nchannels_y;
         const int zt = blockIdx.z - wt*nchannels_y;
@@ -3709,7 +3667,7 @@ static __global__ void mul_mat_q_id(
              tile_x_max_i, tile_y_max_j, 0, ncols_x/qk);
         return;
     }
-#endif // (defined(GGML_USE_HIP) && !defined(CDNA3)) || __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
+#endif // __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
 
     const     int64_t blocks_per_ne00 = ncols_x / qk;
     constexpr int     blocks_per_iter = MMQ_ITER_K / qk;

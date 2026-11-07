@@ -14,9 +14,6 @@ extern "C" void ggml_cuda_dsv41_cast_vector_note(uint64_t n,bool nc){
 extern "C" uint64_t ggml_backend_cuda_dsv41_cast_vector_queued(void){return dsv41_cast_calls.load(std::memory_order_acquire);}
 extern "C" uint64_t ggml_backend_cuda_dsv41_cast_vector_elements(void){return dsv41_cast_elements.load(std::memory_order_acquire);}
 extern "C" uint64_t ggml_backend_cuda_dsv41_cast_vector_nc_queued(void){return dsv41_cast_nc_calls.load(std::memory_order_acquire);}
-#if defined(GGML_USE_MUSA) && defined(GGML_MUSA_MUDNN_COPY)
-#include "ggml-musa/mudnn.cuh"
-#endif // GGML_USE_MUSA && GGML_MUSA_MUDNN_COPY
 
 typedef void (*cpy_kernel_t)(const char * cx, char * cdst);
 
@@ -499,11 +496,6 @@ void ggml_cuda_cpy(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, gg
 
     if (src0->type == src1->type && contiguous_srcs) {
         GGML_ASSERT(ggml_nbytes(src0) == ggml_nbytes(src1));
-#if defined(GGML_USE_MUSA) && defined(GGML_MUSA_MUDNN_COPY)
-        if (src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_F16) {
-            CUDA_CHECK(mudnnMemcpyAsync(ctx, src1, src0));
-        } else
-#endif // GGML_USE_MUSA && GGML_MUSA_MUDNN_COPY
         {
             CUDA_CHECK(cudaMemcpyAsync(src1_ddc, src0_ddc, ggml_nbytes(src0), cudaMemcpyDeviceToDevice, main_stream));
         }

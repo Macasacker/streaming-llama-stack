@@ -48,13 +48,14 @@ class Evaluator:
         return U
 
     def evaluate(self, expr):
-        toks = re.findall(r"defined\b|[A-Za-z_][A-Za-z0-9_]*|\d+[UL]*|\|\||&&|[()!&|]", expr)
+        toks = re.findall(r"defined\b|[A-Za-z_][A-Za-z0-9_]*|\d+[UL]*|\|\||&&"
+                          r"|>=|<=|==|!=|>|<|[()!&|]", expr)
         p = [0]
 
         def peek():
             return toks[p[0]] if p[0] < len(toks) else None
 
-        def operand():
+        def primary():
             t = peek()
             if t is None:
                 raise Unparsable(expr)
@@ -91,6 +92,19 @@ class Evaluator:
                 return self.value(t)
             raise Unparsable(expr)
 
+        def operand():
+            """A definedness term, optionally the left side of a comparison. A comparison of two
+            macros is never a definedness answer, so its value is unknown; a numeric constant on
+            either side is not read here either way. Leaving it unknown is what keeps
+            `!defined(DEAD) && CUDART_VERSION >= X` decidable as a term to drop rather than as a
+            whole guard to guess at."""
+            v = primary()
+            if peek() in (">", "<", ">=", "<=", "==", "!="):
+                p[0] += 1
+                primary()
+                return U
+            return v
+
         def ands():
             v = operand()
             while peek() == "&&":
@@ -117,10 +131,13 @@ class Evaluator:
         for name in self.scope:
             v = self.value(name)
             if v is T:
-                out = re.sub(r"\s*&&\s*!\s*defined\s*\(\s*" + name + r"\s*\)", "", out)
-                out = re.sub(r"!\s*defined\s*\(\s*" + name + r"\s*\)\s*&&\s*", "", out)
-                out = re.sub(r"\s*\|\|\s*defined\s*\(\s*" + name + r"\s*\)", "", out)
-                out = re.sub(r"defined\s*\(\s*" + name + r"\s*\)\s*\|\|\s*", "", out)
+                # `X && defined(LIVE)` is `X`; `X || !defined(LIVE)` is `X`. Dropping the other
+                # shapes - a false operand of `&&`, or a true operand of `||` - would change the
+                # condition, which is exactly what this tool must never do.
+                out = re.sub(r"\s*&&\s*defined\s*\(\s*" + name + r"\s*\)", "", out)
+                out = re.sub(r"defined\s*\(\s*" + name + r"\s*\)\s*&&\s*", "", out)
+                out = re.sub(r"\s*\|\|\s*!\s*defined\s*\(\s*" + name + r"\s*\)", "", out)
+                out = re.sub(r"!\s*defined\s*\(\s*" + name + r"\s*\)\s*\|\|\s*", "", out)
             elif v is F:
                 out = re.sub(r"\s*\|\|\s*defined\s*\(\s*" + name + r"\s*\)", "", out)
                 out = re.sub(r"defined\s*\(\s*" + name + r"\s*\)\s*\|\|\s*", "", out)
@@ -139,7 +156,9 @@ class Evaluator:
         try:
             v = self.evaluate(expr)
         except Unparsable:
-            return ("UNPARSABLE", expr)
+            # Reported, never rewritten: the payload of a rewrite-guard is written back into the
+            # source, and an expression this tool could not parse is not something to re-emit.
+            return ("UNPARSABLE", expr.strip())
         verdict = {T: "LIVE", F: "DEAD", U: "MANUAL"}[v]
         if verdict != "MANUAL":
             return (verdict, expr)
@@ -153,7 +172,10 @@ class Evaluator:
         if any(name in stripped for name in self.scope) and v2 is not U:
             return ({T: "LIVE", F: "DEAD", U: "MANUAL"}[v2], stripped)
         if any(name in stripped for name in self.scope):
-            return (verdict, expr) if v2 is U else (verdict, stripped)
+            # Declined: the expression still names an in-scope macro whose value the rewrite
+            # cannot settle. Return the stripped text so the caller sees "nothing to rewrite"
+            # rather than a whitespace-only change of the same condition.
+            return (verdict, expr.strip()) if v2 is U else (verdict, stripped)
         return (verdict, stripped)
 
 
@@ -165,13 +187,15 @@ def parse(path):
     for i, raw in enumerate(lines, 1):
         s = raw.strip()
         if pending is not None:
-            pending[2] += " " + s
+            pending[2] += " " + s.rstrip("\\")
             if not s.endswith("\\"):
-                node, kind, expr, bstart = pending[:4]
+                node, kind, expr, bstart, dstart = pending[:5]
                 if node["branches"]:
                     node["branches"][-1]["bend"] = bstart - 1
                 node["branches"].append({"kind": kind, "expr": expr, "bstart": bstart,
-                                         "bend": i - 1, "dir": i})
+                                         "bend": i - 1, "dir": dstart, "dend": i})
+                if node["branches"][0]["dir"] == node["line"]:
+                    node["dline"] = node["branches"][0]["dend"]
                 pending = None
             continue
         if not s.startswith("#"):
@@ -183,23 +207,23 @@ def parse(path):
         expr = ("defined(" + rest.strip() + ")") if kind == "ifdef" else \
                ("!defined(" + rest.strip() + ")") if kind == "ifndef" else rest
         if kind in ("if", "ifdef", "ifndef"):
-            node = {"children": [], "line": i, "end": None, "branches": []}
+            node = {"children": [], "line": i, "end": None, "branches": [], "dline": i}
             stack[-1]["children"].append(node)
             stack.append(node)
             if s.endswith("\\"):
-                pending = [node, kind, expr, i + 1]
+                pending = [node, kind, expr.rstrip("\\"), i + 1, i]
             else:
                 node["branches"].append({"kind": kind, "expr": expr, "bstart": i + 1,
-                                         "bend": None, "dir": i})
+                                         "bend": None, "dir": i, "dend": i})
         elif kind in ("elif", "else"):
             cur = stack[-1]
             if cur["branches"]:
                 cur["branches"][-1]["bend"] = i - 1
             if s.endswith("\\"):
-                pending = [cur, kind, expr, i + 1]
+                pending = [cur, kind, expr.rstrip("\\"), i + 1, i]
             else:
                 cur["branches"].append({"kind": kind, "expr": expr, "bstart": i + 1,
-                                        "bend": None, "dir": i})
+                                        "bend": None, "dir": i, "dend": i})
         elif kind == "endif":
             cur = stack.pop()
             if cur["branches"]:
@@ -228,7 +252,7 @@ def plan_node(ev, scope, node, plans, blocked):
             plan_node(ev, scope, child, plans, blocked)
         return
     if verdict == "LIVE":
-        plans.append((node["line"], node["line"], "drop-if-directive", first["expr"].strip()))
+        plans.append((node["line"], node["dline"], "drop-if-directive", first["expr"].strip()))
         plans.append((node["end"], node["end"], "drop-endif", first["expr"].strip()))
         for b in branches[1:]:
             plans.append((b["dir"], b["bend"], "drop-unreachable-branch", b["expr"].strip()))
@@ -236,8 +260,8 @@ def plan_node(ev, scope, node, plans, blocked):
             plan_node(ev, scope, child, plans, blocked)
         return
     if verdict in ("UNPARSABLE", "MANUAL"):
-        if rewritten != first["expr"].strip():
-            plans.append((node["line"], node["line"], "rewrite-guard", rewritten))
+        if rewritten != first["expr"].strip() and first["dend"] == first["dir"]:
+            plans.append((node["line"], node["dline"], "rewrite-guard", rewritten))
         else:
             blocked.append((node["line"], verdict.lower(), first["expr"].strip()))
         for child in node["children"]:
@@ -262,13 +286,20 @@ def plan_node(ev, scope, node, plans, blocked):
     target = branches[live_at]
     if target["kind"] == "else":
         plans.append((node["line"], target["dir"], "drop-if-through-else", first["expr"].strip()))
+        plans.append((node["end"], node["end"], "drop-endif", first["expr"].strip()))
     else:
+        # The surviving `#elif` becomes the guard, so its `#endif` has to stay - dropping it
+        # would leave the rewritten `#if` unterminated.
         plans.append((node["line"], target["dir"] - 1, "drop-if-through-elif",
                       first["expr"].strip()))
-        plans.append((target["dir"], target["dir"], "rewrite-guard", target["expr"].strip()))
-    plans.append((node["end"], node["end"], "drop-endif", first["expr"].strip()))
+        plans.append((target["dir"], target["dend"], "rewrite-guard", target["expr"].strip()))
     for b in branches[live_at + 1:]:
         plans.append((b["dir"], b["bend"], "drop-unreachable-branch", b["expr"].strip()))
+    # Nested conditionals in the surviving branch are work too: without this the pass stops at
+    # the outer node and a `#if defined(DEAD) / #else / #if defined(DEAD2) ...` leaves the inner
+    # one in place. Plans inside a branch that is being dropped are dropped with it.
+    for child in node["children"]:
+        plan_node(ev, scope, child, plans, blocked)
 
 
 def process(path, tokens, never_defined, apply):
@@ -280,7 +311,10 @@ def process(path, tokens, never_defined, apply):
     drops, rewrites = set(), {}
     for start, end, kind, payload in plans:
         if kind == "rewrite-guard":
+            # A directive can span physical lines; the replacement is one line, so the rest of
+            # the span has to go with it rather than be left behind as stray text.
             rewrites[start] = "#if " + payload
+            drops.update(range(start + 1, end + 1))
             continue
         drops.update(range(start, end + 1))
     out = [rewrites.get(i, line) for i, line in enumerate(lines, 1) if i not in drops]

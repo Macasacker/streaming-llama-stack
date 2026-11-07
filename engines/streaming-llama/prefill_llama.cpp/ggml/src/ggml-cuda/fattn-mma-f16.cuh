@@ -2161,11 +2161,7 @@ void ggml_cuda_flash_attn_ext_mma_f16_case(ggml_backend_cuda_context & ctx, ggml
     float logit_softcap;
     memcpy(&logit_softcap, (const float *) KQV->op_params + 2, sizeof(float));
 
-#if defined(GGML_USE_HIP)
-    using fattn_kernel_ptr_t = const void*;
-#else
     using fattn_kernel_ptr_t = fattn_kernel_t;
-#endif // defined(GGML_USE_HIP)
     fattn_kernel_t fattn_kernel;
     if (logit_softcap == 0.0f) {
         constexpr bool use_logit_softcap = false;
@@ -2185,7 +2181,6 @@ void ggml_cuda_flash_attn_ext_mma_f16_case(ggml_backend_cuda_context & ctx, ggml
             fattn_kernel = flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, false>;
         }
 
-#if !defined(GGML_USE_MUSA)
         CUDA_CHECK(cudaFuncSetAttribute(reinterpret_cast<fattn_kernel_ptr_t>(fattn_kernel), cudaFuncAttributeMaxDynamicSharedMemorySize, nbytes_shared_total));
         // Phase 2.2 angle 31 (2026-05-13): diagnostic for H2 (shmem carveout
         // silently truncates opt-in request). Log actual vs requested per
@@ -2210,7 +2205,6 @@ void ggml_cuda_flash_attn_ext_mma_f16_case(ggml_backend_cuda_context & ctx, ggml
                 }
             }
         }
-#endif // !defined(GGML_USE_MUSA)
     } else {
         constexpr bool use_logit_softcap = true;
         if constexpr (DKQ == 576) {
@@ -2229,7 +2223,6 @@ void ggml_cuda_flash_attn_ext_mma_f16_case(ggml_backend_cuda_context & ctx, ggml
             fattn_kernel = flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, false>;
         }
 
-#if !defined(GGML_USE_MUSA)
         CUDA_CHECK(cudaFuncSetAttribute(reinterpret_cast<fattn_kernel_ptr_t>(fattn_kernel), cudaFuncAttributeMaxDynamicSharedMemorySize, nbytes_shared_total));
         // Phase 2.2 angle 31 (2026-05-13): audit second branch too (logit_softcap=true path).
         if (const char * env = std::getenv("LLAMA_FA_SHMEM_AUDIT")) {
@@ -2250,7 +2243,6 @@ void ggml_cuda_flash_attn_ext_mma_f16_case(ggml_backend_cuda_context & ctx, ggml
                 }
             }
         }
-#endif // !defined(GGML_USE_MUSA)
     }
 
     launch_fattn<DV, ncols1, ncols2>

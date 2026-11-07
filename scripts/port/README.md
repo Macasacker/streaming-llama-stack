@@ -42,6 +42,34 @@ Anything it prints as `BLOCKED` needs a human: those were cases like `#if define
 #elif defined(POSIX_MADV_DONTNEED)`, where the live branch is the `#elif` and the guard has to be
 rewritten rather than removed.
 
+Three things it must not do, and used to:
+
+- **rewrite a condition it could not simplify.** A guard whose text it cannot fully parse
+  (`CUDART_VERSION >= 11070` - the tokenizer had no comparison operators) came back as
+  `UNPARSABLE` and was still written out, re-spaced, as the same condition. It is reported now.
+  Comparison operators are parsed, so a dead term in `!defined(DEAD) && VERSION >= X` is dropped
+  and the rest of the condition is kept verbatim.
+- **drop only part of a directive, or flatten one.** A directive spanning several physical lines
+  (`#if defined(A) || \` / `    defined(B)`) is treated as one node whose span is all of its
+  lines: dropping it takes the continuation lines with it. An *undecided* multi-line condition is
+  reported rather than rewritten, because a rewrite emits one line and would splice the backslash
+  into the middle of an expression; promoting a `#elif` to `#if` does emit one line for whatever
+  the `#elif` spanned, which is the same expression without its line continuations. A dead `#if`
+  with a live `#elif` keeps the `#endif`, because that path introduces a guard rather than
+  removing one.
+- **drop an operand the negation makes load-bearing.** Dropping a provably-true operand of `&&`
+  and a provably-false operand of `||` preserves the value; dropping the *other* shape does not
+  (`false && X` is false, `X || true` is true). The branch for a macro the build *defines* had
+  those four patterns inverted.
+
+`docs/evidence/collapse-probe.h` is the regression gate for all of that: apply the tool to a copy
+and compare the preprocessed text of the copy with the preprocessed text of the probe - it must be
+identical, and the probe covers each decision path including the ones that stay untouched.
+Run the tool over a real tree until it reports no edits. A conditional nested inside the surviving
+branch of a dead outer one is visited in the same pass, but promoting a `#elif` can leave a guard
+that is now always true (`#if !defined(DEAD)` after the `#elif` that tested it became the `#if`),
+and that only collapses on the next pass.
+
 ## preprocess_equiv.py
 
 Proves a sweep changed nothing the compiler sees. `-fdirectives-only -P` expands conditionals but
@@ -82,6 +110,18 @@ it rewrote. It takes the include directories and `-D` flags from a configured bu
 Pass `--cuda-include` when the TU has `__has_include(<cuda_runtime.h>)` blocks, and `--include` for
 a tool directory the file includes from. Without the build's `-D` flags the CUDA regions vanish from
 both sides and the comparison proves less than it looks like it does.
+
+## cuda_live_equiv.py
+
+`preprocess_equiv.py` for a sweep that touches a **header** in the CUDA backend: it preprocesses
+the before file with the before tree's include directories and the after file with the after
+tree's, so `common.cuh` is compared with the copy each side actually includes. Conditionals only
+(`-fdirectives-only`), which is also what keeps `__LINE__` inside `CUDA_CHECK` out of the diff.
+
+    python3 scripts/port/cuda_live_equiv.py build/wt-base . \
+        engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh
+
+`--no-cuda-defines` drops `-DGGML_USE_CUDA`, which is how you compare a CPU-only build's text.
 
 ## warning_profile.py
 

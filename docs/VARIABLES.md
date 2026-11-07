@@ -20062,7 +20062,7 @@ GGML_CUDA_DISABLE_FUSION: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5787`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5672`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20140,7 +20140,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:
         if(const char *diag=std::getenv("DS4PERF_DIAGNOSTIC_LAYERS")){if(*diag){
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1165`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool is_enabled() const {
@@ -20152,7 +20152,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh
     }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6331`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6216`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // use ggml_backend_cuda_graphs_disable_push/pop for scoped runtime control.
@@ -20201,12 +20201,12 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.
     cudaError_t err;
     if (getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY") != nullptr) {
         err = cudaMallocManaged(ptr, size);
-#if defined(GGML_USE_HIP)
-        if (err == hipSuccess) {
-            CUDA_CHECK(cudaMemAdvise(*ptr, size, hipMemAdviseSetCoarseGrain, device));
+    } else if (ds4_switch::enabled) {
+        err = ds4_switch::alloc(ptr, size, device);
+    } else {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7319`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7204`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20224,7 +20224,7 @@ GGML_CUDA_GRAPH_OPT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6420`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6305`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20242,7 +20242,7 @@ GGML_CUDA_NO_PINNED: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2147`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2039`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20254,7 +20254,7 @@ static void * ggml_cuda_host_malloc(size_t size) {
     void * ptr = nullptr;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7351`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7236`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     ggml_backend_cuda_device_get_memory(dev, &props->memory_free, &props->memory_total);
@@ -20272,7 +20272,7 @@ GGML_CUDA_NO_VMM: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1326`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1218`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // past the initial reserve, blocking dynamic n_ubatch resize. The
@@ -20284,7 +20284,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.
 #if defined(GGML_USE_VMM)
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6796`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6681`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if(!ggml_backend_is_cuda(backend))return false;
@@ -20302,7 +20302,7 @@ GGML_CUDA_REGISTER_HOST: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6694`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6579`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20311,10 +20311,10 @@ bool ggml_backend_cuda_register_host_buffer(void * buffer, size_t size) {
         return false;
     }
 
-#if CUDART_VERSION >= 11010 || defined(GGML_USE_MUSA) || defined(GGML_USE_HIP)
+#if CUDART_VERSION >= 11010
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6717`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6602`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20374,7 +20374,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1607`. 
             if (end != env_value && *end == '\0' && parsed >= 1 && parsed <= std::numeric_limits<int32_t>::max()) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7915`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!initialized) {
@@ -26004,7 +26004,7 @@ LLAMA_CPY_ALLOW_ROW_PREFIX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/cpy.cu:445`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/cpy.cu:442`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ne != ggml_nelements(src1)) {
@@ -26022,7 +26022,7 @@ LLAMA_CUBLAS_TF32: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1505`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1420`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // causing layer-major multi-ubatch to diverge through 26 layers.
@@ -26040,7 +26040,7 @@ LLAMA_CUDA_FUSION_COUNTS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5605`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5490`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ggml_cuda_fusion_counts_enabled() {
@@ -26058,7 +26058,7 @@ LLAMA_CUDA_FUSION_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5164`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5049`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ggml_cuda_lid_fusion_trace_enabled() {
@@ -26076,7 +26076,7 @@ LLAMA_CUDA_MMQ_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3321`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3206`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     //printf("src1 is contiguous %d, transposed %d, type = %s, name = %s\n", ggml_is_contiguous(src1), ggml_is_transposed(src1), ggml_type_name(src1->type), src1->name);
@@ -26094,7 +26094,7 @@ LLAMA_CUDA_OP_PROFILE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8089`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7961`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static std::once_flag s_profile_init;
@@ -26154,7 +26154,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:946
                 llama_dsv41_layer_log("SINGLEPASS_LAYER_NODE_SNAPSHOT layer=%u\n",layer);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8092`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7964`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (env && env[0] == '1') {
@@ -26226,7 +26226,7 @@ LLAMA_CUDA_TENSOR_SET_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1609`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1501`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -26244,7 +26244,7 @@ LLAMA_CUDA_TRACE_BUFFER_ALLOC: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1706`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1598`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // to identify per-request leaks. Gated on env to not spam regular runs.
@@ -26262,7 +26262,7 @@ LLAMA_CUDA_TRACE_DEVICE_MALLOC: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:876`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:860`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_cuda_device_malloc_bytes.fetch_add((int64_t) size, std::memory_order_relaxed);
@@ -26280,7 +26280,7 @@ LLAMA_CUDA_TRACE_GRAPHS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1440`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1355`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // Phase 316d (2026-05-04): log every Nth insert with key + map size
@@ -26700,7 +26700,7 @@ LLAMA_DSA_KIDX_STORE_DIAG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3537`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static void ggml_cuda_diag_set_rows(ggml_backend_cuda_context & ctx, const ggml_tensor * dst) {
@@ -27246,7 +27246,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:
             "Resident BF16 requires full resident readback and either explicit streamed-graph support or eager capture policy");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1241`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1156`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // Streamed layers legitimately change tensor bindings on every tile.
@@ -27486,7 +27486,7 @@ LLAMA_DSV41_EXPERT_FULL_K_GRID: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id_common.cuh:4085`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id_common.cuh:4043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // exactly, so every interval starts/ends on a complete K tile. The old XY
@@ -28734,7 +28734,7 @@ LLAMA_DSV4_LID_FUSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // fusion off, CUDA runs the same math Metal does.
@@ -30006,7 +30006,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20671`.
                             (fa_nkv_visible % (int64_t) ubatch.n_tokens) == 0;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2174`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2170`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if constexpr (DKQ == 576) {
@@ -30018,7 +30018,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-
                     : flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, false>;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2218`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2212`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if constexpr (DKQ == 576) {
@@ -30186,7 +30186,7 @@ LLAMA_FA_MLA_NO_K_REUSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2173`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2169`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         constexpr bool use_logit_softcap = false;
@@ -30198,7 +30198,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-
                     ? flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, true>
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2217`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2211`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         constexpr bool use_logit_softcap = true;
@@ -30438,7 +30438,7 @@ LLAMA_FA_SHMEM_AUDIT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2193`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2188`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // silently truncates opt-in request). Log actual vs requested per
@@ -30450,7 +30450,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-
                     logged = true;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2235`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2228`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         CUDA_CHECK(cudaFuncSetAttribute(reinterpret_cast<fattn_kernel_ptr_t>(fattn_kernel), cudaFuncAttributeMaxDynamicSharedMemorySize, nbytes_shared_total));
@@ -32430,7 +32430,7 @@ LLAMA_MOE_GROUPED_EXPERTS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4744`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4629`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -35910,7 +35910,7 @@ LLAMA_PREFILL_STAGING_SYNC: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7066`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6951`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ggml_cuda_staging_sync_enabled(void) {
@@ -37152,7 +37152,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend.cpp:172
         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1042`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // DIAG: log every cudaMalloc from this pool. Useful to see how many
@@ -37164,7 +37164,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.
         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1236`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1131`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // DIAG: log every VMM pool growth so we can see if warm-up

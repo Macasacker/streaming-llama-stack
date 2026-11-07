@@ -22336,11 +22336,11 @@
     ],
     "doc": "GGML_CUDA_DISABLE_FUSION: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5787"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5672"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5787",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5672",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static bool disable_fusion = (getenv(\"GGML_CUDA_DISABLE_FUSION\") != nullptr);",
         "consumer": "\n                // start of fusion operations\n                static bool disable_fusion = (getenv(\"GGML_CUDA_DISABLE_FUSION\") != nullptr);\n                if (!disable_fusion) {\n                    if (moe_grouped_enabled) {\n                        int topk_view_idx = -1;\n                        int weights_idx   = -1;"
@@ -22364,8 +22364,8 @@
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:1470",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:1475",
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:604",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1250",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6331",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1165",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6216",
       "engines/ds4/cuda/mmq/common.cuh:1208"
     ],
     "defaults_by_scope": {
@@ -22403,13 +22403,13 @@
         "consumer": "        const bool streamed_graph_support=streamed_graphs&&std::string(streamed_graphs)==\"1\";\n        require(!options.resident_bf16||(options.carry.defer_hidden_readback&&\n            (streamed_graph_support||(std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\")&&std::string(std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\"))==\"1\"))),\n            \"Resident BF16 requires full resident readback and either explicit streamed-graph support or eager capture policy\");\n        report[\"resident_hidden_storage\"]=options.resident_bf16?\"BF16 after validated existing BF16 boundary; layer0 input unchanged F32\":\"F32\";\n        options.carry.ram_prefix_tokens=uint32_t(ram_prefix);options.carry.disk_reserve_bytes=disk_reserve;\n        if(const char *diag=std::getenv(\"DS4PERF_DIAGNOSTIC_LAYERS\")){if(*diag){"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1250",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1165",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *value=getenv(\"GGML_CUDA_DISABLE_GRAPHS\");",
         "consumer": "    bool is_enabled() const {\n        static const bool disable_cuda_graphs_due_to_env = [] {\n            const char *value=getenv(\"GGML_CUDA_DISABLE_GRAPHS\");\n            return value && std::strcmp(value,\"0\")!=0;\n        }();\n        return !(disable_due_to_gpu_arch || disable_cuda_graphs_due_to_env || disable_due_to_too_many_updates);\n    }"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6331",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6216",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *value=std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\");",
         "consumer": "    // use ggml_backend_cuda_graphs_disable_push/pop for scoped runtime control.\n    static const bool cuda_graphs_disabled = [] {\n        const char *value=std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\");\n        return value && std::strcmp(value,\"0\")!=0;\n    }();\n    if (cuda_graphs_disabled || cuda_graphs_forced_disabled) {\n        use_cuda_graph = false;"
@@ -22435,7 +22435,7 @@
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1029",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:850",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7319"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7204"
     ],
     "code_defaults": [
       {
@@ -22448,10 +22448,10 @@
         "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:850",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\") != nullptr) {",
-        "consumer": "    ggml_cuda_set_device(device);\n    cudaError_t err;\n    if (getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\") != nullptr) {\n        err = cudaMallocManaged(ptr, size);\n#if defined(GGML_USE_HIP)\n        if (err == hipSuccess) {\n            CUDA_CHECK(cudaMemAdvise(*ptr, size, hipMemAdviseSetCoarseGrain, device));"
+        "consumer": "    ggml_cuda_set_device(device);\n    cudaError_t err;\n    if (getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\") != nullptr) {\n        err = cudaMallocManaged(ptr, size);\n    } else if (ds4_switch::enabled) {\n        err = ds4_switch::alloc(ptr, size, device);\n    } else {"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7319",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7204",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool uma_env = getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\") != nullptr;",
         "consumer": "\n    // Check if UMA is explicitly enabled via environment variable\n    bool uma_env = getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\") != nullptr;\n    bool is_uma = prop.integrated > 0 || uma_env;\n\n    if (is_uma) {\n        // For UMA systems (like DGX Spark), use system memory info"
@@ -22469,11 +22469,11 @@
     ],
     "doc": "GGML_CUDA_GRAPH_OPT: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6420"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6305"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6420",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6305",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env     = getenv(\"GGML_CUDA_GRAPH_OPT\");",
         "consumer": "\n    static bool enable_graph_optimization = [] {\n        const char * env     = getenv(\"GGML_CUDA_GRAPH_OPT\");\n        return env != nullptr && atoi(env) == 1;\n    }();\n\n    if (!enable_graph_optimization) {"
@@ -22491,18 +22491,18 @@
     ],
     "doc": "GGML_CUDA_NO_PINNED: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2147",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7351"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2039",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7236"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2147",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2039",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"GGML_CUDA_NO_PINNED\") != nullptr) {",
         "consumer": "\nstatic void * ggml_cuda_host_malloc(size_t size) {\n    if (getenv(\"GGML_CUDA_NO_PINNED\") != nullptr) {\n        return nullptr;\n    }\n\n    void * ptr = nullptr;"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7351",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7236",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool host_buffer = getenv(\"GGML_CUDA_NO_PINNED\") == nullptr;",
         "consumer": "    ggml_backend_cuda_device_get_memory(dev, &props->memory_free, &props->memory_total);\n\n    bool host_buffer = getenv(\"GGML_CUDA_NO_PINNED\") == nullptr;\n#ifdef GGML_CUDA_NO_PEER_COPY\n    bool events = false;\n#else\n    bool events = true;"
@@ -22520,18 +22520,18 @@
     ],
     "doc": "GGML_CUDA_NO_VMM: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1326",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6796"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1218",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6681"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1326",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1218",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * no_vmm = std::getenv(\"GGML_CUDA_NO_VMM\");",
         "consumer": "    // past the initial reserve, blocking dynamic n_ubatch resize. The\n    // legacy pool uses cudaMalloc directly and has no growth restriction.\n    const char * no_vmm = std::getenv(\"GGML_CUDA_NO_VMM\");\n    if (no_vmm && no_vmm[0] != '0' && no_vmm[0] != '\\0') {\n        return std::unique_ptr<ggml_cuda_pool>(new ggml_cuda_pool_leg(device));\n    }\n#if defined(GGML_USE_VMM)"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6796",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6681",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *no_vmm=std::getenv(\"GGML_CUDA_NO_VMM\");",
         "consumer": "    if(!ggml_backend_is_cuda(backend))return false;\n    auto *ctx=(ggml_backend_cuda_context*)backend->context;\n    const char *no_vmm=std::getenv(\"GGML_CUDA_NO_VMM\");\n    if(!ggml_cuda_info().devices[ctx->device].vmm || (no_vmm&&no_vmm[0]!='0'&&no_vmm[0]))return false;\n    ggml_cuda_set_device(ctx->device);\n    if(bytes && ctx->pool().pool_size_bytes()<bytes) {\n        size_t actual=0;void *ptr=ctx->pool().alloc(bytes,&actual);ctx->pool().free(ptr,actual);"
@@ -22549,18 +22549,18 @@
     ],
     "doc": "GGML_CUDA_REGISTER_HOST: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6694",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6717"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6579",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6602"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6694",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6579",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"GGML_CUDA_REGISTER_HOST\") == nullptr) {",
-        "consumer": "\nbool ggml_backend_cuda_register_host_buffer(void * buffer, size_t size) {\n    if (getenv(\"GGML_CUDA_REGISTER_HOST\") == nullptr) {\n        return false;\n    }\n\n#if CUDART_VERSION >= 11010 || defined(GGML_USE_MUSA) || defined(GGML_USE_HIP)"
+        "consumer": "\nbool ggml_backend_cuda_register_host_buffer(void * buffer, size_t size) {\n    if (getenv(\"GGML_CUDA_REGISTER_HOST\") == nullptr) {\n        return false;\n    }\n\n#if CUDART_VERSION >= 11010"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6717",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6602",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"GGML_CUDA_REGISTER_HOST\") == nullptr) {",
         "consumer": "\nvoid ggml_backend_cuda_unregister_host_buffer(void * buffer) {\n    if (getenv(\"GGML_CUDA_REGISTER_HOST\") == nullptr) {\n        return;\n    }\n\n    cudaError_t err = cudaHostUnregister(buffer);"
@@ -22608,7 +22608,7 @@
     "doc": "GGML_OP_OFFLOAD_MIN_BATCH: advanced engine setting; built-in default retained",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1607",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8043"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7915"
     ],
     "code_defaults": [
       {
@@ -22618,7 +22618,7 @@
         "consumer": "    bool prefill_streaming_min_batch_from_cli = params.prefill_min_stream_batch_tokens > 0;\n    if (prefill_min_stream_batch_tokens <= 0) {\n        const char * env_value = std::getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\");\n        if (env_value != nullptr && env_value[0] != '\\0') {\n            char * end = nullptr;\n            long parsed = std::strtol(env_value, &end, 10);\n            if (end != env_value && *end == '\\0' && parsed >= 1 && parsed <= std::numeric_limits<int32_t>::max()) {"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8043",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7915",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const int min_batch_size = getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\") ? atoi(getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\")) : 32;",
         "consumer": "        if (!initialized) {\n            ggml_backend_cuda_reg_context * ctx = new ggml_backend_cuda_reg_context;\n            const int min_batch_size = getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\") ? atoi(getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\")) : 32;\n\n            for (int i = 0; i < ggml_cuda_info().device_count; i++) {\n                ggml_backend_cuda_device_context * dev_ctx = new ggml_backend_cuda_device_context;\n                dev_ctx->device = i;"
@@ -29206,11 +29206,11 @@
     ],
     "doc": "LLAMA_CPY_ALLOW_ROW_PREFIX: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/cpy.cu:445"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/cpy.cu:442"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/cpy.cu:445",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/cpy.cu:442",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = std::getenv(\"LLAMA_CPY_ALLOW_ROW_PREFIX\");",
         "consumer": "    if (ne != ggml_nelements(src1)) {\n        static const bool allow_row_prefix = []() {\n            const char * e = std::getenv(\"LLAMA_CPY_ALLOW_ROW_PREFIX\");\n            return e && e[0] != 0 && e[0] != (char) 48;   // 48 == the character zero\n        }();\n        const bool row_prefix =\n            src0->ne[0] == src1->ne[0] &&"
@@ -29228,11 +29228,11 @@
     ],
     "doc": "LLAMA_CUBLAS_TF32: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1505"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1420"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1505",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1420",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * cublas_math_env = std::getenv(\"LLAMA_CUBLAS_TF32\");",
         "consumer": "            // causing layer-major multi-ubatch to diverge through 26 layers.\n            // Check env var to allow switching back to TF32 for performance.\n            const char * cublas_math_env = std::getenv(\"LLAMA_CUBLAS_TF32\");\n            cublasMath_t math_mode = (cublas_math_env && cublas_math_env[0] == '1')\n                ? CUBLAS_TF32_TENSOR_OP_MATH\n                : CUBLAS_DEFAULT_MATH;\n            CUBLAS_CHECK(cublasSetMathMode(cublas_handles[device], math_mode));"
@@ -29250,11 +29250,11 @@
     ],
     "doc": "LLAMA_CUDA_FUSION_COUNTS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5605"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5490"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5605",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5490",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env = std::getenv(\"LLAMA_CUDA_FUSION_COUNTS\");",
         "consumer": "static bool ggml_cuda_fusion_counts_enabled() {\n    static const bool enabled = []() {\n        const char * env = std::getenv(\"LLAMA_CUDA_FUSION_COUNTS\");\n        return env && env[0] != '\\0' && env[0] != '0';\n    }();\n    return enabled;\n}"
@@ -29272,11 +29272,11 @@
     ],
     "doc": "LLAMA_CUDA_FUSION_TRACE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5164"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5049"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5164",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5049",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env = std::getenv(\"LLAMA_CUDA_FUSION_TRACE\");",
         "consumer": "static bool ggml_cuda_lid_fusion_trace_enabled() {\n    static const bool enabled = []() {\n        const char * env = std::getenv(\"LLAMA_CUDA_FUSION_TRACE\");\n        return env != nullptr && env[0] == '1' && env[1] == '\\0';\n    }();\n    return enabled;\n}"
@@ -29294,11 +29294,11 @@
     ],
     "doc": "LLAMA_CUDA_MMQ_TRACE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3321"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3206"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3321",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3206",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (std::getenv(\"LLAMA_CUDA_MMQ_TRACE\") && (use_mul_mat_q || use_mul_mat_vec_q)) {",
         "consumer": "    //printf(\"src1 is contiguous %d, transposed %d, type = %s, name = %s\\n\", ggml_is_contiguous(src1), ggml_is_transposed(src1), ggml_type_name(src1->type), src1->name);\n\n    if (std::getenv(\"LLAMA_CUDA_MMQ_TRACE\") && (use_mul_mat_q || use_mul_mat_vec_q)) {\n        fprintf(stderr,\n            \"[mmq-trace] dst=%s src0=%s type=%s src0_ne=[%lld,%lld,%lld,%lld] src1=%s type=%s src1_ne=[%lld,%lld,%lld,%lld] dst_ne=[%lld,%lld,%lld,%lld] vec=%d mmq=%d prec=%d\\n\",\n            dst->name, src0->name, ggml_type_name(src0->type),\n            (long long) src0->ne[0], (long long) src0->ne[1], (long long) src0->ne[2], (long long) src0->ne[3],"
@@ -29316,11 +29316,11 @@
     ],
     "doc": "LLAMA_CUDA_OP_PROFILE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8089"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7961"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8089",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7961",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env = getenv(\"LLAMA_CUDA_OP_PROFILE\");",
         "consumer": "    static std::once_flag s_profile_init;\n    std::call_once(s_profile_init, [](){\n        const char * env = getenv(\"LLAMA_CUDA_OP_PROFILE\");\n        if (env && env[0] == '1') {\n            g_op_profile_enabled = true;\n            const char *nodes=getenv(\"LLAMA_CUDA_OP_PROFILE_NODES\");g_node_profile_enabled=nodes&&nodes[0]=='1';\n            std::atexit(cuda_op_profile_dump);"
@@ -29362,7 +29362,7 @@
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:298",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:946",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8092"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7964"
     ],
     "code_defaults": [
       {
@@ -29378,7 +29378,7 @@
         "consumer": "            // Both existing profiling switches are required; timed runs do\n            // not dump, create events or synchronize here.\n            const char *node_profile=std::getenv(\"LLAMA_CUDA_OP_PROFILE_NODES\");\n            const char *tile_timing=std::getenv(\"LLAMADECODE_TILE_TIMING\");\n            if(node_profile&&node_profile[0]=='1'&&tile_timing&&tile_timing[0]=='1'){\n                ggml_cuda_op_profile_dump_now();\n                llama_dsv41_layer_log(\"SINGLEPASS_LAYER_NODE_SNAPSHOT layer=%u\\n\",layer);"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8092",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7964",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *nodes=getenv(\"LLAMA_CUDA_OP_PROFILE_NODES\");g_node_profile_enabled=nodes&&nodes[0]=='1';",
         "consumer": "        if (env && env[0] == '1') {\n            g_op_profile_enabled = true;\n            const char *nodes=getenv(\"LLAMA_CUDA_OP_PROFILE_NODES\");g_node_profile_enabled=nodes&&nodes[0]=='1';\n            std::atexit(cuda_op_profile_dump);\n            fprintf(stderr, \"[CUDA OP PROFILE] enabled \u2014 will dump at exit\\n\");\n            fflush(stderr);  // 2026-07-10: flush so this enable-marker is observable right after startup (env-propagation check)\n        }"
@@ -29462,11 +29462,11 @@
     ],
     "doc": "LLAMA_CUDA_TENSOR_SET_TRACE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1609"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1501"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1609",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1501",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (std::getenv(\"LLAMA_CUDA_TENSOR_SET_TRACE\") != nullptr) {",
         "consumer": "        }\n    }\n    if (std::getenv(\"LLAMA_CUDA_TENSOR_SET_TRACE\") != nullptr) {\n        fprintf(stderr, \"buffer_set_tensor: tensor='%s' size=%zu offset=%zu stream=%p \"\n                \"src_orig=%p src_used=%p (staged=%d)\\n\",\n                tensor->name ? tensor->name : \"?\", size, offset, (void *)s,\n                data, src, (int)(src != data));"
@@ -29484,11 +29484,11 @@
     ],
     "doc": "LLAMA_CUDA_TRACE_BUFFER_ALLOC: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1706"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1598"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1706",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1598",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * trace_env = std::getenv(\"LLAMA_CUDA_TRACE_BUFFER_ALLOC\");",
         "consumer": "    // to identify per-request leaks. Gated on env to not spam regular runs.\n    if (size > 100ull * 1024 * 1024) {\n        const char * trace_env = std::getenv(\"LLAMA_CUDA_TRACE_BUFFER_ALLOC\");\n        if (trace_env && trace_env[0] != '\\0' && trace_env[0] != '0') {\n            size_t free_mb = 0, total_mb = 0;\n            size_t free_b = 0, total_b = 0;\n            (void) cudaMemGetInfo(&free_b, &total_b);"
@@ -29506,11 +29506,11 @@
     ],
     "doc": "LLAMA_CUDA_TRACE_DEVICE_MALLOC: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:876"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:860"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:876",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:860",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * trace_env = std::getenv(\"LLAMA_CUDA_TRACE_DEVICE_MALLOC\");",
         "consumer": "        g_cuda_device_malloc_bytes.fetch_add((int64_t) size, std::memory_order_relaxed);\n        g_cuda_device_malloc_count.fetch_add(1, std::memory_order_relaxed);\n        const char * trace_env = std::getenv(\"LLAMA_CUDA_TRACE_DEVICE_MALLOC\");\n        if (trace_env && trace_env[0] != '\\0' && trace_env[0] != '0' && size > 1024 * 1024) {\n            fprintf(stderr, \"*** DEV_MALLOC: size=%.2f MiB ptr=%p dev=%d (cum_count=%lld cum_bytes=%lld MB)\\n\",\n                    size / 1024.0 / 1024.0, *ptr, device,\n                    (long long) g_cuda_device_malloc_count.load(),"
@@ -29528,11 +29528,11 @@
     ],
     "doc": "LLAMA_CUDA_TRACE_GRAPHS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1440"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1355"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1440",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1355",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * trace_env = std::getenv(\"LLAMA_CUDA_TRACE_GRAPHS\");",
         "consumer": "            // Phase 316d (2026-05-04): log every Nth insert with key + map size\n            // to attribute per-cycle growth. Trigger via env to avoid spam.\n            const char * trace_env = std::getenv(\"LLAMA_CUDA_TRACE_GRAPHS\");\n            if (trace_env && trace_env[0] != '\\0' && trace_env[0] != '0') {\n                if ((prev + 1) % 32 == 0 || (prev + 1) <= 4) {\n                    fprintf(stderr, \"*** GRAPHS_INS: key=%p map_size=%zu cum_created=%lld\\n\",\n                            first_node_ptr, cuda_graphs.size(), (long long)(prev + 1));"
@@ -30003,11 +30003,11 @@
     ],
     "doc": "LLAMA_DSA_KIDX_STORE_DIAG: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3652"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3537"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3652",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:3537",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = std::getenv(\"LLAMA_DSA_KIDX_STORE_DIAG\");",
         "consumer": "static void ggml_cuda_diag_set_rows(ggml_backend_cuda_context & ctx, const ggml_tensor * dst) {\n    static const bool diag_on = []() {\n        const char * e = std::getenv(\"LLAMA_DSA_KIDX_STORE_DIAG\");\n        return e != nullptr && e[0] != '\\0' && e[0] != '0';\n    }();\n    if (!diag_on || dst == nullptr) {\n        return;"
@@ -30594,7 +30594,7 @@
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:65",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:1608",
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:601",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1241",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1156",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:24"
     ],
     "allowed_values": [
@@ -30621,7 +30621,7 @@
         "consumer": "        require(!args.count(\"--resident-hidden-bf16\")||args.at(\"--resident-hidden-bf16\")==\"0\"||args.at(\"--resident-hidden-bf16\")==\"1\",\"resident-hidden-bf16 requires0/1\");\n        options.resident_bf16=args.count(\"--resident-hidden-bf16\")&&args.at(\"--resident-hidden-bf16\")==\"1\";\n        const char *streamed_graphs=std::getenv(\"LLAMA_DSV41_CUDA_GRAPHS\");\n        const bool streamed_graph_support=streamed_graphs&&std::string(streamed_graphs)==\"1\";\n        require(!options.resident_bf16||(options.carry.defer_hidden_readback&&\n            (streamed_graph_support||(std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\")&&std::string(std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\"))==\"1\"))),\n            \"Resident BF16 requires full resident readback and either explicit streamed-graph support or eager capture policy\");"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1241",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1156",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *streaming=getenv(\"LLAMA_DSV41_CUDA_GRAPHS\");",
         "consumer": "        // Streamed layers legitimately change tensor bindings on every tile.\n        // Their explicit mode keeps one bounded executable and updates it.\n        const char *streaming=getenv(\"LLAMA_DSV41_CUDA_GRAPHS\");\n        if (number_consecutive_updates >= 4 && !(streaming && streaming[0]=='1' && !streaming[1])) {\n            GGML_LOG_DEBUG(\"%s: disabling CUDA graphs due to too many consecutive updates\\n\", __func__);\n            disable_due_to_too_many_updates = true;\n        }"
@@ -30860,11 +30860,11 @@
     ],
     "doc": "LLAMA_DSV41_EXPERT_FULL_K_GRID: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id_common.cuh:4085"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id_common.cuh:4043"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id_common.cuh:4085",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id_common.cuh:4043",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *full_k_env=std::getenv(\"LLAMA_DSV41_EXPERT_FULL_K_GRID\");",
         "consumer": "    // exactly, so every interval starts/ends on a complete K tile. The old XY\n    // launch above cannot be enabled on modern CUDA (device branch omitted).\n    const char *full_k_env=std::getenv(\"LLAMA_DSV41_EXPERT_FULL_K_GRID\");\n    const bool full_k=type==GGML_TYPE_Q4_K&&full_k_env&&!std::strcmp(full_k_env,\"1\")&&\n        GGML_CUDA_CC_IS_NVIDIA(cc)&&ggml_cuda_highest_compiled_arch(cc)>=GGML_CUDA_CC_VOLTA&&\n        args.ids_dst&&args.expert_bounds&&args.nchannels_x==384&&args.nchannels_y==384&&\n        args.nsamples_x==1&&args.nsamples_y==1&&args.ncols_max>0&&args.ncols_max<=16384&&"
@@ -32226,11 +32226,11 @@
     ],
     "doc": "LLAMA_DSV4_LID_FUSE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5245"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5130"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5245",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5130",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = std::getenv(\"LLAMA_DSV4_LID_FUSE\");",
         "consumer": "    // fusion off, CUDA runs the same math Metal does.\n    static const bool fuse_enabled = []() {\n        const char * e = std::getenv(\"LLAMA_DSV4_LID_FUSE\");\n        return !(e && e[0] == '0' && e[1] == '\\0');\n    }();\n    if (!fuse_enabled) {\n        return false;"
@@ -33438,8 +33438,8 @@
       "engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20592",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20657",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20671",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2174",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2218"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2170",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2212"
     ],
     "code_defaults": [
       {
@@ -33485,13 +33485,13 @@
         "consumer": "                    pcs_fa_mask_device_tokens = 0;\n                        pcs_fa_mask_direct_causal =\n                            pcs_env_enabled(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") &&\n                            model.hparams.is_mla() &&\n                            ubatch.n_tokens > 0 &&\n                            fa_nkv_visible > 0 &&\n                            (fa_nkv_visible % (int64_t) ubatch.n_tokens) == 0;"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2174",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2170",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const bool use_direct_causal = std::getenv(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") != nullptr;",
         "consumer": "        if constexpr (DKQ == 576) {\n            const bool use_v_as_k_view = std::getenv(\"LLAMA_FA_MLA_NO_K_REUSE\") == nullptr;\n            const bool use_direct_causal = std::getenv(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") != nullptr;\n            if (use_v_as_k_view) {\n                fattn_kernel = use_direct_causal\n                    ? flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, true>\n                    : flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, false>;"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2218",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2212",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const bool use_direct_causal = std::getenv(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") != nullptr;",
         "consumer": "        if constexpr (DKQ == 576) {\n            const bool use_v_as_k_view = std::getenv(\"LLAMA_FA_MLA_NO_K_REUSE\") == nullptr;\n            const bool use_direct_causal = std::getenv(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") != nullptr;\n            if (use_v_as_k_view) {\n                fattn_kernel = use_direct_causal\n                    ? flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, true>\n                    : flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, false>;"
@@ -33677,18 +33677,18 @@
     ],
     "doc": "LLAMA_FA_MLA_NO_K_REUSE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2173",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2217"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2169",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2211"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2173",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2169",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const bool use_v_as_k_view = std::getenv(\"LLAMA_FA_MLA_NO_K_REUSE\") == nullptr;",
         "consumer": "        constexpr bool use_logit_softcap = false;\n        if constexpr (DKQ == 576) {\n            const bool use_v_as_k_view = std::getenv(\"LLAMA_FA_MLA_NO_K_REUSE\") == nullptr;\n            const bool use_direct_causal = std::getenv(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") != nullptr;\n            if (use_v_as_k_view) {\n                fattn_kernel = use_direct_causal\n                    ? flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, true>"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2217",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2211",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const bool use_v_as_k_view = std::getenv(\"LLAMA_FA_MLA_NO_K_REUSE\") == nullptr;",
         "consumer": "        constexpr bool use_logit_softcap = true;\n        if constexpr (DKQ == 576) {\n            const bool use_v_as_k_view = std::getenv(\"LLAMA_FA_MLA_NO_K_REUSE\") == nullptr;\n            const bool use_direct_causal = std::getenv(\"LLAMA_FA_MLA_CAUSAL_DIRECT\") != nullptr;\n            if (use_v_as_k_view) {\n                fattn_kernel = use_direct_causal\n                    ? flash_attn_ext_f16<DKQ, DV, ncols1, ncols2, use_logit_softcap, true, true>"
@@ -33939,18 +33939,18 @@
     ],
     "doc": "LLAMA_FA_SHMEM_AUDIT: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2193",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2235"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2188",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2228"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2193",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2188",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (const char * env = std::getenv(\"LLAMA_FA_SHMEM_AUDIT\")) {",
         "consumer": "        // silently truncates opt-in request). Log actual vs requested per\n        // first launch when LLAMA_FA_SHMEM_AUDIT=1.\n        if (const char * env = std::getenv(\"LLAMA_FA_SHMEM_AUDIT\")) {\n            if (env[0] != '\\0' && env[0] != '0') {\n                static bool logged = false;\n                if (!logged) {\n                    logged = true;"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2235",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/fattn-mma-f16.cuh:2228",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (const char * env = std::getenv(\"LLAMA_FA_SHMEM_AUDIT\")) {",
         "consumer": "        CUDA_CHECK(cudaFuncSetAttribute(reinterpret_cast<fattn_kernel_ptr_t>(fattn_kernel), cudaFuncAttributeMaxDynamicSharedMemorySize, nbytes_shared_total));\n        // Phase 2.2 angle 31 (2026-05-13): audit second branch too (logit_softcap=true path).\n        if (const char * env = std::getenv(\"LLAMA_FA_SHMEM_AUDIT\")) {\n            if (env[0] != '\\0' && env[0] != '0') {\n                static bool logged_b = false;\n                if (!logged_b) {\n                    logged_b = true;"
@@ -36188,11 +36188,11 @@
     ],
     "doc": "LLAMA_MOE_GROUPED_EXPERTS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4744"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4629"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4744",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4629",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env = std::getenv(\"LLAMA_MOE_GROUPED_EXPERTS\");",
         "consumer": "\nstatic bool moe_grouped_enabled = []() {\n    const char * env = std::getenv(\"LLAMA_MOE_GROUPED_EXPERTS\");\n    return env && env[0] != '\\0' && env[0] != '0';\n}();\n\nstatic bool ggml_cuda_topk_moe_fusion(const struct ggml_cgraph * cgraph, int node_idx, ggml_cuda_topk_moe_args & args) {"
@@ -39975,11 +39975,11 @@
     ],
     "doc": "LLAMA_PREFILL_STAGING_SYNC: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7066"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6951"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7066",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6951",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = getenv(\"LLAMA_PREFILL_STAGING_SYNC\");",
         "consumer": "static bool ggml_cuda_staging_sync_enabled(void) {\n    static const bool en = [] {\n        const char * e = getenv(\"LLAMA_PREFILL_STAGING_SYNC\");\n        const bool on = e != nullptr && e[0] != '\\0' && e[0] != '0';\n        if (on) {\n            fprintf(stderr, \"*** STAGING_SYNC_PROBE_V1 ACTIVE: device-drain before sync staging memcpys\\n\");\n            fflush(stderr);"
@@ -41268,8 +41268,8 @@
       "engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26210",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend.cpp:1711",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend.cpp:1723",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1137",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1236"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1042",
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1131"
     ],
     "code_defaults": [
       {
@@ -41291,13 +41291,13 @@
         "consumer": "    for (int split_id = 0; split_id < sched->n_splits; split_id++) {\n        struct ggml_backend_sched_split * split = &splits[split_id];\n        if (getenv(\"LLAMA_SPLIT_CAP_TRACE\")) {\n            fprintf(stderr, \"[split_cap_trace]   split %d: backend_id=%d n_inputs=%d\\n\",\n                    split_id, split->backend_id, split->n_inputs);\n            fflush(stderr);\n        }"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1137",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1042",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"LLAMA_SPLIT_CAP_TRACE\")) {",
         "consumer": "        // DIAG: log every cudaMalloc from this pool. Useful to see how many\n        // fire per compute so we know if warm-up is stabilizing sizes.\n        if (getenv(\"LLAMA_SPLIT_CAP_TRACE\")) {\n            fprintf(stderr, \"[split_cap_trace] pool_alloc cudaMalloc(size=%zu, look_ahead=%zu)\\n\",\n                    size, look_ahead_size);\n            fflush(stderr);\n        }"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1236",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:1131",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"LLAMA_SPLIT_CAP_TRACE\")) {",
         "consumer": "            // DIAG: log every VMM pool growth so we can see if warm-up\n            // has stabilized the pool for split-decode capture.\n            if (getenv(\"LLAMA_SPLIT_CAP_TRACE\")) {\n                fprintf(stderr, \"[split_cap_trace] vmm_pool grow: requested=%zu avail=%zu reserve=%zu (pool_size=%zu -> %zu)\\n\",\n                        size, avail, reserve_size, pool_size, pool_size + reserve_size);\n                fflush(stderr);\n            }"

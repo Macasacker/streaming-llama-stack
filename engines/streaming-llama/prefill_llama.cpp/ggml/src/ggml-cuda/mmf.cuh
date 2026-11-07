@@ -870,7 +870,6 @@ static void mul_mat_f_switch_rows_per_block(
         const int64_t nsamples_dst, const int64_t stride_sample_x, const int64_t stride_sample_y, const int64_t stride_sample_dst, \
         cudaStream_t stream, const mmf_ids_data * ids_data);
 
-#if !defined(GGML_USE_MUSA)
 #define DECL_MMF_CASE_EXTERN(ncols_dst) \
     extern DECL_MMF_CASE_HELPER(float, MMF_ROWS_PER_BLOCK, ncols_dst) \
     extern DECL_MMF_CASE_HELPER(half2, MMF_ROWS_PER_BLOCK, ncols_dst) \
@@ -903,6 +902,3 @@ DECL_MMF_CASE_EXTERN(13);
 DECL_MMF_CASE_EXTERN(14);
 DECL_MMF_CASE_EXTERN(15);
 DECL_MMF_CASE_EXTERN(16);
-#else
-#define DECL_MMF_CASE(ncols_dst)
-#endif
