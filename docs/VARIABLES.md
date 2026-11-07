@@ -5896,7 +5896,7 @@ Source: `engines/ds4/ds4_cuda.cu:9143`. Unset read: NULL from getenv; the litera
             if (direct_fd >= 0) {
 ```
 
-Source: `engines/ds4/cuda/mmq/ds4_repack.cu:80`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/cuda/mmq/ds4_repack.cu:76`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (st.st_blksize > 1) m.direct_align = (uint64_t)st.st_blksize;
@@ -15310,7 +15310,7 @@ DS4_MMQ_D2R_STATS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/cuda/mmq/ds4_mmq_d2r.cu:37`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/cuda/mmq/ds4_mmq_d2r.cu:33`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -15388,7 +15388,7 @@ DS4_MMQ_POOL_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/cuda/mmq/ds4_ggml_stubs.cu:155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/cuda/mmq/ds4_ggml_stubs.cu:137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -15397,7 +15397,7 @@ static bool ds4_pool_trace_enabled() {
     return value && value[0] == '1' && value[1] == '\0';
 }
 
-#if !defined(GGML_USE_HIP)
+/* Query backing separately from requested/used bytes. Async frees can leave
 ```
 
 ### DS4_MMQ_YBUF_MEMSET
@@ -19282,7 +19282,7 @@ DS4_WS_REPACK_HASH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/cuda/mmq/ds4_repack.cu:575`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/cuda/mmq/ds4_repack.cu:571`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool repack_hash_enabled(void) {
@@ -19300,7 +19300,7 @@ DS4_WS_REPACK_THREADS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/cuda/mmq/ds4_repack.cu:584`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/cuda/mmq/ds4_repack.cu:580`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int n = g_repack_threads;
@@ -20164,7 +20164,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.
         use_cuda_graph = false;
 ```
 
-Source: `engines/ds4/cuda/mmq/common.cuh:1208`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/cuda/mmq/common.cuh:1115`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 

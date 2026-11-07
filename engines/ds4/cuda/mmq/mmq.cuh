@@ -143,9 +143,6 @@ static constexpr __device__ int get_mmq_x_max_device() {
     return 128;
 #else // defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
 
-#if defined(GGML_USE_HIP)
-    return 64;
-#else // defined(GGML_USE_HIP)
 
 #if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
 #ifdef GGML_CUDA_FORCE_MMQ
@@ -157,18 +154,12 @@ static constexpr __device__ int get_mmq_x_max_device() {
     return 64;
 #endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
 
-#endif // defined(GGML_USE_HIP)
 #endif // defined(AMD_MFMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
 }
 
 static int get_mmq_y_host(const int cc) {
-#if defined(GGML_USE_HIP) && defined(DS4_HIP_MMQ_Y)
-    GGML_UNUSED(cc);
-    return DS4_HIP_MMQ_Y;
-#else
     return GGML_CUDA_CC_IS_AMD(cc) ? (GGML_CUDA_CC_IS_RDNA1(cc) ? 64 : 128) :
         ((GGML_CUDA_CC_IS_NVIDIA(cc) && ggml_cuda_highest_compiled_arch(cc) >= GGML_CUDA_CC_VOLTA) ? 128 : 64);
-#endif
 }
 
 static constexpr __device__ int get_iter_k([[maybe_unused]] const ggml_type type) {
@@ -181,23 +172,11 @@ if (type == GGML_TYPE_NVFP4 || type == GGML_TYPE_MXFP4) {
 }
 
 static constexpr __device__ int get_mmq_y_device() {
-#if defined(GGML_USE_HIP)
-#if defined(DS4_HIP_MMQ_Y)
-    return DS4_HIP_MMQ_Y;
-#else
-#if defined(RDNA1)
-    return 64;
-#else
-    return 128;
-#endif // defined RDNA1
-#endif // defined(DS4_HIP_MMQ_Y)
-#else
 #if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
     return 128;
 #else
     return 64;
 #endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
-#endif // defined(GGML_USE_HIP)
 }
 
 // Decouple shared memory tile sizes from WARP_SIZE to allow for different warp sizes.
@@ -325,27 +304,13 @@ static constexpr __device__ int mmq_get_granularity_device(const int /*mmq_x*/) 
 }
 #endif // AMD_MFMA_AVAILABLE
 
-#if defined(GGML_USE_HIP)
-static int mmq_get_nwarps_host(const int cc, const int warp_size) {
-#if defined(DS4_HIP_MMQ_Y)
-    return amd_mfma_available(cc) ? 8 : DS4_HIP_MMQ_Y/16;
-#else
-    return amd_mfma_available(cc) ? 8 : 256/warp_size;
-#endif
-}
-#else
 static int mmq_get_nwarps_host(const int /*cc*/, const int warp_size) {
     return 256/warp_size;
 }
-#endif // (GGML_USE_HIP)
 
 static constexpr __device__ int mmq_get_nwarps_device() {
 #if defined(AMD_MFMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
-#if defined(DS4_HIP_MMQ_Y)
-    return DS4_HIP_MMQ_Y/16;
-#else
     return 8;
-#endif
 #else
     return 256/ggml_cuda_get_physical_warp_size();
 #endif // AMD_MFMA_AVAILABLE
@@ -3704,22 +3669,6 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
     // only write-back is too late: stale or NaN tail blocks can contaminate
     // other values in the same hardware matrix fragment.
     const int valid_y_words = min(mmq_x, tile_y_max_j + 1) * MMQ_TILE_Y_K;
-#if defined(GGML_USE_HIP) && defined(__gfx1151__)
-    // Load scheduling can change fast-math accumulation order. Keep the
-    // established path outside the larger gfx1151 IQ2 prefill templates.
-    constexpr bool fast_y_loads = type == GGML_TYPE_IQ2_XXS && mmq_x >= 32;
-    const bool full_y_tile = tile_y_max_j >= mmq_x - 1;
-    const int linear_tid = threadIdx.y*warp_size + threadIdx.x;
-    constexpr int nthreads = nwarps * warp_size;
-
-    // Seed invalid columns once. Both K stages refresh only the valid prefix,
-    // and the existing barriers keep the suffix zero before every matrix op.
-    if (fast_y_loads && !full_y_tile) {
-        for (int l = valid_y_words + linear_tid; l < mmq_x * MMQ_TILE_Y_K; l += nthreads) {
-            tile_y[l] = 0;
-        }
-    }
-#endif
 
     float sum[mmq_x*mmq_y / (nwarps*warp_size)] = {0.0f};
 
@@ -3749,35 +3698,12 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
         }
         {
             const int * by0 = y + ncols_y * (kb0 * qk / ne_block) * sz;
-#if defined(GGML_USE_HIP) && defined(__gfx1151__)
-            if constexpr (fast_y_loads) {
-                if (full_y_tile) {
-#pragma unroll
-                    for (int l0 = 0; l0 < mmq_x * MMQ_TILE_Y_K; l0 += nthreads) {
-                        const int l = l0 + linear_tid;
-                        tile_y[l] = by0[l];
-                    }
-                } else {
-                    for (int l = linear_tid; l < valid_y_words; l += nthreads) {
-                        tile_y[l] = by0[l];
-                    }
-                }
-            } else {
-#pragma unroll
-                for (int l0 = 0; l0 < mmq_x * MMQ_TILE_Y_K; l0 += nwarps * warp_size) {
-                    int l = l0 + threadIdx.y*warp_size + threadIdx.x;
-
-                    tile_y[l] = l < valid_y_words ? by0[l] : 0;
-                }
-            }
-#else
 #pragma unroll
             for (int l0 = 0; l0 < mmq_x * MMQ_TILE_Y_K; l0 += nwarps * warp_size) {
                 int l = l0 + threadIdx.y*warp_size + threadIdx.x;
 
                 tile_y[l] = l < valid_y_words ? by0[l] : 0;
             }
-#endif
         }
 
         __syncthreads();
@@ -3788,35 +3714,12 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 
         {
             const int * by0 = y + ncols_y * ((kb0 * qk / ne_block) * sz + sz);
-#if defined(GGML_USE_HIP) && defined(__gfx1151__)
-            if constexpr (fast_y_loads) {
-                if (full_y_tile) {
-#pragma unroll
-                    for (int l0 = 0; l0 < mmq_x * MMQ_TILE_Y_K; l0 += nthreads) {
-                        const int l = l0 + linear_tid;
-                        tile_y[l] = by0[l];
-                    }
-                } else {
-                    for (int l = linear_tid; l < valid_y_words; l += nthreads) {
-                        tile_y[l] = by0[l];
-                    }
-                }
-            } else {
-#pragma unroll
-                for (int l0 = 0; l0 < mmq_x * MMQ_TILE_Y_K; l0 += nwarps * warp_size) {
-                    int l = l0 + threadIdx.y*warp_size + threadIdx.x;
-
-                    tile_y[l] = l < valid_y_words ? by0[l] : 0;
-                }
-            }
-#else
 #pragma unroll
             for (int l0 = 0; l0 < mmq_x * MMQ_TILE_Y_K; l0 += nwarps * warp_size) {
                 int l = l0 + threadIdx.y*warp_size + threadIdx.x;
 
                 tile_y[l] = l < valid_y_words ? by0[l] : 0;
             }
-#endif
         }
 
         __syncthreads();
@@ -3837,17 +3740,11 @@ static __device__ __forceinline__ void mul_mat_q_process_tile(
 // The mul_mat_q kernel implements "stream-k" work partitioning as described in https://arxiv.org/abs/2301.03598
 
 template <ggml_type type, int mmq_x, bool need_check>
-#if defined(GGML_USE_HIP)
-#if defined(RDNA4) || defined(RDNA3) || defined(RDNA2) || defined(CDNA) || defined(GCN)
-    __launch_bounds__(ggml_cuda_get_physical_warp_size()*mmq_get_nwarps_device(), 2)
-#endif // defined(RDNA4) || defined(RDNA3) || defined(RDNA2) || defined(CDNA) || defined(GCN)
-#else
 #if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
     __launch_bounds__(ggml_cuda_get_physical_warp_size()*mmq_get_nwarps_device(), 1)
 #else
     __launch_bounds__(ggml_cuda_get_physical_warp_size()*mmq_get_nwarps_device(), 2)
 #endif // __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
-#endif // defined(GGML_USE_HIP)
 static __global__ void mul_mat_q(
         const char * __restrict__ x, const int * __restrict__ y, const int32_t * __restrict__ ids_dst,
         const int32_t * __restrict__ expert_bounds, float * __restrict__ dst, float * __restrict__ tmp_fixup,
@@ -3887,7 +3784,7 @@ static __global__ void mul_mat_q(
     __syncthreads();
 
     // On non-CDNA AMD or old CUDA the performance with stream-k was worse, use conventional tiling instead:
-#if (defined(GGML_USE_HIP) && !defined(CDNA)) || __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
+#if __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
     {
         const uint2 tmp2 = fast_div_modulo(blockIdx.z, nchannels_y);
         const int wt = tmp2.x;
@@ -3948,7 +3845,7 @@ static __global__ void mul_mat_q(
              tile_x_max_i, tile_y_max_j, 0, blocks_per_ne00.z, x_soa, soa_blocks);
         return;
     }
-#endif // (defined(GGML_USE_HIP) && !defined(CDNA4) && !defined(CDNA3)) || __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
+#endif // __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA
 
     constexpr int ITER_K          = get_iter_k(type);
     constexpr int blocks_per_iter = ITER_K / qk;

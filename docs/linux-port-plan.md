@@ -1347,6 +1347,65 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
       Darwin/iOS/tvOS, and the visionOS definition in `ggml/src/CMakeLists.txt`. None of it is a
       backend, none of it is built here, and no chunk has claimed it.
 
+4.3a The engine's vendored mmq tier folds the same way. Done, one commit. `engines/ds4/cuda/mmq/`
+    is a copy of the same ggml CUDA tier (chunk 4.2's finding said so, and it was right about the
+    copy and wrong about the file it cited: `cuda/mmq/VENDOR.md` did not exist, although the
+    Makefile and `ds4_cuda.cu` both pointed at it - it is written now, and says what was pruned).
+    The engine's Makefile passes `-gencode arch=compute_120a,code=sm_120a -DDS4_CUDA_HAVE_MXF4=1`
+    and nothing else that reaches a preprocessor, so none of the names 4.2b pinned is defined here
+    either, and the same collapse applies: 18 tokens, 13 files, 426 deletions and 42 insertions to
+    a fixed point, plus `vendors/hip.h` (308 lines) deleted.
+    - Six `BLOCKED` nodes, resolved by hand to the branch nvcc had already kept, and they are the
+      same six shapes 4.2b met: the VMM guard, the flash-attention guard whose MUSA term sits
+      inside a negated group, the `ggml_cuda_hmax2` `#if` whose live branch is the `#elif`, the
+      `__hgt2_mask` guard spanning two physical lines, the `#elif defined(GGML_COMMON_IMPL_CUDA) ||
+      …_HIP || …_MUSA` in `ggml-common.h`, and mmq.cuh's `(GGML_USE_HIP && !CDNA) || __CUDA_ARCH__
+      < VOLTA` stream-k guard. 19 `#endif`/`#else` comments quoted conditions the pass had just
+      shortened and were rewritten, one of them (`mma.cuh`'s `#endif // defined(GGML_USE_HIP)`) a
+      comment that never matched its guard even upstream - it now names the three MMA macros that
+      guard does test.
+    - `MUSART_HMASK` goes, its last reader was the guard above it, exactly as in the llama tree.
+      Two `#undef`s go too: `ds4_ggml_stubs.h` disabled `GGML_HIP_GRAPHS` and `GGML_MUSA_GRAPHS`
+      beside `GGML_CUDA_USE_GRAPHS`, and `#undef` of a macro nothing defines is a no-op.
+    - Dead branches named two headers that are not in this checkout at all: `vendors/musa.h` (the
+      llama tree has one, the engine never did) and `../../ds4_rocm_memory.h`, included by the HIP
+      arm of the engine's own allocation pool. Both were invisible because the branch naming them
+      was dead; the pool's HIP arm, its mutex and its `ds4_rocm_allocation_fits()` call went with
+      it. No environment name moved: the tier's 23 `DS4_*` reads are all outside the folded
+      branches, so six rows had their `path:line` re-anchored and 2,150 rows stand.
+    Gate: `docs/evidence/collapse-probe.h` first (the tool's own equivalence, identical), then the
+    per-file `#if`/`#endif` balance over every `.cu`/`.cuh`/`.h` in the tier (no UNBALANCED line).
+    `scripts/port/cuda_live_equiv.py` grew `--include` and `--defs` for this tree - its include set
+    was the llama CUDA backend's, and the engine's build defines none of the `GGML_USE_*` names -
+    and over the 13 comparable paths it reports 0 differing live lines for the six that do not
+    resolve through `common.cuh`, exactly three for the six that do - the two `#undef`s and the
+    `#define MUSART_HMASK`, which are the intended deletions and all of them - and two for
+    `ds4_ggml_stubs.h`, which holds the `#undef`s but never sees the `#define`. `vendors/hip.h` is
+    reported as a deletion, not a sweep. The stronger check for a CUDA sweep is the machine code:
+    `cuobjdump --dump-sass` of the nine CUDA objects rebuilt at `sm_120` is byte-identical between
+    a baseline worktree and this tree except nvcc's content hash inside the internal-linkage kernel
+    names and one 16-bit immediate in 50 instantiations of `mul_mat_q` - the `__LINE__`
+    `no_device_code()` prints, which moved 3861 -> 3758, exactly the 103 lines the fold deleted
+    above it in `mmq.cuh`. `nm` symbol sets match with that hash normalised, and `-Wall -Wextra`
+    warnings are 40 occurrences and 16 kinds on both sides.
+    `make -B ds4 ds4-server ds4-bench ds4-eval ds4-agent CUDA_ARCH=sm_120` and
+    `make -B ds4-decode.so CUDA_ARCH=sm_120` exit 0; `./ds4 --help`, `./ds4 --metal` (unknown
+    option), `make test-batch-io` (io_uring matched pread, 64 MiB) and `make test-decode-library`
+    (19 entry points) pass.
+    `metal_word_census --strict` is unchanged over both trees, `envdocs --check` reads 2,150 with
+    `test_environment_contract` 11 tests OK, the Python suite reads 673 passed / 38 skipped with
+    `test_yoco` and the one moving process test failing - the same names the baseline has - and
+    `release_check` reports 0 findings.
+    Left, and not this chunk's: the AMD and Moore Threads compute-capability vocabulary, in this
+    directory and in the llama tree - `GGML_CUDA_CC_IS_CDNA`/`_RDNA`/`_MTHREADS`, the
+    `CDNA*`/`RDNA*`/`QY*`/`PH1` constants, and 210 mentions of `AMD_MFMA_AVAILABLE`/
+    `AMD_WMMA_AVAILABLE` here beside 381 in `ggml-cuda/`. Their guards key on `__CUDA_ARCH__`, which
+    is genuinely undefined for the host pass and defined for the device pass, so no collapse can
+    decide them; deleting them is deleting AMD kernel paths by hand. The engine's host layer has a
+    third layer of the same kind: 152 `#if`s on `DS4_ROCM_BUILD`, which no build of this fork
+    defines either, spread over `ds4.c` and nine other files - mechanical, and bigger than this
+    chunk, and the 78 `DS4_ROCM_*` rows would need a whole-tree reader scan before any of them go.
+
 5.1 Python orchestrator. Done in four commits: `270d7a9` (memory_counters reads
     /proc/meminfo, /proc/vmstat and /proc/swaps), `65e54bd` (journal.advisory_lock, the
     lease admission lock, and the nt-only branches in shutdown/config/preferences/process/

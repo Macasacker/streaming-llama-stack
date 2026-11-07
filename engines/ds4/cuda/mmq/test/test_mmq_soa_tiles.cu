@@ -30,11 +30,7 @@
 
 #include "ds4_mmq.h"
 
-#if defined(GGML_USE_HIP)
-#include "vendors/hip.h"
-#else
 #include <cuda_runtime.h>
-#endif
 
 // libds4mmq.a references this ds4_cuda.cu symbol from the q8-fold vec paths
 // (C3 Inc4); the entries under test never reach it, so a "no fold available"

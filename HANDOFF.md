@@ -17,7 +17,7 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-**Phase 4 and Phase 5 are closed, and Phase 7 has landed its first three commits.** Phase 3's producer CLI, its weight
+**Phase 4, Phase 5 and chunk 4.3a are done, and Phase 7 has landed its first three commits.** Phase 3's producer CLI, its weight
 fetcher, its native weight provider, its Engram row loader, its carry store and its locked RAM
 tier are Linux; the orchestrator (`slstack/`) has no `msvcrt` and no `CREATE_SUSPENDED`, the
 guardian caps its tree in the kernel, ULTRA and mode1 producers launch here, and resident
@@ -29,29 +29,32 @@ is a qualified GGUF, which this box does not have. Chunk 7.1a deleted the Mac an
 examples and Mac test sources and rewrote the front page for one Linux machine, 7.1b fixed the
 four suite names Phase 7 owned plus two scripts that still named `engines/ds4-win`, and 7.1c fixed
 the census gate the remaining text sweep needs and made the rewording chunk 4.1 had claimed but
-never did.
+never did. Chunk 4.3a folded the same HIP and MUSA branches out of the engine's vendored mmq tier,
+so no name that retired backend defines is left anywhere in `engines/ds4`.
 
-1. **Chunk 4.3 - the dead platform text the two 4.2 commits did not reach.** Two pieces, both
-   keyed on names no build of this fork defines, so both are the same mechanical fold 4.2b did:
-   (a) `engines/ds4/cuda/mmq/` - the engine's vendored copy of the ggml CUDA tier - carries 96
-   directive lines naming `GGML_USE_HIP`/`GGML_USE_MUSA`/`MUSART_*` across 11 files plus its own
-   `vendors/hip.h` (308 lines); its gates are the engine's, not llama's (the four hand-compiled
-   TUs, `make -C engines/ds4 cuda CUDA_ARCH=sm_120`, and the by-hand warning comparison in
-   `docs/linux-port-commands.md`), and `cuda/mmq/VENDOR.md` should say what was pruned from the
-   vendored copy. (b) the CUDA backend's AMD and Moore Threads compute-capability vocabulary,
-   described in the next paragraph.
-   Chunk 4.2 deleted
+1. **Chunk 4.3b - the dead platform text 4.3a could not reach.** Chunk 4.2 deleted
    `ggml-hip` and `ggml-musa`, which were the only things that ever defined `GGML_USE_HIP` and
-   `GGML_USE_MUSA`, and folded every branch keyed on those names. What is left is one layer
-   deeper and is not a collapse: `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, the
-   `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants, `AMD_MFMA_AVAILABLE`, `AMD_WMMA_AVAILABLE` and
-   the `RDNA*`/`CDNA*` guards in `common.cuh`, `mma.cuh`, `mmf.cuh`, `mmq.cuh`, `fattn-mma-f16.cuh`
-   and `ds4split-q4k-half-panel.cu`. Their guards' first term is `defined(RDNA3)` or
-   `__CUDA_ARCH__`, and `__CUDA_ARCH__` must stay unknown - it is genuinely undefined for the host
-   pass and defined for the device pass - so `collapse_conditionals` cannot decide any of them and
-   should not be told to. Deleting the vocabulary means deleting the AMD/MTHREADS kernel paths by
-   hand and proving the surviving kernels still compile at `sm_120a`; `mma.cuh`'s `#endif //
-   defined(GGML_USE_HIP)` comment has never matched its guard, upstream, and is part of that sweep.
+   `GGML_USE_MUSA`; 4.3a folded every branch keyed on those names, in the llama tree and in the
+   engine's copy of it. What is left is one layer deeper and is not a collapse:
+   `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, the `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants,
+   `AMD_MFMA_AVAILABLE` and `AMD_WMMA_AVAILABLE` and the `RDNA*`/`CDNA*` guards in `common.cuh`,
+   `mma.cuh`, `mmf.cuh`, `mmq.cuh`, `fattn-mma-f16.cuh` and `ds4split-q4k-half-panel.cu`, and the
+   same vocabulary in the engine's `cuda/mmq/` copies of three of those files - 210 mentions of the
+   two MMA macros there beside 381 in the llama tree. Their guards' first term is `defined(RDNA3)`
+   or `__CUDA_ARCH__`, and `__CUDA_ARCH__` must stay unknown - it is genuinely undefined for the
+   host pass and defined for the device pass - so `collapse_conditionals` cannot decide any of them
+   and should not be told to. Deleting the vocabulary means deleting the AMD/MTHREADS kernel paths
+   by hand and proving the surviving kernels still compile at `sm_120a`; the machine-code gate in
+   `docs/linux-port-commands.md` is how to prove it (identical SASS except nvcc's content hash and
+   the `__LINE__` in `no_device_code`). `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment, in
+   both copies, never matched its guard even upstream - 4.3a rewrote the engine's to name the three
+   MMA macros that guard does test, and the llama copy's is still the old text.
+   A third layer of the same kind is mechanical and unclaimed: 152 directives in the engine's host
+   layer key on `DS4_ROCM_BUILD`, which no build of this fork defines, across `ds4.c` and nine other
+   files (`collapse_conditionals` already lists it as a false platform macro, so the pass is one
+   command; `docs/linux-port-commands.md` has the engine gates). 78 `DS4_ROCM_*` rows would need the
+   whole-tree reader scan before any of them go, and most of those names are read through
+   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")`, which is live code that survives the fold.
    `GGML_ACCELERATE` and the Apple cmake logic in the llama tree (`ggml-cpu/CMakeLists.txt`'s APPLE
    branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants, `HAVE_BUGGY_APPLE_LINKER`,
    `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of leftover and belongs with it or

@@ -6268,7 +6268,7 @@
     "doc": "DS4_CUDA_NO_DIRECT_IO: advanced engine setting; built-in default retained",
     "reads": [
       "engines/ds4/ds4_cuda.cu:9143",
-      "engines/ds4/cuda/mmq/ds4_repack.cu:80"
+      "engines/ds4/cuda/mmq/ds4_repack.cu:76"
     ],
     "code_defaults": [
       {
@@ -6278,7 +6278,7 @@
         "consumer": "        }\n#if defined(__linux__) && defined(O_DIRECT)\n        if (getenv(\"DS4_CUDA_NO_DIRECT_IO\") == NULL) {\n            char proc_path[64];\n            snprintf(proc_path, sizeof(proc_path), \"/proc/self/fd/%d\", fd);\n            int direct_fd = open(proc_path, O_RDONLY | O_DIRECT);\n            if (direct_fd >= 0) {"
       },
       {
-        "source": "engines/ds4/cuda/mmq/ds4_repack.cu:80",
+        "source": "engines/ds4/cuda/mmq/ds4_repack.cu:76",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (getenv(\"DS4_CUDA_NO_DIRECT_IO\") == nullptr) {",
         "consumer": "    if (st.st_blksize > 1) m.direct_align = (uint64_t)st.st_blksize;\n#if defined(__linux__) && defined(O_DIRECT)\n    if (getenv(\"DS4_CUDA_NO_DIRECT_IO\") == nullptr) {\n        char proc_path[64];\n        snprintf(proc_path, sizeof(proc_path), \"/proc/self/fd/%d\", m.fd);\n        int direct_fd = open(proc_path, O_RDONLY | O_DIRECT);\n        if (direct_fd >= 0) {"
@@ -16817,11 +16817,11 @@
     ],
     "doc": "DS4_MMQ_D2R_STATS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/ds4/cuda/mmq/ds4_mmq_d2r.cu:37"
+      "engines/ds4/cuda/mmq/ds4_mmq_d2r.cu:33"
     ],
     "code_defaults": [
       {
-        "source": "engines/ds4/cuda/mmq/ds4_mmq_d2r.cu:37",
+        "source": "engines/ds4/cuda/mmq/ds4_mmq_d2r.cu:33",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *env = getenv(\"DS4_MMQ_D2R_STATS\");",
         "consumer": "    static int cached = -1;\n    if (cached < 0) {\n        const char *env = getenv(\"DS4_MMQ_D2R_STATS\");\n        cached = (env && env[0] == '1') ? 1 : 0;\n    }\n    return cached != 0;\n}"
@@ -16918,14 +16918,14 @@
     ],
     "doc": "DS4_MMQ_POOL_TRACE: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/ds4/cuda/mmq/ds4_ggml_stubs.cu:155"
+      "engines/ds4/cuda/mmq/ds4_ggml_stubs.cu:137"
     ],
     "code_defaults": [
       {
-        "source": "engines/ds4/cuda/mmq/ds4_ggml_stubs.cu:155",
+        "source": "engines/ds4/cuda/mmq/ds4_ggml_stubs.cu:137",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *value = getenv(\"DS4_MMQ_POOL_TRACE\");",
-        "consumer": "\nstatic bool ds4_pool_trace_enabled() {\n    const char *value = getenv(\"DS4_MMQ_POOL_TRACE\");\n    return value && value[0] == '1' && value[1] == '\\0';\n}\n\n#if !defined(GGML_USE_HIP)"
+        "consumer": "\nstatic bool ds4_pool_trace_enabled() {\n    const char *value = getenv(\"DS4_MMQ_POOL_TRACE\");\n    return value && value[0] == '1' && value[1] == '\\0';\n}\n\n/* Query backing separately from requested/used bytes. Async frees can leave"
       }
     ]
   },
@@ -21158,11 +21158,11 @@
     ],
     "doc": "DS4_WS_REPACK_HASH: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/ds4/cuda/mmq/ds4_repack.cu:575"
+      "engines/ds4/cuda/mmq/ds4_repack.cu:571"
     ],
     "code_defaults": [
       {
-        "source": "engines/ds4/cuda/mmq/ds4_repack.cu:575",
+        "source": "engines/ds4/cuda/mmq/ds4_repack.cu:571",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *rh = getenv(\"DS4_WS_REPACK_HASH\");",
         "consumer": "static bool repack_hash_enabled(void) {\n    if (g_repack_hash < 0) {\n        const char *rh = getenv(\"DS4_WS_REPACK_HASH\");\n        g_repack_hash = (rh && rh[0] == '1' && rh[1] == '\\0') ? 1 : 0;\n    }\n    return g_repack_hash == 1;\n}"
@@ -21180,11 +21180,11 @@
     ],
     "doc": "DS4_WS_REPACK_THREADS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/ds4/cuda/mmq/ds4_repack.cu:584"
+      "engines/ds4/cuda/mmq/ds4_repack.cu:580"
     ],
     "code_defaults": [
       {
-        "source": "engines/ds4/cuda/mmq/ds4_repack.cu:584",
+        "source": "engines/ds4/cuda/mmq/ds4_repack.cu:580",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *e = getenv(\"DS4_WS_REPACK_THREADS\");",
         "consumer": "    int n = g_repack_threads;\n    if (n <= 0) {\n        const char *e = getenv(\"DS4_WS_REPACK_THREADS\");\n        n = e && e[0] ? atoi(e) : 0;\n    }\n    if (n <= 0) {\n        unsigned hw = std::thread::hardware_concurrency();"
@@ -22366,7 +22366,7 @@
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:604",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1165",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6216",
-      "engines/ds4/cuda/mmq/common.cuh:1208"
+      "engines/ds4/cuda/mmq/common.cuh:1115"
     ],
     "defaults_by_scope": {
       "rtx-llama": "1"
@@ -22415,7 +22415,7 @@
         "consumer": "    // use ggml_backend_cuda_graphs_disable_push/pop for scoped runtime control.\n    static const bool cuda_graphs_disabled = [] {\n        const char *value=std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\");\n        return value && std::strcmp(value,\"0\")!=0;\n    }();\n    if (cuda_graphs_disabled || cuda_graphs_forced_disabled) {\n        use_cuda_graph = false;"
       },
       {
-        "source": "engines/ds4/cuda/mmq/common.cuh:1208",
+        "source": "engines/ds4/cuda/mmq/common.cuh:1115",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static const bool disable_cuda_graphs_due_to_env = (getenv(\"GGML_CUDA_DISABLE_GRAPHS\") != nullptr);",
         "consumer": "\n    bool is_enabled() const {\n        static const bool disable_cuda_graphs_due_to_env = (getenv(\"GGML_CUDA_DISABLE_GRAPHS\") != nullptr);\n        return !(disable_due_to_gpu_arch || disable_cuda_graphs_due_to_env);\n    }\n#endif\n};"

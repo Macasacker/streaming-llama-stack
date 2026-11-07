@@ -119,8 +119,6 @@
 
 // Cuda-graphs are explicitly disabled - ds4 manages its own streams.
 #undef GGML_CUDA_USE_GRAPHS
-#undef GGML_HIP_GRAPHS
-#undef GGML_MUSA_GRAPHS
 
 // GGML_EXTENSION: ggml-common.h provides the canonical definition. We leave
 // it undefined here so the vendored header's `#define GGML_EXTENSION

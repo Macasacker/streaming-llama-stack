@@ -11,10 +11,19 @@ change in `common.cuh` is compared against the `common.cuh` the before-side TU a
         engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh \
         engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu
 
+    python3 scripts/port/cuda_live_equiv.py build/wt-base . --defs _GNU_SOURCE,NDEBUG,DS4_CUDA_HAVE_MXF4=1 \
+        --include engines/ds4/cuda/mmq --include engines/ds4 \
+        engines/ds4/cuda/mmq/common.cuh
+
 `gcc -E -fdirectives-only` resolves conditionals without expanding macros, so `__LINE__` inside a
 `CUDA_CHECK` does not move the diff. `.cu` is preprocessed as C++ for the same reason - nothing is
 compiled here, only directives evaluated - and the CUDA and CCCL include directories are passed
 explicitly because the build passes them as `-isystem`, which this tool does not read.
+
+The include set and the `-D` list are the llama CUDA backend's by default because that is the tree
+this sweep usually touches. `--include` (repeatable, repo-relative so each side resolves inside its
+own tree) and `--defs` replace them for another CUDA tree - the engine's vendored `cuda/mmq/` tier,
+whose build defines none of the `GGML_USE_*` names.
 
 A `.cuh` fragment preprocesses on its own as long as its includes resolve; a file whose conditionals
 the compiler cannot settle (no `-DGGML_USE_CUDA` on a CPU-only build) is compared with those flags
@@ -37,10 +46,15 @@ def main():
     ap.add_argument("--cc", default="g++")
     ap.add_argument("--no-cuda-defines", action="store_true",
                     help="preprocess without -DGGML_USE_CUDA, for a CPU-only build's text")
+    ap.add_argument("--include", action="append", default=[],
+                    help="repo-relative include directory; replaces the derived llama set")
+    ap.add_argument("--defs", default="",
+                    help="comma-separated macros replacing the llama backend's -D list")
     ap.add_argument("files", nargs="+", help="paths relative to each tree's repo root")
     args = ap.parse_args()
 
-    defs = [d for d in DEFS if not args.no_cuda_defines or not d.startswith("-DGGML_USE_CUDA")]
+    defs = ["-D" + d for d in args.defs.split(",") if d] if args.defs else [
+        d for d in DEFS if not args.no_cuda_defines or not d.startswith("-DGGML_USE_CUDA")]
     tmp = os.path.join(ROOT, "build", "cuda-live-equiv")
     os.makedirs(tmp, exist_ok=True)
     bad = 0
@@ -54,14 +68,16 @@ def main():
             continue
         outs = []
         for label, tree in (("before", args.base), ("after", args.new)):
-            # The include set is the CUDA backend's own: its directory, ggml/src, ggml/include and
-            # the llama tree's include/, plus the CUDA and CCCL headers the build passes as
-            # -isystem. Each side resolves inside its own tree.
-            llama = os.path.join(tree, rel[:rel.index("prefill_llama.cpp") + len("prefill_llama.cpp")])
-            ggml = os.path.join(llama, "ggml")
-            inc = [f"-I{os.path.join(ggml, 'src', 'ggml-cuda')}", f"-I{os.path.join(ggml, 'src')}",
-                   f"-I{os.path.join(ggml, 'include')}", f"-I{os.path.join(llama, 'include')}",
-                   f"-I{args.cuda_include}", f"-I{args.cuda_include}/cccl"]
+            # Each side resolves inside its own tree. With no --include the set is the CUDA
+            # backend's own: its directory, ggml/src, ggml/include and the llama tree's include/,
+            # plus the CUDA and CCCL headers the build passes as -isystem.
+            inc = [f"-I{os.path.join(tree, d)}" for d in args.include]
+            if not args.include:
+                llama = os.path.join(tree, rel[:rel.index("prefill_llama.cpp") + len("prefill_llama.cpp")])
+                ggml = os.path.join(llama, "ggml")
+                inc += [f"-I{os.path.join(ggml, 'src', 'ggml-cuda')}", f"-I{os.path.join(ggml, 'src')}",
+                        f"-I{os.path.join(ggml, 'include')}", f"-I{os.path.join(llama, 'include')}"]
+            inc += [f"-I{args.cuda_include}", f"-I{args.cuda_include}/cccl"]
             out = os.path.join(tmp, f"{name}.{label}")
             cmd = [args.cc, "-E", "-fdirectives-only", "-P", "-x", "c++", *inc, *defs,
                    os.path.join(tree, rel), "-o", out]

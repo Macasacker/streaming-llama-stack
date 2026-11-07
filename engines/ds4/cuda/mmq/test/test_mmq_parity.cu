@@ -31,21 +31,12 @@
 // We DON'T use the host IQ2 lookup tables from this mode (they'd be
 // __device__).  iq2_host_tables.h instead provides plain host const
 // arrays generated directly from ggml-common.h's bit-for-bit contents.
-#if defined(GGML_USE_HIP)
-#define GGML_COMMON_DECL_HIP
-#define GGML_COMMON_IMPL_HIP
-#else
 #define GGML_COMMON_DECL_CUDA
 #define GGML_COMMON_IMPL_CUDA
-#endif
 #include "../ggml-common.h"
 
-#if defined(GGML_USE_HIP)
-#include "vendors/hip.h"
-#else
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
-#endif
 
 #include <algorithm>
 #include <cmath>
@@ -819,13 +810,8 @@ bool run_moe_pair_generic(
     // The pair path can choose a tighter tile width than two separate calls,
     // which changes accumulation order slightly. Repeated pair calls must
     // still be bit-identical to the first pair result.
-#if defined(GGML_USE_HIP)
-    constexpr float pair_atol = 2.0e-4f;
-    constexpr float pair_rtol = 1.0e-5f;
-#else
     constexpr float pair_atol = 0.0f;
     constexpr float pair_rtol = 0.0f;
-#endif
     const std::vector<float> ya_first(ya_pair.begin(), ya_pair.begin() + out_count);
     const std::vector<float> yb_first(yb_pair.begin(), yb_pair.begin() + out_count);
     bool ok_a = check_close(ya_first, ya_single, pair_atol, pair_rtol);

@@ -350,6 +350,114 @@ gcc -E -fdirectives-only -P -x c build/probe.h                 > build/probe-aft
 diff build/probe-before.i build/probe-after.i                  # prints nothing
 ```
 
+### Folding the same branches in the engine's vendored tier (chunk 4.3a)
+
+`engines/ds4/cuda/mmq/` is a copy of the ggml CUDA mmq tier, so it carries the same `GGML_USE_HIP`
+and `GGML_USE_MUSA` branches - and the engine's Makefile defines none of those names either. The
+token list is `docs/evidence/collapse-4.3-tokens.txt` (18 names, the ones that actually occur in
+that directory; the 4.2 list's HIP/MUSA sub-options that never appear there are not in it):
+
+```bash
+tok=$(cat docs/evidence/collapse-4.3-tokens.txt)
+files=$(find engines/ds4/cuda/mmq -name '*.cu' -o -name '*.cuh' -o -name '*.h' | grep -v vendors/ | sort)
+for pass in 1 2; do
+  TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+      --never-defined "$tok" --apply $files
+done   # pass 2 must report no edits; pass 3 too - promoting a #elif can leave a guard always true
+TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+    --never-defined "$tok" $files | grep -v "no edits, 0 blocked"
+# six BLOCKED nodes on the 4.3a tree, all resolved by hand: the VMM guard, the FLASH_ATTN guard
+# whose MUSA term is inside a negated group, the ggml_cuda_hmax2 #if whose live branch is the #elif,
+# the two-line __hgt2_mask guard, ggml-common.h's `#elif …IMPL_CUDA || …IMPL_HIP || …IMPL_MUSA`,
+# and mmq.cuh's `(GGML_USE_HIP && !CDNA) || __CUDA_ARCH__ < VOLTA`. Re-running the pass on a copy
+# of the parent tree and diffing that copy against the working tree shows only those hand edits -
+# do that to check you folded what the tool folded and nothing else:
+#   cp -r build/wt-base/engines/ds4/cuda/mmq build/43/base-mmq   # then --apply over the copy
+for f in $(git ls-files engines/ds4/cuda/mmq | grep -E '\.(cu|cuh|h)$'); do
+  b=$(grep -c "^[[:space:]]*#[[:space:]]*\(if\|ifdef\|ifndef\)" $f)
+  e=$(grep -c "^[[:space:]]*#[[:space:]]*endif" $f)
+  [ "$b" = "$e" ] || echo "UNBALANCED $f if=$b endif=$e"
+done
+python3 -B scripts/port/cuda_live_equiv.py build/wt-base . \
+    --defs _GNU_SOURCE,NDEBUG,DS4_CUDA_HAVE_MXF4=1 \
+    --include engines/ds4/cuda/mmq --include engines/ds4 \
+    $(git diff --name-only HEAD -- engines/ds4/cuda/mmq)
+# --include/--defs are what make this work on the engine: the default include set is the llama
+# CUDA backend's and its -D list defines GGML_USE_CUDA, which no engine build defines. Reads 0
+# differing live lines for the six paths that do not resolve through common.cuh and three for the
+# six that do - the two `#undef GGML_HIP_GRAPHS`/`GGML_MUSA_GRAPHS` lines and `MUSART_HMASK` - plus
+# two for ds4_ggml_stubs.h, which has the `#undef`s but not the `#define`.
+```
+
+For a CUDA sweep the machine code is the stronger gate, and it needs no GPU - compile only:
+
+```bash
+R=$PWD
+OBJS="cuda/mmq/ds4_ggml_stubs.o cuda/mmq/ds4_mmq.o cuda/mmq/ds4_mmq_d2r.o cuda/mmq/quantize.o \
+      cuda/mmq/mmid.o cuda/mmq/mmvq.o cuda/mmq/ds4_repack.o cuda/mmq/ds4_q4k_half.o ds4_cuda.o"
+for tag in before after; do
+  tree=$R; [ "$tag" = before ] && tree=$R/build/wt-base
+  (cd "$tree/engines/ds4" && rm -f $OBJS && make -j4 CUDA_ARCH=sm_120 $OBJS > $R/build/43/engine-$tag.log 2>&1)
+done
+# $R is spelled out because a relative log path from inside build/wt-base/engines/ds4 lands in
+# build/build/, and the failure then reads as a missing directory rather than a broken build.
+for o in ds4_ggml_stubs ds4_mmq ds4_mmq_d2r quantize mmid mmvq ds4_repack ds4_q4k_half; do
+  cuobjdump --dump-sass engines/ds4/cuda/mmq/$o.o | sed -E 's/_GLOBAL__N__[0-9a-f]+_/_H_/' > build/43/$o.a
+  cuobjdump --dump-sass build/wt-base/engines/ds4/cuda/mmq/$o.o | sed -E 's/_GLOBAL__N__[0-9a-f]+_/_H_/' > build/43/$o.b
+  printf "%-14s %s\n" "$o" "$(cmp -s build/43/$o.a build/43/$o.b && echo SASS-IDENTICAL || echo DIFFERS)"
+done
+# ds4_mmq is the only one that differs, and only in one immediate repeated across 50 instantiations
+# of mul_mat_q: that is the __LINE__ no_device_code() prints, so the difference must equal the
+# number of lines the fold deleted above it (3861 -> 3758 with 103 lines gone from mmq.cuh).
+# The `_GLOBAL__N__<hash>` prefix of every internal-linkage kernel name is nvcc's hash of the file
+# contents, so it always changes; normalise it before comparing, and compare `nm` output the same
+# way. ds4_cuda.o also carries `tmpxft_<pid>_..._ds4_cuda.cudafe1.cpp` in one symbol name.
+```
+
+The engine has no `compile_commands.json`, so `warning_profile.py` cannot cover it; compare the TUs
+by hand with the Makefile's own flags plus `-Wall -Wextra` (the Makefile passes neither, and the
+build itself is silent - 0 warnings either way - so the stricter flags are what make the comparison
+mean something). Compile each TU to its own log, because a shared log cannot attribute a warning to
+a TU, and never two trees at once into one scratch object - the first run of this lost two warnings
+to that race:
+
+```bash
+R=$PWD
+FLAGS="-O3 -g -lineinfo --use_fast_math -gencode arch=compute_120a,code=sm_120a \
+       -DDS4_CUDA_HAVE_MXF4=1 -Xcompiler -march=native -Xcompiler -pthread -Xcompiler -fPIC \
+       -Xcompiler -Wall -Xcompiler -Wextra"
+for tag in before after; do
+  tree=$R; [ "$tag" = before ] && tree=$R/build/wt-base
+  (cd "$tree/engines/ds4"
+   for o in cuda/mmq/ds4_ggml_stubs cuda/mmq/ds4_mmq_d2r cuda/mmq/quantize cuda/mmq/mmid \
+            cuda/mmq/mmvq cuda/mmq/ds4_repack cuda/mmq/ds4_q4k_half ds4_cuda; do
+     n=$(basename $o)
+     /opt/cuda/bin/nvcc $FLAGS -std=c++17 -Icuda/mmq -c -o $R/build/43/w-$tag-$n.o $o.cu \
+         2> $R/build/43/warn-$tag-$n.txt || echo "COMPILE FAILED $o" >> $R/build/43/warn-$tag-$n.txt
+   done)
+done
+for n in ds4_ggml_stubs ds4_mmq_d2r quantize mmid mmvq ds4_repack ds4_q4k_half ds4_cuda; do
+  grep 'warning:' build/43/warn-before-$n.txt | sed 's/^[^:]*:[0-9]*:[0-9]*: //' | sed -E 's/[0-9]+/N/g' | sort > build/43/w-b-$n
+  grep 'warning:' build/43/warn-after-$n.txt  | sed 's/^[^:]*:[0-9]*:[0-9]*: //' | sed -E 's/[0-9]+/N/g' | sort > build/43/w-a-$n
+  printf "%-14s before=%s after=%s\n" "$n" "$(wc -l < build/43/w-b-$n)" "$(wc -l < build/43/w-a-$n)"
+done
+# 40 occurrences and 16 kinds on both sides; no kind appears in one tree only. nvcc has no
+# --warnings option on CUDA 13, and each tree must be compiled sequentially: two trees writing the
+# same scratch object at once loses warnings from whichever one finished first.
+```
+
+Then link and run what the tier is for. The binaries are the gate a source edit has to reach, so
+rebuild them rather than trusting the ones from the previous session:
+
+```bash
+cd engines/ds4
+make -j4 -B ds4 ds4-server ds4-bench ds4-eval ds4-agent CUDA_ARCH=sm_120   # exit 0
+make -B ds4-decode.so CUDA_ARCH=sm_120                                     # exit 0, ~4 minutes
+./ds4 --help | head -3 && ./ds4 --metal -m /nonexistent                    # unknown option: --metal
+make test-batch-io        # BATCH_IO: PASS io_uring transport matched pread
+make test-decode-library  # DECODE_LIBRARY: PASS ./ds4-decode.so exports 19 entry points
+```
+
 ### The producer's platform layer, with no test target to run
 
 The producer CLI has no cmake test target, so chunk 3.1c proved its ported

@@ -269,7 +269,7 @@ namespace ggml_cuda_mma {
                 return -1;
             }
         }
-#endif // defined(GGML_USE_HIP)
+#endif // defined(AMD_MFMA_AVAILABLE) || defined(VOLTA_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
     };
 
     template <int I_, int J_>

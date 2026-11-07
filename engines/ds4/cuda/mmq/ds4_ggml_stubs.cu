@@ -9,13 +9,8 @@
 
 #include "common.cuh"   // pulls in ds4_ggml_stubs.h via redirect headers
 
-#if defined(GGML_USE_HIP)
-#include "vendors/hip.h"
-#include "../../ds4_rocm_memory.h"
-#else
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-#endif
 
 #include <chrono>
 #include <cstdio>
@@ -53,23 +48,10 @@ const ggml_cuda_device_info & ggml_cuda_info() {
         for (int i = 0; i < count; i++) {
             cudaDeviceProp p;
             CUDA_CHECK(cudaGetDeviceProperties(&p, i));
-#if defined(GGML_USE_HIP)
-            unsigned gfx_id = 0;
-            if (sscanf(p.gcnArchName, "gfx%x", &gfx_id) == 1) {
-                info.devices[i].cc = GGML_CUDA_CC_OFFSET_AMD + (int)gfx_id;
-            } else {
-                info.devices[i].cc = GGML_CUDA_CC_OFFSET_AMD + p.major * 0x100 + p.minor * 0x10;
-            }
-#else
             info.devices[i].cc                          = p.major * 100 + p.minor * 10;
-#endif
             info.devices[i].nsm                         = p.multiProcessorCount;
             info.devices[i].smpb                        = p.sharedMemPerBlock;
-#if defined(GGML_USE_HIP)
-            info.devices[i].smpbo                       = p.sharedMemPerBlock;
-#else
             info.devices[i].smpbo                       = p.sharedMemPerBlockOptin;
-#endif
             info.devices[i].integrated                  = p.integrated != 0;
             info.devices[i].vmm                         = false;
             info.devices[i].vmm_granularity             = 0;
@@ -156,7 +138,6 @@ static bool ds4_pool_trace_enabled() {
     return value && value[0] == '1' && value[1] == '\0';
 }
 
-#if !defined(GGML_USE_HIP)
 /* Query backing separately from requested/used bytes. Async frees can leave
  * backing retained by the default pool, outside logical allocation totals.
  * These observations do not synchronize, trim or configure the allocator. */
@@ -195,60 +176,15 @@ static void ds4_pool_trace(const char *phase, int device, cudaStream_t stream,
         status[0], status[1], status[2], status[3]);
     fflush(stderr);
 }
-#endif
 
 struct ds4_naive_pool : public ggml_cuda_pool {
     int device;
 
     explicit ds4_naive_pool(int device) : device(device) {}
 
-#if defined(GGML_USE_HIP)
-    struct cached_block {
-        void *ptr;
-        size_t size;
-        cudaStream_t stream;
-    };
-
-    std::mutex mutex;
-    std::vector<cached_block> available;
-    std::vector<void *> owned;
-#endif
 
     void * alloc(size_t size, size_t * actual_size) override {
         ggml_cuda_set_device(device);
-#if defined(GGML_USE_HIP)
-        {
-            std::lock_guard<std::mutex> guard(mutex);
-            size_t best = available.size();
-            for (size_t i = 0; i < available.size(); i++) {
-                if (available[i].stream != t_ds4_pool_stream ||
-                    available[i].size < size) {
-                    continue;
-                }
-                if (best == available.size() ||
-                    available[i].size < available[best].size) {
-                    best = i;
-                }
-            }
-            if (best != available.size()) {
-                const cached_block block = available[best];
-                available[best] = available.back();
-                available.pop_back();
-                if (actual_size) *actual_size = block.size;
-                return block.ptr;
-            }
-        }
-
-        void * ptr = nullptr;
-        CUDA_CHECK(ds4_rocm_allocation_fits(size) ? hipSuccess : hipErrorOutOfMemory);
-        CUDA_CHECK(cudaMallocAsync(&ptr, size, t_ds4_pool_stream));
-        {
-            std::lock_guard<std::mutex> guard(mutex);
-            owned.push_back(ptr);
-        }
-        if (actual_size) *actual_size = size;
-        return ptr;
-#else
         void * ptr = nullptr;
         const auto pool_t0 = std::chrono::steady_clock::now();
         struct pool_timer { std::chrono::steady_clock::time_point t0; ~pool_timer() {
@@ -271,16 +207,11 @@ struct ds4_naive_pool : public ggml_cuda_pool {
         CUDA_CHECK(result);
         if (actual_size) *actual_size = size;
         return ptr;
-#endif
     }
 
     void free(void * ptr, size_t size) override {
         if (!ptr) return;
         ggml_cuda_set_device(device);
-#if defined(GGML_USE_HIP)
-        std::lock_guard<std::mutex> guard(mutex);
-        available.push_back({ptr, size, t_ds4_pool_stream});
-#else
         const auto pool_t0 = std::chrono::steady_clock::now();
         struct pool_timer { std::chrono::steady_clock::time_point t0; ~pool_timer() {
             ++g_ds4_pool_calls; g_ds4_pool_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); } } pool_timing{pool_t0};
@@ -288,16 +219,8 @@ struct ds4_naive_pool : public ggml_cuda_pool {
         const cudaError_t result = cudaFreeAsync(ptr, t_ds4_pool_stream);
         ds4_pool_trace("MMQ-free-after", device, t_ds4_pool_stream, ptr, size, size, result);
         CUDA_CHECK(result);
-#endif
     }
 
-#if defined(GGML_USE_HIP)
-    ~ds4_naive_pool() override {
-        ggml_cuda_set_device(device);
-        (void)cudaDeviceSynchronize();
-        for (void *ptr : owned) (void)cudaFree(ptr);
-    }
-#endif
 };
 
 } // anonymous namespace
@@ -329,15 +252,11 @@ extern "C" int ds4_mmq_pool_test_free(void *pool, void *ptr, size_t bytes, void 
 
 extern "C" int ds4_mmq_pool_test_stats(int device, uint64_t stats[4]) {
     if (!ds4_pool_fixture_enabled() || !stats) return 0;
-#if !defined(GGML_USE_HIP)
     cudaMemPool_t pool;
     int status[4];
     if (ds4_pool_statistics(device, &pool, stats, status) != cudaSuccess) return 0;
     for (unsigned i = 0; i < 4; ++i) if (status[i] != (int)cudaSuccess) return 0;
     return 1;
-#else
-    return 0;
-#endif
 }
 
 extern "C" int ds4_mmq_pool_test_destroy(void *pool) {
