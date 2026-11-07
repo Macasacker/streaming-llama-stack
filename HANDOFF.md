@@ -288,7 +288,10 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   `provider-lease-selftest.cpp` is 3.1f's lease program (14 checks through the public `inspect()`
   with no backend), `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait rule,
   and `cuda-headroom-probe.cpp` is the two-call answer to "can this box make a CUDA context right
-  now", which every CUDA gate in `docs/linux-port-commands.md` should be read against. Chunk 3.1g's program is not under `docs/evidence/` but in the test directory -
+  now", which every CUDA gate in `docs/linux-port-commands.md` should be read against. Chunk 5.2's
+  `producer-launch-gate.py` is there too, and is run in place rather than copied to `build/`:
+  `rm -rf build/smoke/out && mkdir -p build/smoke/out && python3 -B docs/evidence/producer-launch-gate.py`.
+  Chunk 3.1g's program is not under `docs/evidence/` but in the test directory -
   `tests/dsv41_engram_early_io.cpp`, ported with the loader, 15 checks over a 208 MB synthetic table
   file, no GPU and no model - and chunk 3.1h's two are there too (`tests/dsv41_carry_release.cpp`,
   which was red before the change, and `tests/pinned_carry_memory.cpp`), because the tier is engine

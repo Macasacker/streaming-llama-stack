@@ -161,8 +161,13 @@ against an 8 MiB `RLIMIT_MEMLOCK` on this box, with the shortfall logged as
 `SetProcessWorkingSetSizeEx` in `combo_ram.py` and `working_set.py` has no Linux equivalent yet:
 model it as cgroup v2 `memory.min` on the child's scope (page-multiple writes - the kernel rounds
 and splits the VMA at the lock boundary), and `LockedRam`'s named section as `shm_open`/`mmap` plus
-`mlock`. That is chunk 5.3, behind 5.2, because both functions take the suspended-handle object
-`_Native` creates.
+`mlock`. That is chunk 5.3: chunk 5.2 landed the runner, so both functions are reachable here and
+refuse only inside `kernel_api()`, and the handle they take (`job.pi.process`) is gone - the Linux
+`_Job` exposes `pid` and `scope` instead. Two things it has to settle first: `memory.min` on the
+scope the producer *inherits* also raises the floor of the guardian's own tree, so the producer may
+need a scope of its own and the guardian may have to delegate `memory` to it; and 5.2's volume rule
+refuses a RAM-backed filesystem, which is what `/dev/shm` is, so `LockedRam`'s named section either
+moves off tmpfs or that rule gets scoped to producer paths.
 
 ### Process guard
 
