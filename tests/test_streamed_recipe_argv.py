@@ -4,8 +4,11 @@ import subprocess
 import sys
 from types import SimpleNamespace
 import unittest
-from studio.streamed_lora_argv import streamed_lora_train_argv
 from slstack.config import ROOT
+from slstack.native_broker import vendor
+
+vendor()
+from studio.streamed_lora_argv import streamed_lora_train_argv
 
 
 class StreamedRecipeArgvTests(unittest.TestCase):
@@ -32,8 +35,14 @@ class StreamedRecipeArgvTests(unittest.TestCase):
 
     def test_studio_generated_argv_is_accepted_by_the_existing_trainer_parser(self):
         argv = self.build(self.config())
+        # The launcher hands the trainer a PYTHONPATH over the stack and the vendored
+        # engines tree (envvars' library_pythonpath), which is what makes
+        # `cosmos_windows` importable there. Without it the parser check would be
+        # testing an import failure instead of the argv.
+        env = {**os.environ, 'PYTHONPATH': os.pathsep.join((str(ROOT), str(ROOT / 'vendor' / 'engines')))}
         result = subprocess.run([argv[0], '-X', 'utf8', '-B', *argv[1:], '--help'],
             cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=20,
+            env=env,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('--no-prefix-cache', argv)

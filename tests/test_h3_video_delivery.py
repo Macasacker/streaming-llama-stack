@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -41,10 +42,24 @@ class VideoHttpTests(unittest.TestCase):
             server.shutdown();server.server_close();thread.join(2)
 
     def test_ready_marker_cannot_hide_changed_or_unverified_tools(self):
+        if os.name != 'nt':
+            self.skipTest('the setup-owned FFmpeg marker is the Windows arm; the PATH arm is checked below')
         root=Path(tempfile.mkdtemp());tools=media_tools.directory(root);tools.mkdir(parents=True)
         for name in ('ffmpeg','ffprobe'):(tools/(name+'.exe')).write_bytes(b'fixture')
         (tools.parent/'installed.json').write_text(json.dumps(dict(archive_sha256=media_tools.SHA256,files={})))
         self.assertFalse(media_tools.install(root,check=True)['ready'])
+
+    def test_the_posix_arm_reports_path_tools_and_never_a_windows_marker(self):
+        # A marker written by a Windows install must not make a Linux run ready, and
+        # must not make it unready either: on this platform the tools are PATH's.
+        root=Path(tempfile.mkdtemp());tools=media_tools.directory(root);tools.mkdir(parents=True)
+        (tools.parent/'installed.json').write_text(json.dumps(dict(archive_sha256=media_tools.SHA256,files={})))
+        with patch('shutil.which',return_value=None):
+            self.assertFalse(media_tools.install(root,check=True)['ready'])
+        with patch('shutil.which',side_effect=lambda name:'/usr/bin/'+name):
+            result=media_tools.install(root,check=True)
+        self.assertTrue(result['ready'])
+        self.assertEqual(set(result['tools']),{'ffmpeg','ffprobe'})
 
 
 class H3AdapterTests(unittest.TestCase):

@@ -167,7 +167,7 @@ def stage(args):
     for index,path in enumerate([*args.measurements,args.native_baseline,*args.alternating]):
         copy(path,f'qualification/measurement-{index+1}.json')
     result=relocate_runtime(cfg,installed,revision)
-    preset=dict(name='DSV4.1 1017 (RTX: ULTRA prefill \u2192 ds4-win decode)',mode='local',mac={},include_previous_reasoning=True,
+    preset=dict(name='DSV4.1 1017 (RTX: ULTRA prefill \u2192 ds4 decode)',mode='local',include_previous_reasoning=True,
         rtx=dict(backend='ds4',model='deepseek-reasoner',model_path=cfg['model'],ctx=cfg['context'],
             ds4_binary=str(installed/'ds4-server'),ds4_chdir=str(installed),ds4_ssd_streaming='1',ds4_cache_experts='24GB',
             prefill_chunk=cfg['native_prefill_chunk'],ds4_cache_affinity_bias=0,

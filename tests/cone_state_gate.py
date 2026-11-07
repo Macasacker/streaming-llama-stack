@@ -58,7 +58,7 @@ def main():
     forced=[int(t) for t in args.forced_ids.split(',')]
     if not forced or len(forced)>8 or any(t<0 or t>=129280 for t in forced):raise ValueError('Use1..8 native vocabulary IDs')
     out=Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True)
-    result=dict(status='INCOMPLETE',scope='single vs paired RTX producer state; actual Mac import/recall requires separate WebUI proof',
+    result=dict(status='INCOMPLETE',scope='single-engine vs native-export producer state on one RTX; live broker import and WebUI recall are a separate gate',
                 prompt_tokens=len(tokens),tokens_sha256=hashlib.sha256(raw).hexdigest(),yoco_keep=2541,
                 forced_ids=forced,arms={})
     try:

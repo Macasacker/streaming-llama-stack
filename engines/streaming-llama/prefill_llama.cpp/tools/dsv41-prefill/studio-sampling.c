@@ -1,5 +1,5 @@
 /* Derived from vendored ds4.c; original MIT license retained at engines/ds4/LICENSE.
- * Source SHA-256: d25b29076ab04530217d41a266256b0890dca8e97db98bea15aa3614ee0f1cc7. Refresh with scripts/export_ds4_sampling.py.
+ * Source SHA-256: 326ff4fca96040e45749271713ef4aeebda4234ef9a67be2c61a5daeb46d5edc. Refresh with scripts/export_ds4_sampling.py.
  * Shared Studio/native sampler: temperature, top-k, top-p, min-p and seeded RNG.
  */
 #include <stdbool.h>

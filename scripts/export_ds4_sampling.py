@@ -7,7 +7,7 @@ from pathlib import Path
 import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
-source = ROOT / 'engines/ds4-win/ds4.c'
+source = ROOT / 'engines/ds4/ds4.c'
 text = source.read_text(encoding='utf-8')
 def function(name):
     import re
@@ -19,7 +19,7 @@ def function(name):
 names = ['sample_rng_next', 'sample_rng_f32', 'sample_candidate_cmp_desc',
          'sample_candidate_gt', 'sample_heap_sift_up', 'sample_heap_sift_down',
          'sample_fast_top_p', 'sample_full_vocab', 'sample_top_p_min_p']
-out = '''/* Derived from vendored ds4.c; original MIT license retained at engines/ds4-win/LICENSE.
+out = '''/* Derived from vendored ds4.c; original MIT license retained at engines/ds4/LICENSE.
  * Source SHA-256: SOURCE_HASH. Refresh with scripts/export_ds4_sampling.py.
  * Shared Studio/native sampler: temperature, top-k, top-p, min-p and seeded RNG.
  */

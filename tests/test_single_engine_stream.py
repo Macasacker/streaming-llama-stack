@@ -119,7 +119,7 @@ class SingleEngineStreamTests(unittest.TestCase):
         threading.Thread(target=upstream.serve_forever, daemon=True).start()
         engines = Engines.__new__(Engines)
         engines.cfg = {**self.cfg, 'ds4_url': f'http://127.0.0.1:{upstream.server_port}', '_control_token': 'tok',
-                       'serving': 'single_engine', 'mac': None}
+                       'serving': 'single_engine'}
         engines.remote = None
         engines.select = lambda model: None
         engines.ready = lambda: None

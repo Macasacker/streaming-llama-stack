@@ -40,17 +40,17 @@ def test_preset_self_check_uses_intercepts():
 
 def _runtime():
     rows=dict(ultra=dict(r_native_tok_s=266.157,r_stream_tok_s=1151.0,switch_seconds=13.21,native_intercept_s=14.502,stream_fixed_s=20.0,
-                         llama_producer='direct3.exe',producer_sha256='a'*64,
+                         llama_producer='direct3.bin',producer_sha256='a'*64,
                          combo_qualification_root='qual-ultra',combo_native_binding='qual-ultra/native-parity-binding.json'),
               fast=dict(r_native_tok_s=266.157,r_stream_tok_s=800.0,switch_seconds=13.21,native_intercept_s=14.502,stream_fixed_s=20.0,
-                        llama_producer='fast.exe',producer_sha256='b'*64,
+                        llama_producer='fast.bin',producer_sha256='b'*64,
                         combo_qualification_root='qual-fast',combo_native_binding='qual-fast/native-parity-binding.json'))
     for row in rows.values():row['combo_crossover_tokens']=owner_crossover(row['r_native_tok_s'],row['r_stream_tok_s'],
         row['switch_seconds'],row['native_intercept_s'],row['stream_fixed_s'])
     base=['-m','m.gguf','--port','8080','--ctx','262144','--cuda']
     # A stale global N*/producer from an earlier preset must never survive a launch.
     return dict(studio_expected_args=base,combo_crossover_profiles=rows,combo_crossover_tokens=1,
-                producer_profile='ultra',llama_producer='stale.exe',producer_sha256='c'*64),base,rows
+                producer_profile='ultra',llama_producer='stale.bin',producer_sha256='c'*64),base,rows
 
 def test_active_preset_selects_its_own_n_star_and_producer():
     from slstack.combo_proxy import native_launch_config
@@ -66,7 +66,7 @@ def test_active_preset_selects_its_own_n_star_and_producer():
         assert launched['producer_profile']==profile
         seen[profile]=n
     assert seen['ultra']!=seen['fast']
-    assert cfg['combo_crossover_tokens']==1 and cfg['llama_producer']=='stale.exe'   # launch config is a copy
+    assert cfg['combo_crossover_tokens']==1 and cfg['llama_producer']=='stale.bin'   # launch config is a copy
 
 def test_profile_runtime_refuses_launch_without_preset_crossover():
     from slstack.combo_proxy import native_launch_config

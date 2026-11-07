@@ -1,4 +1,4 @@
-"""The paired exporter must use the actual single-engine prefill configuration."""
+"""The native-export producer path must use the actual single-engine prefill config."""
 from slstack.combo_producer import prefill_arguments
 
 
@@ -9,7 +9,7 @@ CFG = dict(context=1000001, producer_profile='ultra', yoco_keep=2541,
            ctx_cache_precision='f32', ctx_cache_growable=True)
 
 
-def test_paired_and_single_share_every_prefill_flag_except_required_capture():
+def test_native_export_and_single_share_every_prefill_flag_except_required_capture():
     for count in (49787, 198287):
         single, plan = prefill_arguments(CFG, count, 24 << 30)
         paired, peer_plan = prefill_arguments(CFG, count, 24 << 30, export_state=True)
@@ -33,16 +33,10 @@ def test_50k_uses_one_folded_sweep_and_no_warmup():
 
 
 def test_desktop_reserve_is_512mib_and_runtime_floor_is_half():
-    from unittest.mock import patch
     from slstack.config import load
-    from slstack.mac import budget
     cfg = load(overrides={'gpu_uuid': 'GPU-test'})
     assert cfg['producer_desktop_reserve_gib'] == .5 and cfg['min_available_gib'] == .5
     assert cfg['runtime_min_free_gib'] == 0.5
-    with patch('slstack.memory_counters.available_physical_bytes', return_value=int(400.5*2**30)):
-        mac = budget({**cfg, 'mac_host_budget_gib': 400})
-    assert mac['host_budget_gib'] == 400 and mac['min_available_gib'] == .5
-    assert mac['runtime_min_free_gib'] == 0.5
 
 def test_broker_reads_actual_progress_before_cold_producer_ready():
     from slstack.native_broker import OwnedProducer

@@ -6,6 +6,9 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+# The streamed trainer lives in the vendored engines tree, which is how the launcher
+# puts it on a worker's PYTHONPATH (slstack/envvars.py's library_pythonpath).
+MEDIA_PYTHONPATH = os.pathsep.join((str(ROOT), str(ROOT / 'vendor' / 'engines')))
 
 
 class Dsv41RecipeTests(unittest.TestCase):
@@ -13,6 +16,7 @@ class Dsv41RecipeTests(unittest.TestCase):
         result = subprocess.run([sys.executable, '-X', 'utf8', '-B', '-m', 'cosmos_windows.gguf_qat.train_gguf_lora_streamed',
                                  '--arch', 'deepseek41', '--gguf', 'TEST-not-loaded.gguf', '--help'],
                                 cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace',
+                                env={**os.environ, 'PYTHONPATH': MEDIA_PYTHONPATH},
                                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         self.assertEqual(result.returncode, 0, result.stderr)
 
