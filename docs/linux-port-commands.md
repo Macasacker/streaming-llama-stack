@@ -198,35 +198,57 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
 # 0 hits
 ```
 
-### The ggml backend prune (chunk 4.1)
+### The ggml backend prune (chunks 4.1 and 4.2)
 
 The gate is that cmake offers no backend but CUDA and CPU, in both flag sets, and that the CUDA
 half of this fork still builds. `build.sh llama`'s flags are the ones that matter - they add
 CUTLASS and `-DGGML_CUDA_DSV41_SPLIT_F32=ON`, and `ggml-common.h` is included by the CUDA kernels.
-Neither command below passes any backend option other than `-DGGML_CUDA=ON`:
+Neither command below passes any backend option other than `-DGGML_CUDA=ON`. The second is the
+plain set, into its own directory so the CUTLASS build survives it; `tests/`, `examples/`
+(no `CMakeLists.txt` left in it) and `pocs/` do not exist in this fork, so without the two
+`LLAMA_BUILD_*` flags cmake fails on `add_subdirectory` - it did at the parent commit too.
 
 ```bash
 llama=engines/streaming-llama/prefill_llama.cpp
-root=$PWD
+mkdir -p build/cutlass-v3.9.2
+test -f build/cutlass-v3.9.2/include/cutlass/gemm/warp/mma_tensor_op_fast_f32.h ||
+  git clone --quiet --depth 1 --branch v3.9.2 https://github.com/NVIDIA/cutlass build/cutlass-v3.9.2
 cmake -G Ninja -S "$llama" -B build/llama -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF \
     -DGGML_CUDA=ON -DGGML_BACKEND_DL=OFF -DBUILD_SHARED_LIBS=OFF \
+    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_OPENSSL=OFF \
     -DLLAMA_DSV41_OFFLINE_PRODUCER=ON -DLLAMA_DSV41_NATIVE_HALF_PROFILES=ON \
-    -DCMAKE_CUDA_ARCHITECTURES=120a
-cmake --build build/llama --parallel 6      # 210 targets, exit 0
+    -DLLAMA_DSV41_JSON_INCLUDE_DIR="$llama/vendor" \
+    -DCMAKE_CUDA_ARCHITECTURES=120a -DGGML_BACKEND_DL=OFF \
+    -DGGML_CUDA_DSV41_SPLIT_F32=ON -DGGML_CUDA_CUTLASS_PATH="$PWD/build/cutlass-v3.9.2"
+cmake --build build/llama --parallel 8      # 489 edges from scratch, exit 0
+cmake -G Ninja -S "$llama" -B build/llama-plain -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF \
+    -DGGML_CUDA=ON -DGGML_BACKEND_DL=OFF -DBUILD_SHARED_LIBS=OFF \
+    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_OPENSSL=OFF \
+    -DLLAMA_DSV41_OFFLINE_PRODUCER=ON -DLLAMA_DSV41_NATIVE_HALF_PROFILES=ON \
+    -DLLAMA_DSV41_JSON_INCLUDE_DIR="$llama/vendor" -DCMAKE_CUDA_ARCHITECTURES=120a
+cmake --build build/llama-plain --parallel 8   # 489 edges, no CUTLASS and no split-F32, exit 0
+grep -oE "\-DGGML_USE_[A-Z_]+" build/llama/compile_commands.json | sort -u
+# GGML_USE_CPU, GGML_USE_CPU_REPACK, GGML_USE_CUDA, GGML_USE_LLAMAFILE, GGML_USE_OPENMP - and
+# nothing else. That list is the premise of every backend collapse: a GGML_USE_* name outside it
+# is a macro no compiler of this fork resolves.
 ./build/llama/bin/llama-dsv41-prefill --check-native-profiles
+./build/llama-plain/bin/llama-dsv41-prefill --check-native-profiles
 ./build/llama/bin/llama-server --list-devices
 ```
 
 `--list-devices` is the CUDA check that costs almost no VRAM: it initializes the runtime and asks
 the device for its name and memory, so it works while Strata holds the rest. It reads
-`CUDA0: NVIDIA GeForce RTX 5090 (32193 MiB, 359 MiB free)`.
+`CUDA0: NVIDIA GeForce RTX 5090 (32193 MiB, 298 MiB free)`. Run the headroom probe below in the
+same session as it.
 
 The env table is part of this gate, because deleting a backend deletes its `getenv` sites:
 
 ```bash
+python3 -B scripts/port/drop_rows.py --names build/42/dropped-names-42.json --keep
+python3 -B scripts/port/drop_rows.py --names build/42/dropped-names-42.json --apply
 python3 -B scripts/port/reanchor_env_reads.py --apply   # reads are anchored to path:line
 python3 -B -m slstack.envdocs --refresh-defaults
-python3 -B -m slstack.envdocs --check                   # 2162 documented variables
+python3 -B -m slstack.envdocs --check                   # 2,150 documented variables
 python3 -B -m unittest tests.test_environment_contract  # 11 tests, OK
 ```
 
@@ -270,12 +292,62 @@ python3 scripts/port/preprocess_equiv.py --cc g++ --extra \
 # line is inside #ifndef GGML_USE_CUDA, so a reword there cannot reach the compiled text. Drop
 # -DGGML_USE_CUDA and the same command reports exactly the one intended message line.
 python3 scripts/port/metal_word_census.py --strict engines/streaming-llama/prefill_llama.cpp
-# IDENTIFIER 1, STRING 3, COMMENT 51 lines as of chunk 7.1c. --strict fails, and correctly so:
-# the census used to keep reading a line comment as open after the newline, so any identifier on
-# a later line was filed as COMMENT and IDENTIFIER 0 was not evidence. The one identifier is
-# USE_METAL_GUEST_SUPPORTS_OP in ggml/src/ggml-virtgpu/ggml-remoting.h, a backend tree no cmake
-# option builds any more - chunk 4.2's to delete. The 51 comment lines and 3 printed strings are
-# the Mac peer's measurement history, which chunk 7.1 still owes.
+# IDENTIFIER 0, STRING 3, COMMENT 51 lines and --strict passes as of chunk 4.2: the one
+# code-position mention, USE_METAL_GUEST_SUPPORTS_OP in ggml/src/ggml-virtgpu/ggml-remoting.h, went
+# with that tree. Chunk 7.1c recorded STRING 4 here - re-extracting the tree at 050e0b1 and running
+# the fixed census reads 3, so a mention count and a line count were mixed up. The 51 comment lines
+# and 3 printed strings are the Mac peer's measurement history plus the ten retired-backend
+# mentions 4.2 left in comment position, which is chunk 7.1e's.
+```
+
+### Folding the branches the deleted backends defined (chunk 4.2b)
+
+`ggml-hip` and `ggml-musa` compiled `../ggml-cuda/*.cu` themselves, so the CUDA backend's
+`GGML_USE_HIP`/`GGML_USE_MUSA` branches became undecidable-by-compiler text the moment those trees
+went. The collapse is the same tool as everywhere else, run to a fixed point:
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+tok=$(cat docs/evidence/collapse-4.2-tokens.txt)
+files=$(find $llama/ggml/src/ggml-cuda -name '*.cu' -o -name '*.cuh' -o -name '*.h' | sort)
+for pass in 1 2; do
+  TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+      --never-defined "$tok" --apply $files $llama/ggml/src/ggml-common.h $llama/ggml/include/ggml-cuda.h
+done   # pass 2 must report "no edits"; promoting a #elif can leave a guard that is then always true
+TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+    --never-defined "$tok" $files $llama/ggml/src/ggml-common.h $llama/ggml/include/ggml-cuda.h
+# whatever it still prints as BLOCKED is the manual work: eight nodes here, each of them a
+# condition whose first term is a comparison the tool will not simplify across (the two VMM
+# guards, the negated `!(defined(GGML_USE_MUSA) && __MUSA_ARCH__ < 220)`, the two-line
+# __hgt2_mask guard, the hmax2 #if whose live branch is the #elif, and the two
+# `(defined(GGML_USE_HIP) && !defined(CDNA)) || __CUDA_ARCH__ < GGML_CUDA_CC_VOLTA` guards).
+for f in $(find $llama/ggml/src/ggml-cuda -name '*.cu' -o -name '*.cuh' -o -name '*.h'); do
+  b=$(grep -c "^[[:space:]]*#[[:space:]]*\(if\|ifdef\|ifndef\)" $f)
+  e=$(grep -c "^[[:space:]]*#[[:space:]]*endif" $f)
+  [ "$b" = "$e" ] || echo "UNBALANCED $f if=$b endif=$e"
+done   # a collapse that promotes an #elif and drops its #endif shows up here, nowhere else
+git diff -U0 -- $llama/ggml | grep '^+[^+]' | sort | uniq -c
+# every insertion is a guard line the compiler had already resolved; read each one.
+python3 scripts/port/cuda_live_equiv.py build/wt-base . $(git diff --name-only HEAD -- $llama/ggml)
+# 0 differing live lines for the two files that do not include common.cuh, and exactly one for
+# each of the 18 that do: the deleted `#define MUSART_HMASK 40300`, which is the intended change.
+# preprocess_equiv.py cannot do this - one include set for both sides means the before file reads
+# the after tree's common.cuh. Files present on one side only are reported, not failed.
+python3 -B scripts/port/warning_profile.py --list ggml-cuda.cu,mmq.cu,mmq_id.cu,cpy.cu,\
+fattn-wmma-f16.cu,ssm-scan.cu,wkv.cu,softmax.cu build/wt-base .   # 13 occurrences, 6 distinct both
+```
+
+The tool's own regression gate is `docs/evidence/collapse-probe.h`: apply it to a copy and diff the
+preprocessed text of the copy against the preprocessed text of the probe. Identical means the
+pass only removed what the preprocessor had already removed.
+
+```bash
+cp docs/evidence/collapse-probe.h build/probe.h
+python3 -B scripts/port/collapse_conditionals.py --tokens DEAD_ONE,DEAD_TWO,__linux__ \
+    --never-defined DEAD_ONE,DEAD_TWO --apply build/probe.h
+gcc -E -fdirectives-only -P -x c docs/evidence/collapse-probe.h > build/probe-before.i
+gcc -E -fdirectives-only -P -x c build/probe.h                 > build/probe-after.i
+diff build/probe-before.i build/probe-after.i                  # prints nothing
 ```
 
 ### The producer's platform layer, with no test target to run

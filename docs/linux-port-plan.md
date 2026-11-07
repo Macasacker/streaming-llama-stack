@@ -15,8 +15,11 @@ Delete outright:
 - Windows: DirectStorage, D3D12 interop, Win32 host code, IoRing, Job Objects, PowerShell.
 - macOS: Metal sources, Objective-C, Accelerate, the Darwin Makefile branch, the Mac receiver,
   MLX, mlx-serve, omlx, mference (Swift), vendor/mac-mlx.
-- Other ggml backends that are not CUDA: Vulkan, SYCL, Hexagon, KleidiAI, RPC, AMX, CPU-only
-  MoE paths that exist to serve Mac and Windows hosts.
+- Other ggml backends that are not CUDA: Vulkan, SYCL, Hexagon, KleidiAI, RPC, AMX, BLAS,
+  CANN, HIP, MUSA, OpenCL, WebGPU, zDNN, ZenDNN, VirtGPU, CPU-only
+  MoE paths that exist to serve Mac and Windows hosts. Chunks 4.1 and 4.2 deleted the trees;
+  what is left of that scope is the CUDA backend's AMD and Moore Threads compute-capability
+  vocabulary, recorded under chunk 4.2.
 - ROCm and DGX Spark targets. Linux, but AMD and sm_121 paths nobody here will run. Say the
   word if ROCm should stay.
 
@@ -25,10 +28,11 @@ orchestrator, the web UI, MCP, LoRA, and images.
 
 ## Machine facts
 
-Arch Linux, RTX 5090 32 GB, compute capability 12.0, driver 615.78, CUDA 13.4
-(`nvcc --list-gpu-code` shows `sm_120` and `sm_121`; `compute_120a` compiles), cmake 4.4.5,
-ninja 1.13.2, `/usr/include/liburing.h` present, Python 3.14.8 (the stack wants 3.12), ext4 on
-a single NVMe, 30 GB RAM, about 793 GB free.
+Arch Linux, kernel 7.2.14-arch1-1, RTX 5090 32 GB (32,607 MiB), compute capability 12.0,
+driver 615.78.08, CUDA 13.4.92 (`nvcc --list-gpu-code` shows `sm_120` and `sm_121`;
+`compute_120a` compiles), cmake 4.4.5, ninja 1.13.2, `/usr/include/liburing.h` present,
+Python 3.14.9 (the stack wants 3.12), ext4 on a single 1.8 TB NVMe with 333 GiB free, 93 GB
+RAM, 16 cores.
 `nvidia-fs` is not installed, so GPUDirect Storage is unavailable today. io_uring is the route.
 
 ## Open decisions
@@ -349,10 +353,13 @@ are met; the third needs a qualified GGUF on this box.
 
 ## Phase 4: prune ggml backends
 
-Keep CUDA and CPU. Delete `ggml-vulkan`, `ggml-sycl`, `ggml-hexagon`, `ggml-cpu/kleidiai`,
-`ggml-rpc`, `ggml-cpu/amx`, the Metal backend in `ggml-bench` and the `GGML_METAL`, `GGML_VULKAN`,
-`GGML_SYCL`, `GGML_RPC`, `GGML_HEXAGON` options in `ggml/CMakeLists.txt`. Set the build to
-`-DGGML_CUDA=ON` only. `build.sh` already does that.
+Keep CUDA and CPU. Delete every other backend tree, its public header and the cmake option that
+offered it: `ggml-vulkan`, `ggml-sycl`, `ggml-hexagon`, `ggml-cpu/kleidiai`, `ggml-rpc`,
+`ggml-cpu/amx` and the Metal sources in chunk 4.1; `ggml-blas`, `ggml-cann`, `ggml-hip`,
+`ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`, `ggml-zendnn` and `ggml-virtgpu` in
+chunk 4.2. There is no `ggml-bench` in this fork, so the plan's original "the Metal backend in
+`ggml-bench`" item had nothing to delete. Set the build to `-DGGML_CUDA=ON` only. `build.sh`
+already does that.
 
 Gate: cmake configures and builds with no backend options other than CUDA.
 
@@ -443,13 +450,16 @@ Gate: cmake configures and builds with no backend options other than CUDA.
       comment position by `scripts/port/metal_word_census.py --strict`. That report was not sound:
       the census kept line-comment state open past its newline, so an identifier on a later line
       was filed as a comment and `IDENTIFIER 0` proved nothing. Chunk 7.1c fixed the scanner, and
-      the same command now reads IDENTIFIER 1, STRING 4, COMMENT 51 lines, with `--strict` failing.
-      The identifier is `USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/ggml-remoting.h`,
+      the same command now reads IDENTIFIER 1, STRING 3, COMMENT 51 lines, with `--strict` failing
+      (chunk 7.1c's message and this plan both recorded STRING 4; re-extracting the tree at
+      `050e0b1` and running the fixed census reads 3 - a mention count and a line count were mixed
+      up). The identifier is `USE_METAL_GUEST_SUPPORTS_OP` in
+      `ggml/src/ggml-virtgpu/ggml-remoting.h`,
       one of nine backend directories this chunk's list never named and never deleted -
       `ggml-blas`, `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`
       and `ggml-zendnn` beside it, 68 tracked files and about 1.5 MB, none of them compiled on this
-      build. Their deletion is chunk 4.2; the comment and message sweep is chunk 7.1e's, as it was
-      for the engine.
+      build. Their deletion landed as chunk 4.2; the comment and message sweep is chunk 7.1e's, as
+      it was for the engine.
     - `common/arg.cpp`'s `--device` parsing and `llama_supports_rpc()` still name "RPC" at
       runtime; both are inert because no RPC registry exists, and neither is in the producer path.
 
@@ -1238,23 +1248,93 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
 4.1 ggml backend prune: done (`0c9d01d`), see the Phase 4 entry above for what it deleted and
     what it proved.
 
-4.2 The nine ggml backends Phase 4's list never named. Pending. `ggml/src/ggml-blas`,
-    `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`,
-    `ggml-zendnn` and `ggml-virtgpu` are still in the tree - 68 tracked files, about 1.5 MB -
-    and none is built: `ggml_add_backend()` is still called for each, but the cmake option behind
-    each defaults OFF and `build.sh` passes only `-DGGML_CUDA=ON`, so
-    `ggml-backend-reg.cpp`'s registration blocks sit inside `#ifdef GGML_USE_*` guards this build
-    never defines. Their environment rows survived chunk 4.1's drop because
-    `envvars.py:inventory()` scans `engines/` whether or not the tree is compiled: 8
-    `GGML_CANN_*`, 3 `GGML_OPENCL_*` and one `GGML_REMOTING_*` row are documented reads in code
-    nobody builds. Deleting them is the same work as 4.1 - collapse the conditionals the compiler
-    already resolved, drop the options and the `ggml_add_backend()` calls, run
-    `drop_rows.py` with a whole-tree reader scan per name - and it removes the last code-position
-    Metal mention in the llama tree, `USE_METAL_GUEST_SUPPORTS_OP` in
-    `ggml-virtgpu/ggml-remoting.h`, which is why `metal_word_census --strict` fails there today.
-    Gate: `metal_word_census --strict engines/streaming-llama/prefill_llama.cpp` reports 0
-    identifiers, both cmake flag sets configure and build with exit 0, `warning_profile.py`
-    loses occurrences and gains no kind, and `envdocs --check` reports the dropped count.
+4.2 The nine ggml backends Phase 4's list never named. Done in two commits (`9125df4`, `eaccc5e`).
+    4.2a deleted `ggml/src/ggml-blas`, `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`,
+    `ggml-webgpu`, `ggml-zdnn`, `ggml-zendnn` and `ggml-virtgpu` - 68 tracked files - with the
+    seven public headers they exported (hip and musa exported none), 32,327 lines over 75 files,
+    the nine `ggml_add_backend()` calls, the options and sub-options behind them
+    (`GGML_BLAS`/`GGML_BLAS_VENDOR` and the APPLE default split, `GGML_MUSA` and its two,
+    `GGML_HIP` and its five, `GGML_WEBGPU` and its four, `GGML_ZDNN`, `GGML_VIRTGPU` and
+    `GGML_VIRTGPU_BACKEND`, `GGML_OPENCL` and its four, `GGML_ZENDNN`, `ZENDNN_ROOT`), the
+    deprecated `LLAMA_CANN` mapping - which was the only thing that could ever have set
+    `GGML_CANN`, because no option defined it - the BLAS, OpenCL and HIP dependency branches of
+    `ggml-config.cmake.in`, seven include guards and seven registration blocks and seven
+    `ggml_backend_load_best` names in `ggml-backend-reg.cpp`, and five `GGML_PUBLIC_HEADERS`
+    entries. `GGML_ACCELERATE` stays: its only reader is the APPLE branch of
+    `ggml-cpu/CMakeLists.txt`, so it is an Apple cmake setting rather than a backend. 12 env rows
+    lost their last reader (8 `GGML_CANN_*`, 3 `GGML_OPENCL_*`, `GGML_REMOTING_USE_APIR_CAPSET`),
+    2,162 documented variables down to 2,150; `GGML_OP_OFFLOAD_MIN_BATCH` stays because it is also
+    read in `ggml-cuda/` and `llama-context.cpp`, so only its stale `ggml-cann` reference went.
+    `code_line_diff` reports 7 changed code lines in `ggml-backend-reg.cpp`, exactly the seven
+    `load_best` calls - everything else deleted there was inside a guard this build never defined,
+    which is why `preprocess_equiv` cannot see it at all.
+    4.2b collapsed what those trees made dead. `ggml-hip` and `ggml-musa` had no kernels: each
+    globbed `../ggml-cuda/*.cu` and compiled it with hipcc or the MUSA clang, defining
+    `GGML_USE_HIP`/`GGML_USE_MUSA` and their sub-options, so the CUDA backend's AMD and Moore
+    Threads branches are now text no compiler of this fork ever resolves. 22 files, 1,419
+    deletions and 58 insertions over `ggml/src/ggml-cuda`, `ggml-common.h` and `ggml-cuda.h`, to a
+    fixed point (a second pass is required: promoting a `#elif` can leave a guard that is then
+    always true). `vendors/hip.h` and `vendors/musa.h` (425 lines) go - the branches that included
+    them were their only references - and `MUSART_HMASK` with them, its last reader being the
+    collapsed `__hgt2_mask` guard. Eight `BLOCKED` nodes were resolved by hand, and 26 `#endif //
+    <condition>` comments were rewritten to the surviving condition: a collapse that shortens a
+    guard leaves its trailing comment describing a condition that no longer exists.
+    - Four soundness bugs in `scripts/port/collapse_conditionals.py` were fixed on the way, and
+      `docs/evidence/collapse-probe.h` is now the gate for the tool: apply it to a copy and diff
+      the preprocessed text of the copy against the preprocessed text of the probe - identical,
+      with every decision path covered including the ones that must stay untouched. An
+      unparsable condition was written back re-spaced instead of reported (the tokenizer had no
+      comparison operators, so every `CUDART_VERSION >= X` guard counted as unparsable and the first
+      pass on the CUDA tree wrote out 28 rewrite-guards, several of them the same condition
+      re-spaced); a directive spanning continuation lines was treated
+      as one line, so a rewrite flattened `#if A || \` into a single line with the backslash inside
+      the expression and a drop left the continuation behind; the dead-`#if`-with-live-`#elif`
+      path dropped the `#endif` that closes the promoted guard, which is how `vecdotq.cuh` ended up
+      with four `#if` and three `#endif`; and the operand-drop patterns for a macro the build does
+      define were inverted, so `false && X` lost its false operand and `X || true` its true one -
+      each of those changes a condition rather than shortening it. Nesting inside the surviving
+      branch of a dead outer node was never visited.
+    - `scripts/port/cuda_live_equiv.py` is new: `preprocess_equiv.py` preprocesses both sides with
+      one include set, which proves nothing when the sweep touches a header, because the before
+      file then includes the after tree's `common.cuh`. Each side gets its own tree's directories;
+      over the 20 changed files it reports 0 differing live lines for `ggml-cuda.h` and
+      `ggml-common.h` and exactly one for each of the 18 that include `common.cuh` - the deleted
+      `#define MUSART_HMASK 40300`, which is the intended change and the only one. Conditionals are
+      resolved and macros left alone, so `__LINE__` inside `CUDA_CHECK` does not move the diff. A
+      file present on one side only is reported, not failed: a deletion is not a sweep.
+    Gate: the CUDA headroom probe said yes first (298 MiB free), both flag sets build with exit 0,
+    `--check-native-profiles` passes from both, `llama-server --list-devices` still enumerates the
+    5090, `warning_profile` over eight CUDA TUs reads 13 occurrences and 6 distinct on both sides,
+    the eight hand-compiled programs pass relinked against the rebuilt objects,
+    `metal_word_census --strict` passes over the llama tree and the engine (IDENTIFIER 1 -> 0:
+    `USE_METAL_GUEST_SUPPORTS_OP` went with `ggml-virtgpu`, which is what reopened this phase),
+    `envdocs --check` reports 2,150 documented variables with 29 rows re-anchored and no name
+    added or dropped, the suite's failing names are a subset of the baseline worktree's, and
+    `release_check` reports 0 findings.
+    Findings this chunk produced, for the chunk that owns them:
+    - The CUDA backend's AMD and Moore Threads compute-capability vocabulary is still
+      dead-but-present: `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, `AMD_MFMA_AVAILABLE`,
+      `AMD_WMMA_AVAILABLE` and the `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants. Their guards'
+      first term is `defined(RDNA3)` or `__CUDA_ARCH__`, and the collapse cannot pin
+      `__CUDA_ARCH__` - it is genuinely undefined for the host pass and defined for the device
+      pass - so no branch keyed on it is decidable by that rule. Pruning it is a chunk of its own,
+      not a collapse. `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment never matched its
+      guard, upstream.
+    - Ten retired-backend mentions remain in the llama tree, all in comment position
+      (`src/llama-context.cpp` x2, `src/llama-prefill-stream.cpp`, `common/common.h` x2,
+      `ggml/src/ggml-cpu/simd-mappings.h`, `ggml/src/ggml-backend.cpp`,
+      `ggml/include/ggml-backend.h`, `ggml/src/ggml-cuda/mma.cuh`, `common.cuh`'s Moore Threads
+      heading): chunk 7.1e's text sweep.
+    - The "plain flag set" in `docs/linux-port-commands.md` cannot configure as written: this fork
+      has no `tests/`, no `examples/CMakeLists.txt` and no `pocs/`, so it needs
+      `-DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF` and
+      `-DLLAMA_DSV41_JSON_INCLUDE_DIR` (it failed the same way at the parent commit - the command
+      predated chunk 7.1a). Corrected in the commands file.
+    - Apple cmake logic survives in the llama tree: `GGML_ACCELERATE` and the APPLE branch of
+      `ggml-cpu/CMakeLists.txt`, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants in
+      `ggml_add_cpu_backend_variant`, the `HAVE_BUGGY_APPLE_LINKER` probe, `_DARWIN_C_SOURCE` for
+      Darwin/iOS/tvOS, and the visionOS definition in `ggml/src/CMakeLists.txt`. None of it is a
+      backend, none of it is built here, and no chunk has claimed it.
 
 5.1 Python orchestrator. Done in four commits: `270d7a9` (memory_counters reads
     /proc/meminfo, /proc/vmstat and /proc/swaps), `65e54bd` (journal.advisory_lock, the
@@ -1442,8 +1522,9 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
 7.1c Done (`050e0b1`): `scripts/port/metal_word_census.py` kept reading a `//` comment as open
     after its newline, so every identifier on a later line was filed as COMMENT and an
     `IDENTIFIER 0` answer proved nothing. The engine's numbers are unchanged by the fix, so
-    chunk 2.2e's gate stands; the llama tree moves to IDENTIFIER 1, STRING 4, COMMENT 51 lines,
-    and `--strict` now fails there. `llama_split_graph_create`'s refusal line still printed
+    chunk 2.2e's gate stands; the llama tree moves to IDENTIFIER 1, STRING 3, COMMENT 51 lines,
+    and `--strict` now fails there - the 4 recorded for STRING in that commit's message and in this
+    plan for a session was a mention/line mix-up, re-measured against `050e0b1` in chunk 4.2. `llama_split_graph_create`'s refusal line still printed
     "need CUDA or Metal" although chunk 4.1's message, this plan and the handoff all claimed it
     had been reworded: it is reworded now, with `preprocess_equiv` showing 0 differing positions
     on the CUDA build (the line is inside `#ifndef GGML_USE_CUDA`) and exactly one on a CPU-only
@@ -1576,11 +1657,12 @@ number - it keys on `os.name` and `.exe` names rather than on those tokens (Phas
 `engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 195 lines, ENV_NAME_CITED 123
 lines and COMMENT 26 lines: the documented `DS4_METAL_*` names are kept on purpose, the 123 cited
 ones are the wrapper reads chunk 7.1d owes the inventory, and the 26 comment lines are the
-provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 1,
-STRING 4 and COMMENT 51 lines and `--strict` fails, because `USE_METAL_GUEST_SUPPORTS_OP` lives in
-`ggml/src/ggml-virtgpu/` - one of nine backend directories (also blas, cann, hip, musa, opencl,
-webgpu, zdnn, zendnn) that no cmake option builds and chunk 4.2 has to delete. Re-count before
-trusting any of these numbers.
+provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0,
+STRING 3 and COMMENT 51 lines and `--strict` passes, since chunk 4.2 deleted the tree holding the
+one code-position mention (`USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/`). The 51
+comment lines and 3 printed strings are the Mac peer's measurement history and the ten
+retired-backend mentions 4.2 left behind - chunk 7.1e's. Re-count before trusting any of these
+numbers.
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in
@@ -1590,11 +1672,13 @@ comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-pref
 from, so gate greps still need `| grep -vE ":[0-9]+:\s*//"`. `tests/dsv41_engram_early_io.cpp` and
 `tests/pinned_carry_memory.cpp` are Linux with the code they test; two test sources remain
 Windows-shaped (`dsv41_producer_abort.cpp`, `studio_generation.cpp`) and none of them has a build
-rule. The repo-wide pattern above now counts 504, down from 532 before 3.1h. The rest
+rule. The repo-wide pattern above now reads 443 Windows references and 691 Apple/MLX ones, unchanged
+by chunk 4.2 - the nine deleted backend trees carried no `_WIN32`, `windows.h` or `IoRing` text at
+all, and their platform abstraction was their own. The rest
 of the producer tree is still Windows-shaped: 15 files under `src/` by that pattern (one of them a
 comment), 6 under
-`common/`, 4 under `tools/mtmd`, 3 under `tools/server`, 1 under `tools/decode-receiver`, plus the
-ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
+`common/`, 4 under `tools/mtmd`, 3 under `tools/server`, 1 under `tools/decode-receiver`. Re-count
+before trusting any of these numbers.
 
 `python3 -B scripts/release_check.py` reports 0 findings since `docs/VARIABLES.md` was regenerated
 in chunk 1.10b.
@@ -1614,10 +1698,12 @@ as `auto` rather than the 49,152 it asserts - chunk 8.1's. Chunk 7.1b removed th
 skipped here, with a POSIX arm added, which is why the skip line moved 37 to 38) and
 `test_shared_prefill_profile`'s `slstack.mac` import.
 
-`python3 -B -m slstack.envdocs --check` reports 2,162 documented variables. Chunk 5.1 moved no
+`python3 -B -m slstack.envdocs --check` reports 2,150 documented variables. Chunk 5.1 moved no
 row and dropped no name; chunk 4.1 is the first chunk that did, because deleting a backend deletes
 its `getenv` sites - 71 rows went, and 7 more were re-anchored to new line numbers after the
-comment rewording. No name was added.
+comment rewording. Chunk 4.2 dropped 12 more (the `GGML_CANN_*`, `GGML_OPENCL_*` and
+`GGML_REMOTING_*` rows whose last reader was a tree nobody built) and re-anchored 29 rows whose
+reads moved inside `ggml-cuda` when its HIP and MUSA branches folded. No name was added.
 
 Build a CUDA engine with `make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4` (~4 min). `make cpu`
 builds the same binary names as CPU variants, so rebuild CUDA afterwards if you need the CUDA
