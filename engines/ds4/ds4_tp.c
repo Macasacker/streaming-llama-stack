@@ -600,7 +600,7 @@ int ds4_tp_validate_engine_options(
         return 1;
     }
     bool supported_backend = false;
-#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
+#if !defined(DS4_NO_GPU)
     supported_backend = opt->backend == DS4_BACKEND_CUDA;
 #endif
     if (!supported_backend) {

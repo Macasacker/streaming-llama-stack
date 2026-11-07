@@ -196,18 +196,10 @@ static const char *need_arg(int *i, int argc, char **argv, const char *opt) {
 }
 
 static ds4_backend parse_backend(const char *s, const char *opt) {
-#ifdef DS4_ROCM_BUILD
-    if (!strcmp(s, "rocm")) return DS4_BACKEND_CUDA;
-#else
     if (!strcmp(s, "cuda")) return DS4_BACKEND_CUDA;
-#endif
     if (!strcmp(s, "cpu")) return DS4_BACKEND_CPU;
     fprintf(stderr, "ds4-bench: invalid value for %s: %s\n", opt, s);
-#ifdef DS4_ROCM_BUILD
-    fprintf(stderr, "ds4-bench: valid backends are: rocm, cpu\n");
-#else
     fprintf(stderr, "ds4-bench: valid backends are: cuda, cpu\n");
-#endif
     exit(2);
 }
 
@@ -355,13 +347,8 @@ static bench_config parse_options(int argc, char **argv) {
             c.threads = parse_int(need_arg(&i, argc, argv, arg), arg);
         } else if (!strcmp(arg, "--backend")) {
             c.backend = parse_backend(need_arg(&i, argc, argv, arg), arg);
-#ifdef DS4_ROCM_BUILD
-        } else if (!strcmp(arg, "--rocm")) {
-            c.backend = DS4_BACKEND_CUDA;
-#else
         } else if (!strcmp(arg, "--cuda")) {
             c.backend = DS4_BACKEND_CUDA;
-#endif
         } else if (!strcmp(arg, "--gpu-vram")) {
             c.gpu_vram_arg = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--gpu-devices")) {

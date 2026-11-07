@@ -151,9 +151,10 @@ grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel
 # 2.2e's first run missed). The census classifies each mention by its position in the file, which is
 # the only honest test, and --strict fails on anything the compiler sees.
 python3 -B scripts/port/metal_word_census.py --strict
-# IDENTIFIER 0, ENV_NAME 195, ENV_NAME_CITED 123, COMMENT 26 lines, STRING 0 lines
-# (the 26 comments are provenance: they name the retired backend or its source files;
-#  no engine message names Metal since chunk 2.2e 4/4)
+# IDENTIFIER 0, ENV_NAME 195, ENV_NAME_CITED 118, COMMENT 25 lines, STRING 0 lines
+# (the 25 comments are provenance: they name the retired backend or its source files;
+#  no engine message names Metal since chunk 2.2e 4/4. ENV_NAME_CITED was 123 until chunk 4.3b
+#  folded four wrapper names away with their guards)
 python3 -B scripts/port/metal_word_census.py --strict --list   # names the tokens and the files
 # --strict exit 1 means a code identifier names Metal again.
 grep -rn "\bmetal_\|\bMETAL_" engines/ds4 \
@@ -248,7 +249,7 @@ python3 -B scripts/port/drop_rows.py --names build/42/dropped-names-42.json --ke
 python3 -B scripts/port/drop_rows.py --names build/42/dropped-names-42.json --apply
 python3 -B scripts/port/reanchor_env_reads.py --apply   # reads are anchored to path:line
 python3 -B -m slstack.envdocs --refresh-defaults
-python3 -B -m slstack.envdocs --check                   # 2,150 documented variables
+python3 -B -m slstack.envdocs --check                   # 2,143 documented variables
 python3 -B -m unittest tests.test_environment_contract  # 11 tests, OK
 ```
 
@@ -456,6 +457,48 @@ make -B ds4-decode.so CUDA_ARCH=sm_120                                     # exi
 ./ds4 --help | head -3 && ./ds4 --metal -m /nonexistent                    # unknown option: --metal
 make test-batch-io        # BATCH_IO: PASS io_uring transport matched pread
 make test-decode-library  # DECODE_LIBRARY: PASS ./ds4-decode.so exports 19 entry points
+```
+
+### Folding the engine's host layer (chunk 4.3b)
+
+`DS4_ROCM_BUILD` is already in `collapse_conditionals.py`'s false-platform set, and no build of this
+fork defines it, so the host-layer fold is one command over the ten files that mention it. The
+engine compiles most of those TUs twice - once for CUDA, once with `-DDS4_NO_GPU` for the CPU
+binaries - so the equivalence check has to run both arms, each side with **its own tree's** include
+directory (`ds4.c` includes `ds4_gpu.h`, which the fold edits):
+
+```bash
+files=$(grep -rl "DS4_ROCM_BUILD\|DS4_ROCM\b" engines/ds4 \
+        --include=*.c --include=*.cpp --include=*.h --include=*.cu \
+        --include=*.cuh --include=*.inc | sort)
+TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py \
+    --tokens DS4_ROCM_BUILD,DS4_ROCM --never-defined DS4_ROCM_BUILD,DS4_ROCM --apply $files
+TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py \
+    --tokens DS4_ROCM_BUILD,DS4_ROCM --never-defined DS4_ROCM_BUILD,DS4_ROCM $files | grep -v "no edits, 0 blocked"
+# one BLOCKED on the 4.3b tree: ds4.c's `#ifdef DS4_ROCM_BUILD / #elif !defined(DS4_NO_GPU) /
+# #else`. DS4_NO_GPU is a real build option, so neither the #elif nor the #else is dead - promote
+# the #elif to #if and delete the ROCm branch, which keeps both arms' behaviour.
+for f in ds4.c ds4_agent.c ds4_cli.c ds4_server.c ds4_bench.c ds4_eval.c ds4_tp.c ds4_help.c \
+         ds4_gpu.h ds4_deepseek41_gpu.h ds4_cuda.cu; do
+  for mode in cuda cpu; do
+    D=""; [ "$mode" = cpu ] && D=-DDS4_NO_GPU
+    gcc -E -fdirectives-only -P -x c -std=c99 -D_GNU_SOURCE -Ibuild/wt-base/engines/ds4 $D \
+        build/wt-base/engines/ds4/$f -o build/43/b.i 2>/dev/null
+    gcc -E -fdirectives-only -P -x c -std=c99 -D_GNU_SOURCE -Iengines/ds4 $D \
+        engines/ds4/$f -o build/43/a.i 2>/dev/null
+    printf "%-22s %-4s differing=%s\n" "$f" "$mode" "$(diff build/43/b.i build/43/a.i | grep -c '^[<>]')"
+  done
+done
+# every line 0 on the 4.3b tree, including ds4_cuda.cu: its own source did not change, but it
+# includes two headers that did, so it is compared rather than skipped. Use -x c++ for .cu and add
+# -Iengines/ds4/cuda/mmq -I/opt/cuda/include or the include block fails and reads as 0 differences.
+make -j4 -B ds4 ds4-server ds4-bench ds4-eval ds4-agent CUDA_ARCH=sm_120 > build/43/host.log 2>&1
+make -j4 ds4_cpu.o ds4_cli_cpu.o ds4_server_cpu.o ds4_bench_cpu.o ds4_eval_cpu.o \
+       ds4_agent_cpu.o ds4_gpu_args_cpu.o ds4_host_memory_cpu.o > build/43/cpu.log 2>&1
+# the CPU *objects*, not `make cpu`: that target links and overwrites the CUDA binaries with CPU
+# variants of the same names, and you would then be gating on a binary you did not build.
+grep 'warning:' build/43/host.log | sed 's/^[^:]*:[0-9]*:[0-9]*: //' | sed -E 's/[0-9]+/N/g' | sort
+# 37 occurrences, 23 kinds, identical to the baseline tree's log; the CPU object set is 8 and 6.
 ```
 
 ### The producer's platform layer, with no test target to run

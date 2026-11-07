@@ -644,7 +644,8 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     advisory, `ds4_gpu_device_is_spark()`, two `_WIN32`/`__linux__` pairs in `ds4_agent.c`), and 77
     conditions kept their guard after losing only the Apple operand, since they still test
     `DS4_NO_GPU` or `DS4_ROCM_BUILD`. The only `__APPLE__` left in `engines/ds4` is one inside the
-    vendored `external/nlohmann/json.hpp`.
+    vendored `external/nlohmann/json.hpp`. (Chunk 4.3b folded the `DS4_ROCM_BUILD` half of those
+    guards away; `DS4_NO_GPU` is a real build option and stays.)
 
 2.2b Metal naming in live CUDA code. Done. Option (b): the environment names stay, the code
     identifiers went - 3,323 lines, 3,311 of them in `ds4.c`. `metal_graph_*` (the CUDA graph
@@ -1405,11 +1406,50 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     third layer of the same kind: 152 `#if`s on `DS4_ROCM_BUILD`, which no build of this fork
     defines either, spread over `ds4.c` and nine other files - mechanical, since
     `collapse_conditionals` already treats that name as a false platform macro, and bigger than this
-    chunk. Of the 102 `DS4_ROCM_*` names the engine cites, 93 are read outside any `DS4_ROCM_BUILD`
+    chunk. Of the 103 `DS4_ROCM_*` names the engine cites, 93 are read outside any `DS4_ROCM_BUILD`
     guard - `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live code that survives a fold -
-    so only nine rows (`DS4_ROCM_DSPARK_FAST`, `DS4_ROCM_DSPARK_VERIFY_FAST`, the two
-    selected-async-load names and five more) lose their last reader with that chunk, and they go
-    through `drop_rows.py --keep` rather than a name pattern.
+    so only nine of them lose their last reader with that chunk, and those go through
+    `drop_rows.py --keep` rather than a name pattern.
+
+4.3b The engine's host-layer ROCm build flag folds. Done, one commit, taken before the
+    compute-capability vocabulary because it is mechanical and that one is not. `DS4_ROCM_BUILD` is
+    in `collapse_conditionals`'s false-platform set already, and no build of this fork defines it -
+    the Makefile has no ROCm target and `build.sh` passes no such flag - so listing it in
+    `--tokens` and `--never-defined` is the whole pass: 152 directives over ten files, 1,432
+    deletions and 38 insertions, plus one `BLOCKED` node (ds4.c's `#ifdef DS4_ROCM_BUILD / #elif
+    !defined(DS4_NO_GPU) / #else` - the `#elif` is the branch the CUDA build keeps and the `#else`
+    the CPU build's, so it was promoted rather than removed, ten more lines gone). The committed
+    diff is 1,442 deletions and 39 insertions. No `#endif // <condition>` comment named the folded
+    macro, so none had rewriting.
+    - Nine `DS4_ROCM_*` names go with the dead branches, and the row question split the way the
+      chunk 4.2 finding did not predict: of the 103 the engine cited, 93 are read outside any
+      `DS4_ROCM_BUILD` guard - `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live code that
+      survives a fold - so nine names lost their last reader and **seven** rows went - five
+      `DS4_ROCM_*` plus the two `DS4_GLM_*` aliases of a folded pair
+      (`DS4_GLM_STREAMING_DECODE_SYNC_EACH_LAYER`, `DS4_GLM_STREAMING_PREFILL_SYNC_EACH_LAYER`),
+      which `drop_rows.py --keep` confirmed no other file reads. Four of the nine were
+      wrapper-only names the table never carried. 2,150 documented variables down to 2,143, and
+      665 read locations re-anchored because `ds4.c` lost 1,338 lines - which is why `--apply`
+      rewrites every row's `reads` in sorted order and `--refresh-defaults` has to follow it in the
+      same sequence, or the JSON diff is 51,000 lines of pure reordering.
+    Gate: each engine TU's live text compared per tree in **both** arms the engine compiles -
+    `-DDS4_NO_GPU` and without - with `-fdirectives-only` and each side's own `-I`: 0 differing
+    live lines for `ds4.c` (131,975 CUDA / 71,628 CPU lines), `ds4_agent.c`, `ds4_cli.c`,
+    `ds4_server.c`, `ds4_bench.c`, `ds4_eval.c`, `ds4_tp.c`, `ds4_help.c`, `ds4_gpu.h`,
+    `ds4_deepseek41_gpu.h` and `ds4_cuda.cu` - the last unchanged in this chunk but including two
+    headers that changed, so it is compared, not skipped. The per-file `#if`/`#endif` count is
+    balanced in all ten. `-Wall -Wextra` warnings are 37 occurrences and 23 kinds on both sides of
+    the CUDA build (`ds4.o` 36, `ds4_ext.o` 11, `ds4_cuda.o` 13, `ds4_cuda_ext.o` 0 each) and 8
+    occurrences and 6 kinds on both sides of the CPU object set. `cuobjdump --dump-sass` of
+    `ds4_cuda.o` is byte-identical with the name and temp-file hashes normalised, and `nm` lists
+    the same 4,590 symbols in `ds4.o`. All five executables and `ds4-decode.so` relink with exit 0,
+    `./ds4 --help`, `./ds4 --metal` (unknown option), `make test-batch-io`,
+    `make test-decode-library` and `docs/evidence/platform-selftest.cpp` against the rebuilt
+    `ds4-decode.so` pass. `envdocs --check` reads 2,143 with `test_environment_contract` 11 tests
+    OK, `metal_word_census --strict` passes over both trees (the engine's `ENV_NAME_CITED` falls
+    123 -> 118 - four folded wrapper names were part of that count), the Python suite reads 673
+    passed / 38 skipped with only `test_yoco` and the moving process test, and `release_check`
+    reports 0 findings.
 
 5.1 Python orchestrator. Done in four commits: `270d7a9` (memory_counters reads
     /proc/meminfo, /proc/vmstat and /proc/swaps), `65e54bd` (journal.advisory_lock, the
@@ -1723,7 +1763,8 @@ and 920 after 5.1) were counted at different commits and some without `-I`, so t
 comparable; re-run the command rather than trusting any number here. The AMD and Moore Threads
 vocabulary is a third count and chunk 4.3b's: 674 `hip`/`musa`/`rocm`/`moore` matches in
 `engines/ds4` sources after 4.3a folded the HIP and MUSA branches out of `cuda/mmq/` (6 more are
-vendored under `external/` and `linenoise.c`), 441 of them in that directory alone. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
+vendored under `external/` and `linenoise.c`), 13 of them in that directory. Chunk 4.3b took the
+engine's host-layer half of that count down to 286. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
 `scripts/port`'s own sweep `--tokens` list does not count, the gate in
 `docs/linux-port-commands.md` reports 5 lines after chunk 7.1b: the two `ctypes.WinDLL('kernel32')`
 calls in the Windows arms of `combo_ram.py` and `working_set.py`, which run on both platforms, and

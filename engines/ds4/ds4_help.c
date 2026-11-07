@@ -150,10 +150,6 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
     if (tool == DS4_HELP_DS4 || tool == DS4_HELP_AGENT || tool == DS4_HELP_SERVER) {
         opt(fp, c, "--vision FILE", "Vision encoder GGUF for the selected model.");
     }
-#ifdef DS4_ROCM_BUILD
-    opt(fp, c, "--rocm | --cpu", "Select the backend explicitly.");
-    opt(fp, c, "--backend NAME", "Backend name: rocm, or cpu.");
-#else
     opt(fp, c, "--cuda | --cpu", "Select the backend explicitly.");
     opt(fp, c, "--backend NAME", "Backend name: cuda, or cpu.");
     opt(fp, c, "--gpu-vram N[,N,...]|auto", "CUDA VRAM budgets per device, in GiB, or auto-detect free VRAM.");
@@ -161,7 +157,6 @@ static void print_model_runtime(FILE *fp, const help_colors *c,
     if (tool != DS4_HELP_EVAL) {
         opt(fp, c, "--cuda-tensor-parallel", "Enable the paired DeepSeek tensor/expert path on an even multi-GPU CUDA placement.");
     }
-#endif
     if (tool != DS4_HELP_BENCH) {
         opt(fp, c, "-c, --ctx N", "Allocated context tokens.");
     }

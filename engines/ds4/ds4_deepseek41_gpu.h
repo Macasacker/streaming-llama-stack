@@ -37,7 +37,7 @@ int ds4_gpu_dsv41_matmul_f32_rows(ds4_gpu_tensor *out, const void *model_map, ui
                                   const ds4_gpu_tensor *x, uint32_t rows);
 int ds4_gpu_dsv41_quantize(ds4_gpu_tensor *x, uint32_t width, uint32_t rows,
                           ds4_v41_activation_format format);
-#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
+#if !defined(DS4_NO_GPU)
 /* CUDA scalar Q8 shared expert. 1: queued; 0: unsupported, no work queued;
  * -1: failure. After 1, keep the input/output tensors alive and unchanged
  * until join, which orders the result before subsequent main-stream work.

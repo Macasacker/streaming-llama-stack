@@ -97,14 +97,6 @@ int ds4_gpu_commands_active(void);
 int ds4_gpu_signal_selected_readback_ready(uint64_t *event_value);
 int ds4_gpu_commit_and_wait_selected_readback(uint64_t event_value, const char *label);
 int ds4_gpu_wait_selected_readback_ready(uint64_t event_value, const char *label);
-#ifdef DS4_ROCM_BUILD
-int ds4_gpu_tensor_read_after_selected_event(const ds4_gpu_tensor *tensor,
-                                             uint64_t offset,
-                                             void *data,
-                                             uint64_t bytes,
-                                             uint64_t event_value,
-                                             const char *label);
-#endif
 int ds4_gpu_end_commands(void);
 int ds4_gpu_synchronize(void);
 
@@ -194,7 +186,7 @@ typedef struct ds4_gpu_decode_profile_snapshot {
     uint64_t live_hotlist_decay_passes;
     int      enabled;
 } ds4_gpu_decode_profile_snapshot;
-#if defined(DS4_NO_GPU) || defined(DS4_ROCM_BUILD)
+#if defined(DS4_NO_GPU)
 static inline void ds4_gpu_decode_profile_get(ds4_gpu_decode_profile_snapshot *snapshot) {
     if (!snapshot) return;
     *snapshot = (ds4_gpu_decode_profile_snapshot) {0};
@@ -226,9 +218,6 @@ int ds4_gpu_cache_model_range(const void *model_map, uint64_t model_size, uint64
 int ds4_gpu_cache_q8_f16_range(const void *model_map, uint64_t model_size, uint64_t offset, uint64_t bytes, uint64_t in_dim, uint64_t out_dim, const char *label);
 int ds4_gpu_q8_cache_suppressed(void);
 void ds4_gpu_set_q8_cache_suppressed(int suppressed);
-#ifdef DS4_ROCM_BUILD
-void ds4_gpu_release_q8_f16_cache(void);
-#endif
 
 /* Model-file ranges assigned to CUDA devices by the multi-GPU placement
  * planner. These declarations are part of the shared engine interface. */
@@ -397,7 +386,7 @@ typedef struct ds4_gpu_stream_expert_table {
      * Lower is hotter. NULL preserves the existing slot-protect/LRU policy. */
     const uint32_t *expert_ranks;
 } ds4_gpu_stream_expert_table;
-#if !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
+#if !defined(DS4_NO_GPU)
 /* Optional CUDA look-ahead between completed layers, inside the existing
  * expert cache. The foreground owns slots; the reader cannot publish them
  * or evict the current layer's inputs. */
@@ -438,7 +427,7 @@ int ds4_gpu_glm_stream_expert_cache_begin_selected_load_tensor(
         const ds4_gpu_stream_expert_table *table,
         const ds4_gpu_tensor              *selected,
         uint32_t                           n_selected);
-#if defined(DS4_ROCM_BUILD) || (!defined(DS4_NO_GPU))
+#if (!defined(DS4_NO_GPU))
 int ds4_gpu_stream_expert_cache_prepare_selected_batch(
         const ds4_gpu_stream_expert_table *table,
         const int32_t                     *selected_ids,
@@ -458,18 +447,6 @@ int ds4_gpu_prefill_pipeline_wait_layer(uint32_t layer);
 int ds4_gpu_prefill_pipeline_layer_done(uint32_t layer);
 int ds4_gpu_prefill_pipeline_finish(void);
 void ds4_gpu_prefill_pipeline_release(void);
-#endif
-#ifdef DS4_ROCM_BUILD
-int ds4_gpu_stream_expert_cache_load_layer(
-        const ds4_gpu_stream_expert_table *table);
-int ds4_gpu_stream_expert_cache_seed_from_layer_selected(
-        const ds4_gpu_stream_expert_table *table,
-        const ds4_gpu_tensor             *selected,
-        uint32_t                          n_tokens,
-        uint32_t                          n_seed_tokens,
-        uint32_t                          n_selected);
-int ds4_gpu_stream_expert_cache_finish_pending_batch(void);
-int ds4_gpu_stream_expert_cache_release_layer_cache(void);
 #endif
 int ds4_gpu_stream_expert_cache_seed_experts(
         const ds4_gpu_stream_expert_table *table,
@@ -725,7 +702,6 @@ int ds4_gpu_matmul_q8_0_tensor(
         uint64_t                out_dim,
         const ds4_gpu_tensor *x,
         uint64_t                n_tok);
-#if !defined(DS4_ROCM_BUILD)
 /* Qwen projections preserve FP32 activations on both GPU backends. */
 int ds4_gpu_qwen4_matmul_q8_0_tensor(
         ds4_gpu_tensor       *out,
@@ -736,9 +712,6 @@ int ds4_gpu_qwen4_matmul_q8_0_tensor(
         uint64_t                out_dim,
         const ds4_gpu_tensor *x,
         uint64_t                n_tok);
-#else
-#define ds4_gpu_qwen4_matmul_q8_0_tensor ds4_gpu_matmul_q8_0_tensor
-#endif
 
 int ds4_gpu_matmul_q8_0_decode_mpp_tensor(
         ds4_gpu_tensor       *out,
@@ -2755,12 +2728,7 @@ int ds4_gpu_glm_routed_moe_batch_direct_scalar_q4_tensor(
 
 int ds4_gpu_routed_moe_set_selected_override(const int32_t *selected, uint32_t n_selected);
 void ds4_gpu_set_glm_mtp_verify_mode(bool enabled);
-#if defined(DS4_ROCM_BUILD)
-int ds4_gpu_dspark_gfx1151_fast_path(void);
-void ds4_gpu_set_dspark_verify_mode(bool enabled);
-#else
 int ds4_gpu_device_is_spark(void);
-#endif
 
 int ds4_gpu_matmul_q8_0_kslice_hc_expand_add_tensor(
         ds4_gpu_tensor       *out_hc,

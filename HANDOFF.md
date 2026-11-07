@@ -31,43 +31,39 @@ four suite names Phase 7 owned plus two scripts that still named `engines/ds4-wi
 the census gate the remaining text sweep needs and made the rewording chunk 4.1 had claimed but
 never did. Chunk 4.3a folded the same HIP and MUSA branches out of the engine's vendored mmq tier,
 so `GGML_USE_HIP`, `GGML_USE_MUSA` and the macros their toolchains defined are gone from
-`engines/ds4` entirely. `DS4_ROCM_BUILD` is not, and it is the third layer of item 1.
+`engines/ds4` entirely. Chunk 4.3b folded the host layer's `DS4_ROCM_BUILD` guards, so what is left
+of Phase 4 is the compute-capability vocabulary below.
 
-1. **Chunk 4.3b - the dead platform text 4.3a could not reach.** Chunk 4.2 deleted
+1. **Chunk 4.3c - the AMD and Moore Threads compute-capability vocabulary.** Chunk 4.2 deleted
    `ggml-hip` and `ggml-musa`, which were the only things that ever defined `GGML_USE_HIP` and
    `GGML_USE_MUSA`; 4.3a folded every branch keyed on those names, in the llama tree and in the
-   engine's copy of it. What is left is one layer deeper and is not a collapse:
-   `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, the `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants,
-   `AMD_MFMA_AVAILABLE` and `AMD_WMMA_AVAILABLE` and the `RDNA*`/`CDNA*` guards in `common.cuh`,
-   `mma.cuh`, `mmf.cuh`, `mmq.cuh`, `fattn-mma-f16.cuh` and `ds4split-q4k-half-panel.cu`, and the
-   same vocabulary in seven files of the engine's `cuda/mmq/` copy - 210 mentions of the two MMA
-   macros there beside 381 in the llama tree. Their guards' first term is `defined(RDNA3)` or
-   `__CUDA_ARCH__`, and `__CUDA_ARCH__` must stay unknown - it is genuinely undefined for the host
-   pass and defined for the device pass - so `collapse_conditionals` cannot decide any of them and
-   should not be told to. Deleting the vocabulary means deleting the AMD/MTHREADS kernel paths by
-   hand and proving the surviving kernels still compile at `sm_120a`; the machine-code gate in
-   `docs/linux-port-commands.md` is how to prove it (identical SASS except nvcc's content hash and
-   the `__LINE__` in `no_device_code`). `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment, in
-   both copies, never matched its guard even upstream - 4.3a rewrote the engine's to name the three
-   MMA macros that guard does test, and the llama copy's is still the old text.
-   A third layer of the same kind is mechanical and unclaimed: 152 directives in the engine's host
-   layer key on `DS4_ROCM_BUILD`, which no build of this fork defines, across `ds4.c` and nine other
-   files (`collapse_conditionals` already treats it as a false platform macro, and listing it in
-   both `--tokens` and `--never-defined` makes the pass one command; the engine gates are in
-   `docs/linux-port-commands.md`). Measured, not assumed: 102 `DS4_ROCM_*` names are cited in the
-   source and 78 have rows, and 93 of the 102 are read outside any `DS4_ROCM_BUILD` guard - through
-   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")`, live code the fold leaves alone - while
-   nine (`DS4_ROCM_DSPARK_FAST`, `DS4_ROCM_DSPARK_VERIFY_FAST`, the two selected-async-load names
-   and five more) are read *only* inside those guards, so those nine rows lose their last reader
-   with the fold and go through `drop_rows.py --keep`, not the name pattern.
+   engine's copy of it, and 4.3b folded the engine's host layer on `DS4_ROCM_BUILD`. What is left is
+   one layer deeper and is not a collapse: `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, the
+   `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants, `AMD_MFMA_AVAILABLE` and `AMD_WMMA_AVAILABLE` and
+   the `RDNA*`/`CDNA*` guards in `common.cuh`, `mma.cuh`, `mmf.cuh`, `mmq.cuh`, `fattn-mma-f16.cuh`
+   and `ds4split-q4k-half-panel.cu`, and the same vocabulary in seven files of the engine's
+   `cuda/mmq/` copy - 210 mentions of the two MMA macros there beside 381 in the llama tree.
+   Measured on the current tree: 286 `hip`/`musa`/`rocm`/`moore` matches remain in `engines/ds4`
+   sources, 13 of them in that directory - the rest are `DS4_ROCM_*` names read through the live
+   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` wrapper and comments naming the route.
+   Their guards' first term is `defined(RDNA3)` or `__CUDA_ARCH__`, and `__CUDA_ARCH__` must stay
+   unknown - it is genuinely undefined for the host pass and defined for the device pass - so
+   `collapse_conditionals` cannot decide any of them and should not be told to. Deleting the
+   vocabulary means deleting the AMD/MTHREADS kernel paths by hand and proving the surviving kernels
+   still compile at `sm_120a`; the machine-code gate in `docs/linux-port-commands.md` is how to prove
+   it (identical SASS except nvcc's content hash and the `__LINE__` in `no_device_code`).
+   `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment, in both copies, never matched its guard
+   even upstream - 4.3a rewrote the engine's to name the three MMA macros that guard does test, and
+   the llama copy's is still the old text.
    `GGML_ACCELERATE` and the Apple cmake logic in the llama tree (`ggml-cpu/CMakeLists.txt`'s APPLE
    branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants, `HAVE_BUGGY_APPLE_LINKER`,
    `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of leftover and belongs with it or
    with Phase 7, not with a backend prune.
 2. **Chunk 7.1d - the env inventory and `docs/VARIABLES.md`.** `envvars.py:inventory()` sees
    only literal `getenv("NAME")`, so a read through a wrapper such as
-   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is invisible; the census counts 123
-   such names in `engines/ds4` today (`ENV_NAME_CITED 123`). Fix the inventory, add a row per
+   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is invisible; the census counts 118
+   such names in `engines/ds4` today (`ENV_NAME_CITED 118`, down from 123 when chunk 4.3b folded
+   away four of them). Fix the inventory, add a row per
    name by hand before `--refresh-defaults`, then regenerate. Do not rename the names - 2.2b
    kept them for recipe compatibility. The same chunk decides what the 28 `engines/mlx-serve/`
    read references in `envvars.json` mean now that the gitlink is gone, since
