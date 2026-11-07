@@ -77,20 +77,27 @@ timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'tes
 # process tests flip, and un-skipping a platform's tests moves the skip total.
 mkdir -p runtime
 timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q
-# 649 passed, 5 failed, 41 skipped. The five are the missing cosmos_windows module (2), its
-# video gate, the deleted slstack.mac profile, and test_yoco's preset default. A sixth name
-# appears in some runs and not others, alone or in a full run -
+# 669 passed, 6 failed, 37 skipped. The five stable ones are the missing cosmos_windows module
+# (2), its video gate, the deleted slstack.mac profile, and test_yoco's preset default; the rest
+# of the line depends on which process tests flipped this run - runs of this tree showed 6 and 7
+# failures an hour apart. One of those names appears in some runs and not others, alone or in a
+# full run -
 # test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only - and it
 # fails in a worktree of the commit before chunk 5.2 too, so it is the box, not the tree.
 
-# Chunk 5.1's kernel containment, and chunk 5.2's runner and shared lease: no GPU, no model.
-timeout 300 env PYTHONPATH=.:tests python3 -B -m pytest \
-  tests/test_cgroup_scope.py tests/test_advisory_lock.py tests/test_producer_runner.py -q
-# 37 passed. The cgroup one creates real subgroups under the user's app.slice and lets the
-# kernel SIGKILL an oversized child, so it needs the memory controller delegated there - it
-# skips with the reason printed if it is not. The runner one launches real children through
-# slstack/producer_launch.py and reads their /proc identity; it writes its fixtures under
-# runtime/ because the runner refuses a RAM-backed volume, which /tmp is here.
+# Chunk 5.1's kernel containment, chunk 5.2's runner and shared lease, chunk 5.3's resident
+# admission and checkpoint tier: no GPU, no model.
+timeout 300 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest \
+  tests/test_cgroup_scope.py tests/test_advisory_lock.py tests/test_producer_runner.py \
+  tests/test_working_set.py tests/test_combo_ram.py -q
+# 68 passed, 4 skipped (the Windows arms of the working-set and section tests). At the commit
+# before chunk 5.3 the same command reads 48 passed, 8 skipped.
+# The cgroup one creates real subgroups under the user's app.slice and lets the kernel SIGKILL an
+# oversized child, so it needs the memory controller delegated there - it skips with the reason
+# printed if it is not. The runner one launches real children through slstack/producer_launch.py
+# and reads their /proc identity; it writes its fixtures under runtime/ because the runner refuses
+# a RAM-backed volume, which /tmp is here. The checkpoint tier lives under /dev/shm on purpose -
+# that refusal is the producer's volume rule, not this tier's.
 
 # The check gate the plan's Phase 5 names. Runs here; model/vram rows fail for box reasons.
 timeout 120 ./bin/slstack --config config.example.json check
@@ -99,6 +106,20 @@ timeout 120 ./bin/slstack --config config.example.json check
 cat /sys/fs/cgroup$(awk -F: '{print $3}' /proc/self/cgroup)/cgroup.subtree_control
 # Empty in this process's own scope; the walk in slstack/cgroup_scope.py goes up to app.slice,
 # which shows "memory pids". Exceeding a scope's memory.max with memory.swap.max=0 SIGKILLs it.
+# A scope of ours delegates memory while it is empty and answers EBUSY once it has a member, so
+# a producer cannot be given a scope nested inside the guarded one.
+
+# Whether a subgroup's memory.min is honoured here: it is not, because the ancestors are not
+# floored and an unprivileged user cannot floor them. Read the chain, then ask the kernel.
+for d in /sys/fs/cgroup /sys/fs/cgroup/user.slice /sys/fs/cgroup/user.slice/user-1000.slice \
+         /sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service \
+         /sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice; do
+  printf '%s min=%s owner=%s writable=%s\n' "$d" "$(cat $d/memory.min 2>/dev/null)" \
+    "$(stat -c %U $d/memory.min 2>/dev/null)" "$([ -w $d/memory.min ] && echo yes || echo no)"
+done
+# Every floor above app.slice is root-owned and 0644, so slstack/cgroup_scope.py reports the
+# subgroup's floor as honored=false with the first such ancestor as blocked_by, and
+# tests/test_cgroup_scope.py proves the kernel agrees by writing to memory.reclaim.
 
 # io_uring expert-read transport against pread: no GPU, no model, runs while Strata is up.
 make -C engines/ds4 test-batch-io            # needs /tmp/ds4-batch-io.bin (64 MiB); the target creates it
@@ -112,13 +133,14 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
 
-# The orchestrator has no Win32 bindings left either, except the two files chunk 5.3 owns
+# The orchestrator has no Win32 bindings left except the two Windows arms of the ported modules
 # and the media installer. Note -I (the built engine binaries and *.o match these patterns) and
 # --exclude-dir=port, because scripts/port's own sweep token list is not platform code.
 grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel32\|add_dll_directory" \
   slstack scripts --include=*.py --exclude-dir=__pycache__ --exclude-dir=port
-# 8 lines, and only two of them are code: combo_ram.py and working_set.py (chunk 5.3) each call
-# ctypes.WinDLL('kernel32'). The other six are provenance - five rows of the mapping table in
+# 8 lines, and only two of them are code: combo_ram.py and working_set.py each call
+# ctypes.WinDLL('kernel32') in the Windows arm of a module that now runs on both platforms.
+# The other six are provenance - five rows of the mapping table in
 # slstack/producer_runner.py's docstring, which names the retired API it replaces, and one line
 # in working_set.py's module docstring. media_tools.py's Windows FFmpeg download does not match
 # this pattern - it keys on os.name and .exe names.
@@ -477,6 +499,47 @@ timeout 300 python3 -B docs/evidence/producer-launch-gate.py
 leaves with 125 when its controller's write end goes away, so nothing survives the run. Readiness itself is still unreachable here - the engine then asks for a qualified GGUF,
 and `--gpu-reserve-bytes` has a 1 GiB floor, so a box with less free VRAM than that stops at
 the reserve refusal.
+
+### What a resident admission receipt says about this box (chunk 5.3)
+
+`protect_working_set` runs after resume and writes `resident-admission.json` (ULTRA, mode1) or
+`working-set.json` (the native broker). On Linux the arm is `memory.min` on the scope the job
+inherited, so the row is `mechanism: "cgroup memory.min"` plus a `resident` object, and the two
+fields that matter are `honored` and `blocked_by`. A receipt with `honored: false` is not a
+failure and not a residency guarantee either: it says the kernel will not protect those pages
+because an ancestor carries no floor, and that `memory.swap.max=0` on the scope plus the
+guardian's paging guard is what keeps them resident. `headroom_kept_bytes` is the reclaim room
+left below the scope's ceiling.
+
+```bash
+timeout 300 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest \
+  tests/test_working_set.py -q -s -k inherited
+# DS4COMBO_RESIDENT_FLOOR_INERT {"pid": ..., "scope": ".../slstack-resident-<pid>-<nonce>",
+#   "applied": true, "floor_bytes": 134217728, "ceiling_bytes": 268435456,
+#   "original_floor_bytes": 0, "retained": true, "honored": false,
+#   "blocked_by": ".../app.slice", "reason": "... zeroes this protection",
+#   "requested_bytes": 134217728, "headroom_kept_bytes": 134217728}
+# 1 passed, 8 deselected
+```
+
+The checkpoint tier is a `/dev/shm` section with the creating pid in its name, so a controller
+killed before its own teardown does not leave gigabytes pinned until reboot: the next creator
+removes owned names whose pid is gone. A partial page lock is a printed line, never a refusal:
+
+```bash
+ls /dev/shm | grep -c '^DS4COMBO-'      # 0 after a clean run; a name outlives a SIGKILLed owner
+timeout 120 env PYTHONPATH=. python3 -B -c "
+from slstack.combo_ram import LockedRam, memlock_allowance_bytes, section_name
+ram=LockedRam(16<<20,session='3'*32,host_budget_gib=.5,min_available_gib=4)
+print('locked',ram.locked_bytes,'of',ram.capacity,'errno',ram.lock_reason,
+      'allowance',memlock_allowance_bytes());ram.close()
+print('gone after close:',not section_name(ram.name).exists())"
+# DS4COMBO_LOCKED_RAM_PARTIAL {"name":"DS4COMBO-...-<pid>-<nonce>","capacity_bytes":16777216,
+#   "locked_bytes":8388608,"shortfall_bytes":8388608,"errno":12,"memlock_allowance_bytes":8388608,
+#   "enforcement":"the guarded scope memory.swap.max=0 and the guardian paging guard"}
+# locked 8388608 of 16777216 errno 12 allowance 8388608
+# gone after close: True                  (errno 12 is ENOMEM on this kernel, not EAGAIN)
+```
 
 ## Gates that fail today, and why
 

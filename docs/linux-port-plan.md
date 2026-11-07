@@ -362,16 +362,18 @@ Chunk 5.1 landed the platform half of this phase in four commits (`270d7a9`, `65
 `c17d6a6`, `63c8dc1`): the paging counters read `/proc`, one advisory lock replaces the
 four `msvcrt`/`fcntl` pairs, the guardian contains its tree in a cgroup v2 scope, and the
 staged runtime carries Linux binaries. Chunk 5.2 (`5fb07f7`) landed the producer runner, so
-nothing that launches a producer refuses non-nt any more; what still refuses non-nt is two
-files and one media installer:
+nothing that launches a producer refuses non-nt any more, and chunk 5.3 landed resident
+admission and the checkpoint tier, so what refuses non-nt in this phase is one media
+installer:
 
 ```
-combo_ram.py      LockedRam is a named Windows file mapping plus VirtualLock, and
-                  protect_working_set is SetProcessWorkingSetSizeEx on the owned job.
-                  Its runner is now slstack.producer_runner.default_runner, so both are
-                  reachable on Linux and refuse only inside kernel_api() - chunk 5.3.
-working_set.py    the same protect_working_set, kept as a separate module for the
-                  native_broker path. Same dependency, same chunk.
+combo_ram.py      both arms now: the Windows named section and `VirtualLock` stay, and the
+                  Linux arm is an exclusive 0600 `/dev/shm` section, `MAP_SHARED`, chunked
+                  best-effort `mlock`, and `attach()` for the child. Resident admission moved
+                  out of it - it was a copy of working_set.py's.
+working_set.py    resident admission, one implementation. Windows keeps the hard minimum
+                  working set; Linux writes `memory.min` on the scope the job inherited and
+                  reports whether the kernel will honour it.
 media_tools.py    downloads and unpacks a pinned Windows FFmpeg zip; the non-nt arm only
                   reports the system ffmpeg and ffprobe on PATH. Media setup, Phase 6.
 ```
@@ -1204,21 +1206,70 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `job.pi.process`, which this runner does not expose - chunk 5.3 reads `job.scope` and
     `job.pid` instead.
 
-5.3 Resident admission and the locked checkpoint. `working_set.protect_working_set` and
-    `combo_ram.protect_working_set` set a hard minimum working set on the owned job; the
-    Linux counterpart is `memory.min` on the scope the job inherited (`job.scope`), written
-    in page multiples - chunk 3.1h learned that the kernel rounds and splits VMAs. Neither
-    module may need a handle at all, since chunk 5.2's `_Job` exposes `pid` and `scope`
-    only. `memory.min` on an *inherited* scope raises the floor of the guardian's own tree
-    too, which the Windows working set did not: decide whether the producer needs a scope of
-    its own, and whether the guardian can delegate `memory` to it, before writing one.
-    `combo_ram.LockedRam` is a named `CreateFileMappingW` + `VirtualLock` shared section,
-    which becomes `shm_open`/`mmap` + best-effort `mlock` with the 3.1h
-    `CARRY_RAM_LOCK_PARTIAL` rule, and its child-side `OpenFileMappingW` becomes the same
-    name under `/dev/shm` - which chunk 5.2's volume rule refuses as RAM-backed, so either
-    the checkpoint moves off tmpfs or that rule is scoped to producer paths.
-    Gate: `tests/test_working_set.py` and `tests/test_combo_ram.py` stop skipping and the
-    shared-RAM child handoff in `combo_ultra_parity.py` runs.
+5.3 Resident admission and the locked checkpoint. Done in `1279063`. The two verbatim copies of
+    `protect_working_set` are one function now: resident admission (`protect_working_set`,
+    `wait_owned_initialization`) lives only in `slstack/working_set.py`, which `combo_native` and
+    `combo_producer` import directly, and `slstack/combo_ram.py` keeps the section. Linux has no
+    per-process page floor, so the arm is `memory.min` on the scope the job inherited
+    (`job.scope`), written in whole pages and kept below the scope's ceiling by the same 64 MiB
+    metadata headroom the Windows arm kept between its minimum and its advisory maximum - a
+    subgroup whose floor equals its ceiling has nothing left to evict, so pressure there would
+    become a termination instead of an eviction of page cache.
+    Two decisions, both settled by measuring the kernel here rather than by reasoning:
+    - **No scope of its own for the producer.** A scope that has member processes cannot
+      delegate the memory controller - writing `+memory` to `cgroup.subtree_control` answers
+      EBUSY (16) - so a producer scope nested under the guarded one is impossible, and a
+      sibling created in `app.slice` would take the producer out of the ceiling chunk 5.2
+      deliberately kept. The floor therefore bounds the guarded tree, controller included,
+      which is the same tree the ceiling already bounds and which host admission proves fits.
+      A scope this stack did not create (no `slstack-` prefix: a terminal's or a session
+      manager's) is reported and left alone - raising a floor on somebody else's tree is not
+      this stack's to do.
+    - **The floor is written and reported, not counted as residency.** The kernel zeroes a
+      subgroup's protection as soon as any ancestor between it and the root carries no floor,
+      and the ancestors above `app.slice` here are root-owned (`user@1000.service/memory.min`
+      is uid 0, mode 0644), so an unprivileged process cannot complete that chain. Measured
+      with `memory.reclaim` against a child holding 64 MiB of page cache in a subgroup floored
+      at 64 MiB: the kernel took all of it back, both with `app.slice` at 0 and with `app.slice`
+      raised to 64 MiB too. So the row says `honored: false` with the blocking ancestor and the
+      run prints `DS4COMBO_RESIDENT_FLOOR_INERT`; what actually holds the pages is the scope's
+      `memory.swap.max=0` and the guardian's paging guard, as chunk 3.1h concluded for the
+      carry tier. A deployment that floors its own slice chain gets residency from this write
+      with no change to the code.
+    `LockedRam` is the same tier on `/dev/shm`: `O_CREAT|O_EXCL` 0600, `ftruncate`, `MAP_SHARED`
+    mmap, chunked best-effort `mlock` halving at each refusal (the engine's `lock_pages` rule,
+    whole pages, `DS4COMBO_LOCKED_RAM_PARTIAL` for the shortfall) and `munlock` of what it
+    captured. The checkpoint's RAM-backed directory is not the producer's volume rule: that rule
+    refuses RAM-backed *producer* paths (weights, receipts, outputs) and the section never goes
+    through `_Native._open` or `volume()`, so the refusal list was left alone and the exception is
+    stated where the rule lives. A tmpfs name outlives the process that made it, which a kernel
+    section's handle did not, so the name carries the creating pid and `reap_stale_sections()`
+    removes owned names whose creator is gone - the rule `cgroup_scope.reap_stale` uses for
+    capped directories. `attach(name,capacity)` is the child-side `OpenFileMappingW` +
+    `MapViewOfFile`, and it hands back the same bounded-transfer surface (`SharedSection`), which
+    is now the half `LockedRam` shares with it.
+    Gate: `tests/test_working_set.py` (8 checks on Linux, one Windows arm still skipped) against
+    real owned CPU children and real scopes - the floor lands on the inherited scope, a foreign
+    scope and a missing scope are reported without being touched, the ceiling gap is kept, an
+    admission that rounds below one page refuses, and a failed `after_resume` certifies the owned
+    cleanup on Linux now that the runner is Linux. `tests/test_cgroup_scope.py` (5 checks added)
+    covers the whole-page rounding, the readback and the ceiling it reports, a limit written as
+    `max`, the refusal where there is no memory controller, and the claim that the reported honour
+    is the kernel's actual answer, applied through `memory.reclaim`. `tests/test_combo_ram.py`
+    (7 checks un-skipped from the Windows class) covers bounded transfers, the cross-process
+    attach and the child's write, exclusive creation, name validation, the stale-name reap, the
+    teardown that removes the name, and the lock receipt. The five chunk-5.x Python files read 68
+    passed, 4 skipped against the same command at `c4ddbf8` reading 48 passed, 8 skipped - 20 more
+    running, three names un-skipped, and one duplicated Windows assertion deleted with the copy of
+    `protect_working_set` it belonged to. The full suite reads 669 passed, 6 failed, 37 skipped
+    against this chunk's own 648/7/41 baseline, and every failing name in both runs is one of the
+    five this plan's Phase 7 and Phase 8 own or one of the three process tests that flip between
+    runs.
+    `combo_ultra_parity.py`'s shared-RAM handoff still needs a qualified GGUF, so it is unrun.
+    Findings this chunk produced: `mlock` past `RLIMIT_MEMLOCK` answers ENOMEM (12) on this
+    kernel, not the EAGAIN the man page leads with; and a whole-user floor chain is not reachable
+    without privileges, so a resident admission on Linux is a claim about the tree this stack
+    created, never about the host.
 
 6.1 Vendor and engine bloat: `vendor/mac-mlx`, `engines/mlx-receiver`, `engines/mlx-serve`,
     `engines/mference`, the MLX lock files, `patches/mlx-core-ring-listeners.*`.
@@ -1260,12 +1311,21 @@ cgroup v2 is unified (`/sys/fs/cgroup` is cgroup2fs) and the user's `app.slice` 
 what chunk 5.1's guardian does. `systemd-run --user --scope -p MemoryMax=...` works too, but it
 puts the command one generation below the caller, which breaks the guardian's identity checks
 (`owner==child.pid` or `candidate.ppid()==child.pid`), so the port uses the subgroup directly.
-The process's own scope does *not* delegate `memory` to its children (`cgroup.subtree_control`
-is empty there and writing `+memory` to it returns EPERM), which is why `controller_parent()`
-walks up out of it. Exceeding `memory.max` with `memory.swap.max=0` SIGKILLs the tree, and
-`memory.oom.group=1` takes every member, not only the offender. `RLIMIT_MEMLOCK` stays 8 MiB soft
-*and* hard, so `mlock` remains best effort (chunk 3.1h) - the scope ceiling is a different
-mechanism and needs no allowance.
+The process's own scope does *not* delegate `memory` to its children (its
+`cgroup.subtree_control` is empty), which is why `controller_parent()` walks up out of it.
+Measured in chunk 5.3: a scope this stack created delegates `memory` while it is empty and
+answers EBUSY (16) as soon as it has a member process - the no-internal-processes rule, and
+the reason the producer cannot get a scope *inside* the guarded one.
+Exceeding `memory.max` with `memory.swap.max=0` SIGKILLs the tree, and
+`memory.oom.group=1` takes every member, not only the offender. `memory.min` is the half that
+does not work here: the kernel zeroes a subgroup's protection when any ancestor between it and
+the root carries no floor, and above `app.slice` the ancestors are root-owned
+(`user@1000.service/memory.min` is uid 0, mode 0644), so an unprivileged process cannot complete
+the chain. Measured with `memory.reclaim` against a child holding 64 MiB of page cache in a
+subgroup floored at 64 MiB: all of it came back, with `app.slice` at 0 and also with `app.slice`
+raised to 64 MiB. `RLIMIT_MEMLOCK` stays 8 MiB soft *and* hard, so `mlock` remains best effort
+(chunk 3.1h), and on this kernel a lock past it answers ENOMEM (12) rather than the EAGAIN the
+man page leads with. The scope ceiling is a different mechanism and needs no allowance.
 
 Two things limit what a gate can prove here:
 
@@ -1308,10 +1368,11 @@ built engine binaries and `*.o` under `engines/ds4` match these patterns and are
 differently - some without `-I` - so they are not comparable; re-run the command rather than
 trusting any number here. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
 `scripts/port`'s own sweep `--tokens` list does not count, the gate in
-`docs/linux-port-commands.md` reports 8 lines after chunk 5.2 and only two of them are code:
-`combo_ram.py` and `working_set.py` each call `ctypes.WinDLL('kernel32')` (chunk 5.3). The other
-six are provenance - five rows of `slstack/producer_runner.py`'s mapping table, which names the
-retired API it replaces, and one line of `working_set.py`'s module docstring.
+`docs/linux-port-commands.md` reports 8 lines after chunk 5.3 and only two of them are code:
+`combo_ram.py` and `working_set.py` each call `ctypes.WinDLL('kernel32')` in the Windows arm of
+a module that now runs on both platforms. The other six are provenance - five rows of
+`slstack/producer_runner.py`'s mapping table, which names the retired API it replaces, and one
+line of `working_set.py`'s docstring naming the Win32 binding that arm keeps.
 `media_tools.py`'s Windows FFmpeg download is not in that
 number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
@@ -1336,11 +1397,15 @@ ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 in chunk 1.10b.
 
 Python suite: `timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B
--m pytest tests/ -q` reports **649 passed, 5 failed, 41 skipped** after chunk 5.2 (22 runner
-checks and one shared-lock check added; no name un-skipped). Set
+-m pytest tests/ -q` reports **669 passed, 6 failed, 37 skipped** after chunk 5.3 (20 new
+resident-admission and checkpoint checks, 3 names un-skipped from the two Windows-only
+classes; one of those is the post-resume cleanup contract, which only runs now that the runner
+is Linux). A second full run of the same tree an hour earlier read 669 passed, 7 failed, 38
+skipped: three of the failures are process tests that move. Set
 `STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or 21
-process tests raise `KeyError: STUDIO_RUNTIME_ROOT`; without it the same tree reads 624 passed,
-29 failed, 41 skipped, which is why counts alone mislead. Two process tests vary run to run
+process tests raise `KeyError: STUDIO_RUNTIME_ROOT`, and chunk 5.3's floor-honour check needs a
+disk-backed fixture directory too; without it the same tree reads 639 passed, 35 failed, 38
+skipped, which is why counts alone mislead. Two process tests vary run to run
 (`test_real_owned_child_stops_on_kit11_hold`,
 `test_disconnect_inside_reasoning_then_next_turn_appends_only`), so compare the set of names,
 not the count. The five stable survivors are Linux gaps, not Mac leftovers: the missing

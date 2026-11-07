@@ -26,24 +26,23 @@ in the streamed prefill path refuses on Linux any more. What it still needs is a
 Chunk 5.1 - the Python orchestrator's platform half - is finished, in four commits, so `slstack/`
 has no `msvcrt` and no `CREATE_SUSPENDED` left and the guardian caps its tree in the kernel rather
 than polling it; chunk 5.2 (`5fb07f7`) is the producer runner, so a ULTRA or mode1 producer can be
-launched here and has been, without a model. In the order worth doing next:
+launched here and has been, without a model; chunk 5.3 is resident admission and the locked
+checkpoint, so `combo_producer`, `combo_native` and `native_broker` reach `after_resume` on Linux
+and the checkpoint tier allocates, locks what the kernel allows, and is attachable by name from a
+second process. Phase 5 is complete. In the order worth doing next:
 
-1. **Chunk 5.3 - resident admission and the locked checkpoint.** `working_set.protect_working_set`
-   and `combo_ram.protect_working_set` reach for `job.pi.process`, the suspended process handle the
-   retired Windows runner exposed; chunk 5.2's `_Job` exposes `job.pid` and `job.scope` instead, so
-   the Linux counterpart is `memory.min` on the scope the job inherited - write page multiples,
-   because 3.1h learned the kernel rounds and splits the VMA - and `shm_open`/`mmap` plus
-   best-effort `mlock` for `LockedRam`'s named section. Two things to decide before writing it:
-   an *inherited* scope's `memory.min` also raises the floor of the guardian's own tree, which a
-   Windows working set did not, so the producer may need a scope of its own and the guardian may
-   need to delegate `memory` to it (its own scope cannot, because of the internal-processes rule);
-   and chunk 5.2's volume rule refuses a RAM-backed filesystem, which is what `/dev/shm` is, so
-   either the checkpoint moves off tmpfs or that rule gets scoped to producer paths. Read
-   `code-design` first: this changes admission, not text.
+1. **Chunk 4.1 - the ggml backend prune** (keep CUDA and CPU; delete Vulkan, SYCL, Hexagon,
+   KleidiAI, RPC, AMX, Metal in `ggml-bench` and the options in `ggml/CMakeLists.txt`). It is the
+   last chunk that changes what the producer compiles, so it belongs before anything that measures.
+2. **Chunk 7.1 - docs, presets, tests**: the Mac/paired halves, `docs/VARIABLES.md` regeneration
+   (which also owes the 123 wrapper-read names below), the inherited Windows/macOS measurement
+   labels, `media_tools.py`'s FFmpeg pin, `scripts/build_combo_runtime.py`'s `... -> ds4-win
+   decode` preset name, and the four suite names it owns.
+3. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start without
+   a download or a quantize run in the accepted type set (see "Constraints on this box" 2).
 
-Also open: 7.1 (docs/presets/tests), 4.1 (ggml backend prune), and 8.1 (qualification), the last
-blocked on a qualified GGUF. Phase 3's remaining Win32 is `mtmd`, `server` and `decode-receiver`,
-none of which the streamed prefill needs. Three findings from 2.2e that belong to those chunks and
+Phase 3's remaining Win32 is `mtmd`, `server` and `decode-receiver`, none of which the streamed
+prefill needs. Three findings from 2.2e that belong to those chunks and
 to no chunk yet: 35 declarations in the engine's GPU headers are dead - declared by the deleted
 Mac backend, defined nowhere, called nowhere (the scan is in this file's method section, and the
 three that named Metal were deleted in 2.2e's comment half); 123 `DS4_METAL_*` environment names
@@ -79,10 +78,14 @@ allowance a multi-gigabyte carry tier is mostly pageable, and the paging guard, 
 is what keeps it resident. Expect also a scope ceiling: the guardian caps the tree at
 `job_commit_gib`, which on Linux is `host_budget_gib`, so a plan whose host tier exceeds the config's
 host budget is now refused by the kernel rather than reported by the poll.
-Through `slstack`'s combo / ULTRA session path, chunk 5.3 first: the runner is Linux now
-(`slstack.producer_runner.default_runner`), so a producer is launched and reaches its own
-refusal, but `combo_producer`'s and `combo_native`'s `after_resume` still calls
-`protect_working_set`, which refuses non-nt inside `kernel_api()`.
+Through `slstack`'s combo / ULTRA session path, nothing of the admission chain is missing any
+more: chunk 5.3 landed the resident admission that `combo_producer`'s, `combo_native`'s and
+`native_broker`'s `after_resume` call, so a producer is launched, admitted, and reaches the
+engine's own readiness gate. Expect `DS4COMBO_RESIDENT_FLOOR_INERT` in that path's log on this box:
+`memory.min` is written and read back, but the kernel zeroes it because no ancestor of the scope
+carries a floor - what keeps the pages resident is the scope's `memory.swap.max=0` and the
+guardian's paging guard. Expect `DS4COMBO_LOCKED_RAM_PARTIAL` too on any checkpoint tier above
+8 MiB, for the same reason the carry tier reports `CARRY_RAM_LOCK_PARTIAL`.
 
 Chunk 3.2 (the decode library loader) landed inside 3.1c, because `live-session.inc` is part of
 `main.cpp`'s body: `dlopen`/`dlsym` of `ds4-decode.so` beside the executable. Its binding is
@@ -96,30 +99,37 @@ maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a),
 `1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), `187f2fa` + `09b6158` (the
 model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4), `f551a8d`
 (2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), `270d7a9` (5.1a), `65e54bd` (5.1b),
-`c17d6a6` (5.1c), `63c8dc1` (5.1d), `5fb07f7` (5.2), plus the plan/handoff commits.
-`git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
+`c17d6a6` (5.1c), `63c8dc1` (5.1d), `5fb07f7` (5.2), `1279063` (5.3), plus the plan/handoff
+commits. `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
 
 The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyError` for it (the
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **649 passed, 5 failed, 41 skipped**; without it, 624 passed, 29 failed, 41 skipped.
+this tree reads **669 passed, 6 failed, 37 skipped**; without it, 639 passed, 35 failed, 38
+skipped - chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
 Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
 count - the process tests flip and the skip set changes when a platform gate starts running.
 Chunk 5.1 un-skipped `tests/test_combo_guard.py`, which was `skipUnless(os.name=='nt')`: 21 guardian
 tests that had never run on Linux now do, which is why the skip count fell from 62 to 41. Chunk 5.2
-added 22 runner checks and one shared-lock check and un-skipped nothing, so the skip line is still
-41; a sixth name appears and disappears between runs, alone or in a full run,
-`test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only`, and it
-fails in a worktree of the commit before chunk 5.2 as well - it is the box, not the tree.
+added 22 runner checks and one shared-lock check and un-skipped nothing, so the skip line was still
+41. Chunk 5.3 added 20 checks and un-skipped three names - among them the post-resume ownership
+contract, which only runs now that the runner is Linux - so the line is 37 and the passing count
+moved from the 648 this session measured at `c4ddbf8`. Five names fail in every run: the ones
+7.1 and 8.1 own (listed below). Three more appear and disappear -
+`test_combo_guard::test_persistent_window_denial_still_stops_owned_job`,
+`test_hold_yield::test_real_owned_child_stops_on_kit11_hold` and
+`test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only` - so four
+full runs of this session's tree read 6 or 7 failures against the same five. All three fail in a
+worktree of the commit before chunk 5.2 as well; they are the box, not the tree.
 
 Working tree is clean apart from scratch under `build/` and `runtime/`; `build/wt-base` is a
-worktree at `9a288ef` (the commit before chunk 5.2), so move it wherever a comparison needs a
-baseline - `git -C build/wt-base checkout <sha>` - or remove it with
+worktree now checked out at `c4ddbf8` (the commit before chunk 5.3), so move it wherever a
+comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
 `git worktree remove build/wt-base`. `engines/ds4` holds `ds4` and `ds4-decode.so` built from the
 pushed tree (CUDA_ARCH=sm_120), so `./ds4 --help` and the unknown-option gate can run without a
 rebuild; `ds4-server`, `ds4-bench`, `ds4-eval` and `ds4-agent` are still from the previous session.
-Chunks 5.1 and 5.2 touched no engine source, so nothing they link changed - but rebuild before
+Chunks 5.1, 5.2 and 5.3 touched no engine source, so nothing they link changed - but rebuild before
 trusting a gate that runs one of them.
 `python3 -B scripts/release_check.py`
 reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPath` is empty and
@@ -127,16 +137,18 @@ reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPa
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
-`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **649 passed, 5 failed, 41 skipped**, and the
-five are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing `cosmos_windows` module),
-`test_h3_video_delivery` (that module, plus a `.exe`-shaped fixture),
+`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **669 passed, 6 failed, 37 skipped**, and five
+of the six are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing
+`cosmos_windows` module), `test_h3_video_delivery` (that module, plus a `.exe`-shaped fixture),
 `test_shared_prefill_profile` (needs `slstack.mac`, which this checkout does not publish), and
-`test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the 49152 it asserts).
-One more, `test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only`,
+`test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the 49152 it asserts);
+the other two are the process tests named above. One more,
+`test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only`,
 flips between runs and was passing in the run quoted above. Chunk 7.1 owns the missing-module and
 Mac-profile names, 8.1 the recipe default. Chunk 5.1 fixed four names that used to be in this list
-and un-skipped 21 more; check a suspected regression by running the same file in a worktree at the
-baseline (`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
+and un-skipped 21 more; chunk 5.3 un-skipped three more and fixed none. Check a suspected
+regression by running the same file in a worktree at the baseline
+(`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
 between runs - compare the set of names, never the counts.
 
 Five hand-compiled programs cover what has no test target, all passing on this tree:
@@ -155,18 +167,29 @@ has the exact compile lines for all eight - the lease recipe was missing from it
 session, and the two carry recipes until this one.
 
 Chunk 5.1's Linux gates are ordinary pytest files rather than hand-compiled programs:
-`tests/test_cgroup_scope.py` (8 checks, the kernel refusing an oversized tree, a grandchild's
-refusal taking the group, the survivor and stale-launcher rules) and
+`tests/test_cgroup_scope.py` (13 checks after 5.3 - the kernel refusing an oversized tree, a
+grandchild's refusal taking the group, the survivor and stale-launcher rules, and the floor half:
+whole-page rounding, the readback, the refusal where there is no memory controller, and
+`memory.reclaim` proving that the reported honour is the kernel's actual answer) and
 `tests/test_advisory_lock.py` (7 checks after 5.2 added the shared arm and the interrupted-wait
 rule, one lock across two
 processes, contended, blocking and shared) both run in the suite and need no GPU, no model and no
-`STUDIO_RUNTIME_ROOT`. Chunk 5.2's are `tests/test_producer_runner.py` (22 checks: nothing runs
+`STUDIO_RUNTIME_ROOT` - except the honour check, which needs a disk-backed fixture directory.
+Chunk 5.2's are `tests/test_producer_runner.py` (22 checks: nothing runs
 before admission, the never-resumed and closed-child retirements, SIGINT retirement, the force
 fallback with a grandchild, `wait_for_exit` over the job, `/proc` module list, the volume and alias
 refusals, lease sharing, `commit()`/`memory()` from `/proc`, NVML identity and capability) and
 `docs/evidence/producer-launch-gate.py`, which drives the real CLI through the vendored `Producer`
 and is the only gate that exercises the launch chain end to end; it needs the CUDA headroom probe
-to say yes and `build/smoke/out` cleared.
+to say yes and `build/smoke/out` cleared. Chunk 5.3's are `tests/test_working_set.py` (8 checks
+against real owned CPU children and real scopes: the floor lands where the job inherited it, a
+foreign or missing scope is reported and left alone, the ceiling keeps its reclaim gap, an admission
+below one page refuses, and a failed `after_resume` certifies the owned cleanup on Linux) and
+`tests/test_combo_ram.py` (7 checks on the `/dev/shm` tier: bounded transfers, a second process
+attaching by name and writing through it, exclusive creation, name validation, the stale-name reap,
+the teardown that removes the name, and the lock receipt). Those two files' Windows classes stay
+skipped here, and `docs/linux-port-commands.md` has the commands that read the receipt and the
+partial-lock line directly.
 
 Nothing verified so far is a performance result for a model. The measurements are the fetcher's
 reader comparison (`docs/evidence/wf-io-selftest.cpp`: io_uring x1.04 at four threads, x1.44-x1.67
@@ -345,7 +368,36 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunk 5.2, one commit):
+This session's (chunk 5.3, one commit):
+
+- **Resident admission runs on Linux.** `working_set.protect_working_set` is one function now -
+  `combo_ram`'s verbatim copy is gone, and `combo_native`/`combo_producer` import the surviving
+  one - and its Linux arm writes `memory.min` on the scope the job inherited (`job.scope`), in
+  whole pages, kept below the scope's ceiling by the 64 MiB metadata headroom. The budget
+  arithmetic, the initialization wait and the receipt keys are unchanged; the row gains
+  `mechanism` and a `resident` object. **Anything reading `resident-admission.json` or
+  `working-set.json` on Linux now sees `resident.honored` and `resident.blocked_by`** and, where
+  the ancestors carry no floor, a `DS4COMBO_RESIDENT_FLOOR_INERT` line. The floor bounds the
+  guarded tree, controller included, and a scope this stack did not create (`slstack-` prefix) is
+  reported and left untouched - `resident.applied` is then false and nothing is written.
+- **The checkpoint tier is `/dev/shm` now.** `LockedRam` creates the section
+  `O_CREAT|O_EXCL` at 0600, truncates to the admitted capacity, maps it `MAP_SHARED`, and locks
+  it in whole-page chunks that halve at each refusal - the engine's `lock_pages` rule - reporting
+  the shortfall as `DS4COMBO_LOCKED_RAM_PARTIAL` rather than refusing, because an unprivileged
+  Linux process cannot lock a real tier at all here. A full `VirtualLock` failure is still a
+  refusal on Windows. **A lock past `RLIMIT_MEMLOCK` answers ENOMEM (12), not EAGAIN**, on this
+  kernel. `attach(name,capacity)` replaces the child-side `OpenFileMappingW` + `MapViewOfFile`
+  and returns the same bounded-transfer surface (`SharedSection`, which `LockedRam` now shares).
+  The name carries the creating pid and `reap_stale_sections()` removes owned names whose creator
+  is gone, because a tmpfs name outlives its process where a section handle did not; `close()`
+  unlinks it. Transfers stay <=64 KiB, `sha256` and `lease()` are unchanged, and no environment
+  variable was added or dropped.
+- **The volume refusal was left alone.** It refuses RAM-backed *producer* paths - weights,
+  receipts, outputs - and the checkpoint never goes through `_Native._open` or `volume()`, so the
+  exception is written in `combo_ram.py`'s docstring and in `producer_runner.py`'s refusal list
+  comment instead of narrowing the rule.
+
+Previous session's (chunk 5.2, one commit):
 
 - **A ULTRA or mode1 producer can be launched on Linux.** `slstack/producer_runner.py` is the
   counterpart of the vendored Windows runner with the same `_Native`/`_Job` surface, and
@@ -436,14 +488,15 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   variables), no engine source changed, and the geometry defaults in `choose_scan()` are still the
   Windows RAID-0 tuning, untouched.
 
-- Still Windows-shaped and untouched: `combo_ram.py`'s `LockedRam` and both copies of
-  `protect_working_set` (5.3), `media_tools.py`'s pinned Windows FFmpeg download with
+- Still Windows-shaped and untouched: `media_tools.py`'s pinned Windows FFmpeg download with
   `test_h3_video_delivery`'s `.exe` fixture (Phase 6/7.1), `scripts/perfexp_pair.py`'s
   `ds4-decode.dll` hash and its `decode_dll_sha256` receipt key (8.1), and
   `scripts/build_combo_runtime.py`'s preset name `... -> ds4-win decode` with its `mac={}` field
   (7.1). The producer launcher - `studio.dsv41_windows_runner._Native`, which refuses non-nt in
   its constructor - is ported (5.2): it stays as the Windows arm, and nothing selects it by
-  import any more.
+  import any more. `combo_ram.LockedRam` and `working_set.protect_working_set` are ported too
+  (5.3); their `ctypes.WinDLL('kernel32')` calls are the Windows arms of modules that run on both
+  platforms, which is what the `docs/linux-port-commands.md` gate of 8 lines means now.
 
 ## Gotchas
 
@@ -641,6 +694,36 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   the user's slice (twelve had piled up on this box). Two consequences: a live launcher's fresh,
   still-empty scope is never taken from it, and scopes created before this naming existed match no
   rule and are never reaped (this box's were removed by hand).
+- **`memory.min` is honoured only while every ancestor between the subgroup and the root carries
+  a floor of its own**, and above `app.slice` on this box the ancestors are root-owned
+  (`user@1000.service/memory.min` is uid 0, mode 0644), so an unprivileged process can never
+  complete that chain. Measured, not recalled: 64 MiB of page cache in a subgroup floored at
+  64 MiB came fully back through `memory.reclaim`, both with `app.slice` at 0 and with `app.slice`
+  raised to 64 MiB too. Writing the floor is therefore free and correct, and counting it as
+  residency is not: `cgroup_scope.memory_floor` returns `honored` and `blocked_by`, and the guard
+  prints `DS4COMBO_RESIDENT_FLOOR_INERT`. Do not "fix" this by raising `app.slice` - that is the
+  user's whole session, including Strata and this assistant, and it does not help anyway.
+- **A scope that has member processes cannot delegate `memory`:** writing `+memory` to its
+  `cgroup.subtree_control` answers EBUSY (16). That is why the producer's floor lands on the scope
+  it inherited instead of a scope of its own - a nested scope is impossible and a sibling created
+  in `app.slice` would leave the guardian's ceiling. An *empty* scope of ours does delegate.
+- **A floor equal to a scope's ceiling leaves nothing to evict**, so pressure inside that scope
+  becomes a termination instead of an eviction of page cache. `protect_working_set` keeps the
+  64 MiB metadata headroom below `memory.max` for the same reason the Windows arm kept a gap
+  between its minimum and its advisory maximum.
+- **`memory.reclaim` is how protection is tested without host-wide pressure.** It answers EAGAIN
+  when there is nothing to take, and `memory.current` also counts the holder's interpreter RSS, so
+  assert on the delta rather than on the absolute.
+- **`mlock` past `RLIMIT_MEMLOCK` answers ENOMEM (12) on this kernel**, not the EAGAIN the man page
+  leads with; `munlock` of pages the kernel never locked is a no-op success, so a deleter may
+  unlock what it recorded at allocation.
+- **A `/dev/shm` name outlives the process that made it**, which a kernel section's handle did not:
+  a controller killed before its own teardown would pin its tier until reboot. The creating pid is
+  therefore in the name and `combo_ram.reap_stale_sections()` removes owned names whose creator is
+  gone. A test that leaves one behind leaks RAM, not just a file.
+- **`ctypes.c_char.from_buffer(mmap)` exports the buffer**, and a live export makes `close()` raise
+  "cannot close exported pointers exist". Read the address and `del` the ctypes object in the same
+  step (`combo_ram._address`).
 - `patch('mod.func', wraps=mod.func)` makes attribute lookups on the mock delegate to the wrapped
   function, so `mock.return_value` and `mock.spy_return` are unreachable (the test that asserted the
   scope ceiling through it got `'_SentinelObject' object is not subscriptable`, then `AttributeError:
@@ -744,25 +827,34 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   three also compiled by hand (`docs/linux-port-commands.md`).
 - `code-design` / `code-reviewer` when a chunk changes admission rather than text - chunk 3.1h,
   chunk 5.1's cgroup scope, chunk 5.2's runner (suspended launch, leases, ownership) and chunk 5.3
-  (`memory.min`, `LockedRam`) are the four. 5.1 and 5.2 went through inline verification only:
-  `code-design` was read before writing 5.2, and its guidance that mattered there was "reuse rather
-  than duplicate" (`journal.advisory_lock` got a `shared` arm instead of a second lock helper) and
-  "a boolean flag argument means the function does two things" (which is why `suspended()` keeps the
-  retired five-positional-argument shape and the admission byte lives in the launcher, not in a
-  `suspend=` option).
+  (`memory.min`, `LockedRam`) are the four, and each was read through `code-design` before writing.
+  What mattered in 5.3: "remove duplicate code, one source of truth" is why `protect_working_set`
+  exists once now - `combo_ram`'s verbatim copy is deleted and its two callers import
+  `slstack.working_set` - and "a boolean flag argument means the function does two things" is why
+  the shared half of the tier is a `SharedSection` with `attach()` beside it rather than a
+  `LockedRam(owner=False)` option. In 5.2 the same rule is why `suspended()` keeps the retired
+  five-positional-argument shape, the admission byte lives in the launcher rather than in a
+  `suspend=` option, and `journal.advisory_lock` gained a `shared` arm instead of a second lock
+  helper.
 - `adversarial-code-review` after a chunk that rewrote behaviour, if the user allows a subagent; the
   `scripts/port/` equivalence commands are the evidence to hand it. For 3.1h the proof was inline:
   the collapse report, `preprocess_equiv`, `code_line_diff`, the warning profile, and both carry
-  programs, one of which was red before the change. For 5.1 and 5.2 there is no C equivalence to
-  prove - the evidence was the suite plus `tests/test_cgroup_scope.py` (the kernel refusing an
-  oversized tree, a grandchild's refusal taking the whole group) and
+  programs, one of which was red before the change. For 5.1, 5.2 and 5.3 there is no C equivalence
+  to prove - the evidence was the suite plus `tests/test_cgroup_scope.py` (the kernel refusing an
+  oversized tree, a grandchild's refusal taking the whole group, and `memory.reclaim` showing that
+  an un-honoured floor really is evicted) and
   `tests/test_producer_runner.py` (nothing runs before admission, the force fallback only after two
-  requests and both graces, and a killed group with a grandchild in it ending empty).
+  requests and both graces, and a killed group with a grandchild in it ending empty), plus
+  `tests/test_working_set.py` (a foreign scope left untouched, a real scope floored) and
+  `tests/test_combo_ram.py` (a second process attaching the same name and writing through it).
 - `web-research` for liburing, CCCL 3 / libcudacxx header changes, llama.cpp cmake details, and the
   cgroup v2 interface (`Documentation/admin-guide/cgroup-v2.rst`: what a subgroup sees, the
-  no-internal-processes rule, `memory.oom.group`, `cgroup.kill`).
+  no-internal-processes rule, `memory.oom.group`, `cgroup.kill`, and the ancestor rule for
+  `memory.min` - but confirm any protection claim against `memory.reclaim` on the box rather than
+  against that document alone).
 - `add-unit-test` for the Python side too: `tests/test_cgroup_scope.py`,
-  `tests/test_advisory_lock.py` and `tests/test_producer_runner.py` are the pattern for a gate that
+  `tests/test_advisory_lock.py`, `tests/test_producer_runner.py`, `tests/test_working_set.py` and
+  `tests/test_combo_ram.py` are the pattern for a gate that
   needs no model and no GPU - drive the real kernel mechanism and assert on the counters it reports.
   The runner's file is also the pattern for *not* trusting your own fixture: three of its first
   failures were the test calling a context manager without entering it, and one was an assertion on

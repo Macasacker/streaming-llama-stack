@@ -117,7 +117,7 @@ The streaming prefill producer is hard-gated to Windows. It will not configure, 
 | Locked carry RAM through `VirtualAlloc(MEM_RESERVE\|MEM_COMMIT)` | `src/llama-dsv41-locked-ram.h` | closed (3.1h, `mmap` plus best-effort `mlock`) |
 | DirectStorage plus D3D12 and CUDA interop | 3 files, about 32 call sites: `llama-weight-fetcher.cpp`, `llama-wf-gpu-ring.inl`, `tools/dsv41-prefill/carry-copy-bench.cpp` | closed (3.1e, io_uring) |
 | Windows Job Objects for the child memory guard | `slstack/guard.py:80`, function `windows_job` | **closed (5.1c)** - `slstack/cgroup_scope.py`, a cgroup v2 subgroup entered between fork and exec |
-| Locked shared-RAM checkpoint refuses non-NT | `slstack/combo_ram.py:86`, `raise RuntimeError('The one-RTX shared checkpoint requires Windows')` | open - chunk 5.3. Chunk 5.2 removed the dependency: the runner these functions are reached through is now `slstack.producer_runner.default_runner`, so they are callable on Linux and refuse only inside `kernel_api()`. |
+| Locked shared-RAM checkpoint and the hard working-set minimum refuse non-NT | `slstack/combo_ram.py` (`kernel_api`), `slstack/working_set.py` (`kernel_api`) | **closed (5.3)** - the checkpoint is an exclusive 0600 `/dev/shm` section with `MAP_SHARED` and chunked best-effort `mlock`, attached by name through `combo_ram.attach`; the working-set minimum is `memory.min` on the scope the job inherited, written in whole pages and reported as honoured or inert from the ancestor chain. Both Windows arms stay, behind `os.name`, and are the only Win32 bindings left in the orchestrator. |
 | The producer launcher refuses non-nt | `vendor/studio/studio/dsv41_windows_runner.py`, `_Native.__init__` (`require(os.name == 'nt' ...)`), imported by `combo_producer`, `combo_native`, `combo_session`, `native_broker` | **closed (5.2)** - `slstack/producer_runner.py` is the Linux counterpart (`slstack/producer_launch.py` is the child that waits before its exec), and `default_runner()` selects between the two. The vendored file is untouched; `dsv41_session_process`'s default runner moved to the seam and is recorded in PROVENANCE. **Not in the original list**: the review read `slstack/` only, and this is vendored Studio code. |
 | Installer and backend gating assume Windows or Apple Silicon | `slstack/install.py:106`, `slstack/backend_setup.py:225` | partly closed (1.10b, 5.1b); `media_tools.py`'s pinned Windows FFmpeg download is open (Phase 6) |
 | Every launcher is PowerShell | `build.ps1`, `slstack.ps1`, `scripts/start-dsv41-single-*.ps1`, `engines/ds4-win/windows_build.ps1`, `flashinfer-sm120/build.ps1` | closed for the build (`build.sh`); the `slstack` launcher is `bin/slstack` |
@@ -158,16 +158,23 @@ The provider deliberately refuses symlinked or redirected volumes, requiring `Qu
 `VirtualAlloc` plus working-set locking became `mmap` plus `mlock` in chunk 3.1h, best effort
 against an 8 MiB `RLIMIT_MEMLOCK` on this box, with the shortfall logged as
 `CARRY_RAM_LOCK_PARTIAL` and the paging guard as what actually keeps the tier resident.
-`SetProcessWorkingSetSizeEx` in `combo_ram.py` and `working_set.py` has no Linux equivalent yet:
-model it as cgroup v2 `memory.min` on the child's scope (page-multiple writes - the kernel rounds
-and splits the VMA at the lock boundary), and `LockedRam`'s named section as `shm_open`/`mmap` plus
-`mlock`. That is chunk 5.3: chunk 5.2 landed the runner, so both functions are reachable here and
-refuse only inside `kernel_api()`, and the handle they take (`job.pi.process`) is gone - the Linux
-`_Job` exposes `pid` and `scope` instead. Two things it has to settle first: `memory.min` on the
-scope the producer *inherits* also raises the floor of the guardian's own tree, so the producer may
-need a scope of its own and the guardian may have to delegate `memory` to it; and 5.2's volume rule
-refuses a RAM-backed filesystem, which is what `/dev/shm` is, so `LockedRam`'s named section either
-moves off tmpfs or that rule gets scoped to producer paths.
+`SetProcessWorkingSetSizeEx` became `memory.min` on the scope the job inherited, in chunk 5.3,
+written in whole pages and kept below the scope's ceiling by the same metadata headroom the
+Windows arm kept between its minimum and its advisory maximum. Two things had to be settled, and
+both were settled by measuring this kernel rather than by reasoning. The producer gets **no scope
+of its own**: a scope with member processes cannot delegate `memory` (writing `+memory` to
+`cgroup.subtree_control` answers EBUSY), so a nested scope is impossible, and a sibling in
+`app.slice` would leave the guardian's ceiling - which chunk 5.2 kept deliberately. The floor
+therefore bounds the guarded tree, and a scope this stack did not create is reported and left
+alone. And the floor is **reported, not trusted**: the kernel zeroes a subgroup's protection when
+any ancestor carries no floor, and above `app.slice` the ancestors are root-owned, so on this box
+`protect_working_set` records `honored: false` with the blocking ancestor and prints
+`DS4COMBO_RESIDENT_FLOOR_INERT`, with `memory.swap.max=0` and the paging guard as the actual
+enforcement. `LockedRam`'s named section became a `/dev/shm` section - the volume rule that
+refuses RAM-backed filesystems is the producer's (weights, receipts, outputs) and never sees this
+tier, so the rule stayed and the exception is written where the rule lives. Its name carries the
+creating pid, because a tmpfs name outlives its owner where a section handle did not, and
+`reap_stale_sections()` removes owned names whose creator is gone.
 
 ### Process guard
 
