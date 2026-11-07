@@ -17,7 +17,8 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-**Phase 4, Phase 5 and chunk 4.3a are done, and Phase 7 has landed its first three commits.** Phase 3's producer CLI, its weight
+**Phase 4, Phase 5 and chunks 4.3a and 4.3b are done, and Phase 7 has landed its first three
+commits.** Phase 3's producer CLI, its weight
 fetcher, its native weight provider, its Engram row loader, its carry store and its locked RAM
 tier are Linux; the orchestrator (`slstack/`) has no `msvcrt` and no `CREATE_SUSPENDED`, the
 guardian caps its tree in the kernel, ULTRA and mode1 producers launch here, and resident
@@ -90,8 +91,9 @@ it carries is 13 comment lines and one printed `LLAMA_PD_CACHE_CAPTURE` warning 
 deleted Mac backend, which is chunk 7.1e's text sweep. Three findings from 2.2e that belong to those chunks and
 to no chunk yet: 35 declarations in the engine's GPU headers are dead - declared by the deleted
 Mac backend, defined nowhere, called nowhere (the scan is in this file's method section, and the
-three that named Metal were deleted in 2.2e's comment half); 123 `DS4_METAL_*` environment names
-are read but not documented, because their only reader is a wrapper such as
+three that named Metal were deleted in 2.2e's comment half); 118 `DS4_METAL_*` environment names
+are read but not documented (123 until chunk 4.3b folded four away with their guards), because
+their only reader is a wrapper such as
 `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` and `envvars.py:inventory()` only sees
 literal `getenv("NAME")` calls, so `docs/VARIABLES.md` understates the engine's knobs (chunk 7.1d
 now owns this, with the `engines/mlx-serve/` exemption beside it); and names
@@ -148,9 +150,10 @@ model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4)
 (2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), `270d7a9` (5.1a), `65e54bd` (5.1b),
 `c17d6a6` (5.1c), `63c8dc1` (5.1d), `5fb07f7` (5.2), `1279063` (5.3), `0c9d01d` (4.1),
 `5b941ff` (7.1a), `9a822c8` (7.1b), `050e0b1` (7.1c), `9125df4` (4.2a), `eaccc5e` (4.2b),
-`26dacf6` + `cb3b58f` (4.2 recorded, baseline position), `4c368e7` (4.3 scoped) and `e47c111`
-(4.3a), plus the plan/handoff commits. The branch was in sync with `origin/linux-only` when this
-session opened; check `git status -sb` rather than assuming it still is.
+`26dacf6` + `cb3b58f` (4.2 recorded, baseline position), `4c368e7` (4.3 scoped), `e47c111` (4.3a)
+and `463cd31` (4.3b), plus the plan/handoff commits. The branch was in sync with
+`origin/linux-only` when this session opened and was pushed again after each chunk; check
+`git status -sb` rather than assuming it still is.
 
 The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyError` for it (the
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
@@ -179,15 +182,17 @@ baseline worktree. The first two also fail in a worktree of the commit before ch
 are the box, not the tree.
 
 Working tree is clean apart from scratch under `build/` and `runtime/`; `build/wt-base` is a
-worktree now checked out at `4c368e7` (the commit before chunk 4.3a), so move it wherever a
+worktree now checked out at `463cd31` (chunk 4.3b, the current HEAD), so move it wherever a
 comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
-`git worktree remove build/wt-base`. `build/llama` is configured with `build.sh`'s CUTLASS and
+`git worktree remove build/wt-base`. Note that a comparison after a chunk that moved lines in
+`ds4.c` needs the *parent* commit, not HEAD, or the re-anchored `envvars.json` and the fold itself
+show up as changes. `build/llama` is configured with `build.sh`'s CUTLASS and
 split-F32 flags and `build/42/plain` holds the plain flag set from chunk 4.2's gate; both are
-scratch, and chunk 4.3a touched no llama source so neither was rebuilt and no hand-compiled program
-needed relinking. `engines/ds4` holds all five executables and `ds4-decode.so` rebuilt from the
-folded tree (CUDA_ARCH=sm_120), so `./ds4 --help`, `./ds4 --metal`, `make test-batch-io`,
-`make test-decode-library` and the platform selftest's `dlopen` arm all run against the current
-engine without a rebuild. Chunks 5.1, 5.2 and 5.3 touched no engine source. Chunk 7.1c touched one: `llama-context.cpp`'s
+scratch, and chunks 4.3a and 4.3b touched no llama source so neither was rebuilt and no
+hand-compiled program needed relinking. `engines/ds4` holds all five executables and
+`ds4-decode.so` rebuilt from the folded tree (CUDA_ARCH=sm_120), so `./ds4 --help`, `./ds4 --metal`,
+`make test-batch-io`, `make test-decode-library` and the platform selftest's `dlopen` arm all run
+against the current engine without a rebuild. Chunks 5.1, 5.2 and 5.3 touched no engine source. Chunk 7.1c touched one: `llama-context.cpp`'s
 `llama_split_graph_create` refusal line, which sits inside `#ifndef GGML_USE_CUDA` and so cannot
 reach a CUDA build's compiled text (`preprocess_equiv` shows 0 differing positions with
 `-DGGML_USE_CUDA`). It also regenerated `tools/dsv41-prefill/studio-sampling.c`, whose only change
@@ -213,8 +218,8 @@ and the launcher's `library_pythonpath` do. Chunk 5.1 fixed four names that used
 and un-skipped 21 more; chunk 5.3 un-skipped three more and fixed none. Check a suspected
 regression by running the same file in a worktree at the baseline
 (`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
-between runs - compare the set of names, never the counts. `envdocs --check` reports **2,150**
-documented variables after chunk 4.2 dropped the last 12.
+between runs - compare the set of names, never the counts. `envdocs --check` reports **2,143**
+documented variables after chunk 4.3b dropped seven whose last reader sat in a folded guard.
 
 Five hand-compiled programs cover what has no test target, all passing on this tree - and all
 relinked and re-run after chunk 4.2b rebuilt every CUDA object, since four of them link
@@ -507,7 +512,7 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunk 4.3a, one commit `e47c111`):
+This session's (chunks 4.3a and 4.3b, one commit each):
 
 - **The engine's vendored mmq tier loses the HIP and MUSA branches the deleted backends defined.**
   18 tokens, 13 files, 426 deletions and 42 insertions to a fixed point, plus `vendors/hip.h`
@@ -522,8 +527,16 @@ This session's (chunk 4.3a, one commit `e47c111`):
   internal-linkage kernel names and the `__LINE__` `no_device_code()` prints. `cuda/mmq/VENDOR.md`
   is new; the Makefile and `ds4_cuda.cu` pointed at it and it had never existed.
 - The CUDA headroom probe said **yes** this session (385 MiB free with Strata at 29.8 GiB and the
-  browser beside it), but nothing in chunk 4.3a needed a context: the fold was proved by compiling,
+  browser beside it), but nothing in either chunk needed a context: both were proved by compiling,
   not by running on the device.
+- **The engine's host layer stops compiling for a ROCm build that never existed.** 152 directives on
+  `DS4_ROCM_BUILD` over ten files, 1,442 deletions and 39 insertions, one node hand-resolved (a
+  `#ifdef DS4_ROCM_BUILD / #elif !defined(DS4_NO_GPU) / #else` whose `#elif` is the CUDA arm and
+  whose `#else` is the CPU arm - promoted, not deleted). Seven env rows went with it, 2,150 down to
+  2,143: five `DS4_ROCM_*` and the two `DS4_GLM_*` aliases of a folded pair. The other four names the
+  fold removed were wrapper-only and the table never carried them, and 93 of the 103 `DS4_ROCM_*`
+  names the engine cites are read outside those guards - live reads this chunk left alone, which is
+  why the count of dead knobs is nine and not seventy-eight.
 
 Before that (chunk 4.2, two commits `9125df4` and `eaccc5e`):
 
@@ -803,6 +816,13 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   equivalence tool still reported 0 differences, because a stray `#endif` is invisible to
   `-fdirectives-only` at the file's own level. Count the directives per changed file after any
   collapse (`docs/linux-port-commands.md` has the loop).
+- A fold of the engine's **host** layer has to be compared in both arms the engine compiles: most of
+  those TUs build twice, once for CUDA and once with `-DDS4_NO_GPU` for the CPU binaries, and a
+  guard dead in one is live in the other. `gcc -E -fdirectives-only` each side with **its own
+  tree's** `-I` (`ds4.c` includes `ds4_gpu.h`, which the fold edits), and include `ds4_cuda.cu` even
+  though its own source did not change - it includes two headers that did. Build the CPU *objects*
+  for the warning comparison, never `make cpu`: that target links, and overwrites the CUDA binaries
+  with CPU variants of the same names.
 - **A collapse leaves its trailing comments describing conditions that no longer exist.**
   `#endif // !defined(GGML_USE_HIP) && __CUDA_ARCH__ >= GGML_CUDA_CC_AMPERE` survives the fold of
   the guard above it. Chunk 4.2b rewrote 27 of them; a later collapse has to do the same, or the
@@ -864,7 +884,8 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   `envvars.py:inventory()` scans only `engines/` and `vendor/`, and treats `setenv("NAME")` as a
   read - a `setenv` whose name is a variable is invisible to it. It also misses a read through a
   wrapper: `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live but undocumented, and 2.2e
-  counted 123 such names. Do not rename them to make the table honest; fix the inventory.
+  counted 123 such names - `metal_word_census` reads 118 since chunk 4.3b folded four away with
+  their guards. Do not rename them to make the table honest; fix the inventory.
 - Gate greps must be scoped: `grep -rn "..." engines/ds4` also matches build outputs, engine
   binaries, `*.o`, `ds4-decode.so` and `__pycache__`, and `build/wt-base` holds a second copy of
   every engine file. Use `--exclude-dir=build --exclude-dir=.git` plus

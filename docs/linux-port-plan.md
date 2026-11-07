@@ -360,6 +360,10 @@ offered it: `ggml-vulkan`, `ggml-sycl`, `ggml-hexagon`, `ggml-cpu/kleidiai`, `gg
 chunk 4.2. There is no `ggml-bench` in this fork, so the plan's original "the Metal backend in
 `ggml-bench`" item had nothing to delete. Set the build to `-DGGML_CUDA=ON` only. `build.sh`
 already does that.
+The same two backends also left their macros inside the engine's **vendored copy** of the CUDA mmq
+tier and inside the engine's host layer, and that text is what chunks 4.3a and 4.3b folded - the
+engine's gates, not this phase's cmake gate. The compute-capability vocabulary both of them left
+behind is chunk 4.3c.
 
 Gate: cmake configures and builds with no backend options other than CUDA.
 
@@ -1402,14 +1406,10 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `CDNA*`/`RDNA*`/`QY*`/`PH1` constants, and 210 mentions of `AMD_MFMA_AVAILABLE`/
     `AMD_WMMA_AVAILABLE` here beside 381 in `ggml-cuda/`. Their guards key on `__CUDA_ARCH__`, which
     is genuinely undefined for the host pass and defined for the device pass, so no collapse can
-    decide them; deleting them is deleting AMD kernel paths by hand. The engine's host layer has a
-    third layer of the same kind: 152 `#if`s on `DS4_ROCM_BUILD`, which no build of this fork
-    defines either, spread over `ds4.c` and nine other files - mechanical, since
-    `collapse_conditionals` already treats that name as a false platform macro, and bigger than this
-    chunk. Of the 103 `DS4_ROCM_*` names the engine cites, 93 are read outside any `DS4_ROCM_BUILD`
-    guard - `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live code that survives a fold -
-    so only nine of them lose their last reader with that chunk, and those go through
-    `drop_rows.py --keep` rather than a name pattern.
+    decide them; deleting them is deleting AMD kernel paths by hand. The engine's host layer had a
+    third layer of the same kind - 152 `#if`s on `DS4_ROCM_BUILD`, which no build of this fork
+    defines either, over `ds4.c` and nine other files - and that folded as chunk 4.3b below; the
+    compute-capability vocabulary is still open and is chunk 4.3c.
 
 4.3b The engine's host-layer ROCm build flag folds. Done, one commit, taken before the
     compute-capability vocabulary because it is mechanical and that one is not. `DS4_ROCM_BUILD` is
@@ -1761,10 +1761,13 @@ built engine binaries and `*.o` under `engines/ds4` match these patterns and are
 Apple/MLX ones repo-wide. Earlier figures in this file (443 and 691 after 7.1c, 504, 532, 491, 488
 and 920 after 5.1) were counted at different commits and some without `-I`, so they are not
 comparable; re-run the command rather than trusting any number here. The AMD and Moore Threads
-vocabulary is a third count and chunk 4.3b's: 674 `hip`/`musa`/`rocm`/`moore` matches in
+vocabulary is a third count and chunk 4.3c's: 674 `hip`/`musa`/`rocm`/`moore` matches in
 `engines/ds4` sources after 4.3a folded the HIP and MUSA branches out of `cuda/mmq/` (6 more are
 vendored under `external/` and `linenoise.c`), 13 of them in that directory. Chunk 4.3b took the
-engine's host-layer half of that count down to 286. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
+engine's host-layer half of that count down to 286, and what remains there is live code reading
+`DS4_ROCM_*` names through the wrapper plus comments naming the route; the 210
+`AMD_MFMA_AVAILABLE`/`AMD_WMMA_AVAILABLE` mentions in `cuda/mmq/` beside 381 in the llama tree's
+`ggml-cuda/` are the ones 4.3c owns. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
 `scripts/port`'s own sweep `--tokens` list does not count, the gate in
 `docs/linux-port-commands.md` reports 5 lines after chunk 7.1b: the two `ctypes.WinDLL('kernel32')`
 calls in the Windows arms of `combo_ram.py` and `working_set.py`, which run on both platforms, and
@@ -1772,10 +1775,10 @@ three provenance lines (`slstack/producer_runner.py`'s mapping table and `workin
 docstring) naming the retired API those arms replace.
 `media_tools.py`'s Windows FFmpeg download is not in that
 number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside
-`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 195 lines, ENV_NAME_CITED 123
-lines and COMMENT 26 lines: the documented `DS4_METAL_*` names are kept on purpose, the 123 cited
-ones are the wrapper reads chunk 7.1d owes the inventory, and the 26 comment lines are the
-provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0,
+`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 195 lines, ENV_NAME_CITED 118
+lines and COMMENT 25 lines: the documented `DS4_METAL_*` names are kept on purpose, the 118 cited
+ones are the wrapper reads chunk 7.1d owes the inventory (123 until chunk 4.3b folded four away with
+their guards), and the 25 comment lines are the provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0,
 STRING 3 and COMMENT 51 lines and `--strict` passes, since chunk 4.2 deleted the tree holding the
 one code-position mention (`USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/`). The 51
 comment lines and 3 printed strings are the Mac peer's measurement history and the ten
