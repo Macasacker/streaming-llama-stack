@@ -165,7 +165,7 @@ baseline worktree. The first two also fail in a worktree of the commit before ch
 are the box, not the tree.
 
 Working tree is clean apart from scratch under `build/` and `runtime/`; `build/wt-base` is a
-worktree now checked out at `4483c7b` (the commit before chunk 4.2a), so move it wherever a
+worktree now checked out at `9125df4` (the commit before chunk 4.2b), so move it wherever a
 comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
 `git worktree remove build/wt-base`. `build/llama` is configured with `build.sh`'s CUTLASS and
 split-F32 flags and `build/42/plain` holds the plain flag set from chunk 4.2's gate; both are
