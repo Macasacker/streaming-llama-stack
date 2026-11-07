@@ -501,6 +501,43 @@ grep 'warning:' build/43/host.log | sed 's/^[^:]*:[0-9]*:[0-9]*: //' | sed -E 's
 # 37 occurrences, 23 kinds, identical to the baseline tree's log; the CPU object set is 8 and 6.
 ```
 
+### Measuring the AMD vocabulary before folding it (chunk 4.3c, not applied)
+
+`docs/evidence/collapse-4.3c-tokens.txt` is the 22 names 4.2b and 4.3a left undefined everywhere:
+the last `#define AMD_MFMA_AVAILABLE`/`AMD_WMMA_AVAILABLE` went with the HIP branches, and
+`vendors/hip.h` was what defined `CDNA*`/`RDNA*`/`GCN*`/`__gfx*__`. Run the pass over **copies** of
+both trees to size the chunk and read its `BLOCKED` shapes without touching the checkout:
+
+```bash
+tok=$(cat docs/evidence/collapse-4.3c-tokens.txt)
+rm -rf build/43/amd && mkdir -p build/43/amd/llama
+cp engines/ds4/cuda/mmq/*.cu engines/ds4/cuda/mmq/*.cuh engines/ds4/cuda/mmq/*.h build/43/amd/
+cp engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/*.cu \
+   engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/*.cuh \
+   engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/*.h build/43/amd/llama/
+for p in 1 2; do
+  TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+      --never-defined "$tok" --apply $(find build/43/amd -name '*.cu' -o -name '*.cuh' -o -name '*.h')
+done
+TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+    --never-defined "$tok" $(find build/43/amd -name '*.cu' -o -name '*.cuh' -o -name '*.h') | grep BLOCKED
+# 22 nodes on that tree: nine dead `#if defined(AMD_WMMA_AVAILABLE)` whose live branch is
+# `#elif defined(TURING_MMA_AVAILABLE)`, seven genuine rewrites where the AMD term sits inside a
+# parenthesised group or the live `#elif` tests `__CUDA_ARCH__`, three `#elif ... //wmma instructions
+# can handle ...` where the trailing comment makes the condition unparsable (the tool reports those
+# instead of rewriting them, which is the correct answer), and three `#else // defined(...)` lines
+# flagged only because a comment on an unconditional `#else` names a pinned macro - those are comment
+# rewrites, not decisions. Sizes: 662 deletions and 75 insertions in the engine tier, 1,040 and 132
+# in the llama tree.
+```
+
+Whether that is behaviour-preserving is answerable without doing the chunk: fold a copy of the
+engine tier, compile one TU from it with the Makefile's own flags, and compare its machine code with
+the committed object's. Identical (name hash normalised) means the fold changed no surviving kernel.
+`ds4_q4k_half.o` reads identical on the 4.3b tree; the host-side half - `amd_mfma_available(cc)`,
+`GGML_CUDA_CC_IS_CDNA(cc)` in `ds4_mmq.cu`'s selection code, `ds4_mmq_gfx1151_flag()` - is plain C on
+a runtime `cc` and no collapse can reach it.
+
 ### The producer's platform layer, with no test target to run
 
 The producer CLI has no cmake test target, so chunk 3.1c proved its ported

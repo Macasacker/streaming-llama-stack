@@ -1451,6 +1451,42 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     passed / 38 skipped with only `test_yoco` and the moving process test, and `release_check`
     reports 0 findings.
 
+4.3c The AMD and Moore Threads compute-capability vocabulary. Scoped, measured on scratch copies
+    of both trees, not landed - and the measurement contradicts what chunk 4.2 and 4.3 recorded.
+    Those entries said the collapse cannot decide these guards because their first term is
+    `defined(RDNA3)` or `__CUDA_ARCH__`. Only the second half of that is true. 4.2b and 4.3a deleted
+    the last `#define AMD_MFMA_AVAILABLE` and `#define AMD_WMMA_AVAILABLE`, and `vendors/hip.h` was
+    what defined `CDNA*`/`RDNA*`/`GCN*`/`__gfx*__`, so all of those are undefined everywhere now:
+    pinning them makes the fold mechanical. 22 tokens
+    (`AMD_MFMA_AVAILABLE,AMD_WMMA_AVAILABLE,V_DOT2_F32_F16_AVAILABLE,CDNA,CDNA1..4,RDNA,RDNA1..4,
+    RDNA3_0,RDNA3_5,GCN,GCN4,GCN5,__GFX8__,__GFX9__,__GFX11__,__GFX12__`) collapse the engine's
+    `cuda/mmq/` tier by 662 deletions and 75 insertions over six files and the llama tree's
+    `ggml/src/ggml-cuda` by 1,040 deletions and 132 insertions over nine, and `ds4_q4k_half.o`
+    rebuilt from a folded copy at `sm_120` gives SASS byte-identical to the committed object once
+    nvcc's content hash is normalised - so the surviving device code is the same code. 22 nodes came
+    back `BLOCKED`, and they are four kinds, not one: nine dead `#if defined(AMD_WMMA_AVAILABLE)`
+    whose live branch is the `#elif defined(TURING_MMA_AVAILABLE)` (promote it), seven genuine
+    rewrites where the AMD term sits inside a parenthesised group or the live `#elif` tests
+    `__CUDA_ARCH__` / `VOLTA_MMA_AVAILABLE`, three `#elif defined(AMD_WMMA_AVAILABLE) //wmma
+    instructions can handle 16x4 tiles...` where the trailing comment makes the condition unparsable
+    and the tool refuses to rewrite it - the correct answer, and the comment goes with the branch by
+    hand - and three `#else // defined(AMD_MFMA_AVAILABLE) || ...` lines the tool reports as a manual
+    branch only because the *comment* on an unconditional `#else` names a pinned macro. That last
+    kind is a quirk worth knowing: an `#else` is never a decision, so three of the 22 are comment
+    rewrites wearing a decision's clothes.
+    What genuinely resists the collapse is the other half, and it is not a sweep: guards keyed on
+    `__CUDA_ARCH__` alone (`__CUDA_ARCH__ == GGML_CUDA_CC_VOLTA`, `< GGML_CUDA_CC_AMPERE`) are
+    undecided by design, and the host-side selection code is plain C on a runtime `cc` -
+    `amd_mfma_available(cc)` and `amd_wmma_available(cc)` in `ds4_mmq.cu:440,448`,
+    `GGML_CUDA_CC_IS_CDNA(cc)` in the stream-k and batch tests at `ds4_mmq.cu:462,645,761,1109,1469`
+    and `common.cuh:262,268,276,280,284`, `ds4_mmq_gfx1151_flag("DS4_ROCM_MMQ_TIGHT_NCOLS", cc)` at
+    `ds4_mmq.cu:1480`, and the `QY*`/`PH1` terms in `fp16_available`/`fast_fp16_available`. Deleting
+    those is deleting host logic that decides kernel selection, and it needs the same per-object
+    SASS gate plus `make test-kv-payload-roundtrip`-shaped runtime gates on a tree whose
+    `DS4_ROCM_MMQ_TIGHT_NCOLS` row would then lose its last reader. The scratch recipe and the
+    comparison are in `docs/linux-port-commands.md` under chunk 4.3b; run the tool over copies of
+    both trees first and read the insertions, do not apply to the tree.
+
 5.1 Python orchestrator. Done in four commits: `270d7a9` (memory_counters reads
     /proc/meminfo, /proc/vmstat and /proc/swaps), `65e54bd` (journal.advisory_lock, the
     lease admission lock, and the nt-only branches in shutdown/config/preferences/process/

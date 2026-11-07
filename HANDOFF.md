@@ -39,23 +39,30 @@ of Phase 4 is the compute-capability vocabulary below.
    `ggml-hip` and `ggml-musa`, which were the only things that ever defined `GGML_USE_HIP` and
    `GGML_USE_MUSA`; 4.3a folded every branch keyed on those names, in the llama tree and in the
    engine's copy of it, and 4.3b folded the engine's host layer on `DS4_ROCM_BUILD`. What is left is
-   one layer deeper and is not a collapse: `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, the
-   `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants, `AMD_MFMA_AVAILABLE` and `AMD_WMMA_AVAILABLE` and
-   the `RDNA*`/`CDNA*` guards in `common.cuh`, `mma.cuh`, `mmf.cuh`, `mmq.cuh`, `fattn-mma-f16.cuh`
-   and `ds4split-q4k-half-panel.cu`, and the same vocabulary in seven files of the engine's
-   `cuda/mmq/` copy - 210 mentions of the two MMA macros there beside 381 in the llama tree.
+   one layer deeper, and it splits in half - the plan's 4.3c entry has the measurement, done on
+   scratch copies of both trees and not applied:
+   - **Mechanical, and bigger than it was recorded as.** 4.2b and 4.3a deleted the last
+     `#define AMD_MFMA_AVAILABLE`/`#define AMD_WMMA_AVAILABLE`, and `vendors/hip.h` - now gone - was
+     what defined `CDNA*`/`RDNA*`/`GCN*`/`__gfx*__`. Pinning those 22 names collapses 662 lines out
+     of the engine's `cuda/mmq/` and 1,040 out of the llama tree's `ggml/src/ggml-cuda`, and
+     `ds4_q4k_half.o` rebuilt from a folded copy is SASS-identical to the committed object. 22 nodes
+     come back `BLOCKED`: nine dead `#if defined(AMD_WMMA_AVAILABLE)` whose live branch is
+     `#elif defined(TURING_MMA_AVAILABLE)`, seven genuine rewrites where the AMD term sits inside a
+     parenthesised group or the live `#elif` tests `__CUDA_ARCH__`, three whose condition ends in a
+     `//` comment the tool refuses to parse, and three `#else // defined(AMD_MFMA_AVAILABLE) || ...`
+     lines flagged only because the comment on an unconditional `#else` names a pinned macro.
+   - **Not a sweep.** Guards keyed on `__CUDA_ARCH__` alone stay undecided by design, and the host
+     side is plain C on a runtime `cc`: `amd_mfma_available(cc)` / `amd_wmma_available(cc)` at
+     `ds4_mmq.cu:440,448`, `GGML_CUDA_CC_IS_CDNA(cc)` at `ds4_mmq.cu:462,645,761,1109,1469` and
+     `common.cuh:262,268,276,280,284`, `ds4_mmq_gfx1151_flag("DS4_ROCM_MMQ_TIGHT_NCOLS", cc)` at
+     `ds4_mmq.cu:1480`, the `QY*`/`PH1` terms in `fp16_available`/`fast_fp16_available`, and the
+     `QY*`/`PH1`/`CDNA*`/`RDNA*` constants themselves. Deleting those deletes kernel-selection
+     logic, and `DS4_ROCM_MMQ_TIGHT_NCOLS` would lose its last reader with it.
    Measured on the current tree: 286 `hip`/`musa`/`rocm`/`moore` matches remain in `engines/ds4`
-   sources, 13 of them in that directory - the rest are `DS4_ROCM_*` names read through the live
-   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` wrapper and comments naming the route.
-   Their guards' first term is `defined(RDNA3)` or `__CUDA_ARCH__`, and `__CUDA_ARCH__` must stay
-   unknown - it is genuinely undefined for the host pass and defined for the device pass - so
-   `collapse_conditionals` cannot decide any of them and should not be told to. Deleting the
-   vocabulary means deleting the AMD/MTHREADS kernel paths by hand and proving the surviving kernels
-   still compile at `sm_120a`; the machine-code gate in `docs/linux-port-commands.md` is how to prove
-   it (identical SASS except nvcc's content hash and the `__LINE__` in `no_device_code`).
-   `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment, in both copies, never matched its guard
-   even upstream - 4.3a rewrote the engine's to name the three MMA macros that guard does test, and
-   the llama copy's is still the old text.
+   sources, 13 in `cuda/mmq/`, and 210 `AMD_MFMA_AVAILABLE`/`AMD_WMMA_AVAILABLE` mentions there
+   beside 381 in the llama tree. `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment, in both
+   copies, never matched its guard even upstream - 4.3a rewrote the engine's to name the three MMA
+   macros that guard does test, and the llama copy's is still the old text.
    `GGML_ACCELERATE` and the Apple cmake logic in the llama tree (`ggml-cpu/CMakeLists.txt`'s APPLE
    branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants, `HAVE_BUGGY_APPLE_LINKER`,
    `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of leftover and belongs with it or
@@ -816,6 +823,19 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   equivalence tool still reported 0 differences, because a stray `#endif` is invisible to
   `-fdirectives-only` at the file's own level. Count the directives per changed file after any
   collapse (`docs/linux-port-commands.md` has the loop).
+- **A `BLOCKED` line is a report, not a verdict - read which directive it names.** On the 4.3c
+  measurement three of the 22 nodes are `#else // defined(AMD_MFMA_AVAILABLE) || ...`: an `#else` has
+  no condition, and the tool only flags them because the trailing comment names a pinned macro. They
+  are comment rewrites, not decisions. The same file's three `#elif defined(AMD_WMMA_AVAILABLE) //wmma
+  instructions can handle 16x4 tiles...` come back `unparsable` for the same reason - a comment after
+  a condition - and the tool correctly refuses to rewrite one.
+- **A claim about what a tool *cannot* decide is still a claim, and this file carried a wrong one.**
+  4.2b and this file both said the AMD and Moore Threads vocabulary cannot be collapsed because its
+  guards key on `defined(RDNA3)` or `__CUDA_ARCH__`. `__CUDA_ARCH__` is right and permanent; the
+  other half was only true until 4.2b and 4.3a deleted the last `#define AMD_MFMA_AVAILABLE` and
+  `vendors/hip.h` - after those, the names are undefined everywhere, `--never-defined` is sound, and
+  the fold is mechanical (measured: 662 + 1,040 lines, SASS identical). Re-measure a limitation after
+  every chunk that could have removed its premise.
 - A fold of the engine's **host** layer has to be compared in both arms the engine compiles: most of
   those TUs build twice, once for CUDA and once with `-DDS4_NO_GPU` for the CPU binaries, and a
   guard dead in one is live in the other. `gcc -E -fdirectives-only` each side with **its own
