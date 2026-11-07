@@ -53,10 +53,12 @@ not itself select a four-step LoRA.
 
 Media workers resolve the weight-fetcher library beside the selected producer
 (`build/llama/bin/libslstack-weight-fetcher.so`), or from an explicit `weight_fetcher`
-configuration. Runtime staging includes that library when present. GPU admission
-creates the default hold ledger before child checks use its resolved path; an empty
-configuration no longer resolves to the current directory. Media generation requires
-the selected component files, a loadable weight-fetcher and available GPU admission.
+configuration, and pass it to the worker as `STUDIO_WF_DLL`. Runtime staging includes that
+library when present. GPU admission creates the default hold ledger before child checks use
+its resolved path; an empty configuration no longer resolves to the current directory. That
+library is what the Windows fetcher arms bind - the Linux build exports no `wf_*` API, so
+the Linux loaders read through `safetensors` and the portable tiers instead. Media
+generation requires the selected component files and available GPU admission.
 
 ## KV and YOCO checkpoints
 

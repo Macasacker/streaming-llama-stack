@@ -486,8 +486,9 @@ combo_ram.py      both arms now: the Windows named section and `VirtualLock` sta
 working_set.py    resident admission, one implementation. Windows keeps the hard minimum
                   working set; Linux writes `memory.min` on the scope the job inherited and
                   reports whether the kernel will honour it.
-media_tools.py    downloads and unpacks a pinned Windows FFmpeg zip; the non-nt arm only
-                  reports the system ffmpeg and ffprobe on PATH. Media setup, Phase 6.
+media_tools.py    one implementation since chunk 6.1: it locates the system ffmpeg and
+                  ffprobe and runs each with `-version`, so a name on PATH that cannot start
+                  is not ready. The pinned Windows FFmpeg archive is gone.
 ```
 
 macOS-specific code to delete:
@@ -514,10 +515,14 @@ Delete:
 - `engines/mference`, 2.6 MB Swift package
 - `locks/mac-mlx-py312.txt`, `locks/mac-omlx-py312.txt`
 - `vendor/engines/cosmos_windows` Windows-only media paths, or port them to Linux. Media
-  generation is experimental in the README, so this can lag inference.
+  generation is experimental in the README, so this can lag inference. Chunk 6.1 took the
+  decision: media stays, and its Windows-only weight transport now refuses by name instead
+  of half-binding.
 
 Gate: `git ls-files | wc -l` drops by roughly the count of deleted MLX, Metal and Swift files,
-and the repo size drops from about 150 MB.
+and the repo size drops from about 150 MB. Chunk 6.1 moved it from 2,243 tracked files to 2,236
+(seven media files, one test gate); the MLX, Metal and Swift deletions in 1.10a, 1.10c and 7.1a
+are where the size went.
 
 ## Phase 7: docs, examples, presets, tests
 
@@ -535,7 +540,8 @@ and the repo size drops from about 150 MB.
 - `tests/`: the Mac test sources are gone (7.1a) and the suite names this phase owned pass
   (7.1b). What is still Windows-shaped is two test sources with no build rule,
   `tests/dsv41_producer_abort.cpp` and `tests/studio_generation.cpp`, which need POSIX ports
-  rather than deletion, and `vendor/engines/cosmos_windows` behind the media tests (chunk 6.1).
+  rather than deletion. `vendor/engines/cosmos_windows` behind the media tests went to
+  chunk 6.1, which deleted the Mac-paired peer and retired the DirectStorage requirement.
 - `docs/VARIABLES.md`: done in 7.1d, which is also what made it honest - the inventory now
   follows a read through a wrapper helper, and a name handed to an argument the wrapper discards
   is no longer counted as one.
@@ -1240,8 +1246,11 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     Findings for whoever continues: `tools/slstack-weight-fetcher.cpp` is a two-line anchor
     file, so the `.so` it builds exports one data symbol and carries no fetcher API - chunk
     5.1's `single_runtime.py` PRODUCER_FILES cannot stage it as the DLL's twin; and
-    `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py` mirrors `wf_params` by ctypes
-    field order, which the 3.1e and 3.1f deletions shifted - that module is Phase 6's to delete.
+    `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py` mirrors `wf_params` by
+    ctypes field order, which the 3.1e and 3.1f deletions shifted. Superseded by 6.1: the
+    module is kept rather than deleted (its portable tiers and the media tests need it), the
+    mirror is corrected and gated, and the anchor-only library is now a named refusal - the
+    export itself needs a PIC CUDA build, recorded in the 6.1 entry.
     The CUDA arms of the extent reader (`docs/linux-port-commands.md` has the link line) have still
     never executed: a `ggml` CUDA backend wants about 700 MB past what Strata and the browser leave.
 
@@ -1676,14 +1685,77 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     without privileges, so a resident admission on Linux is a claim about the tree this stack
     created, never about the host.
 
-6.1 Vendor and engine bloat. Partly landed. `vendor/mac-mlx`, `engines/mlx-receiver`,
-    `engines/mlx-serve`, `engines/mference` and the MLX lock files went in 1.10a and 1.10c;
-    `patches/mlx-core-ring-listeners.*` and `scripts/setup-mlx.py` (whose `slstack.mlx_setup`
-    import was already dead) went in 7.1a. What is left is
-    `vendor/engines/cosmos_windows`: Windows-shaped media workers that the media tests import,
-    and `slstack/media_tools.py`, which downloads a pinned Windows FFmpeg archive and on
-    non-nt only reports the system `ffmpeg`/`ffprobe` on PATH. Port media to Linux or delete it;
-    the README already calls it experimental.
+6.1 Vendor and engine bloat. Decision taken and partly landed: **media stays**, because
+    the vendored integration source is what `slstack`'s media worker drives and what nine
+    media test files import, and deleting it would remove a documented (if experimental)
+    feature without replacing any of it. What is retired is the Windows-only transport and
+    the Mac-paired peer.
+
+    `vendor/mac-mlx`, `engines/mlx-receiver`, `engines/mlx-serve`, `engines/mference` and
+    the MLX lock files went in 1.10a and 1.10c; `patches/mlx-core-ring-listeners.*` and
+    `scripts/setup-mlx.py` went in 7.1a.
+
+    Chunk 6.1's first commit (`9465b60`) is the weight transport and the video tools.
+    `ds_backend.py` mirrors
+    the fetcher's structs by ctypes field order and had kept the three fields chunk 3.1e
+    deleted from `wf_params`, so every field after them - `gpu_backend`, `cuda_device`,
+    `mode` - sat one slot late in the struct handed to `wf_create`; the mirror is 22 fields
+    now, and `tests/test_media_fetcher_abi.py` (8 checks) parses the header and refuses any
+    drift in `wf_params`, `wf_weight_span` and `wf_stats`. The header retires mode 3, so the
+    mirror no longer offers it, both callers ask for `DIRECT_IO` explicitly, and eleven
+    `mode != 3` / `mode == 3` requirements across nine files became `is_streaming_mode()`.
+    `load_wf` checks the required symbols before binding and names what is missing: this
+    build's `libslstack-weight-fetcher.so` exports one symbol (`nm -D`), so media streaming
+    refuses by name on Linux instead of dying on an attribute lookup inside a worker.
+    `tests/media_streaming_gate.py` went with the mode it asserted and the `.dll` it named.
+    The same commit replaced `slstack/media_tools.py` with one implementation that locates
+    `ffmpeg` and `ffprobe` and runs each with `-version`, refusing a media setup when either
+    cannot start - this box reads ready with both at n9.0.2 - and dropped
+    `studio_worker.py`'s prepend of a tools directory only a Windows install ever created.
+
+    The second commit (`6ba22ab`) deletes the Mac-paired media peer - `mac_reasoner_server.py`,
+    the three `omni_connector_*` transport scripts, `validate_sender.py`,
+    `weight_streaming/minimax_h3_mac.py` and the Windows-only
+    `setup_native_framework_windows.py`, 991 lines - and the `cosmos_cli.py` half that talked
+    to it (142 out, 32 in): `/reason` and `/preason` now run
+    `reasoner_prefill_stream --mode local|--quant` on this machine, which is the path that
+    already existed for `--local`, and `DEFAULTS` is 29 keys from 41. Gate: the CLI imports
+    and `Cli(dict(DEFAULTS))` constructs with no torch, which is what `studio.adapter` does
+    in the media worker.
+
+    Docs corrected against the code: `MEDIA_SETUP_VERIFICATION.md` claimed Krea reads through
+    the weight fetcher on Linux, and `krea2_diffusion.py` gates that route on
+    `sys.platform == 'win32'` and uses `safetensors` here.
+
+    **The blocker for porting streamed media, measured rather than assumed.** Exporting the
+    `wf_*` API from the shared library is not a shim file: an export table over the fetcher
+    units fails to link, because the CUDA backend objects are compiled without `-fPIC` -
+    `/usr/bin/ld: ggml/src/ggml-cuda/libggml-cuda.a(ggml-cuda.cu.o): relocation
+    R_X86_64_TPOFF32 against _ZL18g_lid_fusion_trace ... local-exec is incompatible with
+    -shared`. A PIC CUDA build (and a TLS model that is not local-exec) is the prerequisite,
+    and it changes how every CUDA object is compiled, so it is its own chunk with the SASS
+    and warning-profile gates that implies. Until then the portable tiers in
+    `weight_streaming/` (bounded-pinned rings, `safetensors` loads) are the Linux media
+    weight paths, and nothing in media has been run end to end here: no media runtime is
+    installed (the locks ask for a ~24 GiB CUDA torch environment) and no media weights are
+    on this box.
+
+    What is left of this phase, none of it a text sweep: the `mps` device arms in
+    `train_video_lora.py`, `weight_streaming/glm_backend.py`, `vggt_backend.py`,
+    `reasoner_prefill_stream.py` (`--device mps` is an argparse choice) and
+    `validate_reasoner.py`; the MLX export branches in `gguf_qat/export_lora_gguf.py`,
+    `export_token_sidecar_gguf.py` and `train_glm_token_sidecar.py`; `hunyuan_gen.py`'s
+    always-aborting `--ar-mode mac` and `STUDIO_MAC_HOST`; and `vendor/studio`'s darwin
+    branch in `adapter.py`, which imports a `mac_backend` this checkout does not contain -
+    editing `vendor/studio` means a `PROVENANCE.json` `local_patches` entry, and dropping
+    `STUDIO_MAC_HOST`'s last read means dropping its row.
+
+    Gate this chunk met: the suite reads 695 passed, 2 failed, 37 skipped against the
+    untouched worktree's 686/1/38 (the ten added are the ABI and video-tool checks, the skip
+    that went is the Windows FFmpeg marker case; the two failures are `test_yoco`, 8.1's, and
+    the process test that moves on this box), `release_check` 0 findings, `envdocs --check`
+    2,186 documented variables with the name set unchanged, and the media test files pass
+    with the same skips they had before.
 
 7.1 Docs, examples, presets, tests. Five commits landed; the phase is closed.
 
@@ -1943,8 +2015,8 @@ Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
 calls in the Windows arms of `combo_ram.py` and `working_set.py`, which run on both platforms, and
 three provenance lines (`slstack/producer_runner.py`'s mapping table and `working_set.py`'s
 docstring) naming the retired API those arms replace.
-`media_tools.py`'s Windows FFmpeg download is not in that
-number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside
+`media_tools.py` is a Linux implementation since chunk 6.1, so that number no longer
+excludes a media installer. Inside
 `engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 306 lines, ENV_NAME_CITED 0
 lines and COMMENT 25 lines after chunk 7.1e: the documented `DS4_METAL_*` names are kept on
 purpose, the 7 cited ones 7.1d left were dead arguments of a folded-to-false stub plus a wildcard

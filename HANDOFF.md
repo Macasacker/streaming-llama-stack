@@ -17,7 +17,8 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-**Phase 4, Phase 5 and chunks 4.3a, 4.3b and 4.3c are done, and Phase 7 is closed.** Phase 3's producer CLI, its weight
+**Phase 4, Phase 5 and chunks 4.3a, 4.3b and 4.3c are done, Phase 7 is closed, and chunk 6.1's
+decision has landed.** Phase 3's producer CLI, its weight
 fetcher, its native weight provider, its Engram row loader, its carry store and its locked RAM
 tier are Linux; the orchestrator (`slstack/`) has no `msvcrt` and no `CREATE_SUSPENDED`, the
 guardian caps its tree in the kernel, ULTRA and mode1 producers launch here, and resident
@@ -44,11 +45,28 @@ from that: 2,143 documented variables to 2,186, with 114 names added and 71 drop
 `reanchor_env_reads.py`. Chunk 7.1e took the Mac peer's text out of the llama tree and
 `decode-receiver`: the census reads IDENTIFIER 0, ENV_NAME_CITED 0 and STRING 0 over both trees,
 the llama tree's COMMENT bucket is 37 provenance lines (from 51), and
-`gpu_graph_ported_m5_decode_feature_enabled()` lost the parameters nothing ever read.
+`gpu_graph_ported_m5_decode_feature_enabled()` lost the parameters nothing ever read. Chunk 6.1
+took the media decision: **media stays**, its Windows-only weight transport refuses by name
+instead of half-binding, its Mac-paired peer is deleted, and `slstack/media_tools.py` verifies the
+system FFmpeg by running it - which is the one media gate on this box that reports ready.
 
-1. **Chunk 6.1's remainder** - `vendor/engines/cosmos_windows` (the media workers the media
-   tests import) and `slstack/media_tools.py`'s pinned Windows FFmpeg archive: port media to
-   Linux or delete it. `GGML_ACCELERATE` and the Apple cmake logic in the llama tree
+1. **Chunk 6.1's remainder.** The decision is taken and landed: media stays, its
+   Windows-only weight transport refuses by name, its Mac-paired peer is deleted, and
+   `slstack/media_tools.py` is one Linux implementation. What that chunk left for a later
+   session is in its plan entry, in two pieces. **Streaming media weights cannot be reached
+   on Linux at all**, and it is not a text fix: exporting the `wf_*` API from
+   `tools/slstack-weight-fetcher.cpp` fails at link, because the CUDA backend objects are
+   compiled without `-fPIC` (`relocation R_X86_64_TPOFF32 against _ZL18g_lid_fusion_trace ...
+   local-exec is incompatible with -shared`), so a PIC CUDA build is the prerequisite and it
+   changes how all 168 CUDA objects are compiled. The residue is the per-file Mac half of
+   the media vendor: `mps` device arms in `train_video_lora.py`, `weight_streaming/glm_backend.py`,
+   `vggt_backend.py`, `reasoner_prefill_stream.py` (where `--device mps` is an argparse
+   choice) and `validate_reasoner.py`; the MLX export branches in three `gguf_qat/` scripts;
+   `hunyuan_gen.py`'s always-aborting `--ar-mode mac` and `STUDIO_MAC_HOST`; and
+   `vendor/studio`'s darwin branch in `adapter.py`, which imports a `mac_backend` this
+   checkout does not contain - editing `vendor/studio` needs a `PROVENANCE.json`
+   `local_patches` entry, and dropping `STUDIO_MAC_HOST`'s last read means dropping its row.
+   `GGML_ACCELERATE` and the Apple cmake logic in the llama tree
    (`ggml-cpu/CMakeLists.txt`'s APPLE branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants,
    `HAVE_BUGGY_APPLE_LINKER`, `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of
    leftover: it belongs with Phase 7's text and cmake cleanup, not with a backend prune.
@@ -74,12 +92,11 @@ renamed: 2.2b kept the names for recipe compatibility, and 7.1d fixed the invent
 CPU-reservation recognition matches hold lines by their *wording*, including the word Windows, so
 a Linux CPU hold worded differently preempts the engine - settle the wording with the owner of the
 other agent rather than widening the regex; `scripts/perfexp_pair.py` hashes
-`<producer>/ds4-decode.dll` and writes `decode_dll_sha256`, which 8.1 regenerates; `media_tools.py`
-downloads a pinned Windows FFmpeg zip (chunk 6.1's), while its Linux arm reports the system
-`ffmpeg`/`ffprobe` and 7.1b's test asserts that arm; and
+`<producer>/ds4-decode.dll` and writes `decode_dll_sha256`, which 8.1 regenerates; and
 `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp` still
 declares `bool gpu_bufs_via_dstorage = false` and branches on it - a folded-to-false constant with
-no chunk of its own. Three from 5.2 in the same category: neither the engine's `require_local_volume`
+no chunk of its own. (`media_tools.py`'s pinned Windows FFmpeg zip was in this list; chunk 6.1
+deleted it.) Three from 5.2 in the same category: neither the engine's `require_local_volume`
 nor `slstack/producer_runner.py`'s copy of that refusal list contains NFS4's magic (`0x6e626470`),
 so an NFS4 mount is accepted on both sides - fix both lists together or neither; `combo_native`'s
 "timed native model weights cannot use the archival drive" refusal keys on a Windows drive letter
@@ -125,17 +142,20 @@ model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4)
 `463cd31` (4.3b) and `bc63367` (4.3b recorded), `37b2bf1` (4.3c scoped, with the correction to what
 4.2 and 4.3 had recorded), `41bc18a` (4.3c, the engine's `cuda/mmq/`) and `a50a7bb` (4.3c, the llama
 tree's `ggml/src/ggml-cuda`, `caa8a9e` (4.3c recorded), `f197552` (7.1d) and `fe001b2` (7.1d
-recorded), `1d47e54` (7.1e) and this file's and the
-plan's commits after it. The branch was in sync with
-`origin/linux-only` when this session opened and was pushed again after each chunk; check
-`git status -sb` rather than assuming it still is.
+recorded), `1d47e54` (7.1e), `37e62a2` + `fbdb761` (7.1e recorded), `9465b60` and `6ba22ab`
+(6.1) and this file's and the plan's commits after them. The branch was in sync with
+`origin/linux-only` when this session opened; check `git status -sb` rather than assuming it
+still is.
 
 The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyError` for it (the
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **685 passed, 2 failed, 38 skipped** on the 7.1e run, and read **686 passed,
-1 failed, 38 skipped** before it - 12 of the passing checks are chunk 7.1d's
+this tree reads **695 passed, 2 failed, 37 skipped** on the chunk 6.1 run, against the same tree's
+baseline worktree at `fbdb761` reading **686 passed, 1 failed, 38 skipped** - chunk 6.1 collected
+nine more checks (eight in `tests/test_media_fetcher_abi.py`, three new video-tool checks for the
+two that named the Windows marker) and removed one skip, so the line is 696/1/37 when the moving
+process test passes and 695/2/37 when it does not. 12 of the passing checks are chunk 7.1d's
 `tests/test_env_inventory.py`, which calls `inventory()` and so adds about 25 s to a run - runs of
 it have read 1, 2, 3 and 7 failures, since the two process tests named below move. Without it, the same tree reads a much worse line -
 chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
@@ -160,8 +180,8 @@ the baseline). The first two also fail in a worktree of the commit before chunk 
 are the box, not the tree.
 
 Working tree is clean apart from scratch under `build/` and `runtime/`; `build/wt-base` is a
-worktree now checked out at `fe001b2` - chunk 7.1d's recorded commit, the same tree HEAD has apart
-from the working edits - so move it wherever a comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
+worktree now checked out at `fbdb761` - chunk 7.1e's recorded commit, the tree chunk 6.1 was
+compared against - so move it wherever a comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
 `git worktree remove build/wt-base`. Note that a comparison after a chunk that moved lines in
 `ds4.c` needs the *parent* commit, not HEAD, or the re-anchored `envvars.json` and the fold itself
 show up as changes. `build/llama` is configured with `build.sh`'s CUTLASS and
@@ -527,7 +547,71 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunk 7.1e, one code commit - engine `ds4.c` and llama-tree comment/string text):
+This session's (chunk 6.1, two commits - `9465b60` and `6ba22ab`, plus this chunk's docs):
+
+- **Media stays, and its Windows-only weight transport now refuses by name.**
+  `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py` mirrored the fetcher's
+  `wf_params` with the three fields chunk 3.1e deleted, so `n_sublayers` sat where
+  `ds_submit_threads` was declared and every field after it - `gpu_backend`, `cuda_device`,
+  `mode` - was one slot late in the struct handed to `wf_create`. The mirror is 22 fields now
+  and matches the header field for field; `tests/test_media_fetcher_abi.py` (8 checks) parses
+  `src/llama-weight-fetcher.h` and refuses drift in `wf_params`, `wf_weight_span` and
+  `wf_stats`, checks the `WF_MODE_*` values against the enum, and proves it is live by
+  rejecting the pre-chunk mirror. Nothing a user can observe changed on Linux, because the
+  library the transport binds exports no `wf_*` symbol at all - `load_wf` now says which ones
+  are missing instead of failing on an attribute lookup inside a worker, and
+  `directstorage_usable()` / `directstorage_available()` already swallow that refusal and
+  choose the portable tier.
+- **The retired DirectStorage mode is nowhere in the media transport.** Eleven requirements
+  across nine files (`ds_backend`, `anima_backend`, `acestep_backend`, `glm_backend`,
+  `ltx_backend` twice, `magi2_layer_ring`, `zimage_backend`, `hunyuan_gen`,
+  `train_video_lora` twice) that asked for `mode == 3` now ask `is_streaming_mode()`, which
+  accepts Direct I/O and GPUDirect Storage and refuses mmap; both ctypes callers request
+  `DIRECT_IO` explicitly rather than AUTO, because AUTO can resolve to GDS and register the
+  fetcher's own allocations before the caller replaces the bank pointers. Every environment
+  name those gates read is unchanged, and the check asserts no `mode [!=]= 3` or
+  `WF_MODE_DSTORAGE` survives in the vendor tree.
+- **`slstack/media_tools.py` is one implementation.** It used to download a pinned
+  `ffmpeg-8.1.2-essentials_build.zip`, hash its `.exe` members and write `installed.json`,
+  while the non-nt arm only reported `shutil.which`. `readiness()` locates `ffmpeg` and
+  `ffprobe` and runs each with `-version`, so a name on PATH that cannot start is not ready;
+  `install.py` refuses a media setup when either is missing, and `studio_worker.py` no longer
+  prepends a tools directory only a Windows install ever created. **This box reads ready**:
+  `/usr/bin/ffmpeg` and `/usr/bin/ffprobe`, both n9.0.2. `test_h3_video_delivery` lost the
+  Windows-marker case and gained three checks (absent, exits non-zero, not executable).
+- **The Mac-paired media peer is deleted** - 991 lines over seven files:
+  `mac_reasoner_server.py`, `omni_connector_receiver.py`, `omni_connector_sender.py`,
+  `omni_connector_rx_server.py`, `validate_sender.py`,
+  `weight_streaming/minimax_h3_mac.py` and the Windows-only
+  `setup_native_framework_windows.py`. Nothing outside the vendor tree imported any of them;
+  the only external references were `cosmos_cli.py`'s own `/sync` and `/remote`. That CLI
+  half went too (142 lines out, 32 in): `_reason_request`, `reason`'s HTTP arm, `health`,
+  `_ssh`, `sync`, `remote`, `loop` and their REPL commands, and `DEFAULTS` from 41 keys to 29
+  - the `mac_*`, `remote_*`, `reasoner_host`/`reasoner_port` settings and the
+  `auto_prefill`/`prefill_*_tokens` pair that only chose between the RTX prefill and the Mac
+  decode. `/reason` and `/preason` now run `reasoner_prefill_stream --mode local|--quant` on
+  this machine's GPU, which is the arm that already existed; `Cli(dict(DEFAULTS))` constructs
+  with no torch, which is what `studio.adapter` does in the media worker.
+- Deleted `tests/media_streaming_gate.py`, which asserted `stream.mode == 3` and named
+  `slstack-weight-fetcher.dll`; the mechanical part of what it claimed is in the new check.
+- Docs corrected against the code, not against the previous docs:
+  `MEDIA_SETUP_VERIFICATION.md` said Krea reads through the weight fetcher on Linux,
+  and `krea2_diffusion.py` gates that route on `sys.platform == 'win32'` and uses
+  `safetensors` here; `STACK_MEDIA_AND_STATE.md` said media generation requires a loadable
+  weight-fetcher.
+- **The measured blocker**, recorded in the plan's 6.1 entry: an export table over the fetcher
+  units does not link, because the CUDA objects are compiled without `-fPIC`
+  (`relocation R_X86_64_TPOFF32 against _ZL18g_lid_fusion_trace ... local-exec is incompatible
+  with -shared`). A PIC CUDA build is the prerequisite for streamed media on Linux and is its
+  own chunk. The failed link also *removed* `build/llama/bin/libslstack-weight-fetcher.so`,
+  so rebuild that target before trusting a media gate that reads it.
+- Gates: suite 695/2/37 against the untouched worktree's 686/1/38 (the two failures are
+  `test_yoco` and the moving process test), `release_check` 0 findings, `envdocs --check`
+  2,186 variables with the name set unchanged and nine rows re-anchored, and
+  `tests/test_media_fetcher_abi.py`, the media test files, and the CLI-import one-liner in
+  `docs/linux-port-commands.md` all pass.
+
+Before that (chunk 7.1e, one code commit - engine `ds4.c` and llama-tree comment/string text):
 
 - **The Mac peer's text is out of the llama tree and `decode-receiver`, and what remains says so
   in the past tense.** 51 comment lines and 3 printed strings became 37 provenance comment lines
@@ -706,7 +790,8 @@ Before that (chunks 7.1a, 7.1b and 7.1c, one commit each):
   `studio` import and hands the trainer the PYTHONPATH the launcher hands it; `test_dsv41_recipe`
   passes the same to its child; `test_h3_video_delivery`'s FFmpeg marker case is the Windows arm
   and is skipped here, with a new POSIX case asserting that readiness is what PATH reports and
-  that a Windows `installed.json` marker neither creates nor breaks it; `test_shared_prefill_profile`
+  that a Windows `installed.json` marker neither creates nor breaks it (chunk 6.1 deleted that
+  marker and rewrote both cases against `media_tools.readiness()`); `test_shared_prefill_profile`
   lost its `slstack.mac` half and calls the export path by its current name.
   `scripts/export_ds4_sampling.py` read `engines/ds4-win/ds4.c` and died on `FileNotFoundError`;
   repointed at `engines/ds4`, regenerating `tools/dsv41-prefill/studio-sampling.c` moves only the
@@ -878,13 +963,15 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   variables), no engine source changed, and the geometry defaults in `choose_scan()` are still the
   Windows RAID-0 tuning, untouched.
 
-- Still Windows-shaped and untouched: `media_tools.py`'s pinned Windows FFmpeg download with
-  `test_h3_video_delivery`'s `.exe` fixture (Phase 6/7.1), `scripts/perfexp_pair.py`'s
-  `ds4-decode.dll` hash and its `decode_dll_sha256` receipt key (8.1), and
-  `scripts/build_combo_runtime.py`'s preset name `... -> ds4-win decode` with its `mac={}` field
-  (7.1). The producer launcher - `studio.dsv41_windows_runner._Native`, which refuses non-nt in
-  its constructor - is ported (5.2): it stays as the Windows arm, and nothing selects it by
-  import any more. `combo_ram.LockedRam` and `working_set.protect_working_set` are ported too
+- Still Windows-shaped and untouched: `scripts/perfexp_pair.py`'s
+  `ds4-decode.dll` hash and its `decode_dll_sha256` receipt key (8.1). `media_tools.py`'s
+  pinned Windows FFmpeg download and `test_h3_video_delivery`'s `.exe` fixture went in
+  chunk 6.1, as did `tests/media_streaming_gate.py`, which named
+  `slstack-weight-fetcher.dll`; `scripts/build_combo_runtime.py`'s preset name and its
+  `mac={}` field went in 7.1b. The producer launcher - `studio.dsv41_windows_runner._Native`,
+  which refuses non-nt in its constructor - is ported (5.2): it stays as the Windows arm, and
+  nothing selects it by import any more. `combo_ram.LockedRam` and
+  `working_set.protect_working_set` are ported too
   (5.3); their `ctypes.WinDLL('kernel32')` calls are the Windows arms of modules that run on both
   platforms, which is what the `docs/linux-port-commands.md` gate of 8 lines means now.
 
@@ -921,6 +1008,14 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   compiled. Chunk 7.1c fixed it. Four lines of probe text are the cheapest way to check a
   classifier: note that the census's `source_files()` skips any path with a `build` component, so
   the probe has to live outside `build/`, and `--list` is what prints the per-file breakdown.
+- **The markdown link gate is scoped, and the whole-tree version has 18 known failures.**
+  Chunk 7.1a's gate said "no tracked markdown links a file that does not exist", which is true
+  of the port's own docs and README, not of the tree: `engines/streaming-llama/prefill_llama.cpp/tools/mtmd/README.md`,
+  `tools/server/README.md`, `tools/server/README-dev.md` and `tools/server/webui/README.md`
+  link llama.cpp docs and test sources this fork never vendored - 18 broken relative links,
+  the same count at `fbdb761` and after chunk 6.1. A link sweep is only a gate if you compare
+  the *set* against a baseline; note also that `docs/VARIABLES.md` contains C signatures whose
+  parentheses a `](`-based regex reads as links, so exclude it or the count is 260.
 - **`envvars.py:inventory()` scans `engines/` whether or not cmake builds it.** That is why nine
   unbuilt ggml backend trees still hold environment rows (8 `GGML_CANN_*`, 3 `GGML_OPENCL_*`, one
   `GGML_REMOTING_*`), and why deleting a backend, not disabling it, is what drops its rows.
@@ -984,9 +1079,16 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
 - **A doc-insertion script must preserve a UTF-8 BOM.** `docs/EXPERIMENT_E7.md`, `_E10.md`,
   `_E17.md` and `_E18.md` begin with one, so a check like `line.startswith('# ')` fails on them and
   a naive rewrite silently drops the BOM.
-- **`media_tools.install()` has no marker on non-nt.** It returns readiness from `shutil.which`
-  and ignores `installed.json` entirely, so a test that wants to prove "a stale marker cannot hide
-  changed tools" is a Windows-arm test; patch `shutil.which` both ways to gate the Linux arm.
+- **The media weight transport's ABI mirror is a struct, not a name.** `ds_backend.py` declares
+  `wf_params` by ctypes field order, so a field the fetcher header no longer has does not fail to
+  bind - it shifts every field after it, and `wf_create` reads an integer where it expects the GPU
+  backend pointer. `tests/test_media_fetcher_abi.py` parses the header and compares; run it after
+  any fetcher-header edit, and prove it is live by checking that it rejects the pre-chunk mirror.
+- **Do not `dlopen` the fetcher library inside the test process.** `libslstack-weight-fetcher.so`
+  is linked against cuFile, the CUDA runtime and liburing; loading it in a pytest run changed what
+  the cgroup admission checks in `tests/test_working_set.py` measured, and four of them failed in
+  a full run while passing alone. Read the export table with `nm -D` and bind the library in a
+  child process.
 - The producer builds the fetcher **twice**: `tools/dsv41-prefill` compiles its own copy of
   `src/llama-weight-fetcher.cpp` into the CLI, and `src/` compiles it into `libllama.a`. A manually
   linked selftest uses `build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o`, which

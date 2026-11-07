@@ -320,7 +320,9 @@ weight streaming. [Model notes and measured speeds](docs/SUPPORTED_MODELS.md).
 - **Images** in prompts.
 - **MCP** endpoint with the quality/speed controls and media tools.
 - **Media generation (experimental):** Anima, Qwen-Image, Krea and H3 image/video
-  from the chat. [Media setup](docs/MEDIA_SETUP_VERIFICATION.md)
+  from the chat. No media run has been made on this box: the setup check verifies the
+  system FFmpeg and the pipeline imports, and the streamed weight transport refuses on
+  Linux. [Media setup](docs/MEDIA_SETUP_VERIFICATION.md)
 - **LoRA (experimental)** for the native ds4 path, with frozen-prefix training.
   [Example](examples/train_jeff_lora/README.md)
 - **Configuration reference:** [Variables](docs/VARIABLES.md),

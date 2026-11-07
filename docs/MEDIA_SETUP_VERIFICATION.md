@@ -5,11 +5,19 @@ imports, supplies hash-verified configuration and tokenizer assets, and builds t
 native engines and the WebUI. `install --all --check` checks readiness. Model weights
 and any required text encoders or VAEs are supplied locally.
 
-Video tools on Linux are the system `ffmpeg` and `ffprobe` on `PATH`:
-`slstack/media_tools.py` reports what it finds there. The pinned archive download and
-its `installed.json` receipt are the Windows arm, and the media pipeline as a whole has
-not been verified on this box, so treat media generation as unported until a run says
-otherwise.
+Video tools are the system `ffmpeg` and `ffprobe`. `slstack/media_tools.py` locates them
+and runs each with `-version`, so a name on `PATH` that cannot start is reported as not
+ready and `install --all` refuses it. The retired setup downloaded and hashed a pinned
+Windows FFmpeg archive into the runtime instead; there is no Linux equivalent in this
+fork. This box answers ready with `/usr/bin/ffmpeg` and `/usr/bin/ffprobe`, both n9.0.2.
+
+What has not been verified is the pipeline itself. No media runtime is installed here (the
+locks ask for a CUDA torch environment of about 24 GiB), no media weights are on this box,
+and the streamed weight transport refuses on Linux because the fetcher library exports no
+`wf_*` API - `tests/test_media_fetcher_abi.py` reads the export table and prints the count.
+Treat media generation as unported until a run says otherwise; the portable tiers in
+`vendor/engines/cosmos_windows/weight_streaming/` are the Linux weight paths, and the
+fetcher route in `vendor/studio/studio/` is gated to Windows.
 
 ## Model families
 
@@ -19,10 +27,11 @@ The retained adapters cover Anima, Krea turbo, Qwen-Image 2.1, Z-Image, Flux2 Kl
 Kroma with explicit compatible adapters. A matching family name does not guarantee
 matching tensor shapes or components. [Model discovery and adapters](STACK_MEDIA_AND_STATE.md)
 
-Krea resident tensors and VAE read through the weight fetcher, which is io_uring on
-Linux, with tensor-coverage checks and owned copies before stream-buffer release.
-Select Streamed or Resident per model in Settings -> Stack. An adapter is applied only
-when explicitly selected for that generation.
+Krea's loader is chosen per platform: the fetcher-backed resident and streamed reads are the
+Windows arm, and on Linux tensors, text encoder and VAE are read through `safetensors`
+(`vendor/studio/studio/krea2_diffusion.py`), in both cases with tensor-coverage checks and
+owned copies before stream-buffer release. Select Streamed or Resident per model in
+Settings -> Stack. An adapter is applied only when explicitly selected for that generation.
 
 ## H3 video
 

@@ -133,8 +133,8 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
 
-# The orchestrator has no Win32 bindings left except the two Windows arms of the ported modules
-# and the media installer. Note -I (the built engine binaries and *.o match these patterns) and
+# The orchestrator has no Win32 bindings left except the two Windows arms of the ported
+# modules. Note -I (the built engine binaries and *.o match these patterns) and
 # --exclude-dir=port, because scripts/port's own sweep token list is not platform code.
 grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel32\|add_dll_directory" \
   slstack scripts --include=*.py --exclude-dir=__pycache__ --exclude-dir=port
@@ -142,8 +142,33 @@ grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel
 # ctypes.WinDLL('kernel32') in the Windows arm of a module that now runs on both platforms.
 # The other six are provenance - five rows of the mapping table in
 # slstack/producer_runner.py's docstring, which names the retired API it replaces, and one line
-# in working_set.py's module docstring. media_tools.py's Windows FFmpeg download does not match
-# this pattern - it keys on os.name and .exe names.
+# in working_set.py's module docstring. media_tools.py is one implementation since chunk 6.1:
+# it locates ffmpeg and ffprobe on PATH and runs each, so it names no platform at all.
+
+# Chunk 6.1's media gates. Both need no GPU, no torch and no model.
+python3 -B -m pytest tests/test_media_fetcher_abi.py -q -s
+# 8 passed: the three ctypes structs in ds_backend.py are compared field for field against
+# engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.h (a mirror that keeps a
+# deleted field shifts every later one), the retired DirectStorage mode is nowhere in the
+# transport, and the built library's export table is read with nm. It prints
+# SLSTACK_MEDIA_FETCHER_ABI library=libslstack-weight-fetcher.so exported=0 of 18 -
+# the fetcher API is not exported here, so `load_wf` refuses by name in a child process
+# rather than failing on an attribute lookup inside a worker. Re-run this if the llama tree
+# is rebuilt with -fPIC CUDA objects: 18 of 18 means media streaming is bindable.
+
+# The video tools readiness the installer refuses on. No test mock, the real binaries.
+python3 -B -c "import json; from slstack.media_tools import readiness; print(json.dumps(readiness()))"
+# {"ready": true, "tools": {"ffmpeg": {"path": "/usr/bin/ffmpeg", "ready": true,
+#  "version": "ffmpeg version n9.0.2 ..."}, "ffprobe": {...}}, "missing": []}
+
+# What the media CLI half of chunk 6.1 left behind must still import without torch, because
+# studio.adapter constructs it in the worker: `RealCosmosBackend.__init__` calls
+# cosmos_cli.Cli(dict(cosmos_cli.DEFAULTS)).
+PYTHONPATH=vendor/engines python3 -B -c "from cosmos_windows.cosmos_cli import Cli, DEFAULTS; Cli(dict(DEFAULTS)); print(len(DEFAULTS))"
+# 29 settings, none of them a Mac host. The deleted peer files were mac_reasoner_server.py,
+# the three omni_connector_* transport scripts, validate_sender.py,
+# weight_streaming/minimax_h3_mac.py and setup_native_framework_windows.py; nothing outside
+# the vendor tree imported any of them.
 
 # No Metal-named identifier or backend left in the engine. The word-boundary greps below are cheap
 # but NOT sufficient: `_` is a word character, so \bMETAL_ cannot see DS4_METAL_FOO (an environment
