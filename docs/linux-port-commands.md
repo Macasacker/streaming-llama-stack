@@ -198,6 +198,71 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing\|IOCP" \
 # 0 hits
 ```
 
+### The ggml backend prune (chunk 4.1)
+
+The gate is that cmake offers no backend but CUDA and CPU, in both flag sets, and that the CUDA
+half of this fork still builds. `build.sh llama`'s flags are the ones that matter - they add
+CUTLASS and `-DGGML_CUDA_DSV41_SPLIT_F32=ON`, and `ggml-common.h` is included by the CUDA kernels.
+Neither command below passes any backend option other than `-DGGML_CUDA=ON`:
+
+```bash
+llama=engines/streaming-llama/prefill_llama.cpp
+root=$PWD
+cmake -G Ninja -S "$llama" -B build/llama -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF \
+    -DGGML_CUDA=ON -DGGML_BACKEND_DL=OFF -DBUILD_SHARED_LIBS=OFF \
+    -DLLAMA_DSV41_OFFLINE_PRODUCER=ON -DLLAMA_DSV41_NATIVE_HALF_PROFILES=ON \
+    -DCMAKE_CUDA_ARCHITECTURES=120a
+cmake --build build/llama --parallel 6      # 210 targets, exit 0
+./build/llama/bin/llama-dsv41-prefill --check-native-profiles
+./build/llama/bin/llama-server --list-devices
+```
+
+`--list-devices` is the CUDA check that costs almost no VRAM: it initializes the runtime and asks
+the device for its name and memory, so it works while Strata holds the rest. It reads
+`CUDA0: NVIDIA GeForce RTX 5090 (32193 MiB, 359 MiB free)`.
+
+The env table is part of this gate, because deleting a backend deletes its `getenv` sites:
+
+```bash
+python3 -B scripts/port/reanchor_env_reads.py --apply   # reads are anchored to path:line
+python3 -B -m slstack.envdocs --refresh-defaults
+python3 -B -m slstack.envdocs --check                   # 2162 documented variables
+python3 -B -m unittest tests.test_environment_contract  # 11 tests, OK
+```
+
+`reanchor_env_reads.py` is needed whenever a source edit moves a line above a read; it remaps each
+recorded reference onto the live read in the same file by order and reports, rather than fixing,
+a file whose read *count* changed. `drop_rows.py` is the other half - it takes a JSON name list and
+removes rows whose last reader went with the deleted tree, refusing any name `inventory()` still
+sees.
+
+To prove the prune changed nothing the compiler did not already drop:
+
+```bash
+git worktree add build/wt-base HEAD          # move it to the current HEAD before each comparison
+for f in ggml/src/ggml-backend-reg.cpp ggml/src/ggml-common.h \
+         ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp ggml/src/ggml-cpu/ggml-cpu.cpp \
+         ggml/src/ggml-cpu/ggml-cpu.c src/llama-context.cpp src/llama.cpp; do
+  git show HEAD:engines/streaming-llama/prefill_llama.cpp/$f > build/41/$(basename $f)
+done
+# amx/amx.h and kleidiai/kleidiai.h must be extracted too: the HEAD ggml-cpu.cpp still includes
+# them, and without them the before side dies on a missing include instead of proving anything.
+mkdir -p build/41/amx build/41/kleidiai
+git show HEAD:$llama/ggml/src/ggml-cpu/amx/amx.h > build/41/amx/amx.h
+python3 scripts/port/preprocess_equiv.py --cc g++ --include build/41 \
+    --extra "-I$llama/ggml/include -I$llama/ggml/src -I$llama/ggml/src/ggml-cpu" \
+    build/41/ggml-backend-reg.cpp $llama/ggml/src/ggml-backend-reg.cpp
+# 149593 vs 149593 live lines, 0 differing position(s) - the deleted backends were already dead
+# text to the compiler. Use code_line_diff.py instead for a file whose code lines were removed,
+# which preprocess_equiv reports as a shift of everything below the deletion.
+python3 scripts/port/warning_profile.py --list llama-context.cpp,llama.cpp,ggml-cpu.cpp,ggml.c,arg.cpp \
+    build/wt-base .   # 36 -> 34 occurrences, 19 distinct both sides: only the two deleted Metal
+                      # branches' own -Wcast-qual went, and no new kind appeared
+python3 scripts/port/metal_word_census.py --strict engines/streaming-llama/prefill_llama.cpp
+# IDENTIFIER 0, STRING 0; the 56 COMMENT lines are the Mac peer's measurement history, which
+# chunk 7.1 owns. --strict passes because it classifies by position, which a grep cannot do.
+```
+
 ### The producer's platform layer, with no test target to run
 
 The producer CLI has no cmake test target, so chunk 3.1c proved its ported

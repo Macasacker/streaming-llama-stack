@@ -29,20 +29,22 @@ than polling it; chunk 5.2 (`5fb07f7`) is the producer runner, so a ULTRA or mod
 launched here and has been, without a model; chunk 5.3 is resident admission and the locked
 checkpoint, so `combo_producer`, `combo_native` and `native_broker` reach `after_resume` on Linux
 and the checkpoint tier allocates, locks what the kernel allows, and is attachable by name from a
-second process. Phase 5 is complete. In the order worth doing next:
+second process. Phase 5 is complete. Chunk 4.1 is landed too, so Phase 4 is: `ggml` builds CUDA and
+CPU only, and the Vulkan, SYCL, Hexagon, RPC, AMX, KleidiAI and Metal trees, options and reads are
+gone. In the order worth doing next:
 
-1. **Chunk 4.1 - the ggml backend prune** (keep CUDA and CPU; delete Vulkan, SYCL, Hexagon,
-   KleidiAI, RPC, AMX, Metal in `ggml-bench` and the options in `ggml/CMakeLists.txt`). It is the
-   last chunk that changes what the producer compiles, so it belongs before anything that measures.
-2. **Chunk 7.1 - docs, presets, tests**: the Mac/paired halves, `docs/VARIABLES.md` regeneration
+1. **Chunk 7.1 - docs, presets, tests**: the Mac/paired halves, `docs/VARIABLES.md` regeneration
    (which also owes the 123 wrapper-read names below), the inherited Windows/macOS measurement
-   labels, `media_tools.py`'s FFmpeg pin, `scripts/build_combo_runtime.py`'s `... -> ds4-win
-   decode` preset name, and the four suite names it owns.
-3. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start without
+   labels - including the 56 `metal` mentions chunk 4.1 left in the llama tree's comments -
+   and the four suite names it owns.
+2. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start without
    a download or a quantize run in the accepted type set (see "Constraints on this box" 2).
 
-Phase 3's remaining Win32 is `mtmd`, `server` and `decode-receiver`, none of which the streamed
-prefill needs. Three findings from 2.2e that belong to those chunks and
+What is left of Phase 3's Win32 is `mtmd`, `server` and `decode-receiver`, none of which the
+streamed prefill needs. Chunk 4.1 changed nothing about `tools/decode-receiver`'s code - it is the
+Mac peer's receiver, its target is `OFF` by default, and it never called the split-graph API; what
+it carries is 13 comment lines and one printed `LLAMA_PD_CACHE_CAPTURE` warning that describe the
+deleted Mac backend, which is chunk 7.1's text sweep. Three findings from 2.2e that belong to those chunks and
 to no chunk yet: 35 declarations in the engine's GPU headers are dead - declared by the deleted
 Mac backend, defined nowhere, called nowhere (the scan is in this file's method section, and the
 three that named Metal were deleted in 2.2e's comment half); 123 `DS4_METAL_*` environment names
@@ -287,11 +289,35 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   changed lines in the four files it touched, every one an intended fold or a dead field, and 0 for
   a pure deletion. For a file whose own include block moved (producer-platform.inc), compare the
   *multiset* of code lines instead of positions.
+- A chunk that deletes a **directory** breaks `preprocess_equiv` on the *before* file: the
+  HEAD version of `ggml-cpu.cpp` still has `#include "amx/amx.h"`, so extract the deleted headers
+  into the before tree (`git show HEAD:<path> > build/41/amx/amx.h`) and pass `--include build/41`
+  or the comparison dies on a missing include instead of proving anything. For a file whose *code*
+  lines were removed, `preprocess_equiv`'s positional diff reports a shift, not a change - use
+  `code_line_diff.py`, which reported `ggml-backend-reg.cpp` and `llama.cpp` at 0 changed lines and
+  named exactly the deletions elsewhere.
+- **A failed compile leaves the previous executable in place, and `./build/<tool>` then runs it.**
+  Chunk 4.1's `provider-lease-selftest` link died on a missing include while an older binary of the
+  same name reported `SELFTEST PASSED`. `rm -f` the output before compiling, or compile to a fresh
+  name, and check that the binary is the one you just built - a green gate that predates your edit
+  is worse than a red one.
+- Hand-compiled selftests need the include directory the *header* lives in, not the one the test
+  names: `provider-lease-selftest.cpp` includes `llama-dsv41-weights.h`, which is under `src/`, and
+  `wf-extent-selftest.cpp` must compile `src/llama-weight-fetcher.cpp` itself **without**
+  `-DGGML_USE_CUDA` - linking the CUDA-built object instead fails with "target CUDA device cannot
+  be bound" when Strata holds the VRAM, which reads like a broken reader and is only contention.
+- `collapse_conditionals.py` resolves a macro it can see; `#ifndef GGML_USE_CUDA` is *kept* on this
+  build because the macro is not defined at preprocess time, so CUDA-only code stays guarded and a
+  non-CUDA arm survives inside those guards. That is the conservative answer, not a miss - but it
+  means a prune is not finished by the collapse alone, and `#if defined(GGML_USE_METAL)` (also
+  unknown) is likewise kept. Say which arms the collapse could not decide.
 - Warning-profile comparison: `git worktree add build/wt-base HEAD` then
   `scripts/port/warning_profile.py build/wt-base .`, which compiles the same TU list in both trees
   with the same commands and prints the texts with line numbers stripped. 2.2c: 26 vs 26 occurrences
   in the engine; 3.1e: 27 vs 27, 18 distinct, none added or removed. Renames should differ only in
-  the renamed symbol's own warnings.
+  the renamed symbol's own warnings. A deletion chunk should lose occurrences and gain no *kind*:
+  4.1 went 36 -> 34 with 19 distinct both sides, the two losses being the deleted Metal branches'
+  own `-Wcast-qual` sites.
 - A chunk that folds a constant (`backend == METAL` is false here) is *not* covered by
   `preprocess_equiv`: the line delta shifts everything and the positional diff is noise. Review
   `git diff -U0 <file> | grep '^+[^+]'` - the insertions - line by line instead, and check
@@ -370,7 +396,37 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunk 5.3, one commit):
+This session's (chunk 4.1, one commit):
+
+- **`ggml` builds CUDA and CPU only.** Six backend trees and their public headers are deleted
+  (`ggml-vulkan`, `ggml-sycl`, `ggml-hexagon`, `ggml-rpc`, `ggml-cpu/amx`,
+  `ggml-cpu/kleidiai`), plus `ggml/src/ggml-metal`'s sources and the `kleidiai` and `amx`
+  directories under `ggml-cpu/`. `ggml/CMakeLists.txt` no longer offers `GGML_METAL`,
+  `GGML_VULKAN`, `GGML_SYCL`, `GGML_RPC`, `GGML_HEXAGON`, `GGML_CPU_KLEIDIAI` or the four AMX
+  feature options, and neither does `ggml-cpu/CMakeLists.txt`, which also lost the
+  `sapphirerapids` variant and the KleidiAI `FetchContent`. `ggml-rmw-vec.cpp` is now built
+  unconditionally - it was compiled on every non-Vulkan build already.
+- **71 environment rows are gone**, and the table is at 2,162 documented variables from 2,234.
+  Every one lost its last reader in the deleted trees; nothing was dropped merely because its
+  *name* names a deleted backend. **`SPLIT_DECODE_EVENT_SYNC` stays and is now inert** - its
+  branch and the default branch both call `ggml_backend_synchronize`, so the knob changes nothing
+  while the read keeps the row honest.
+- **A CPU-only llama no longer offers `--rpc`** (`common/arg.cpp` lost `add_rpc_devices` and the
+  option), and `llama_split_graph_create`'s no-backend warning reads "this fork builds CUDA".
+  Both were already unreachable here: `llama_supports_rpc()` asks the registry for "RPC", which
+  no longer exists, and the warning sits in `#ifndef GGML_USE_CUDA`.
+- **The Mac peer's split-graph API is now eleven stubs with no caller in this fork**
+  (`submit_layer_gated` and `launch_mega` return -99, the four host event helpers and
+  `synchronize` do nothing, `attn_out_buf`/`hidden_buf` return NULL,
+  `submit_split_layer_async`/`wait_split_layer_async` start nothing and report -99).
+  `llama_split_layer_params` lost its five `metal_*` fields and
+  `llama_context::get_metal_backend()` is gone. **That is an ABI change to a public struct**,
+  and nothing in this checkout constructs those fields; deleting the stub surface itself belongs
+  to the chunk that prunes the two-machine API.
+- `ggml_cpu_has_amx_tile/_bf16/_fp16` stay (they are `--version`'s CPU feature flags, not a
+  backend); `ggml_cpu_has_amx_int8` is gone because its only reader was the deleted AMX buft.
+
+Previous session's (chunk 5.3, one commit):
 
 - **Resident admission runs on Linux.** `working_set.protect_working_set` is one function now -
   `combo_ram`'s verbatim copy is gone, and `combo_native`/`combo_producer` import the surviving
@@ -399,7 +455,7 @@ This session's (chunk 5.3, one commit):
   exception is written in `combo_ram.py`'s docstring and in `producer_runner.py`'s refusal list
   comment instead of narrowing the rule.
 
-Previous session's (chunk 5.2, one commit):
+The session before that (chunk 5.2, one commit):
 
 - **A ULTRA or mode1 producer can be launched on Linux.** `slstack/producer_runner.py` is the
   counterpart of the vendored Windows runner with the same `_Native`/`_Job` surface, and
@@ -533,6 +589,16 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   variable *name* set is unchanged (`git show HEAD:envvars.json` vs the new file) rather than
   reading the diff; 2.2c deleted Metal-only `getenv` sites and no name dropped. Moving a `getenv`
   between files (3.1c moved several into `producer-platform.inc`) moves rows but not names.
+  Chunk 4.1 is the first chunk that dropped names, and it found the two halves of that rule:
+  **`reads` are anchored to `path:line`**, so rewording a comment above a read breaks the gate on
+  rows whose content did not change - `scripts/port/reanchor_env_reads.py` remaps them by order
+  within each file and refuses where a file's read *count* moved, because that is a row decision.
+  Run it before `--refresh-defaults`, since the evidence entries carry the same `path:line`. And
+  **a dropped row needs a whole-tree reader scan**: `GGML_CUDA_SYCL_GRAPHS`,
+  `GGML_CUDA_SYCL_DISABLE_GRAPHS` and `GGML_NO_SYCL_COMPILLER` name SYCL but are read in
+  `ggml-cuda/`, so they stay; `SPLIT_DECODE_MEGA_DISPATCH` and four siblings lost their last
+  reader when the Metal-only branches went. `scripts/port/drop_rows.py` reports against
+  `inventory()` and `--keep` refuses the batch if any name is still read.
   `envvars.py:inventory()` scans only `engines/` and `vendor/`, and treats `setenv("NAME")` as a
   read - a `setenv` whose name is a variable is invisible to it. It also misses a read through a
   wrapper: `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live but undocumented, and 2.2e

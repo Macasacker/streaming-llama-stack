@@ -356,6 +356,94 @@ Keep CUDA and CPU. Delete `ggml-vulkan`, `ggml-sycl`, `ggml-hexagon`, `ggml-cpu/
 
 Gate: cmake configures and builds with no backend options other than CUDA.
 
+4.1 The ggml backend prune. Done. Eight directories and their headers are gone:
+    `ggml/src/ggml-vulkan` (27986 lines, mostly `vk.cpp` and the generated
+    `spv_*_comp.h` shader blobs), `ggml-sycl`, `ggml-hexagon`, `ggml-rpc`, `ggml-cpu/amx`,
+    `ggml-cpu/kleidiai`, `ggml/src/ggml-metal` (the `.m` and `.metal` sources the build had
+    already stopped compiling), and the five public headers `ggml-{vulkan,sycl,hexagon,rpc,metal}.h`.
+    There is no `ggml-bench` in this fork, so the plan's Metal-in-bench item had nothing to delete.
+    - `ggml/CMakeLists.txt` lost the options, the `GGML_METAL_DEFAULT`/`GGML_BLAS_DEFAULT`
+      APPLE split for Metal, the AMX feature options, the Vulkan shader-gen toolchain, the
+      Hexagon and SYCL settings, the six Metal/SYCL/RPC/Vulkan/Hexagon entries in
+      `GGML_PUBLIC_HEADERS`, and the commented-out Metal resource rule.
+      `ggml/src/CMakeLists.txt` lost the five backend build calls, the six
+      `GGML_DLL_INSTALL_BACKENDS` lines, and the Vulkan/HIP/`__VEC__` guards around
+      `ggml-rmw-vec.cpp` - that source is now built unconditionally, which is what the
+      non-Vulkan branch already did. `ggml/src/ggml-cpu/CMakeLists.txt` lost the AMX sources
+      from the variant list, the `__AMX_*__`/`GGML_AMX_*` definitions in both the MSVC and the
+      GCC/Clang feature blocks, the `sapphirerapids` variant, and the whole KleidiAI block
+      including its `FetchContent` of the ARM kernels. The top-level `CMakeLists.txt` lost the
+      deprecated `LLAMA_METAL`, `LLAMA_METAL_EMBED_LIBRARY`, `LLAMA_RPC`, `LLAMA_SYCL` and
+      `LLAMA_SYCL_F16` option mappings, and `ggml/cmake/ggml-config.cmake.in` lost the Metal,
+      Vulkan and SYCL dependency branches. `ggml-backend-reg.cpp` lost the five registration
+      blocks and the five `ggml_backend_load_best` names, and `common/arg.cpp` lost
+      `add_rpc_devices` and the `--rpc` option - `llama_supports_rpc()` was already false here,
+      so that option was never reachable.
+    - The conditionals the compiler had already resolved were collapsed in the surviving sources
+      by `scripts/port/collapse_conditionals.py`, 44 blocks across six files, and the llama-side
+      Metal shared-buffer I/O went with them: `llama_split_layer_params` lost its five
+      `metal_*` fields, `llama_context::get_metal_backend()` and `split_sync_event` are gone,
+      and `ggml_cpu_has_amx_int8()` is gone from `ggml-cpu.h`.
+    - `ggml-cpu.c` keeps `ggml_cpu_has_amx_tile()`, `_bf16()` and `_fp16()` returning 0.
+      They are not Metal and not a backend - they are the CPU-feature queries behind
+      `llama-server --version`'s `CPU ... AMX` flags, and `preprocess_equiv` shows the file
+      unchanged for every other line.
+    - 71 environment rows lost their last reader and were dropped from `envvars.json`
+      (`scripts/port/drop_rows.py`, reading the name list from `build/dropped-names-41.json`):
+      36 `GGML_VK_*`, 15 `GGML_CUDA_SYCL_*`, 12 `GGML_SYCL_*`, 3 each for `GGML_METAL_*`,
+      `GGML_HAP_*` and `GGML_VIRTGPU_RPC_*`, plus `GGML_CPU_KLEIDIAI`, `GGML_DISABLE_VULKAN`,
+      `GGML_RPC` and the llama-side `LLAMA_ARG_RPC`. 2162 documented variables, down from 2234.
+      Dropping a row needs a whole-tree read scan, not the backend scan - `GGML_CUDA_GRAPHS`,
+      `GGML_CUDA_DISABLE_GRAPHS` and `GGML_NO_COMPILLER` name a deleted backend but are read in
+      `ggml-cuda/`, and `envvars.py:inventory()` does not scan `slstack/`, so a launcher-owned
+      name has to be checked there separately.
+    Behaviour changes, none of them reachable on this build: a CPU-only llama no longer offers
+    `--rpc`, and `llama_split_graph_create`'s refusal line reads "no supported backend (this fork
+    builds CUDA)" where it named Metal; both are in the CUDA-gated producer path only under
+    `#ifndef GGML_USE_CUDA`.
+    Gate: cmake configures with no backend option other than CUDA and CPU in both flag sets -
+    `build.sh`'s (CUTLASS, `-DGGML_CUDA_DSV41_SPLIT_F32=ON`, sm_120a) and the plain one - and
+    both build 489 and 210 targets with exit 0 and no new warning kind
+    (`scripts/port/warning_profile.py` against a baseline worktree: 36 -> 34 occurrences and 19
+    distinct both sides over `llama-context.cpp`, `llama.cpp`, `ggml-cpu.cpp`, `ggml.c` and
+    `arg.cpp` - the two lost occurrences are the deleted Metal branches' own `-Wcast-qual`).
+    `--check-native-profiles` passes from both trees, `llama-server --list-devices` still
+    enumerates the 5090, `preprocess_equiv` reports 0 differing positions for
+    `ggml-backend-reg.cpp`, `ggml-common.h` and `cpu-feats.cpp`, `code_line_diff` reports only
+    the intended deletions for `llama-context.cpp`, `ggml-cpu.cpp` and `ggml-cpu.c`, and 0 changed lines for
+    `ggml-backend-reg.cpp` and `llama.cpp` (neither file's code changed - the backends they
+    dispatch to were already conditionals the compiler dropped), `metal_word_census.py --strict` is clean over
+    the whole llama tree and the engine, the four hand-compiled programs
+    (`platform-selftest`, `provider-lease-selftest`, `wf-io-selftest`, `wf-extent-selftest`,
+    plus the Engram loader's 15) pass after being relinked against the rebuilt objects, the
+    Python suite's failing names are a subset of the baseline worktree's, and
+    `scripts/release_check.py --summary` reports 0 findings.
+    `scripts/port/reanchor_env_reads.py` is new: the table anchors reads to `path:line`, so a
+    source edit above a read breaks `envdocs --check` even when the read itself is untouched.
+    It maps each recorded reference onto the live read in the same file by order and refuses to
+    guess where a file's read count changed - that is a table decision, not a line fix.
+    Findings this chunk produced, for the chunk that owns them:
+    - The Mac peer's split-graph API is now eleven permanent stubs declared in
+      `include/llama.h` with no caller anywhere in this fork:
+      `llama_split_graph_submit_layer_gated` and `llama_split_graph_launch_mega` return -99,
+      `llama_split_graph_{signal_input_ready,wait_output_ready}_host` and their `_value` forms
+      and `llama_split_graph_synchronize` do nothing, `llama_split_graph_attn_out_buf` and
+      `llama_split_graph_hidden_buf` return NULL, and
+      `llama_submit_split_layer_async`/`llama_wait_split_layer_async` start nothing and report
+      -99 because only the deleted backend's event record made the deferred read possible.
+      They returned -99 on Linux before this chunk too, so keeping them is
+      behaviour-preserving; deleting that public surface belongs to the chunk that prunes the
+      two-machine API, not here. The CUDA half of the same API
+      (`llama_split_graph_create`, `launch`, `post_input`, `get_output`, `capture_layer`,
+      `wait_token_complete`) is live and unchanged.
+    - `SPLIT_DECODE_EVENT_SYNC` is now an inert knob: its branch and the default branch both
+      call `ggml_backend_synchronize`, and the read is kept so the row stays documented.
+    - 61 `metal` mentions remain in the llama tree across 56 lines, all of them in comment
+      position - the Mac peer's measurement history. `scripts/port/metal_word_census.py --strict` passes because it
+      classifies by position; the comment sweep is chunk 7.1's, as it was for the engine.
+    - `common/arg.cpp`'s `--device` parsing and `llama_supports_rpc()` still name "RPC" at
+      runtime; both are inert because no RPC registry exists, and neither is in the producer path.
+
 ## Phase 5: Python orchestrator
 
 Chunk 5.1 landed the platform half of this phase in four commits (`270d7a9`, `65e54bd`,
@@ -1422,8 +1510,10 @@ Chunk 5.1 fixed four names: `test_journal_recovery_flags` (a fixture path outsid
 `test_shared_guard_adapter` (the vendored StopIteration, and a Windows-only page-scan
 assertion), and `test_combo_guard`'s whole 21-test class, which had been skipped on this box.
 
-`python3 -B -m slstack.envdocs --check` reports 2,234 documented variables and no row moved by
-chunk 5.1; no engine source changed and no environment name was added or dropped.
+`python3 -B -m slstack.envdocs --check` reports 2,162 documented variables. Chunk 5.1 moved no
+row and dropped no name; chunk 4.1 is the first chunk that did, because deleting a backend deletes
+its `getenv` sites - 71 rows went, and 7 more were re-anchored to new line numbers after the
+comment rewording. No name was added.
 
 Build a CUDA engine with `make -C engines/ds4 cuda CUDA_ARCH=sm_120 -j4` (~4 min). `make cpu`
 builds the same binary names as CPU variants, so rebuild CUDA afterwards if you need the CUDA
