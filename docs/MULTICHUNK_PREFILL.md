@@ -1,5 +1,7 @@
 # Reading fewer weights during prefill
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 DeepSeek V4.1 prefill reads **315,825,603,008 bytes** for a complete Q4_K/Q8_0
 weight pass, rather than the GGUF's entire 518.6 GB. The two Engram tables stay
 on disk; the existing loader gathers the prompt's selected rows into its bounded

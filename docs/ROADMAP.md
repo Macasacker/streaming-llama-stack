@@ -2,12 +2,18 @@
 
 ## Limitations
 
-- The RTX path is Windows-only today (DirectStorage), targeting compute capability 12.0 (RTX 50-series). Other GPUs are untested.
+- The RTX path is Linux: CUDA with io_uring batch reads, targeting compute
+  capability 12.0 (RTX 50-series). Other GPUs are untested.
+- Nothing in this fork has been measured. Every rate in these docs came from the
+  upstream Windows build, or from the macOS decode half that was deleted; see
+  [the port plan](linux-port-plan.md) chunk 8.1 for the re-qualification that would
+  restate them.
+- One machine only. Two-machine pairing went with macOS.
 - The single-engine DeepSeek V4.1 path supports the [listed tensor layouts](DSV41_GGUF.md); split GGUFs require lossless assembly first.
 - The faster quality/speed settings cost quality. Max speed introduced syntax
   errors in C++ tests; use Max quality or Balanced for code.
-- Approximate YOCO140 is opt-in. Exact cone keep2541 is the single-machine
-  and paired ULTRA default, with negotiated state v2 for paired use.
+- Approximate YOCO140 is opt-in. Exact cone keep2541 is the ULTRA default, with
+  negotiated state v2 on the native broker path.
 - The measured FP4 file was requantised from Q4; native-precision FP4 conversion from the official weights is coming, with the same layout and expected speed.
 - Dense FP8 remains experimental. The shipping model remains Q4_K/Q8_0.
 - TileLang attention is numerically different from native attention. Retrieval
@@ -49,9 +55,8 @@
 - Revisit the experimental host-RAM expert tier on machines with much more RAM
   (untested). It gave no gain on the 32 GB machine and is not in this release;
   [measured decode rates](PERFORMANCE.md#host-ram-expert-tier).
-- Complete the CPU mode3/YOCO receiver for the delivered
-  [large-RAM ds4-win untested example](../examples/dual-machine/dsv41-large-ram-untested/README.md).
-- Faster cold start and DirectStorage setup; better VRAM use within the same RAM budget.
+- Faster cold start and a tuned io_uring read path; better VRAM use within the same
+  RAM budget.
 - Wider quality and long-context testing across prompt types and hardware.
 - More media models and adapters.
 

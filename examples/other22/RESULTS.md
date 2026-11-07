@@ -1,5 +1,7 @@
 # OTHER22 measured partial result
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](../../docs/linux-port-plan.md).
+
 Round2 continuation: [latest results and graph support](ROUND2_RESULTS.md). The following records round1.
 
 **BLOCKED-OWNER: the 10,000 tok/s objective and whole-sweep graph replay are unfinished.** Two exact CUDA kernel improvements are implemented and qualified. No reliable full-prompt speedup is established. Source base `1fc2d08201355ab57b98c9bf7fe9939262f865f2`; publication branch `agent/other22`, for orchestrator merge only.

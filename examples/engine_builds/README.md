@@ -1,7 +1,15 @@
 # Building native engines
 
-`slstack install --all` builds Windows CUDA/native targets, streaming targets, producer-profile checks and the chat UI. On macOS it builds the native receiver. Python 3.12, CMake/Ninja and the platform C++ compiler are required; Windows also needs the CUDA toolkit and Node.js/npm for UI assets.
+`./bin/slstack install --all` builds this fork's two engines and the chat UI by
+running `build.sh`: the llama fork with cmake (`GGML_CUDA=ON`, `sm_120a`), producing
+`llama-server`, `llama-export-lora`, `libslstack-weight-fetcher.so` and
+`llama-dsv41-prefill`; the ds4 engine with `make cuda`, producing `ds4-server` and
+`ds4-decode.so`; and the WebUI with npm and vite. `install --all --check` checks the
+outputs without rebuilding. Python 3.12, CMake and Ninja, a CUDA toolkit with `nvcc`,
+liburing and Node.js are the prerequisites.
 
-`install --all --check` checks packages and outputs without rebuilding. The source includes the CUDA provider headers needed for standalone builds. UI assets build before the server embeds them.
-
-`RESULTS.json` records measured build durations, binary identities and resource usage. Model-output comparisons are described in [engine parity](../engine_parity/README.md).
+`RESULTS.json` here is the inherited record from the deleted Windows and macOS
+engines: durations, binary identities and resource usage measured before the port. The
+Linux builds have no receipt of their own yet; `setup-backend` writes one per backend
+under `runtime_root/state/backends/`. Model-output comparisons are described in
+[engine parity](../engine_parity/README.md).

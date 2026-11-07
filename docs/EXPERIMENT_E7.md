@@ -1,5 +1,7 @@
 ﻿# E7: CPU experts for small row batches
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Reject the tested8-thread CPU expert component. GPU compute wins at every
 measured row count, and CPU/GPU arithmetic differs. No engine preset changes.
 A CPU/GPU hybrid for up to12K rows still needs native routing/integration;

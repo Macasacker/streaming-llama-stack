@@ -1,5 +1,7 @@
 # OPUS22: where the 100K prefill time goes
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](../../docs/linux-port-plan.md).
+
 Setup for every run: 100,000 identical tokens, cone 2541, bias 0, ULTRA, context
 131072, two row sweeps 49152 + 50848, packed FP4 4K speed proxy (the inherited
 lossy Q4-to-FP4 proxy), prompt-only (`--prefill-only`, one untouched frontier

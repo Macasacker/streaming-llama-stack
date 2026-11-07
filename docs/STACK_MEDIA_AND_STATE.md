@@ -51,11 +51,12 @@ worker and unloads the backend afterward. Studio's automatic Krea/profile/step
 adapter additions are suppressed for these calls. Selecting four steps does
 not itself select a four-step LoRA.
 
-Windows media workers resolve the weight-fetcher library beside the selected
-producer, or from an explicit `weight_fetcher` configuration. Runtime staging
-includes that library when present. GPU admission creates the default hold
-ledger before child checks use its resolved path; an empty configuration no
-longer resolves to the current directory. Media generation requires the selected component files, a loadable weight-fetcher and available GPU admission.
+Media workers resolve the weight-fetcher library beside the selected producer
+(`build/llama/bin/libslstack-weight-fetcher.so`), or from an explicit `weight_fetcher`
+configuration. Runtime staging includes that library when present. GPU admission
+creates the default hold ledger before child checks use its resolved path; an empty
+configuration no longer resolves to the current directory. Media generation requires
+the selected component files, a loadable weight-fetcher and available GPU admission.
 
 ## KV and YOCO checkpoints
 
@@ -81,7 +82,7 @@ prefill: YOCO remains an approximate prefill preset.
 
 ## Native vision lifetime
 
-Use a vision-capable producer and `-Vision` on a single-engine launch script,
+Use a vision-capable producer and `--vision` on a single-engine launch script,
 or set `vision_bridge_version: 1` in its local configuration. The matching
 `*-Vision.gguf` beside the selected language model is detected automatically;
 an existing `ds4_vision` or `--vision` path is also accepted. Native checkpoint
@@ -89,36 +90,44 @@ metadata validates the encoder against the loaded language model. There is no
 vision-encoder entry in Stack settings.
 
 On an image upload, the engine checkpoints and releases LLM GPU ownership. An
-isolated encoder process fetches encoder weights through DirectStorage into a
-GPU buffer, runs native image preprocessing/encoding/projecting, and exits.
-Its GPU allocation is released before LLM prefill/decode resumes. The retained
-projected rows enter the original chat context at native image-token positions,
-with image routing and Engram masking; no caption replaces the image. Generated
-image tool results also re-enter context this way.
+isolated encoder process fetches encoder weights through the weight fetcher over
+io_uring into a GPU buffer, runs native image preprocessing/encoding/projecting,
+and exits. Its GPU allocation is released before LLM prefill/decode resumes. The
+retained projected rows enter the original chat context at native image-token
+positions, with image routing and Engram masking; no caption replaces the image.
+Generated image tool results also re-enter context this way.
 
 The projector uses the encoder's validated output width: 5,120 for V4.1 and
 4,096 for the earlier supported checkpoint. It does not pad or resize embeddings.
-The Windows GPU proof uploaded a red image mid-chat, verified DirectStorage GPU
-fetch and encoder release, restored the previous KV prefix, and answered “Red.”
-The encoder and LLM use the same VRAM budget at different times; sharing one
-physical allocation across their processes is not implemented.
+An inherited Windows proof uploaded a red image mid-chat, verified the GPU encoder
+fetch and release, restored the previous KV prefix, and answered "Red". The vision
+bridge binds `ds4x_vision_file` in the Linux `ds4-decode.so`; encoding a real image
+has not been repeated here, because there is no qualified model on this box. The
+encoder and LLM use the same VRAM budget at different times; sharing one physical
+allocation across their processes is not implemented.
 
-## RTX/Mac YOCO transfer
+## Native state transfer
 
-Negotiated YOCO state v1 passes the live Mac decode, 105K recall and 198K uploaded-image WebUI gate. Historical plain-ULTRA and new YOCO timings are both retained in [performance](PERFORMANCE.md).
+The native broker carries initial and appended mode3 state between the ULTRA producer
+and the ds4 server on the same machine, including the complete DSpark ring and the
+incremental updates. Rewind checks the restored state hashes. Both sides must
+negotiate the same state version before transfer, and
+[CONE_STATE](CONE_STATE.md) records what each version means. A successful compile or
+state import alone does not establish equal model outputs across different arithmetic
+paths.
 
-Paired presets negotiate YOCO140 and state version1 explicitly in pairing,
-startup headers and native readiness. Unrecognized/mismatched peers cannot
-enable YOCO export. Version1 uses the original mode3 payload and incremental
-artifact geometry, including a complete DSpark ring, with all-region hashes.
-The provenance remains YOCO-derived. Ordinary exact mode is unchanged.
+Version 1 uses the original mode3 payload and incremental artifact geometry, including
+a complete DSpark ring, with all-region hashes. The provenance stays YOCO-derived for a
+YOCO preset. Ordinary exact mode is unchanged.
 
-Compatible YOCO transport carries initial and appended mode3 state, including the complete DSpark ring and incremental updates. Rewind checks the restored state hashes. Both peers must negotiate the same format before transfer. A successful compile or state import alone does not establish equal model outputs across different arithmetic paths.
+An image span carried through that state uses a bounded SLVP v1 envelope containing
+final token IDs, absolute image spans and the original SLVI projected embeddings.
+SHA-256 binds the complete body and each projection. The authenticated broker creates
+immutable owned files; network callers cannot supply filesystem paths. Image
+identities must match on continuation.
 
-The paired image candidate uses a bounded SLVP v1 envelope containing final
-token IDs, absolute image spans and the original SLVI projected embeddings.
-SHA-256 binds the complete body and each projection. The authenticated broker
-creates immutable owned files; network callers cannot supply filesystem paths.
-Historical image identities must match on continuation. The Mac restores image
-fingerprints after native state import. CPU checks cover initial/incremental
-transport and images before, across and inside the YOCO replay tail. Numerical KL/recall and live image conversation qualification pass. [Receipts and browser evidence](YOCO_PAIRED_QUALIFICATION.md).
+The two-machine version of this transfer, and the Mac receiver that imported it,
+were deleted with macOS. Numerical KL and recall measurements against that receiver,
+including the 105K recall and 198K uploaded-image WebUI gates, are no longer recorded
+in this repository. CPU checks still cover initial and incremental transport and
+images before, across and inside the YOCO replay tail.

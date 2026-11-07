@@ -1,5 +1,7 @@
 ﻿# E17: packed FP4 KV codec qualification
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Verdict: **needs-native**. The codec qualifies on captured model values;
 there is no integrated packed cache allocation/read/write path. Shipping
 presets retain their existing KV types. The experiment is behind

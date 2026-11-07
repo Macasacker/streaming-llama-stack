@@ -1,17 +1,16 @@
 # Streaming Llama Stack
 
 Run frontier-size mixture-of-experts models on one desktop GPU. The stack streams
-the weights from NVMe straight into an RTX 5090 with GPUDirect Storage or io_uring,
-so a 483 GiB model runs on a machine with 32 GB of VRAM and 32 GB of system RAM. Add a
-512 GB Mac Studio and the RTX does the long prefill while the Mac decodes.
+the weights from NVMe into an RTX 5090 over io_uring, so a 483 GiB model runs on a
+machine with 32 GB of VRAM and 32 GB of system RAM.
 
 It ships a llama.cpp fork with streaming prefill, the ds4 decode kernels for
 DeepSeek V4.1 Flash, an OpenAI-compatible API, MCP tools and the llama.cpp web UI.
 
 ## Results
 
-DeepSeek V4.1 Flash on one RTX 5090 desktop with 32 GB of RAM, plus an optional
-512 GB Mac Studio M3 Ultra for decode. Every figure below is **real text**: *I Promessi
+DeepSeek V4.1 Flash on one RTX 5090 desktop with 32 GB of RAM. Every figure below
+is **real text**: *I Promessi
 Sposi* with a password at the start and a recall question at the end, 199,952 tokens
 (the 100K rows use its first 100,000 tokens). Every run below answered the password
 correctly. Logits are bit-identical to the
@@ -20,10 +19,13 @@ previous build. Earlier README figures (for example 5,240 tok/s) were measured o
 1.66M on real text, so it hid about 37 s of Engram and spill cost at 200K. Those
 figures are retired.
 
-These figures were measured on the upstream Windows build. The Linux fork in this
-repository has not re-measured them; the streaming producer needs the Linux weight
-provider first, and every number then needs re-qualification against the same
-hash-pinned fixtures. See [linux-port.md](linux-port.md).
+These figures are inherited: they were measured on the upstream Windows build,
+which read weights through DirectStorage. The Linux fork in this repository reads
+them through io_uring and has re-measured none of them. No model file in the
+accepted quant set has been opened here yet, so every number needs re-qualification
+against the same hash-pinned fixtures before it can be restated. See
+[linux-port.md](linux-port.md) and chunk 8.1 of
+[docs/linux-port-plan.md](docs/linux-port-plan.md).
 
 ### Single machine: RTX 5090
 
@@ -46,95 +48,20 @@ executor (31.1 s against 29.3 s), the tail weight stream (6.8 s) and an Engram w
 planner then refused the whole-prompt Engram admission (9.37 GB needed, 9.30 GB room),
 so each sweep loaded its own rows: still exact, but slower.
 
-### Single machine: Mac Studio M3 Ultra (512 GB)
-
-| Model file | Prompt | Prefill | Decode | Notes |
-|---|---:|---:|---:|---|
-| Mac decode FP4 | 200K | 384 tok/s (521 s) | 36.6 tok/s serial | Metal layer prefill |
-| Mac decode FP4 + DSpark | 200K | 311 tok/s (643 s) | 36.8 tok/s (prose; DSpark rarely drafts on prose) | |
-
-The Mac-only engine must keep Metal layer prefill on. The paired receiver preset
-disables it, and with it disabled the Mac prefills one token at a time (~37 tok/s); the
-stack's Mac receiver now unsets it for Mac-only runs.
-
-### Two machines: RTX prefill, Mac decode
-
-200K real text: packed FP4 on the RTX, Mac decode FP4 on the Mac.
-
-| Prefill figure | Value |
-|---|---:|
-| (1) RTX prefill rate alone (single-machine prompt clock) | **43.2 s = 4,632 tok/s** |
-| (1) RTX producer prompt clock inside the paired run | 44.4 s |
-| (2) Effective end-to-end prefill on the current 5 Gb/s link, measured | **55.4 s = 3,610 tok/s** |
-| (3) Estimate: 10 GbE, transfer link-bound | ~52.3 s = ~3,830 tok/s |
-| (3) Estimate: Thunderbolt 4/5 bridge, transfer link-bound | ~51.8-52.0 s = ~3,850 tok/s |
-
-Time to first token is 56.3 s from the client's request, with the Mac engine already
-loaded at pairing or preset start. Decode runs at **37.0 tok/s**.
-
-Measured stage breakdown of (2). The sum is prompt_ms on the Mac clock:
-
-| Stage | Seconds |
-|---|---:|
-| RTX producer startup, admission and allocation, prefill, until ready | 48.35 |
-| Export of 0.66 GB BF16 wire (1.30 GB canonical), streaming over direct TCP and Mac load | 3.73 |
-| Mac owner-hash verification | 0.88 |
-| Mac prefix verification | 0.88 |
-| Rewind anchor (Mac capture plus RTX save) | 1.00 |
-| Mac catch-up hash chain | 0.44 |
-| **prompt_ms** | **55.39** |
-
-Before this release the same 200K paired run took 101.9 s (1,962 tok/s), with about
-183 s to first token. The changes since: real-text Engram, an F32-to-BF16 wire,
-in-stream owner hashing, no rewind re-hash, and a direct TCP stream in place of the
-SSH tunnel. That stream goes through a small relay in the Mac receiver, because macOS
-Local Network privacy blocks an unapproved ds4-server from dialling the RTX. The SSH
-tunnel remains the explicit fallback.
-
-Assumptions for the estimates in (3):
-- Only the transfer stage is rescaled, to payload / achievable link rate.
-- Payload is the BF16 wire, 0.66 GB at 200K.
-- Achievable rates: 5 GbE ~550 MB/s (1.2 s), 10 GbE ~1.1 GB/s (0.6 s), Thunderbolt 4
-  bridge ~2 GB/s (0.33 s), Thunderbolt 5 bridge ~4 GB/s (0.17 s).
-
-Today the stream runs at ~178 MB/s of wire bytes, and it is bound by the RTX export
-loop (GPU readback, BF16 narrowing and per-owner SHA-256), not by the 5 Gb/s link. A
-faster link therefore helps only after that loop is overlapped. The link itself
-negotiates at 5 Gb/s, not 10.
-
-**Known limits.**
-- Cross-machine KL is mean 0.028, max 0.054 nats over 8 rows (qualification limit 0.1
-  mean / 0.5 max).
-- The RTX-Mac link runs at 5 Gb/s.
-- About 3 s of RTX startup sits inside prompt_ms.
-- About 3 s of Mac-side verification is serial.
-
-[Paired measurements and timing scope](docs/PERFORMANCE.md#rtx-prefill-mac-decode).
-
 ### Presets and scripts (fastest defaults)
 
-- RTX single machine: `python -B examples/run_preset.py --single ultra-cone --context 1m --config my.local.json`
+- `python -B examples/run_preset.py --single ultra-cone --context 1m --config my.local.json`
   (packed FP4 file in your config; Max quality or Max speed is the live quality-speed
   control).
-- Mac single machine: `slstack mac` with the Mac decode FP4 file and its DSpark support
-  model. Metal layer prefill is on for Mac-only requests.
-- Two machines: `examples/dual-machine/dsv41-ultra-cone-fp4/preset.json`
-  (`python examples/run_preset.py --preset dsv41-ultra-cone-fp4 --machine mac|rtx`). The
-  Mac receiver relays the producer stream over direct TCP; `host_budget_gib` 9.25 admits
-  the whole-prompt Engram rows.
+- `scripts/start-dsv41-single-262k.sh --webui`, or one of the other labelled launchers
+  under `scripts/`.
 
 The host-RAM expert tier and the CPU expert lane stay opt-in toggles.
 
-Other models on the same streaming engine and RTX 5090:
-
-| Model | Best prefill | Prompt length |
-|---|---:|---:|
-| Step-3.5 Flash (Q8_0, 194 GB) | 2,294 tok/s | about 25K tokens |
-| MiniMax M2.5 (Q3_K_XL, 100 GB) | 1,576 tok/s | 9K tokens |
-| GLM-5 (Q4_K_XL, 400 GB) | 764 tok/s | 16K tokens |
-| Kimi K2.5 (Q3_K_XL, 500 GB) | 652 tok/s | 16K tokens |
-
-[Full numbers, with the conditions for each](docs/PERFORMANCE.md).
+[Full numbers, with the conditions for each](docs/PERFORMANCE.md). Kimi, GLM, MiniMax
+and Step streamed their prefill on the RTX and decoded on a Mac. That route went with
+the Mac half; their rates stay in `docs/PERFORMANCE.md` as history, not as something
+this fork can run.
 
 ### Host-RAM expert tier
 
@@ -195,12 +122,11 @@ cache instead of fetching from disk. Max quality never does this: it is the full
 model. You set the dial from the web UI, the API or MCP, separately for reasoning,
 tool calls, answers and code. The model can set it itself.
 
-**Exact cone.** Single-machine and paired ULTRA defaults compute every encoder row
-and the decoder's final 2,541-row dependency cone. Aligned replay preserves
-full-prefill arithmetic; the matched 8K and 49,555-token controls are exact.
-Paired mode negotiates state v2 and retains the mode3 export/import payload,
-owner hashes and compatibility checks. [Design](docs/MULTICHUNK_PREFILL.md) ·
-[Paired state and live proof](docs/CONE_STATE.md).
+**Exact cone.** The ULTRA defaults compute every encoder row and the decoder's final
+2,541-row dependency cone. Aligned replay preserves full-prefill arithmetic; the
+matched 8K and 49,555-token controls are exact. The state protocol that the native
+broker's export and import use keeps its version negotiation. [Design](docs/MULTICHUNK_PREFILL.md) ·
+[Cone state protocol](docs/CONE_STATE.md).
 
 **YOCO.** Optional approximate prefill from DeepSeek's
 [DeepInfer](https://github.com/deepseek-ai/DeepInfer/blob/553741557a57df44a46fb3ab72b6aafeaf945337/README.md)
@@ -209,21 +135,18 @@ compute of the decoder layers (21–39) on every pass except the last. It speeds
 long prefills by 1.26–1.45× and changes outputs slightly.
 [Speed and quality](docs/ULTRAYOCO_QUALIFICATION.md).
 
-**Two machines.** The RTX prefills the prompt and hands the finished state to the
-Mac once. The Mac decodes. Short prompts and follow-ups (under 11,776 new tokens)
-prefill on the Mac with no round trip. [Details](docs/TWO_MACHINE.md).
+The two-machine route is gone. The RTX did the prefill and a Mac Studio decoded, and
+the receiver for that handoff was macOS-only; this fork serves one machine.
 
-Streaming prefill, the RTX-to-Mac handoff and Mac decode are general and work
-with several model families. The single-engine ds4-kernel decode on the RTX is the
-one DeepSeek V4.1-specific part.
+Streaming prefill is general across the architectures the llama fork builds, but the
+serving half of this stack is the ds4-kernel decode of DeepSeek V4.x, and the launcher
+refuses a `general` or `mac` config.
 
 ## Who can run this
 
 | Mode | Hardware needed |
 |---|---|
-| Single RTX | Linux RTX 50-series desktop, 32 GB VRAM, 32 GB system RAM and fast NVMe; measured on an RTX 5090. |
-| RTX + Mac | The same RTX machine plus an Apple Silicon Mac with enough unified memory for the model; measured on an M3 Ultra with 512 GB. |
-| RTX + large-RAM box | The same RTX machine plus a RAM-rich Linux decode host sized for the whole GGUF and session; **untested example**, receiver gap documented [here](examples/dual-machine/dsv41-large-ram-untested/README.md). |
+| Single RTX | Linux RTX 50-series desktop, 32 GB VRAM, 32 GB system RAM and fast NVMe; the inherited measurements were taken on an RTX 5090. |
 
 ## Requirements
 
@@ -235,7 +158,6 @@ one DeepSeek V4.1-specific part.
   desktop reserve free, and stops cleanly if RAM drops below 0.5 GiB free.
 - **Build tools:** Linux, Python 3.12, a C++ toolchain, CMake, Ninja, CUDA 13.2 or
   newer with `sm_120a`, liburing, and Node.js 24.
-- **Optional Mac:** M3 Ultra with 512 GB, on the same network, with the same model file.
 
 ## Any-GGUF single engine
 
@@ -254,13 +176,13 @@ with a header-only dry run. The installer never downloads weights.
 
 ## Making the model files
 
-DeepSeek V4.1 Flash uses four GGUF files, all produced from the original
+DeepSeek V4.1 Flash uses GGUF files produced from the original
 [DeepSeek-V4.1-Flash-1017 safetensors checkpoint](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017/tree/1bae0e1088993b9b82de08f59de5be5a34e42170)
-(revision `1bae0e10…`, about 475 GiB) with `scripts/convert_dsv41_gguf.py`. The two
-FP4 files keep DeepSeek's released E2M1/E8M0 expert values in two different byte
-layouts and are not interchangeable: the RTX file carries
-`deepseek41.expert_layout = flashinfer-sm120-mxfp8-mxfp4-v1`, which ds4 on the Mac
-refuses to load, and the Mac file has no layout flag (canonical `ggml-mxfp4`).
+(revision `1bae0e10…`, about 475 GiB) with `scripts/convert_dsv41_gguf.py`. The FP4
+file keeps DeepSeek's released E2M1/E8M0 expert values in the tensor-core-native byte
+layout, `deepseek41.expert_layout = flashinfer-sm120-mxfp8-mxfp4-v1`. The converter
+still writes the canonical `ggml-mxfp4` layout when asked, but nothing in this fork
+loads it: the engine that did was the Mac one.
 
 Status: this native safetensors path has not yet been run end to end and qualified on this stack.
 
@@ -268,13 +190,12 @@ Status: this native safetensors path has not yet been run end to end and qualifi
 
 | File | Purpose | Runs on | Preset or script | Command (after the plan step below) |
 |---|---|---|---|---|
-| **RTX packed FP4** | RTX prefill (single machine and the prefill side of two machines) and RTX single-machine decode | Linux RTX 5090 | `python -B examples/run_preset.py --single ultra-cone`; `rtx.model` of `examples/dual-machine/dsv41-ultra-cone-fp4/preset.json` | `--expert-format native-fp4 --expert-layout flashinfer-sm120-mxfp8-mxfp4-v1 --dense-format q8` |
-| **Mac decode FP4** | Mac decode with ds4: Mac single machine and the decode side of two machines | Mac Studio M3 Ultra | `slstack mac --model …`; `mac.model` of `dsv41-ultra-cone-fp4/preset.json` and `dsv41-ultra-cone/preset.json` | `--expert-format native-fp4 --expert-layout ggml-mxfp4 --dense-format q8` |
-| **DSpark drafter** | Speculative drafts for Mac decode | Mac Studio M3 Ultra | `mac.mtp_model` in the paired presets; the DSpark support model for `slstack mac` | `--component dspark` (Q4_K experts, Q8_0 attention/shared/projections; no `--expert-format`/`--expert-layout`) |
-| **Q4** | The Q4_K/Q8_0 alternative on the RTX | Linux RTX 5090 (also loads on the Mac) | `scripts/start-dsv41-single-262k.sh` / `-1m.sh` with the Q4 path in your config; `rtx.model` of `dsv41-ultra-cone/preset.json` | `--expert-format q4` (the default) |
+| **Packed FP4** | Streaming prefill and ds4 decode | Linux RTX 5090 | `python -B examples/run_preset.py --single ultra-cone`; `--model` of `scripts/start-dsv41-single-262k.sh` | `--expert-format native-fp4 --expert-layout flashinfer-sm120-mxfp8-mxfp4-v1 --dense-format q8` |
+| **DSpark drafter** | Speculative drafts for ds4 decode | Linux RTX 5090 | `dspark_model` in local config, or `--dspark` on the native server | `--component dspark` (Q4_K experts, Q8_0 attention/shared/projections; no `--expert-format`/`--expert-layout`) |
+| **Q4** | The Q4_K/Q8_0 alternative | Linux RTX 5090 | `scripts/start-dsv41-single-262k.sh` / `-1m.sh` with the Q4 path in your config | `--expert-format q4` (the default) |
 
-Rule of thumb: **MXFP4 experts with the layout flag = RTX; MXFP4 experts with no flag
-= Mac; Q4_K experts = Q4.** You can check a file without reading its payload:
+Rule of thumb: **MXFP4 experts with the layout flag are the packed FP4 file; Q4_K
+experts are Q4.** You can check a file without reading its payload:
 
 ```sh
 python -B -c "import sys; sys.path.insert(0,'.'); from slstack.gguf_header import read_header, TYPE_NAMES; h=read_header(sys.argv[1]); m=h['metadata']; t=[x for x in h['tensors'] if x['name'].endswith('_exps.weight')][0]; print('experts', TYPE_NAMES.get(t['type']), '| layout', m.get('deepseek41.expert_layout', 'none = ggml-mxfp4 if MXFP4'))" <file.gguf>
@@ -300,15 +221,10 @@ python -B scripts/convert_dsv41_gguf.py --source <HF checkpoint dir> --ds4-tools
 **2. Convert**, with the same file flags as the plan:
 
 ```sh
-# RTX packed FP4
+# Packed FP4
 python -B scripts/convert_dsv41_gguf.py --source <HF checkpoint dir> --ds4-tools <ds4-tools> \
   --expert-format native-fp4 --expert-layout flashinfer-sm120-mxfp8-mxfp4-v1 --dense-format q8 \
-  --execute --out <rtx-fp4.gguf> --quants-library <libds4quants> --threads 8 --host-budget-gib 8
-
-# Mac decode FP4
-python -B scripts/convert_dsv41_gguf.py --source <HF checkpoint dir> --ds4-tools <ds4-tools> \
-  --expert-format native-fp4 --expert-layout ggml-mxfp4 --dense-format q8 \
-  --execute --out <mac-fp4.gguf> --quants-library <libds4quants> --threads 8 --host-budget-gib 8
+  --execute --out <fp4.gguf> --quants-library <libds4quants> --threads 8 --host-budget-gib 8
 
 # DSpark drafter
 python -B scripts/convert_dsv41_gguf.py --source <HF checkpoint dir> --ds4-tools <ds4-tools> \
@@ -319,9 +235,6 @@ python -B scripts/convert_dsv41_gguf.py --source <HF checkpoint dir> --ds4-tools
   --expert-format q4 --execute --out <q4.gguf> --quants-library <libds4quants> --threads 8 --host-budget-gib 8
 ```
 
-- **Both machines' files must use the same `--dense-format`.** The code accepts
-  `--dense-format native-fp8` only with the RTX layout, so a matched RTX/Mac pair
-  uses `q8` on both.
 - `--threads` is 1..32. `--host-budget-gib` is required with `--execute` and must
   fit in physical RAM above `--runtime-floor-gib` (default and minimum 4).
 - `--resume` continues an interrupted run from its journal. Existing outputs are
@@ -333,8 +246,7 @@ python -B scripts/convert_dsv41_gguf.py --source <HF checkpoint dir> --ds4-tools
 
 | File | Output size | Free disk needed | Host RAM |
 |---|---:|---|---|
-| RTX packed FP4 (`q8` dense) | ~502 GB | output + 32 GiB reserve, checked by the writer | `--host-budget-gib` |
-| Mac decode FP4 (`q8` dense) | ~502 GB | output + 32 GiB reserve | `--host-budget-gib` |
+| Packed FP4 (`q8` dense) | ~502 GB | output + 32 GiB reserve, checked by the writer | `--host-budget-gib` |
 | DSpark drafter | ~7.8 GiB | output + 32 GiB reserve | `--host-budget-gib` |
 | Q4 | ~483 GiB | output + 32 GiB reserve | `--host-budget-gib` |
 
@@ -344,7 +256,7 @@ Conversion is CPU-only.
 ## Quickstart
 
 ```sh
-git clone --recurse-submodules https://github.com/fronteagle739/streaming-llama-stack.git
+git clone https://github.com/fronteagle739/streaming-llama-stack.git
 cd streaming-llama-stack
 ./bin/slstack install --all
 ./bin/slstack install --all --check
@@ -380,53 +292,24 @@ scripts/start-dsv41-single-262k-ultra-yoco.sh --webui  # 262K, approximate YOCO 
 scripts/start-dsv41-single-1m-ultra-yoco.sh --webui    # 1M, approximate YOCO keep 140
 ```
 
-Each script accepts `-Config`, `-Model`, `-DryRun` and `-Stop`.
-The legacy `ultra-yoco` filenames also default to exact cone; `-ApproximateYoco`
-selects approximate replay. Paired ULTRA presets also default to exact cone
-with negotiated state v2; approximate YOCO140/v1 remains explicit opt-in. [Defaults and optional experiments](docs/MERGEPERF.md).
+Each script accepts `--config`, `--model`, `--webui`, `--vision`, `--dry-run` and
+`--stop`. The `-ultra-yoco` filenames are approximate replay (keep 140); the plain ones
+are the exact cone (keep 2541), which is also the native broker's negotiated state v2
+default. [Defaults and optional experiments](docs/MERGEPERF.md).
 
 ## Supported models
 
 | Model | RTX streaming prefill | Decode |
 |---|---|---|
-| DeepSeek V4.1 Flash | Yes | RTX (single engine, ds4 kernels) or Mac (ds4) |
-| DeepSeek V4 Flash, V2, V3 | Yes | Mac |
-| Kimi K2.5 / K2.6 / K2.7 | Yes | Mac (MLX) |
-| GLM-5 / 5.1 / 5.2 / 5.3 | Yes | Mac (MLX) |
-| MiniMax M2.5 / M3 | Yes | Mac |
-| Step-3.5 / 3.7 Flash | Yes | Mac |
-| MiMo V2.6 Pro | — | Mac (ds4 with expert streaming and the quality/speed dial) |
+| DeepSeek V4.1 Flash | Yes | ds4 kernels on the RTX |
 
-The Mac can also serve other models through MLX-LM, MLX-VLM, mlx-serve and
-llama-server. [Model notes and measured speeds](docs/SUPPORTED_MODELS.md).
-
-## Two machines
-
-Install on both. On the Mac:
-
-```sh
-./bin/slstack install --all
-./bin/slstack mac --model '<model_dir>/<deepseek-v4.1-flash>.gguf' --host-budget-gib 400 --min-available-gib 0.5
-```
-
-It prints an endpoint, a pairing token and the RTX command:
-
-```sh
-./bin/slstack rtx --config my.local.json --mac <mac-endpoint> --pair-token <printed-token> --webui
-```
-
-The current exact-cone WebUI proof processes **105,054 tokens** in a
-**59.005 s** prompt interval; initial Mac decode measures **27.50 tok/s**.
-The same prompt on one RTX takes **46.282 s**. Historical image-prompt results
-remain in the [paired measurements](docs/TWO_MACHINE.md).
-Use the [ULTRA exact-cone paired preset](examples/dual-machine/dsv41-ultra-cone/preset.json)
-with the [example launchers](examples/dual-machine/README.md).
-[Cone state protocol](docs/CONE_STATE.md).
-
-For a RAM-rich Linux second machine with enough memory to hold the model, see the
-[large-RAM ds4-win untested example](examples/dual-machine/dsv41-large-ram-untested/README.md).
-It documents the missing mode3/YOCO CPU receiver; its launcher only previews the
-configuration.
+Nothing else is qualified. The llama fork builds the other MoE architectures for
+prefill and `ds4` reads `glm-dsa`, `glm5-next` and `qwen4exp` metadata, but no run
+here has loaded a model outside DeepSeek V4.1 Flash, and Kimi K2.5/K2.6/K2.7,
+GLM-5.x, MiniMax M2.5/M3, Step-3.5/3.7 and MiMo V2.6 Pro decoded on macOS through
+receivers this fork deleted. The launcher refuses a `general` config. `llama-server`
+still serves any architecture llama.cpp understands, with its own prefill and no
+weight streaming. [Model notes and measured speeds](docs/SUPPORTED_MODELS.md).
 
 ## Features
 
@@ -434,7 +317,7 @@ configuration.
   per-phase settings. [Live controls](docs/LIVE_GENERATION.md)
 - **Persistent sessions.** The conversation stays loaded between turns, and
   follow-ups only process new tokens. [Prefix reuse](docs/PREFIX_REUSE.md)
-- **Images** in prompts, on one machine or two.
+- **Images** in prompts.
 - **MCP** endpoint with the quality/speed controls and media tools.
 - **Media generation (experimental):** Anima, Qwen-Image, Krea and H3 image/video
   from the chat. [Media setup](docs/MEDIA_SETUP_VERIFICATION.md)
@@ -446,9 +329,13 @@ configuration.
 ## Limitations
 
 - CUDA kernels target compute capability 12.0 (RTX 50-series).
-- The streaming producer needs the Linux weight provider: the V4.1 physical provider,
-  the Engram extent reader and the locked-RAM carry are not ported yet. See
-  [docs/linux-port-plan.md](docs/linux-port-plan.md).
+- Nothing in this fork has run against model weights. The streaming producer is
+  ported (provider lease, io_uring fetcher, Engram extent reader, carry tier), but
+  no GGUF in the [accepted layouts](docs/DSV41_GGUF.md) is on this box, so the
+  inherited figures above stay inherited and the port's gates are host-side ones.
+  See [docs/linux-port-plan.md](docs/linux-port-plan.md).
+- One machine only. Two-machine pairing was deleted with macOS, so there is no
+  decode host for a model too large for the RTX.
 - The single-engine DeepSeek V4.1 path accepts the [supported GGUF layouts](docs/DSV41_GGUF.md); split files require assembly first.
 - The faster dial settings cost quality. Max speed introduced syntax errors in C++
   tests; use Max quality or Balanced for code.
@@ -482,11 +369,9 @@ own licences; see [NOTICE](NOTICE).
   [DeepInfer](https://github.com/deepseek-ai/DeepInfer/blob/553741557a57df44a46fb3ab72b6aafeaf945337/README.md)
   for YOCO. TensorSharp was a secondary reference.
 - [llama.cpp / ggml](https://github.com/ggml-org/llama.cpp) for the inference base and web UI.
-- [antirez/ds4](https://github.com/antirez/ds4),
-  [ds4-win-NovaStar](https://github.com/mishal-harbi/ds4-win-NovaStar) and
-  [IngeniousIdiocy's V4.1 backend](https://github.com/IngeniousIdiocy/ds4-v41-m3ultra)
+- [antirez/ds4](https://github.com/antirez/ds4) and
+  [ds4-win-NovaStar](https://github.com/mishal-harbi/ds4-win-NovaStar)
   for the native kernels.
-- [mlx-serve](https://github.com/ddalcu/mlx-serve) for the optional MLX service.
 - [NVIDIA GPUDirect Storage](https://github.com/NVIDIA/gds-nvidia-fs) for
   storage-to-GPU transfers, and Linux io_uring for the read path.
 

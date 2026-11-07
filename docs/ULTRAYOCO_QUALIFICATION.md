@@ -1,12 +1,17 @@
 # Approximate YOCO: measurements and limits
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 `yoco_keep=140` is opt-in. Default `0` retains full prefill. With the flag off, the compared 43,327-token exports were byte-identical (288,477,488 bytes).
 
 ## Origin and streaming implementation
 
 YOCO prefill truncation comes from DeepSeek’s [DeepInfer inference release](https://github.com/deepseek-ai/DeepInfer/blob/553741557a57df44a46fb3ab72b6aafeaf945337/README.md), whose compact truncation settings retain 140 tokens. TensorSharp is a secondary reference. The stack’s contribution is the streaming variant: non-final sweeps skip the weight reads and evaluation of layers 21–39; layer 20 still runs in full, and the final sweep evaluates the retained decoder suffix.
 
-Negotiated YOCO state v1 passes the live Mac decode, long recall and uploaded-image conversation gate. [Paired measurements and qualification](YOCO_PAIRED_QUALIFICATION.md) retain the historical pre-YOCO result and document the shared-producer performance gate. See [state transport](STACK_MEDIA_AND_STATE.md).
+Negotiated YOCO state v1 passed the live Mac decode, long recall and uploaded-image
+conversation gate on the build that still had a Mac. That half is deleted and its
+receipts went with it. [State transport](STACK_MEDIA_AND_STATE.md) keeps the transport
+contract that survives.
 
 ## Timing and weight fetches
 
@@ -65,8 +70,8 @@ The existing approximately 100K recall case renders to **93,668 tokens**.
 YOCO returns the expected **amber-quartz-1147**. Prefill takes **60.343 s**,
 using `[49152, 44516]` sweeps.
 
-The actual `start-dsv41-single-1m-ultra-yoco.ps1 -WebUI` launcher serves HTML
-and completes two API chat turns through its WebUI router: HTTP 200,
+The `start-dsv41-single-1m-ultra-yoco` launcher of that build, PowerShell then, serves
+HTML and completes two API chat turns through its WebUI router: HTTP 200,
 answers **12**, then **15**, in **22.062 s** and **3.829 s**. Launch metadata
 confirms `yoco_keep=140`, context **999,424**, growable bf16 cache and the
 4 GiB native runtime floor. Prompts are 593 and 611 tokens: this validates

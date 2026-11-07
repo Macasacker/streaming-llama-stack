@@ -1,5 +1,7 @@
 # Reproduce the carry comparison
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](../../docs/linux-port-plan.md).
+
 Build this branch's producer and pin its SHA-256 in your local config. Use the
 same original Q4_K/Q8_0 model, binary, DLL, context and token file in each pair.
 The config supplies the shared GPU hold ledger and explicit memory budgets.

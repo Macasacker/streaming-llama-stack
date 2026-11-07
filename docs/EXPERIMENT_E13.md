@@ -1,5 +1,7 @@
 # E13: selected Engram row I/O
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Timing scope: historical prefill seconds/tokens per second in this report include producer startup; they are not prompt-execution-only measurements. TTFT includes startup and first output.
 Opt-in 512 B reads reduced requested Engram bytes by about 82% with exact
 results. A 64 MiB row cache eliminated nearly all reads on repeated turns.

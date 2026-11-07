@@ -37,13 +37,12 @@ single GGUF directly. **Split files must first be losslessly assembled** using
 antirez's pinned `gguf-tools/merge_deepseek41_shards.py`; its `--help` describes
 the required original byte count and SHA. It preserves tensor bytes, retains
 the inputs, restores 16 KiB alignment and verifies the assembled file before
-publication. It currently requires POSIX `fcntl` (Linux/macOS). This is a file
+publication. It currently requires POSIX `fcntl`. This is a file
 assembly prerequisite, not a new quantization. Allow space for the assembled
 file plus the inputs; this release does not directly stream a shard set.
 
-Use the same complete file on both machines for an exact paired handoff. This
-change's new quant coverage is for the combined single-engine path; it does
-not qualify additional paired model identities or speed/quality measurements.
+The combined single-engine path is what the new quant coverage qualifies. Nothing
+here qualifies a second machine's model identity, and two-machine pairing is gone.
 
 ## Convert an existing raw checkpoint
 
@@ -62,8 +61,7 @@ about 475 GiB of safetensors. The measured files record source revision
 Full conversion also needs the source tokenizer, NumPy, tokenizers and a locally
 built upstream `libds4quants` shared library. The fetched source includes its
 Makefile, `quants.c` and `quants.h`; run `make -C <converter-source-dir>
-quants-shared` on Linux/macOS (C compiler and pthreads required). A native
-Windows build needs a compatible pthread-enabled toolchain. Use local storage with room
+quants-shared` (C compiler and pthreads required). Use local storage with room
 for the raw input, roughly 483 GiB main output, 7.8 GiB DSpark, 0.91 GiB Vision,
 and upstream's free-space reserve. Conversion is CPU-only and can take a long
 time. It was not performed again for this release.
@@ -115,11 +113,10 @@ Use `--component dspark` with the same arguments for DSpark; use `--component
 vision` without `--quants-library` for Vision. Keep output paths distinct. The
 main/DSpark writer supports upstream's `--resume`. Existing complete outputs
 are never overwritten. The selected host budget must fit available physical
-RAM plus the default 512 MiB free-RAM floor. The supervisor enforces an aggregate
-Windows Job commitment limit and watches tree RSS/available RAM; failures are
-loud. Its 600-second timeout is a renewable **no-progress** window, not a total
-conversion deadline. On POSIX the existing supervisor supplies RSS/floor checks.
-Logs and the memory receipt are beside the output. The resulting header is
+RAM plus the default 512 MiB free-RAM floor. The supervisor caps the process tree
+in a cgroup v2 scope and watches RSS and available RAM; failures are loud. Its
+600-second timeout is a renewable **no-progress** window, not a total conversion
+deadline. Logs and the memory receipt are beside the output. The resulting header is
 checked against the plan before success is reported.
 
 ## Validation scope

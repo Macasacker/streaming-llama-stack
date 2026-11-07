@@ -1,5 +1,7 @@
 # Single-engine RAM experts: Round 3
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 The accepted Round 2 maximum-size upload, CPU and mix runs already used an
 explicit **10240 MiB** setting, with a **10,729,635,840-byte** payload rounded
 to 539 whole experts. Each completed its append and graceful shutdown under

@@ -11,4 +11,6 @@ python -B tests/prove_image_environment.py --config <config.json> --expect admit
 python -B tests/prove_native_environment.py --config <config.json> --expect model-open --receipt <output.json> --ds4-cache-affinity-bias 0
 ```
 
-[RTX vector casts](rtx-vector-cast.json) compare the complete 67-token state with vector dispatch on/off. [Mac Metal budget](mac-metal-budget.json) exercises the owned wired-buffer factory with explicit allowance/refusal cases. These bounded samples do not establish inference behavior for every variable.
+[RTX vector casts](rtx-vector-cast.json) compare the complete 67-token state with
+vector dispatch on/off. These bounded samples do not establish inference behavior for
+every variable.

@@ -1,5 +1,7 @@
 # Prefill defaults and optional experiments
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Single-machine DSV4.1 launchers use `ultra-cone`: ULTRA arithmetic, a padded
 2,541-row exact dependency cone and automatic routed reads. The matched
 49,555-token text prompt improved from 36.250 to 25.375 seconds including
@@ -8,16 +10,16 @@ apply through 2,048 tokens; longer prompts route only the decoder tail.
 The 262K preset keeps F32 cache; the 1M preset keeps BF16 cache. The measured
 cone throughput uses BF16. [Qualification and receipts](MULTICHUNK_PREFILL.md).
 
-Use `examples/single-machine/dsv41-ultra-cone-webui.ps1` or the standard
-`scripts/start-dsv41-single-262k.ps1`. Python callers can select
-`scripts/dsv41_single.py --preset 262k --profile ultra-cone`. Explicit
-`accurate`, `fast` and full `ultra` profiles remain available.
+Use `scripts/start-dsv41-single-262k.sh --webui` or
+`python -B examples/run_preset.py --single ultra-cone --config <local.json>`. Python
+callers can also select `scripts/dsv41_single.py --preset 262k --profile ultra-cone`.
+Explicit `accurate`, `fast` and full `ultra` profiles remain available.
 
-The older `ultra-yoco` single-machine filenames now default to exact cone too.
-Add `-ApproximateYoco`, or select Python profile `ultra-yoco`, for approximate
-keep-140 replay. CONEALL adds negotiated exact-cone state v2 and makes keep2541
-the ULTRA paired and large-RAM preview default as well. The full mode3 owner
-layout and raw history remain unchanged; v1-only peers refuse cone pairing.
+`scripts/start-dsv41-single-262k-ultra-yoco.sh` and its 1M twin are the approximate
+keep-140 route; the plain `-262k` and `-1m` launchers are exact cone. The Python
+profile `ultra-yoco` selects the same approximate replay.
+Keep 2541 with negotiated state v2 is also the native broker's
+default; the paired and large-RAM previews that used it were deleted with macOS.
 [Protocol and live qualification](CONE_STATE.md).
 
 Single-machine examples also enable E8's recency LFU admission with a 16-token

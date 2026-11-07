@@ -1,100 +1,61 @@
 # Backend installation
 
-The stack retains the custom decoder sources and installs external dependencies
-at pinned revisions. Build inputs, environments, compiler outputs and receipts
-live under `runtime_root`; model weights and host settings are separate.
-Installation does not require Studio or a Studio virtual environment.
+This fork builds two engines. `ds4` is the native CUDA decode engine in
+`engines/ds4`; `llama-server` is the llama.cpp fork in
+`engines/streaming-llama/prefill_llama.cpp`. Build inputs, compiler output and
+receipts live under `runtime_root`; model weights and host settings stay in your own
+config. Installation needs no Studio checkout and no virtual environment of yours.
 
-On Apple Silicon, install Python 3.12 and the Xcode command-line tools, including
-the Metal compiler. Use the stack's Python interpreter for these commands:
+Setup is Linux-only: `slstack/backend_setup.py` refuses any other platform rather
+than building something it cannot verify.
 
 ```sh
-python3.12 scripts/bootstrap.py setup-backend --backend mlx-receiver
-python3.12 scripts/bootstrap.py setup-backend --backend llama-decode
-python3.12 scripts/bootstrap.py setup-backend --backend llama-decode-upstream
-python3.12 scripts/bootstrap.py setup-backend --backend ds4-peer
-python3.12 scripts/bootstrap.py setup-backend --backend mference
-python3.12 scripts/bootstrap.py setup-backend --backend mlx-serve
-python3.12 scripts/bootstrap.py setup-backend --backend omlx
+./bin/slstack --config my.local.json setup-backend --backend ds4
+./bin/slstack --config my.local.json setup-backend --backend llama-server
+./bin/slstack --config my.local.json setup-backend --backend all --check
 ```
 
-Pass a private config using `--config` before the command. `--backend all` installs
-all registered Mac backends. Keep at least 16 GiB free on the runtime volume;
-large compiler caches and multiple backends may require more. Compiler jobs are
-limited to one or two and run under the stack's host memory guardian.
-The default build memory budget is 3 GiB, or 8 GiB for mlx-serve's native MLX
-Metal linker, with at least 4 GiB of system memory kept available. An explicit
-`backend_build_budget_gib` in local config overrides that budget; a lower limit
-can stop the linker before it finishes.
+`--backend all` covers both. `--jobs` is 1 or 2 compiler jobs, each running under the
+stack's host-memory guardian with `backend_build_budget_gib` (default 3 GiB) and at
+least 4 GiB of available system memory; a lower budget can stop a linker before it
+finishes. Setup requires 16 GiB free on the runtime volume for inputs, outputs and
+headroom.
 
-| Backend | Installation |
+| Backend | What setup builds |
 | --- | --- |
-| `mlx-receiver`, `mlx-lm`, `mlx-vlm`, `mtp-shim` | Retained custom MLX-VLM, MLX 0.32.2 and GLM native kernels in `decode-venv`. |
-| `llama-decode`, `llama-server` | Retained streaming llama source, Metal and Accelerate. |
-| `llama-decode-upstream` | Pinned upstream source plus the retained KV/token receiver overlay. WIR is unavailable in this overlay. |
-| `ds4` | DSV4.1 native state receiver. Existing `mac-setup` also performs its model and wired memory checks. |
-| `ds4-peer` | Earlier DS4P protocol, built from the consistent retained peer receiver sources. This is a distinct protocol from the DSV4.1 state broker. |
-| `mference` | Swift HTTP server, native decode service and model repacker with pinned local dependencies and Foundation networking; Swift 6.1 or newer. Optional Xet and AsyncHTTPClient transports are disabled in this local-model build. |
-| `mlx-serve` | Pinned server, DS4, OpenCode, MLX, MLX-C, llama, Jinja and webp inputs, private dependency prefixes and Zig 0.17.0. Requires macOS/Metal 26.2 or newer. |
-| `omlx` | Separate `omlx-venv`, MLX 0.32.4, nanobind 3.1.0, pinned model libraries and compiled native kernels. It does not replace the custom MLX environment. |
+| `ds4` | `make -jN cuda CUDA_ARCH=sm_<arch>` over the staged engine tree, producing `ds4-server`. The architecture comes from `nvidia-smi --query-gpu=compute_cap`, falling back to `sm_120a` or `DS4_CUDA_ARCH`. |
+| `llama-server` | cmake over the staged llama fork with `-DGGML_CUDA=ON`, `-DBUILD_SHARED_LIBS=OFF`, `-DLLAMA_CURL=OFF`, `-DLLAMA_OPENSSL=ON`, tests and examples off, building the `llama-server` target into `runtime_root/build/llama-<revision>/bin/`. |
 
-An OpenAI HTTP backend performs its own prefill. Select a KV/token receiver or
-the matching DS4 protocol for RTX prefill and Mac decode.
+The producer and the chat UI are not `setup-backend` targets. `./build.sh
+[config] [all|llama|ds4|webui]` builds them: the WebUI with npm and vite, the ds4
+engine with `make cuda`, and the llama tree with cmake including
+`llama-dsv41-prefill` and `libslstack-weight-fetcher.so`. `./bin/slstack install
+--all` runs `build.sh` too, alongside the media environments, and hashes the model
+file once.
 
-Mference loads a completed `.gturbo` directory. Its setup receipt at
-`runtime_root/state/backends/mference.json` records the installed `repacker`
-executable. Run that executable with `--help` for supported model sources and
-conversion options, then explicitly select its output directory as
-`decode.model_path`. Setup builds the repacker without downloading model weights.
-
-For an offline Mac, fetch source archives on a connected machine:
+An OpenAI HTTP backend performs its own prefill. `llama-server` is that backend; the
+`ds4` route is the native state broker and does the streaming prefill in the producer.
 
 ```sh
-python3.12 scripts/bootstrap.py setup-backend --backend all --fetch-only --cache-dir /path/to/source-cache
+./bin/slstack --config my.local.json setup-backend --backend ds4 --build-only
 ```
 
-Transfer that cache, including archive `.json` receipts, and a wheelhouse containing
-the packages in the chosen `locks/mac-*.txt` profile. Include CMake 4.4.4,
-setuptools 84.2.1, wheel 0.48.0 and, for mlx-serve, ziglang 0.17.0. Then install:
+`--build-only` compiles and leaves verification pending. A normal setup run also
+executes `<binary> --help` as a CLI check before marking the backend ready.
+`--fetch-only` downloads pinned source archives into `--cache-dir` and builds
+nothing. `--offline` needs a `--wheelhouse` for the Python build tools
+(cmake 4.4.4, setuptools 84.2.1, wheel 0.48.0) and a `--cache-dir` for sources.
+Downloads are verified before extraction, and a divergent cache or build snapshot is
+reported and preserved rather than overwritten.
 
-```sh
-python3.12 scripts/bootstrap.py setup-backend --backend mlx-serve --offline \
-  --cache-dir /path/to/source-cache --wheelhouse /path/to/wheels
-```
+Backend receipts at `runtime_root/state/backends/<name>.json` record the source
+revision, the binary hashes and fingerprints of the retained stack sources the build
+used. `--check` refuses a changed or unverified artifact, and `slstack decode`
+refuses to launch one.
 
-Downloads are verified before extraction. A divergent cache or build snapshot
-is preserved and reported instead of overwritten. Backend receipts record source
-and binary hashes. `--check` refuses changed or unverified artifacts.
+Installation and CLI checks establish that an engine is built and runs its own help
+text. They do not qualify a model, an output, or a speed. Nothing in this fork has
+loaded weights yet; see [the port plan](linux-port-plan.md) for the gates that would.
 
-`--build-only` compiles without model inference or GPU smoke checks and leaves
-verification pending. Run setup without that option before normal launch.
-Installation and CLI checks establish that an engine is installed; they do not
-qualify a model, cross-machine state handoff, output quality or performance.
-
-On Windows, `install --all` and `build.ps1` prepare the retained RTX engines and
-WebUI. Install Visual Studio C++ Build Tools, the CUDA toolkit, Ninja and Node.js
-first. The SDK installer fetches the pinned DirectStorage redistributable rather
-than relying on files in Studio. Choose a CUDA architecture matching the GPU.
-
-See [the backend audit](BACKEND_SOURCE_AUDIT.md) for qualification status and
-existing measurements, and [paired examples](../examples/dual-machine/README.md)
-for model paths, interface settings and launch order.
-
-## Verified build run
-
-On October 27, 2026, the single offline `--backend all --build-only` command
-completed successfully for all 12 registered backends in an isolated runtime.
-It used the retained stack sources and pinned source/wheel caches, with no
-dependency on a Studio checkout. The host was a 512 GB M3 Ultra Mac Studio with
-macOS 26.2, Python 3.12.12, Swift 6.3.3, CMake 4.4.4 and Zig 0.17.0.
-
-The run built native DS4, DS4P, both llama receivers and llama-server, mlx-serve
-and its native dependencies, oMLX's native kernels, the custom MLX-VLM GLM
-kernels, and Mference's HTTP server, native decode service and repacker. Read-only
-checks matched all recorded build hashes. The custom MLX and oMLX extensions
-matched their respective MLX binary ABI tags.
-
-[The build receipt](evidence/backend-builds-20261027.json) records the source
-checkpoint and binary hashes. Every backend remains marked `ready: false` in
-that receipt: this compile-only run performed no model generation, GPU
-correctness smoke, cross-machine inference or new inference performance test.
+See [the source audit](BACKEND_SOURCE_AUDIT.md) for provenance and what a source
+audit does and does not prove.

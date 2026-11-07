@@ -1,5 +1,7 @@
 # Prefill carry in VRAM
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 The 1M exact-cone preset now keeps more prefill carry in VRAM. It borrows the
 growable cache's unused physical reservation during the initial prefill, then
 returns that space before decode or a later append grows the cache. The total

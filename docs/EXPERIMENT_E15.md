@@ -1,5 +1,7 @@
 # E15: RTX 5090 power and clocks
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Verdict: reject changing the power limit. Current, default and maximum
 supported limits all report575W. No supported increase is available.
 

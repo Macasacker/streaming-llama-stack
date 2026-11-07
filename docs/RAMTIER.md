@@ -1,5 +1,7 @@
 # Single-engine host expert tier
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 The producer can now use the host-cache implementation from standalone
 ds4 between its VRAM L2 and DirectStorage. The versioned `ds4x_host_cache_v1`
 bridge reuses ds4's allocation/backoff, LRU/admission and pinned upload code.

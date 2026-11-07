@@ -1,5 +1,7 @@
 # E8: recency-weighted L2 admission
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Timing scope: historical prefill seconds/tokens per second in this report include producer startup; they are not prompt-execution-only measurements. TTFT includes startup and first output.
 Verdict: **adopt LFU with a16-token half life as the example default**. On one frozen
 8K synthetic-record workload, it reduced routed expert-miss bytes by 11.7% in

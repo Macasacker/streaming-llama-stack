@@ -1,5 +1,7 @@
 # Native-format kernel and stored-weight experiments
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](../../docs/linux-port-plan.md).
+
 Latest matched100K runs after the KERNELS2 defaults and the16K/64K fused-FFN
 follow-up: [COMBINATION_RESULTS.md](COMBINATION_RESULTS.md). Earlier packed-layout
 and dense-FP8 qualification: [PACKED_LAYOUT_RESULTS.md](PACKED_LAYOUT_RESULTS.md).

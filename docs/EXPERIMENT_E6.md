@@ -1,5 +1,7 @@
 # E6: sparse attention and FP4 index scoring
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Original 518,596,067,328-byte Q4 GGUF, RTX 5090, 100,000 frozen tokens,
 same-day fresh engines, exclusive leases, zero quality bias, YOCO disabled.
 The primary sweep plan is 49,152 + 50,848 tokens. F32 growable context,

@@ -1,5 +1,7 @@
 # Follow-up prefix reuse
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Append-only turns reuse the live decoded frontier and prefill only new tokens. The two-process single-RTX coordinator and paired session transport also validate saved state against the new conversation render.
 
 ## Sampled and canonical tokens

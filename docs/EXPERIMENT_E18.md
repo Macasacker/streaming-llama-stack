@@ -1,5 +1,7 @@
 ﻿# E18: reuse a bounded host transfer registration
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Adopt `LLAMADECODE_HOST_COPY_STAGING=auto`, preserving explicit0 for the
 original direct tile copies and1 for forced staging. Every example and shared
 profile uses auto. Native auto selects the64MiB slot only when a supported

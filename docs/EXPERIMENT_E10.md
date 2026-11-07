@@ -1,5 +1,7 @@
 ﻿# E10: bounded CUDA HC graph islands
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 Adopt `DS4_CUDA_SINGLE_GPU_HC_GRAPHS=1` for CUDA single-GPU V4.1 decode.
 Explicit0 retains eager execution. Every example and the shared profile overlay
 uses1 while preserving an explicit local0. Metal/ROCm and unsupported graph

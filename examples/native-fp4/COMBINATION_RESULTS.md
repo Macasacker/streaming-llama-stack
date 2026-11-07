@@ -1,5 +1,7 @@
 # Matched 100K after KERNELS2 defaults
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](../../docs/linux-port-plan.md).
+
 All FP4 rows are **Q4 to FP4 requant (lossy), speed proxy for native FP4**. FP8 rows additionally use a **Q8_0 to FP8 lossy dense proxy**. Both remain opt-in. Main `f5d35f1` is merged into agent/native-fp4 as `6fe2f0e`. All producer C++ units, allocator, CUDA dispatcher and token-tile unit were rebuilt; other qualified CUDA objects, static libraries and the decode DLL were reused. The embedded TileLang path is observed in every accepted trace. No full clean CUDA-library rebuild is claimed.
 
 The fixed 100000-token prompt, bias 0, exact cone 2541 and context 131072 are matched. The primary comparison uses 49152/50848 sweeps. Prompt-only time starts at prompt execution and ends at frontier logits; TTFT includes launch/model open/allocation. Separate synchronized profiles are diagnostic. Every throughput below uses prompt-only seconds.

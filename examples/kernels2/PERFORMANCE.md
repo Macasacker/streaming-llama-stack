@@ -1,5 +1,7 @@
 # E19: measured imports, defaults and remaining gap
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](../../docs/linux-port-plan.md).
+
 2026-10-29; RTX5090 SM120,32GiB VRAM,33.7GiB physical host memory. Base
 `ccd310061ac702b9642942df9180f53767da3034`; branch `agent/kernels2`.
 Original Q4 model bytes and placement are unchanged. Prompt-only timing spans

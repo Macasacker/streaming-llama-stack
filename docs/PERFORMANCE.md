@@ -1,8 +1,14 @@
 # Performance
 
-All RTX numbers come from one desktop: RTX 5090 (32 GB VRAM), 32 GB of system
-RAM, Windows, NVMe RAID-0 at about 25 GB/s. The Mac is an M3 Ultra with 512 GB.
-Every figure below was measured; each says what was timed.
+Every number in this file is inherited. The RTX rows come from one desktop on the
+upstream Windows build: RTX 5090 (32 GB VRAM), 32 GB of system RAM, NVMe RAID-0 at
+about 25 GB/s, weights read through DirectStorage. The Linux fork reads them over
+io_uring and has measured nothing yet. Each figure says what was timed. The macOS
+decode half's measurements were deleted with its receipts, so routes that needed a
+second machine are gone from here; the RTX prefill rates of the other model families
+stay below as history.
+Chunk 8.1 of [the port plan](linux-port-plan.md) is the run that would replace all of
+this.
 
 ## DeepSeek V4.1 Flash on one RTX 5090
 
@@ -12,7 +18,7 @@ Model: DeepSeek V4.1 Flash GGUF, Q4_K routed experts and Q8_0 for the rest
 
 ### Prefill
 
-Single-machine and paired ULTRA defaults use the exact 2,541-row dependency
+The ULTRA defaults use the exact 2,541-row dependency
 cone. The current kernel stack includes certified FP4 index scoring, native-parity
 fused Sinkhorn, TileLang attention, E18 automatic transfer staging, allocation-plan
 reuse and the exact OTHER22 HC/CONCAT/QAT improvements. N=1 remains the default.
@@ -159,8 +165,8 @@ The earlier carry policy measured 25.375 s at 49,555 tokens, 45.484 s at 100K,
 At 49,555 tokens, the same-build full eager control took 36.250 s
 (1,367.03 tok/s); the cone preserved every logit and cache checkpoint hash.
 The 400K result has not been remeasured with the carry policy. The 262K launcher
-retains growable F32 cache; the 1M launcher uses BF16. The paired cone image
-and exact-cone one-million-token throughput remain unmeasured.
+retains growable F32 cache; the 1M launcher uses BF16. Exact-cone
+one-million-token throughput remains unmeasured.
 
 Earlier single-engine Q4_K/Q8_0, approximate YOCO140 controls from NATIVEFP4:
 
@@ -386,11 +392,11 @@ proxy. Explicit toggles retain the original paths.
 
 The host-RAM tier stays **off by default** (`LLAMADECODE_HOST_CACHE_MB=0`). Round 4
 (2026-10-30) moved its data movement off the critical path: the VRAM-to-RAM copy-in
-runs on its own stream with one event, the DirectStorage batch is submitted first and
+runs on its own stream with one event, the storage batch is submitted first and
 RAM hits upload on a separate H2D stream while it reads, and Max-speed routing prices
 a RAM expert at half a miss (`LLAMADECODE_RAM_ROUTE_COST=0.5`). On this 32 GB box the
-tier is a small gain only at FP4 Max quality and still a loss elsewhere: Windows refuses
-to CUDA-register the locked tier in-process, so each hit is copied through pinned
+tier is a small gain only at FP4 Max quality and still a loss elsewhere: that build
+could not CUDA-register the locked tier in-process, so each hit is copied through pinned
 staging (about 1 ms of CPU per expert), and a 6.6 GB tier holds 351 experts, removing
 only 6% of misses.
 
@@ -460,64 +466,14 @@ Use Max quality or Balanced for code.
 The dial only reroutes experts that would otherwise come from disk. The more of
 the model fits in fast memory, the fewer experts need rerouting.
 
-MiMo V2.6 Pro on the 512 GB Mac (ds4 decoder with expert streaming, 416 GiB
-expert cache) already hits about 97% at bias 0. The same dial there:
+DeepSeek V4.1 on a 32 GB GPU hits about 75-90% of experts in cache. The dial there
+trades real quality for real speed: KL 0.10-0.48, up to 2.3x faster.
 
-| Bias | Warm decode tok/s | Expert misses | KL vs full model | Top-1 agreement |
-|---:|---:|---:|---:|---:|
-| 0 | 6.03 | 2.66% | 0 | 100% |
-| 0.35 | 7.78 | 0.86% | 0.008 | 93.9% |
-| 0.65 | 8.32 | 0.48% | 0.015 | 91.2% |
-| 0.9 | 8.62 | 0.30% | 0.019 | 93.9% |
-| 1.36 | 9.00 | 0.09% | 0.034 | 90.5% |
-
-Warm rate is the last 128 of 256 tokens.
-
-Side by side:
-
-- **DeepSeek V4.1 on a 32 GB GPU:** about 75–90% expert hits. The dial trades
-  real quality for real speed: KL 0.10–0.48, up to 2.3× faster.
-- **MiMo V2.6 Pro on a 512 GB Mac:** 97%+ hits. The dial is nearly free: KL at
-  most 0.034, up to 1.5× faster.
-
-The more memory you have for the expert cache, the faster it runs and the smaller
-the quality cost of the speed settings. Within the DeepSeek sweep above, the hit
-rate and KL columns show the same trend.
-
-## RTX prefill, Mac decode
-
-Paired ULTRA defaults now use exact cone keep2541 and negotiated state v2.
-The existing mode3 export/import retains owner hashes, token history and
-compatibility checks. A matched actual-WebUI prompt contains 105,054 tokens:
-
-| Route | WebUI prompt interval | Displayed prompt rate | Initial decode |
-|---|---:|---:|---:|
-| Single RTX exact cone | 46.282 s | 2,269.867 tok/s | 2.256 tok/s |
-| RTX → Mac exact cone v2 | 59.005 s | 1,780.432 tok/s | 27.499 tok/s |
-
-The paired interval includes startup, prefill, export and handoff; it is
-separate from native prompt-only timing and TTFT. The measured mode3 transfer
-is 691,633,076 bytes in 3.066 s, including verification/import acknowledgment.
-Both routes and the follow-ups return the same retrieval answers.
-[Live proof and timing components](CONE_STATE.md).
-
-Earlier image measurements, approximate YOCO140/v1 or full prefill, with
-startup and handoff included in the WebUI prompt interval:
-
-| Prompt | YOCO | Prompt time | Prefill tok/s | Mac decode tok/s |
-|---|---|---:|---:|---:|
-| 198,287 tokens with an image | On | 118.8 s | 1,670 | 31.0 |
-| 49,787 tokens with an image | On | 33.7 s | 1,477 | 31.8 |
-| 49,787 tokens with an image | Off | 41.6 s | 1,197 | — |
-
-The 198K run is 1.69× faster than the same-size image prompt on one machine
-without YOCO (986 tok/s). The image was answered correctly in every run.
-
-The handoff adds about 3.4 s: the 49,787-token prompt takes 30.4 s on the RTX
-alone with YOCO, and 33.7 s with the Mac.
-
-Prompts and follow-ups under 11,776 new tokens prefill on the Mac instead, at
-about 350–390 tok/s. Mac decode runs at about 31 tok/s at 9K and 24K tokens.
+The more memory the expert cache has, the higher the hit rate and the smaller the
+quality cost of the speed settings. Within the DeepSeek sweep above, the hit rate and
+KL columns show that trend. A model that fits whole in one machine's memory, which the
+deleted 512 GB macOS decoder did, made the dial nearly free; nothing in this fork can
+reproduce that.
 
 ## Memory
 
@@ -525,7 +481,6 @@ about 350–390 tok/s. Mac decode runs at about 31 tok/s at 9K and 24K tokens.
 |---|---:|---:|
 | Single engine, engine process | 7.75 GiB | 5.7 GiB (1M-token run) |
 | Single engine, engine and controller | 9.25 GiB | — |
-| RTX side of the two-machine setup | 8.5 GiB | 6.3 GiB |
 
 The single-engine example uses a 9.25 GiB host budget, 4 GiB admission floor,
 512 MiB desktop reserve and 0.5 GiB runtime free-RAM floor. Experimental runs
@@ -533,24 +488,25 @@ declare their own host ceilings and retain paging stops. The model is never load
 
 ## Other models
 
-Measured with the streaming engine on the same RTX 5090 desktop. These are
-prefill rates timed by the engine; decode ran on the Mac.
+Prefill rates from the streaming engine on the same RTX 5090 desktop. Decode for
+these families ran on the deleted macOS half, so only the prefill column survives.
+The launcher refuses a `general` config now, which means none of these can be repeated
+in this fork at all. [What this fork serves](SUPPORTED_MODELS.md).
 
-| Model | Prompt | Prefill tok/s | Mac decode tok/s |
-|---|---:|---:|---:|
-| Step-3.5 Flash Q8_0 (194 GB) | about 25K | 2,294 | 25–33 |
-| Step-3.5 Flash Q8_0 | 16K | 1,518 | — |
-| MiniMax M2.5 UD-Q3_K_XL (100 GB) | 9K | 1,576 | 20–35 |
-| MiniMax M2.5 UD-Q3_K_XL | 32K | 1,205 | — |
-| MiniMax M2.5 UD-Q3_K_XL | 196K | 439 | — |
-| MiniMax M2.5 UD-Q8_K_XL (200 GB) | 14.5K | 598 | 20–35 |
-| GLM-5 UD-Q4_K_XL (400 GB) | 16K | 764 | — |
-| GLM-5 UD-Q4_K_XL | 32K | 493 | — |
-| GLM-5.1 UD-Q4_K_XL | 15.6K | 415 | — |
-| GLM-5.3 UD-Q4_K_XL | short | — | 14.1 |
-| Kimi K2.5 UD-Q3_K_XL (500 GB) | 16K | 652 | — |
-| Kimi K2.5 UD-Q3_K_XL | 32K | 561 | — |
-| Kimi K2.6 Q3_K_L (457 GB) | 23K | 576 | 24.3 |
+| Model | Prompt | Prefill tok/s |
+|---|---:|---:|
+| Step-3.5 Flash Q8_0 (194 GB) | about 25K | 2,294 |
+| Step-3.5 Flash Q8_0 | 16K | 1,518 |
+| MiniMax M2.5 UD-Q3_K_XL (100 GB) | 9K | 1,576 |
+| MiniMax M2.5 UD-Q3_K_XL | 32K | 1,205 |
+| MiniMax M2.5 UD-Q3_K_XL | 196K | 439 |
+| MiniMax M2.5 UD-Q8_K_XL (200 GB) | 14.5K | 598 |
+| GLM-5 UD-Q4_K_XL (400 GB) | 16K | 764 |
+| GLM-5 UD-Q4_K_XL | 32K | 493 |
+| GLM-5.1 UD-Q4_K_XL | 15.6K | 415 |
+| Kimi K2.5 UD-Q3_K_XL (500 GB) | 16K | 652 |
+| Kimi K2.5 UD-Q3_K_XL | 32K | 561 |
+| Kimi K2.6 Q3_K_L (457 GB) | 23K | 576 |
 
 Kimi K2.6 also reached about 690 tok/s with a 4,096-token microbatch; the
 shipping Kimi settings use 2,048, which gave 576 tok/s at 23K.
@@ -579,7 +535,8 @@ shipping Kimi settings use 2,048, which gave 576 tok/s at 23K.
 - Historical dial sweeps, current warm-decode controls and E8/E10 comparisons
   use different fixtures and builds; their gains cannot be combined. HC graph
   islands are not full-step decode graphs or PDL.
-- Paired cone validation covers the initial frontier and one forced row, plus
-  actual three-turn WebUI recall. Multi-row continuation equivalence has not
-  been established, and the older image speeds are approximate YOCO140 results.
+- Paired cone validation covered the initial frontier and one forced row, plus
+  actual three-turn WebUI recall, on the build that had a Mac. Multi-row
+  continuation equivalence was never established, and the receipts for that proof are
+  deleted. The single-machine cone controls are the ones this fork can repeat.
 - The 10,000 tok/s target at 100K remains unmet. [Remaining work](ROADMAP.md).

@@ -1,5 +1,7 @@
 # Any-GGUF Q4/Q8 GPU regression smoke
 
+Inherited measurement. Every number here came from the upstream Windows build (DirectStorage on an RTX 5090 with 32 GB of system RAM) or from the macOS decode half this fork deleted. Nothing has been re-measured on Linux, and chunk 8.1 of the port plan is the run that would replace them. See [the port plan](linux-port-plan.md).
+
 2026-10-27; tested source `5ec948606934f425bf8e4271657a61e7d219d661` on one RTX 5090. **PASS for the requested smoke**, using the full warm decode interval after 100 tokens. No main branch was changed.
 
 The actual stack WebUI ran in headless Chromium. Single engine: streaming-llama ULTRA prefill, YOCO 140, ds4-decode.dll, context 1,000,001 with growable BF16 cache, 49,152 primary sweep/61,440 fold cap, eight DirectStorage split reads, and the existing Q4_K/Q8_0 GGUF. No model download or conversion occurred. The complete producer source was rebuilt with the reference native MSVC recipe against its unchanged, hash-recorded GGML libraries. The changed ds4 external-decode DLL was freshly built with windows_build.ps1; all nine CUDA images target sm_120a. Native profile preflight passed.
