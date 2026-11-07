@@ -36,12 +36,18 @@ class EnvironmentContractTests(unittest.TestCase):
                 self.assertEqual(producer[key],value)
                 self.assertNotIn(key,other)
 
-    def test_pinned_external_evidence_is_retained_but_stale_local_reads_fail(self):
-        row=dict(var='PATH',doc='Host path',reads=['engines/current.c:1','engines/mlx-serve/pinned.zig:2'])
-        with patch('slstack.envvars.rows',return_value=[row]),patch('slstack.envvars.inventory',return_value={'PATH':['engines/current.c:1']}):
-            self.assertEqual(validate_table(),1)
-            with patch('slstack.envvars.inventory',return_value={'PATH':['engines/current.c:3']}):
-                with self.assertRaisesRegex(ValueError,'stale'):validate_table()
+    def test_a_read_outside_this_checkout_is_stale(self):
+        # Chunk 7.1d removed the `engines/mlx-serve/` exemption in `validate_table()`
+        # and `envdocs`. That gitlink is gone from this fork, so a row naming a read
+        # there documents a source nobody can open, and the gate must say so.
+        row = dict(var='PATH', doc='Host path', reads=['engines/current.c:1'])
+        with patch('slstack.envvars.rows', return_value=[row]), patch('slstack.envvars.inventory', return_value={'PATH': ['engines/current.c:1']}):
+            self.assertEqual(validate_table(), 1)
+        pinned = dict(row, reads=['engines/current.c:1', 'engines/mlx-serve/src/main.zig:992'])
+        with patch('slstack.envvars.rows', return_value=[pinned]), patch('slstack.envvars.inventory', return_value={'PATH': ['engines/current.c:1']}):
+            with self.assertRaisesRegex(ValueError, 'stale'): validate_table()
+        with patch('slstack.envvars.rows', return_value=[row]), patch('slstack.envvars.inventory', return_value={'PATH': ['engines/current.c:3']}):
+            with self.assertRaisesRegex(ValueError, 'stale'): validate_table()
 
     def test_all_source_reads_have_documented_table_rows(self):
         self.assertGreater(validate_table(), 100)

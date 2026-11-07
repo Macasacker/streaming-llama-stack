@@ -40,14 +40,11 @@ def main():
     problems = []
     for row in table:
         var = row["var"]
-        # mlx-serve is a pinned gitlink that can be uninitialized here; its rows
-        # keep their recorded references (same rule as envdocs.reference_table).
-        current = [ref for ref in live.get(var, []) if not ref.startswith("engines/mlx-serve/")]
-        recorded = [ref for ref in row["reads"] if not ref.startswith("engines/mlx-serve/")]
-        pinned = [ref for ref in row["reads"] if ref.startswith("engines/mlx-serve/")]
+        current = live.get(var, [])
+        recorded = row["reads"]
         want = by_file(recorded)
         have = by_file(current)
-        new_refs = list(pinned)
+        new_refs = []
         for path in sorted(set(want) | set(have)):
             before, after = want.get(path, []), have.get(path, [])
             if path not in want:

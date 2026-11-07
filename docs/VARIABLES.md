@@ -3172,6 +3172,18 @@ Source: `engines/ds4/ds4.c:83085`. Unset read: NULL from getenv; the literal con
         return false;
 ```
 
+Source: `engines/ds4/ds4_cuda.cu:17361`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (n_score < min_score) return 0;
+    uint32_t chunk = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK", DS4_CUDA_SPLITKV_CHUNK,
+            1u, DS4_CUDA_ATTENTION_SCORE_CAP, NULL);
+    uint32_t s_floor = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR", 6u,
+            1u, DS4_CUDA_SPLITKV_S_MAX, NULL);
+```
+
 Source: `engines/ds4/ds4_cuda.cu:25999`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
@@ -3364,6 +3376,18 @@ Source: `engines/ds4/ds4.c:83084`. Unset read: NULL from getenv; the literal con
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_S") != NULL) {
 ```
 
+Source: `engines/ds4/ds4_cuda.cu:17357`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+     * used to protect short contexts (512) now defaults to 1. */
+    const uint32_t min_score = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_MIN_SCORE", 1u, 0u,
+            DS4_CUDA_ATTENTION_SCORE_CAP, NULL);
+    if (n_score < min_score) return 0;
+    uint32_t chunk = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK", DS4_CUDA_SPLITKV_CHUNK,
+```
+
 Source: `engines/ds4/ds4_cuda.cu:25998`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
@@ -3392,6 +3416,18 @@ Source: `engines/ds4/ds4.c:83088`. Unset read: NULL from getenv; the literal con
     }
 
     ds4_gpu_graph *first = &items[0].session->graph;
+```
+
+Source: `engines/ds4/ds4_cuda.cu:17371`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    int exact_present = 0;
+    uint32_t S = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_S", 0u, 1u,
+            DS4_CUDA_SPLITKV_S_MAX, &exact_present);
+    if (!exact_present) {
+        S = (n_score + chunk - 1u) / chunk;
+        if (S < s_floor) S = s_floor < n_score ? s_floor : n_score;
 ```
 
 Source: `engines/ds4/ds4_cuda.cu:26002`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -3424,6 +3460,18 @@ Source: `engines/ds4/ds4.c:83086`. Unset read: NULL from getenv; the literal con
     }
 ```
 
+Source: `engines/ds4/ds4_cuda.cu:17364`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            1u, DS4_CUDA_ATTENTION_SCORE_CAP, NULL);
+    uint32_t s_floor = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR", 6u,
+            1u, DS4_CUDA_SPLITKV_S_MAX, NULL);
+    uint32_t s_max = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_S_MAX", DS4_CUDA_SPLITKV_S_MAX,
+            1u, DS4_CUDA_SPLITKV_S_MAX, NULL);
+```
+
 Source: `engines/ds4/ds4_cuda.cu:26000`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
@@ -3452,6 +3500,18 @@ Source: `engines/ds4/ds4.c:83087`. Unset read: NULL from getenv; the literal con
         return false;
     }
 
+```
+
+Source: `engines/ds4/ds4_cuda.cu:17367`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            1u, DS4_CUDA_SPLITKV_S_MAX, NULL);
+    uint32_t s_max = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_S_MAX", DS4_CUDA_SPLITKV_S_MAX,
+            1u, DS4_CUDA_SPLITKV_S_MAX, NULL);
+    int exact_present = 0;
+    uint32_t S = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_EXACT_SCORE_SPLIT_S", 0u, 1u,
 ```
 
 Source: `engines/ds4/ds4_cuda.cu:26001`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
@@ -3766,6 +3826,24 @@ static float gpu_graph_cuda_greedy_splitkv_margin_threshold(void) {
         while (end && isspace((unsigned char)*end)) end++;
 ```
 
+### DS4_CUDA_GREEDY_SPLITKV_MAX_SEGMENT
+
+DS4_CUDA_GREEDY_SPLITKV_MAX_SEGMENT: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19937`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+static uint32_t gpu_graph_cuda_greedy_splitkv_max_segment(void) {
+    return gpu_graph_cuda_greedy_max_segment("DS4_CUDA_GREEDY_SPLITKV_MAX_SEGMENT");
+}
+
+static uint32_t gpu_graph_cuda_greedy_vec4_max_segment(void) {
+    return gpu_graph_cuda_greedy_max_segment("DS4_CUDA_GREEDY_VEC4_MAX_SEGMENT");
+```
+
 ### DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY
 
 DS4_CUDA_GREEDY_SPLITKV_PAIR_REPLAY: advanced engine setting; built-in default retained
@@ -3974,6 +4052,24 @@ static float gpu_graph_cuda_greedy_vec4_margin_threshold(void) {
         char *end = NULL;
         double v = strtod(env, &end);
         while (end && isspace((unsigned char)*end)) end++;
+```
+
+### DS4_CUDA_GREEDY_VEC4_MAX_SEGMENT
+
+DS4_CUDA_GREEDY_VEC4_MAX_SEGMENT: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19941`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+static uint32_t gpu_graph_cuda_greedy_vec4_max_segment(void) {
+    return gpu_graph_cuda_greedy_max_segment("DS4_CUDA_GREEDY_VEC4_MAX_SEGMENT");
+}
+
+static uint32_t gpu_graph_cuda_greedy_splitkv_min_score(void) {
+    const char *env = getenv("DS4_CUDA_SPLITKV_MIN_SCORE");
 ```
 
 ### DS4_CUDA_GREEDY_VEC4_TRACE
@@ -4354,6 +4450,18 @@ Source: `engines/ds4/ds4_cuda.cu:4492`. Unset read: Wrapper/conditional default:
             g_decode_profile.live_hotlist_refresh_ms,
 ```
 
+Source: `engines/ds4/ds4_cuda.cu:10034`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (live_enabled < 0) {
+        live_enabled = cuda_env_flag_enabled(
+            "DS4_CUDA_LIVE_ROUTE_HOTLIST", 0);
+    }
+    if (!live_enabled) return 0;
+    static int config_initialized = 0;
+    if (!config_initialized) {
+```
+
 Source: `engines/ds4/ds4_cuda.cu:10339`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
@@ -4364,6 +4472,42 @@ extern "C" void ds4_gpu_stream_expert_cache_reset_route_hotness(void) {
     /* The short-prefill wrapper and its decode-style callee both issue this
      * hook at position zero. Do not decay twice when no selection occurred
      * between those calls. */
+```
+
+### DS4_CUDA_LIVE_ROUTE_HOTLIST_MIN_SELECTIONS
+
+DS4_CUDA_LIVE_ROUTE_HOTLIST_MIN_SELECTIONS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4_cuda.cu:10044`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            1u, 65536u, NULL);
+        g_route_live_min_layer_selections = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_LIVE_ROUTE_HOTLIST_MIN_SELECTIONS", 96u,
+            1u, 1048576u, NULL);
+        fprintf(stderr,
+                "ds4: CUDA live route hotlist enabled [R9_LIVE_HOTLIST_V1]: "
+                "reset=halve-counts minimum=%u selections/layer refresh=%u tokens "
+```
+
+### DS4_CUDA_LIVE_ROUTE_HOTLIST_REFRESH_TOKENS
+
+DS4_CUDA_LIVE_ROUTE_HOTLIST_REFRESH_TOKENS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4_cuda.cu:10041`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        config_initialized = 1;
+        g_route_live_refresh_tokens = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_LIVE_ROUTE_HOTLIST_REFRESH_TOKENS", 16u,
+            1u, 65536u, NULL);
+        g_route_live_min_layer_selections = cuda_parse_u32_env_clamped(
+            "DS4_CUDA_LIVE_ROUTE_HOTLIST_MIN_SELECTIONS", 96u,
+            1u, 1048576u, NULL);
 ```
 
 ### DS4_CUDA_MIXED_PREFILL_DECODE
@@ -4412,6 +4556,24 @@ static DS4_MAYBE_UNUSED uint32_t gpu_graph_mixed_routed_max_prefill_rows(void) {
     char *end = NULL;
     unsigned long parsed = strtoul(value, &end, 10);
     if (end == value || *end != '\0' || parsed > UINT32_MAX) return 512u;
+```
+
+### DS4_CUDA_MIXED_ROUTED_SCATTER
+
+DS4_CUDA_MIXED_ROUTED_SCATTER: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:84584`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            "DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS", true);
+    const bool scatter_rows = gpu_graph_tp_env_flag(
+            "DS4_CUDA_MIXED_ROUTED_SCATTER", false);
+    if (ok && combine_rows && decode_rows > 0) {
+        ds4_gpu_tensor decode_out, home_slots, peer_slots, selected;
+        ok = gpu_graph_borrow_tensor_view(
+                    &decode_out, &local_out, prefill_output_bytes,
 ```
 
 ### DS4_CUDA_MMQ
@@ -8326,6 +8488,36 @@ Source: `engines/ds4/ds4.c:84819`. Unset read: Wrapper/conditional default: see 
         gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_SHARED", true) &&
 ```
 
+### DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS
+
+DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:84364`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+    const bool combine_rows = gpu_graph_tp_env_flag(
+            "DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS", true);
+    if (ok && combine_rows) {
+        ok = ds4_gpu_routed_moe_owned_slots_combine_rows_tensor(
+                &local_out, &local_down, &peer_down, &original_selected,
+                (uint32_t)routed_out_dim, DS4_N_EXPERT / 2u,
+```
+
+Source: `engines/ds4/ds4.c:84582`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const uint64_t out_stride = routed_out_dim * sizeof(float);
+    const bool combine_rows = gpu_graph_tp_env_flag(
+            "DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS", true);
+    const bool scatter_rows = gpu_graph_tp_env_flag(
+            "DS4_CUDA_MIXED_ROUTED_SCATTER", false);
+    if (ok && combine_rows && decode_rows > 0) {
+        ds4_gpu_tensor decode_out, home_slots, peer_slots, selected;
+```
+
 ### DS4_CUDA_SESSION_BATCH_QKV
 
 DS4_CUDA_SESSION_BATCH_QKV: advanced engine setting; built-in default retained
@@ -9274,6 +9466,24 @@ static bool gpu_graph_cuda_tp_attn_heads_requested(void) {
     return gpu_graph_tp_env_flag("DS4_CUDA_TP_ATTN_HEADS", false);
 ```
 
+### DS4_CUDA_TP_EP_BALANCED_SHARED_MID
+
+DS4_CUDA_TP_EP_BALANCED_SHARED_MID: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19768`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static DS4_MAYBE_UNUSED bool gpu_graph_cuda_tp_ep_balanced_shared_mid_requested(void) {
+    return gpu_graph_tp_env_flag(
+            "DS4_CUDA_TP_EP_BALANCED_SHARED_MID", true);
+}
+
+static DS4_MAYBE_UNUSED bool gpu_graph_cuda_tp_ep_dual_prequant_requested(void) {
+    return gpu_graph_tp_env_flag(
+```
+
 ### DS4_CUDA_TP_EP_DELAY_REDUCE
 
 DS4_CUDA_TP_EP_DELAY_REDUCE: advanced engine setting; built-in default retained
@@ -9308,6 +9518,24 @@ static bool gpu_graph_cuda_tp_ep_direct_return_requested(void) {
 
 static bool gpu_graph_cuda_tp_ep_delay_reduce_requested(void) {
     return gpu_graph_tp_env_flag("DS4_CUDA_TP_EP_DELAY_REDUCE", true);
+```
+
+### DS4_CUDA_TP_EP_DUAL_PREQUANT
+
+DS4_CUDA_TP_EP_DUAL_PREQUANT: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19773`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static DS4_MAYBE_UNUSED bool gpu_graph_cuda_tp_ep_dual_prequant_requested(void) {
+    return gpu_graph_tp_env_flag(
+            "DS4_CUDA_TP_EP_DUAL_PREQUANT", true);
+}
+
+static bool gpu_graph_cuda_tp_moe_delay_reduce_requested(void) {
+    return gpu_graph_tp_env_flag("DS4_CUDA_TP_MOE_DELAY_REDUCE", true);
 ```
 
 ### DS4_CUDA_TP_EP_FUSED_HC_REDUCE
@@ -10072,6 +10300,24 @@ Source: `engines/ds4/ds4_engram.c:244`. Unset read: NULL from getenv; the litera
 }
 ```
 
+### DS4_DISABLE_HOST_MEMORY_WATCHDOG
+
+Linux host-memory watchdog switch: unset (default) admits allocations from /proc/meminfo, /proc/self/status and the cgroup memory limit, and asks for a graceful abort when a GPU-resident process would exceed them; set disables the check. DS4_EXTERNAL_DECODE also disables it, because a decode library must not kill the process that loaded it.
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4_host_memory.c:262`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+
+```text
+    goto done;
+#endif
+    if (!getenv("DS4_DISABLE_HOST_MEMORY_WATCHDOG")) {
+        pthread_t thread;
+        if (pthread_create(&thread, NULL, host_memory_watchdog, NULL) != 0) {
+            fprintf(stderr, "ds4: HOST_MEMORY_REFUSED_WATCHDOG: cannot start host watchdog (%d)\n", errno);
+            g_host_memory_limit = 0;
+```
+
 ### DS4_DISABLE_V41_ENGRAM_READERS32
 
 DS4_DISABLE_V41_ENGRAM_READERS32: advanced engine setting; built-in default retained
@@ -10372,6 +10618,24 @@ static uint32_t dist_worker_prefetch_depth(void) {
         long v = strtol(env, &end, 10);
 ```
 
+### DS4_DS41_DSPARK_ADAPTIVE
+
+DS4_DS41_DSPARK_ADAPTIVE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:62170`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        if (n >= 0 && n <= DS4_DSPARK_MAX_BLOCK_SIZE) c.min_draft = (uint32_t)n;
+    }
+    c.enabled = ds41_admission_enabled("DS4_DS41_DSPARK_ADAPTIVE");
+    c.loss_budget = ds41_admission_enabled("DS4_DS41_DSPARK_LOSS_BUDGET");
+    c.reasoning_serial = ds41_admission_enabled("DS4_DS41_DSPARK_REASONING_SERIAL");
+    return c;
+}
+```
+
 ### DS4_DS41_DSPARK_FAIL
 
 DS4_DS41_DSPARK_FAIL: advanced engine setting; built-in default retained
@@ -10388,6 +10652,24 @@ Source: `engines/ds4/ds4.c:85769`. Unset read: NULL from getenv; the literal con
             ds41_fault_inject_once(fail && !strcmp(fail, "drafter_once"), &injected)) draft_ok = false;
         if (!draft_ok) {
             if (public_controller) ds41_admission_fault(d, drained);
+```
+
+### DS4_DS41_DSPARK_LOSS_BUDGET
+
+DS4_DS41_DSPARK_LOSS_BUDGET: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:62171`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    }
+    c.enabled = ds41_admission_enabled("DS4_DS41_DSPARK_ADAPTIVE");
+    c.loss_budget = ds41_admission_enabled("DS4_DS41_DSPARK_LOSS_BUDGET");
+    c.reasoning_serial = ds41_admission_enabled("DS4_DS41_DSPARK_REASONING_SERIAL");
+    return c;
+}
+
 ```
 
 ### DS4_DS41_DSPARK_MIN_DRAFT
@@ -10442,6 +10724,24 @@ Source: `engines/ds4/ds4.c:62160`. Unset read: NULL from getenv; the literal con
         const double n = strtod(v, NULL);
         if (n >= 0.0 && n <= 1.0) c.p_min = (float)n;
     }
+```
+
+### DS4_DS41_DSPARK_REASONING_SERIAL
+
+DS4_DS41_DSPARK_REASONING_SERIAL: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:62172`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    c.enabled = ds41_admission_enabled("DS4_DS41_DSPARK_ADAPTIVE");
+    c.loss_budget = ds41_admission_enabled("DS4_DS41_DSPARK_LOSS_BUDGET");
+    c.reasoning_serial = ds41_admission_enabled("DS4_DS41_DSPARK_REASONING_SERIAL");
+    return c;
+}
+
+static void ds41_admission_token(ds4_engine *e, ds41_ctl_state *c, int token) {
 ```
 
 ### DS4_DSPARK_CACHE_RESERVE_GB
@@ -10852,6 +11152,60 @@ static uint32_t ds4_dspark_scheduler_tail_min_tokens(void) {
     return ds4_dspark_env_u32("DS4_DSPARK_SCHEDULER_TAIL_MIN_TOKENS", 10);
 ```
 
+### DS4_DSPARK_SCHEDULER_MAX_EXTRA_SAVED_RATIO_MILLI
+
+DS4_DSPARK_SCHEDULER_MAX_EXTRA_SAVED_RATIO_MILLI: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:62098`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static uint32_t ds4_dspark_scheduler_max_extra_saved_ratio_milli(void) {
+    return ds4_dspark_env_u32(
+            "DS4_DSPARK_SCHEDULER_MAX_EXTRA_SAVED_RATIO_MILLI", 0);
+}
+
+static uint32_t ds4_dspark_scheduler_break_even_window(void) {
+    return ds4_dspark_env_u32("DS4_DSPARK_SCHEDULER_BREAK_EVEN_WINDOW", 0);
+```
+
+### DS4_DSPARK_SCHEDULER_MAX_MS_PER_ACCEPT_MILLI
+
+DS4_DSPARK_SCHEDULER_MAX_MS_PER_ACCEPT_MILLI: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:62093`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static uint32_t ds4_dspark_scheduler_max_ms_per_accept_milli(void) {
+    return ds4_dspark_env_u32(
+            "DS4_DSPARK_SCHEDULER_MAX_MS_PER_ACCEPT_MILLI", 0);
+}
+
+static uint32_t ds4_dspark_scheduler_max_extra_saved_ratio_milli(void) {
+    return ds4_dspark_env_u32(
+```
+
+### DS4_DSPARK_SCHEDULER_MIN_AVG_MILLI
+
+DS4_DSPARK_SCHEDULER_MIN_AVG_MILLI: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:62088`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        ds4_dspark_rocm_gfx1151_fast_path() ? 4000u : 1500u;
+    return ds4_dspark_env_u32(
+            "DS4_DSPARK_SCHEDULER_MIN_AVG_MILLI", fallback);
+}
+
+static uint32_t ds4_dspark_scheduler_max_ms_per_accept_milli(void) {
+    return ds4_dspark_env_u32(
+```
+
 ### DS4_DSPARK_SCHEDULER_NO_DRAFT_SKIP
 
 DS4_DSPARK_SCHEDULER_NO_DRAFT_SKIP: advanced engine setting; built-in default retained
@@ -11228,6 +11582,24 @@ Source: `engines/ds4/ds4_cuda.cu:8986`. Unset read: NULL from getenv; the litera
         int bad = 0;
         write_off = 0;
         for (int i = 0; i < n_ranges; i++) {
+```
+
+### DS4_DSPARK_VERIFY_CAP
+
+DS4_DSPARK_VERIFY_CAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:79305`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        const ds4_dspark_weights *dw = &s->engine->dspark_weights;
+        const uint32_t verify_cap = ds4_dspark_env_u32(
+            "DS4_DSPARK_VERIFY_CAP",
+            ds4_session_dspark_rocm_gfx1151_fast_path(s) ? 5u : 0u);
+        const uint32_t proposal_cap =
+            verify_cap != 0 && verify_cap < dw->block_size ?
+                verify_cap : dw->block_size;
 ```
 
 ### DS4_DSPARK_VERIFY_HEAD_NO_TP
@@ -12556,6 +12928,48 @@ Source: `engines/ds4/ds4.c:25253`. Unset read: NULL from getenv; the literal con
                 fprintf(stderr, \
 ```
 
+Source: `engines/ds4/ds4.c:20791`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
+           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
+                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
+           !glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_PREFIX",
+                                  "DS4_METAL_GRAPH_DUMP_PREFIX");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:30553`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                il) ||
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_DECODE_STAGE_PROFILE",
+                "DS4_METAL_DECODE_STAGE_PROFILE_LAYER",
+                il);
+}
+
+```
+
+### DS4_METAL_DECODE_STAGE_PROFILE_LAYER
+
+DS4_METAL_DECODE_STAGE_PROFILE_LAYER: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:30554`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_DECODE_STAGE_PROFILE",
+                "DS4_METAL_DECODE_STAGE_PROFILE_LAYER",
+                il);
+}
+
+static bool gpu_graph_layer_stage_profile_start(uint32_t il) {
+```
+
 ### DS4_METAL_DISABLE_ATTN_OUT_HC_FUSION
 
 DS4_METAL_DISABLE_ATTN_OUT_HC_FUSION: advanced engine setting; built-in default retained
@@ -12615,6 +13029,60 @@ static bool gpu_graph_use_reference_hc_norm_decode(void) {
 DS4_METAL_DISABLE_GLM53_BF16_QKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
+
+### DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER
+
+DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:48276`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (glm_graph_env_present(
+                "DS4_ROCM_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER",
+                "DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER")) {
+        return false;
+    }
+    if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER",
+                              "DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER")) {
+```
+
+### DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER_PREPARE
+
+DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER_PREPARE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:48294`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           !glm_graph_env_present(
+                "DS4_ROCM_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER_PREPARE",
+                "DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER_PREPARE");
+}
+
+static bool rocm_graph_glm_stream_prefill_full_layer_enabled(
+        const ds4_glm_gpu_graph *g,
+```
+
+### DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD
+
+DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:50567`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_LOAD") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD",
+                              "DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD")) {
+        return false;
+    }
+    return getenv("DS4_METAL_ENABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD") != NULL;
+}
+```
 
 ### DS4_METAL_DISABLE_HC_EXPAND_PRODUCER_FUSE
 
@@ -12676,6 +13144,42 @@ Source: `engines/ds4/ds4.c:23457`. Unset read: NULL from getenv; the literal con
         layer->ffn_down_exps->type == DS4_TENSOR_MXFP4 &&
 ```
 
+Source: `engines/ds4/ds4.c:8721`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (l->ffn_down_exps->type == DS4_TENSOR_Q2_K) {
+        return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                                      "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+    }
+    if (l->ffn_down_exps->type == DS4_TENSOR_IQ2_XXS) {
+        return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE",
+                                      "DS4_METAL_DISABLE_IQ2_STREAM_ADDR_TABLE");
+```
+
+Source: `engines/ds4/ds4.c:23295`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                               "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                               "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+    return pro_q4 || streaming_iq2;
+}
+
+static bool gpu_graph_decode_pro_q4_expert_table_expected(
+```
+
+Source: `engines/ds4/ds4.c:23370`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                                  "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+}
+
+static bool gpu_graph_decode_mxfp4_selected_slots_expected(
+        const ds4_gpu_graph     *g,
+```
+
 ### DS4_METAL_DISABLE_IQ2_SELECTED_SHARED_OVERLAP
 
 DS4_METAL_DISABLE_IQ2_SELECTED_SHARED_OVERLAP: advanced engine setting; built-in default retained
@@ -12692,6 +13196,24 @@ Source: `engines/ds4/ds4.c:23238`. Unset read: NULL from getenv; the literal con
 
 static bool gpu_graph_use_iq2_selected_async_load(const ds4_gpu_graph *g) {
     return g &&
+```
+
+### DS4_METAL_DISABLE_IQ2_STREAM_ADDR_TABLE
+
+DS4_METAL_DISABLE_IQ2_STREAM_ADDR_TABLE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:8725`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (l->ffn_down_exps->type == DS4_TENSOR_IQ2_XXS) {
+        return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE",
+                                      "DS4_METAL_DISABLE_IQ2_STREAM_ADDR_TABLE");
+    }
+    return false;
+}
+
 ```
 
 ### DS4_METAL_DISABLE_KV_FUSION
@@ -13030,6 +13552,18 @@ Source: `engines/ds4/ds4.c:23452`. Unset read: NULL from getenv; the literal con
         layer->ffn_down_exps->type == DS4_TENSOR_Q2_K &&
 ```
 
+Source: `engines/ds4/ds4.c:23351`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
+                                  "DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS");
+}
+
+static bool gpu_graph_decode_iq2_selected_slots_expected(
+        const ds4_gpu_graph     *g,
+```
+
 ### DS4_METAL_DISABLE_QKV_NORM_FUSION
 
 DS4_METAL_DISABLE_QKV_NORM_FUSION: advanced engine setting; built-in default retained
@@ -13096,6 +13630,90 @@ Source: `engines/ds4/ds4.c:23445`. Unset read: NULL from getenv; the literal con
         layer->ffn_gate_exps->type == DS4_TENSOR_Q4_K &&
 ```
 
+Source: `engines/ds4/ds4.c:8708`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
+        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
+                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
+        return false;
+    }
+```
+
+Source: `engines/ds4/ds4.c:21067`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
+        DS4_N_LAYER == 0) {
+        return false;
+    }
+    const uint32_t routed_il =
+```
+
+Source: `engines/ds4/ds4.c:23293`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                               "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                               "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                               "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+    return pro_q4 || streaming_iq2;
+}
+```
+
+Source: `engines/ds4/ds4.c:23318`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
+            getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
+           getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
+           getenv("DS4_METAL_DISABLE_Q4_EXPERT_TABLE") == NULL;
+```
+
+Source: `engines/ds4/ds4.c:23349`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
+                                  "DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:23368`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                                  "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:23387`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           getenv("DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS") == NULL;
+}
+
+static bool gpu_graph_streaming_expert_cache_seed_layer_expected(
+```
+
 ### DS4_METAL_DISABLE_SHARED_DOWN_HC_FUSION
 
 DS4_METAL_DISABLE_SHARED_DOWN_HC_FUSION: advanced engine setting; built-in default retained
@@ -13132,6 +13750,42 @@ Source: `engines/ds4/ds4.c:20087`. Unset read: NULL from getenv; the literal con
     const bool enable_splitkv_spec = gpu_graph_cuda_splitkv_spec_requested();
 ```
 
+### DS4_METAL_DISABLE_STREAMING_COLD_DECODE_PREFILL
+
+DS4_METAL_DISABLE_STREAMING_COLD_DECODE_PREFILL: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:33892`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        if (glm_graph_env_present(
+                    "DS4_ROCM_DISABLE_STREAMING_COLD_DECODE_PREFILL",
+                    "DS4_METAL_DISABLE_STREAMING_COLD_DECODE_PREFILL")) {
+            return false;
+        }
+    }
+    return gpu_graph_use_streaming_decode_prefill(g, weights, n_tokens);
+```
+
+### DS4_METAL_DISABLE_STREAMING_DECODE_PREFILL
+
+DS4_METAL_DISABLE_STREAMING_DECODE_PREFILL: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:33817`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    (void)g;
+    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_DECODE_PREFILL",
+                              "DS4_METAL_DISABLE_STREAMING_DECODE_PREFILL")) {
+        return 0;
+    }
+
+    const char *env = glm_graph_env_value(
+```
+
 ### DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE
 
 DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE: advanced engine setting; built-in default retained
@@ -13148,6 +13802,54 @@ Source: `engines/ds4/ds4.c:21114`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") != NULL ||
         DS4_N_LAYER == 0 ||
         DS4_N_EXPERT < 128 ||
+```
+
+Source: `engines/ds4/ds4.c:21063`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE",
+                              "DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") ||
+        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
+```
+
+### DS4_METAL_DISABLE_STREAMING_EXPERT_HOTLIST
+
+DS4_METAL_DISABLE_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:23505`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           !g->ssd_streaming_cold &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_HOTLIST",
+                                  "DS4_METAL_DISABLE_STREAMING_EXPERT_HOTLIST");
+}
+
+static bool gpu_graph_streaming_expert_hotlist_add(
+        uint32_t    layer,
+```
+
+### DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE
+
+DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20789`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                   "DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE") ||
+            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
+                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
+           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
+                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
+           !glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_PREFIX",
+                                  "DS4_METAL_GRAPH_DUMP_PREFIX");
 ```
 
 ### DS4_METAL_DISABLE_STREAMING_IQ2_CPU_ROUTER
@@ -13168,6 +13870,42 @@ static bool gpu_graph_use_q4_selected_shared_overlap(
         const ds4_gpu_graph *g) {
 ```
 
+### DS4_METAL_DISABLE_STREAMING_LAYER_BATCH
+
+DS4_METAL_DISABLE_STREAMING_LAYER_BATCH: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20785`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           !g_expert_profile.active &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH",
+                                  "DS4_METAL_DISABLE_STREAMING_LAYER_BATCH") &&
+           (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
+                                   "DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE") ||
+            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
+                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
+```
+
+### DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED
+
+DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20763`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED",
+                                  "DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED");
+}
+
+static bool gpu_graph_stream_decode_static_map_enabled(void) {
+    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP",
+```
+
 ### DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR
 
 DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting; built-in default retained
@@ -13186,11 +13924,461 @@ Source: `engines/ds4/ds4.c:21112`. Unset read: NULL from getenv; the literal con
         getenv("DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") != NULL ||
 ```
 
+Source: `engines/ds4/ds4.c:21061`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        n_tokens <= 1 ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR",
+                              "DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE",
+                              "DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") ||
+        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
+```
+
 ### DS4_METAL_DISABLE_STREAMING_PREFILL_CACHE_SEED
 
 DS4_METAL_DISABLE_STREAMING_PREFILL_CACHE_SEED: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21012`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
+}
+
+static uint32_t gpu_graph_stream_prefill_batch_selected_addr_auto_max(void) {
+    const char *env = glm_graph_env_value(
+```
+
+Source: `engines/ds4/ds4.c:21916`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE")) {
+            return true;
+        }
+    } else {
+        if (g) {
+```
+
+Source: `engines/ds4/ds4.c:53990`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
+    const bool layer_prepare =
+        layer_pagein || layer_pread || layer_readahead || layer_madvise;
+    const bool layer_prepare_overlap =
+        layer_prepare &&
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20980`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
+}
+
+static bool gpu_graph_stream_prefill_layer_readahead_enabled(
+        const ds4_gpu_graph *g) {
+```
+
+Source: `engines/ds4/ds4.c:21925`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN")) {
+            return true;
+        }
+    }
+    if (!model || !weights || il >= DS4_N_LAYER) return false;
+```
+
+Source: `engines/ds4/ds4.c:53964`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
+    const bool layer_readahead =
+        full_layer_prepare_base &&
+        !layer_pagein &&
+        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21595`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP");
+}
+
+enum { DS4_STREAM_PREFILL_MAX_PREPARE_AHEAD = 4 };
+
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21000`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:21894`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            if (!gpu_graph_stream_prefill_layer_pread_enabled(g)) return true;
+        } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
+            return true;
+        }
+```
+
+Source: `engines/ds4/ds4.c:53979`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        !layer_readahead &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+    const bool layer_madvise =
+        full_layer_prepare_base &&
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20992`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+}
+
+static bool gpu_graph_stream_prefill_layer_pread_enabled(
+        const ds4_gpu_graph *g) {
+```
+
+Source: `engines/ds4/ds4.c:21002`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+}
+
+static bool gpu_graph_stream_prefill_layer_madvise_enabled(
+        const ds4_gpu_graph *g) {
+```
+
+Source: `engines/ds4/ds4.c:21010`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:21896`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
+            return true;
+        }
+    } else if (readahead_only) {
+        if (g) {
+```
+
+Source: `engines/ds4/ds4.c:21907`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
+            return true;
+        }
+    } else if (madvise_only) {
+        if (g) {
+```
+
+Source: `engines/ds4/ds4.c:21914`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            if (!gpu_graph_stream_prefill_layer_madvise_enabled(g)) return true;
+        } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE")) {
+            return true;
+        }
+```
+
+Source: `engines/ds4/ds4.c:53973`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+    const bool layer_pread =
+        full_layer_prepare_base &&
+        !layer_pagein &&
+        !layer_readahead &&
+```
+
+Source: `engines/ds4/ds4.c:53981`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+    const bool layer_madvise =
+        full_layer_prepare_base &&
+        !layer_pagein &&
+        !layer_pread &&
+```
+
+Source: `engines/ds4/ds4.c:53988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        !layer_readahead &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
+    const bool layer_prepare =
+        layer_pagein || layer_pread || layer_readahead || layer_madvise;
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21593`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP");
+}
+
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20990`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:21905`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
+            return true;
+        }
+```
+
+Source: `engines/ds4/ds4.c:53971`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+    const bool layer_pread =
+        full_layer_prepare_base &&
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20970`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE");
+}
+
+static bool gpu_graph_stream_prefill_layer_pagein_enabled(
+        const ds4_gpu_graph *g) {
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20960`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN");
+}
+
+static bool gpu_graph_stream_prefill_selected_madvise_enabled(
+        const ds4_gpu_graph *g) {
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21182`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_STREAMING_PREFILL_SELECTED_PROFILE") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE");
+}
+
+static void gpu_graph_stream_prefill_selected_profile_reset(
+        ds4_gpu_graph *g) {
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:22234`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED")) &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
+}
+
+static bool gpu_graph_stream_prefill_selected_readahead_shared_enabled(
+        const ds4_gpu_graph *g) {
+```
+
+Source: `engines/ds4/ds4.c:22246`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
+}
+
+static uint32_t gpu_graph_stream_prefill_selected_readahead_gap(void) {
+    const char *env = glm_graph_env_value(
+```
+
+### DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED
+
+DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:22244`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
+}
+
+```
+
+### DS4_METAL_DISABLE_STREAMING_READAHEAD
+
+DS4_METAL_DISABLE_STREAMING_READAHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20756`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                 "DS4_METAL_ENABLE_STREAMING_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_READAHEAD");
+}
+
+static bool gpu_graph_stream_madvise_willneed_enabled(void) {
+    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED",
+```
 
 ### DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_EARLY_COMMIT
 
@@ -13226,6 +14414,18 @@ Source: `engines/ds4/ds4.c:23244`. Unset read: NULL from getenv; the literal con
 
 static bool gpu_graph_use_iq2_selected_async_early_commit(
         const ds4_gpu_graph *g) {
+```
+
+Source: `engines/ds4/ds4.c:50565`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (!g || !g->ssd_streaming) return false;
+    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD",
+                              "DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_LOAD") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD",
+                              "DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD")) {
+        return false;
+    }
 ```
 
 ### DS4_METAL_DISABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY
@@ -13264,11 +14464,47 @@ Source: `engines/ds4/ds4.c:23237`. Unset read: NULL from getenv; the literal con
 static bool gpu_graph_use_iq2_selected_async_load(const ds4_gpu_graph *g) {
 ```
 
+### DS4_METAL_DISABLE_STREAMING_STATIC_DECODE_MAP
+
+DS4_METAL_DISABLE_STREAMING_STATIC_DECODE_MAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20768`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static bool gpu_graph_stream_decode_static_map_enabled(void) {
+    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP",
+                              "DS4_METAL_DISABLE_STREAMING_STATIC_DECODE_MAP")) {
+        return false;
+    }
+    return true;
+}
+```
+
 ### DS4_METAL_DISABLE_STREAMING_STATIC_LOCK
 
 DS4_METAL_DISABLE_STREAMING_STATIC_LOCK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
+
+### DS4_METAL_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE
+
+DS4_METAL_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20776`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static bool gpu_graph_stream_decode_static_map_state_cache_enabled(void) {
+    return !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE",
+                                  "DS4_METAL_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE");
+}
+
+static bool gpu_graph_stream_decode_layer_batch_enabled(
+        const ds4_gpu_graph *g) {
+```
 
 ### DS4_METAL_DISABLE_TINY_PAIR_SWIGLU_FUSION
 
@@ -13678,6 +14914,24 @@ Source: `engines/ds4/ds4.c:77975`. Unset read: NULL from getenv; the literal con
             const bool layer_major = count > 1u;
 ```
 
+### DS4_METAL_DISABLE_V41_DECODE_QUEUE
+
+DS4_METAL_DISABLE_V41_DECODE_QUEUE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:43175`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool queue_layers = !g->imatrix && !layer_resident &&
+        !getenv(g->tp_world == 2 ? "DS4_METAL_DISABLE_V41_TP_DECODE_QUEUE"
+                                 : "DS4_METAL_DISABLE_V41_DECODE_QUEUE");
+    const bool queued_head = queue_layers && !layer_resident && logits && g->tp_world == 1 && !ds41_queued_head_off();
+    if (g->draft && !g->draft->verify_rows) {
+        g->draft->mh_pos0 = g->pos;
+        g->draft->mh_rows = 1;
+```
+
 ### DS4_METAL_DISABLE_V41_DEFER_DECODER
 
 DS4_METAL_DISABLE_V41_DEFER_DECODER: advanced engine setting; built-in default retained
@@ -13953,6 +15207,24 @@ static bool ds41_short_sweep_off(void) { static int c = -1; return ds41_env_flag
 DS4_METAL_DISABLE_V41_TP_BALANCED_ROUTE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
+
+### DS4_METAL_DISABLE_V41_TP_DECODE_QUEUE
+
+DS4_METAL_DISABLE_V41_TP_DECODE_QUEUE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:43174`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+
+```text
+     * the GPU start while the host keeps encoding. */
+    const bool queue_layers = !g->imatrix && !layer_resident &&
+        !getenv(g->tp_world == 2 ? "DS4_METAL_DISABLE_V41_TP_DECODE_QUEUE"
+                                 : "DS4_METAL_DISABLE_V41_DECODE_QUEUE");
+    const bool queued_head = queue_layers && !layer_resident && logits && g->tp_world == 1 && !ds41_queued_head_off();
+    if (g->draft && !g->draft->verify_rows) {
+        g->draft->mh_pos0 = g->pos;
+```
 
 ### DS4_METAL_DISABLE_V41_TP_GATE_EXPAND
 
@@ -14350,6 +15622,24 @@ static bool gpu_graph_q4_non_streaming_opt_in_enabled(void) {
            getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_TABLE_AUTO") != NULL ||
 ```
 
+### DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE
+
+DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20787`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DISABLE_STREAMING_LAYER_BATCH") &&
+           (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
+                                   "DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE") ||
+            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
+                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
+           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
+                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
+```
+
 ### DS4_METAL_ENABLE_STREAMING_IQ2_CPU_ROUTER
 
 DS4_METAL_ENABLE_STREAMING_IQ2_CPU_ROUTER: advanced engine setting; built-in default retained
@@ -14366,6 +15656,258 @@ static bool gpu_graph_use_streaming_iq2_cpu_router(void) {
 }
 
 static bool gpu_graph_use_q4_selected_shared_overlap(
+```
+
+### DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED
+
+DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20761`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static bool gpu_graph_stream_madvise_willneed_enabled(void) {
+    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED",
+                                 "DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED",
+                                  "DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED");
+}
+
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21091`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+    if (glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR",
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR")) {
+        return true;
+    }
+
+    const uint32_t max_tokens =
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:23474`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool enabled =
+        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED",
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED");
+    if (!g ||
+        !g->ssd_streaming ||
+        !enabled) {
+        return 0;
+```
+
+Source: `engines/ds4/ds4.c:51781`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool enabled =
+        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED",
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED");
+    if (!g ||
+        !g->ssd_streaming ||
+        !enabled) {
+        return 0;
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20978`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:21923`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            if (!gpu_graph_stream_prefill_layer_pagein_enabled(g)) return true;
+        } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN")) {
+            return true;
+        }
+```
+
+Source: `engines/ds4/ds4.c:53962`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        full_layer_prepare_base &&
+        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
+    const bool layer_readahead =
+        full_layer_prepare_base &&
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+```
+
+Source: `engines/ds4/ds4.c:21903`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+            if (!gpu_graph_stream_prefill_layer_readahead_enabled(g)) return true;
+        } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
+                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
+```
+
+Source: `engines/ds4/ds4.c:53969`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        !layer_pagein &&
+        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
+                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20968`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE",
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE");
+}
+
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20958`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN");
+}
+
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:22230`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           (glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD") ||
+            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
+                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED")) &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
+```
+
+### DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED
+
+DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:22232`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD") ||
+            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
+                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED")) &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
+}
+
+```
+
+Source: `engines/ds4/ds4.c:22242`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
+                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
+```
+
+### DS4_METAL_ENABLE_STREAMING_READAHEAD
+
+DS4_METAL_ENABLE_STREAMING_READAHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:20754`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static bool gpu_graph_stream_readahead_enabled(void) {
+    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_READAHEAD",
+                                 "DS4_METAL_ENABLE_STREAMING_READAHEAD") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_READAHEAD",
+                                  "DS4_METAL_DISABLE_STREAMING_READAHEAD");
+}
+
 ```
 
 ### DS4_METAL_ENABLE_STREAMING_SELECTED_READAHEAD_SHARED_DELAY
@@ -14404,6 +15946,198 @@ static bool ds41_tp_slab_off(void) { static int c = -1; return ds41_env_flag("DS
  * uneven split of the experts it owns. Both ranks then map every expert. */
 ```
 
+### DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE
+
+DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:8651`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        DS4_N_EXPERT < 128 ||
+        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
+                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
+        return false;
+    }
+    if (!weights_streaming_layer_experts_uniform(w, il) &&
+        !cuda_stream_mixed_precision_experts_enabled()) {
+```
+
+Source: `engines/ds4/ds4.c:8710`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
+        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
+                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
+        return false;
+    }
+
+    if (l->ffn_gate_exps->type != DS4_TENSOR_IQ2_XXS ||
+```
+
+Source: `engines/ds4/ds4.c:23413`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        DS4_N_EXPERT >= 128 &&
+        !glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
+                               "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
+        return true;
+    }
+    if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_GLM_DSA ||
+        g->quality ||
+```
+
+Source: `engines/ds4/ds4.c:23424`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        DS4_N_EXPERT < 128 ||
+        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
+                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
+        return false;
+    }
+    const uint32_t type = layer->ffn_gate_exps->type;
+    return type == DS4_TENSOR_Q2_K || type == DS4_TENSOR_Q4_K;
+```
+
+### DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL
+
+DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:58821`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        ssd_streaming &&
+        !glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL",
+                               "DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL");
+    const double t_prefill0 = now_sec();
+    if (seed_before_prefill) {
+        ds4_gpu_graph seed_graph;
+        memset(&seed_graph, 0, sizeof(seed_graph));
+```
+
+Source: `engines/ds4/ds4.c:75393`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        if (e->ssd_streaming &&
+            !glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL",
+                                   "DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL")) {
+            ds4_gpu_graph seed_graph;
+            memset(&seed_graph, 0, sizeof(seed_graph));
+            seed_graph.quality = e->quality;
+            seed_graph.ssd_streaming = e->ssd_streaming;
+```
+
+### DS4_METAL_GLM_DISABLE_STREAMING_TOKEN_PREFILL
+
+DS4_METAL_GLM_DISABLE_STREAMING_TOKEN_PREFILL: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:57054`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (getenv("DS4_GLM_DISABLE_STREAMING_TOKEN_PREFILL") != NULL ||
+        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_TOKEN_PREFILL",
+                              "DS4_METAL_GLM_DISABLE_STREAMING_TOKEN_PREFILL")) {
+        return false;
+    }
+    if (!glm_graph_span_fits_full_attention(g, pos0, n_tokens)) return false;
+    const uint32_t max_tokens = glm_graph_streaming_token_prefill_max_tokens();
+```
+
+### DS4_METAL_GLM_STREAMING_ASYNC_PROFILE
+
+DS4_METAL_GLM_STREAMING_ASYNC_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:50596`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static bool glm_graph_streaming_async_profile_enabled(void) {
+    return glm_graph_env_present("DS4_ROCM_GLM_STREAMING_ASYNC_PROFILE",
+                                 "DS4_METAL_GLM_STREAMING_ASYNC_PROFILE");
+}
+
+static void glm_graph_streaming_async_profile_print(void) {
+    const glm_graph_streaming_async_profile *p =
+```
+
+### DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP
+
+DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:48196`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    g->streaming_static_decode_map_current = false;
+    if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP",
+                              "DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP") ||
+        getenv("DS4_GLM_STREAMING_DECODE_FULL_LAYER_MAP") != NULL) {
+        return gpu_graph_stream_map_layer(model, weights, il);
+    }
+    if (weights && il < DS4_N_LAYER &&
+```
+
+### DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER
+
+DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:48280`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    }
+    if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER",
+                              "DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER")) {
+        return true;
+    }
+    return n_tokens >= glm_graph_stream_prefill_full_layer_min_tokens();
+}
+```
+
+### DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER_MIN_TOKENS
+
+DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER_MIN_TOKENS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:48259`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER_MIN_TOKENS",
+            "DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER_MIN_TOKENS");
+    if (!env) return DS4_GLM_STREAM_PREFILL_FULL_LAYER_MIN_TOKENS;
+    char *end = NULL;
+    errno = 0;
+    unsigned long v = strtoul(env, &end, 10);
+```
+
+### DS4_METAL_GLM_STREAMING_TOKEN_PREFILL_MAX
+
+DS4_METAL_GLM_STREAMING_TOKEN_PREFILL_MAX: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:57033`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_GLM_STREAMING_TOKEN_PREFILL_MAX",
+            "DS4_METAL_GLM_STREAMING_TOKEN_PREFILL_MAX");
+    if (!env || !env[0]) env = getenv("DS4_GLM_STREAMING_TOKEN_PREFILL_MAX");
+    const uint32_t default_max =
+        glm_graph_streaming_token_prefill_default_max_tokens();
+    if (!env || !env[0]) return default_max;
+```
+
 ### DS4_METAL_GPU_BATCH_EMBED_MIN
 
 DS4_METAL_GPU_BATCH_EMBED_MIN: advanced engine setting; built-in default retained
@@ -14422,6 +16156,24 @@ Source: `engines/ds4/ds4.c:30317`. Unset read: NULL from getenv; the literal con
         if (end != gpu_min_env && v <= UINT32_MAX) gpu_min = (uint32_t)v;
 ```
 
+### DS4_METAL_GRAPH_DUMP_LAYER
+
+DS4_METAL_GRAPH_DUMP_LAYER: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19558`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+        const char *layer_env = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_LAYER",
+                                                    "DS4_METAL_GRAPH_DUMP_LAYER");
+        if (layer_env && layer_env[0] && strcmp(layer_env, "all") != 0) {
+            cfg.layer_set = 1;
+            cfg.layer = (uint32_t)strtoul(layer_env, NULL, 10);
+        }
+```
+
 ### DS4_METAL_GRAPH_DUMP_LOGITS
 
 DS4_METAL_GRAPH_DUMP_LOGITS: advanced engine setting; built-in default retained
@@ -14438,6 +16190,42 @@ Source: `engines/ds4/ds4.c:40247`. Unset read: NULL from getenv; the literal con
             if (write_f32_binary_file(dump_gpu, gpu_logits, DS4_N_VOCAB)) {
                 fprintf(stderr, "ds4: wrote GPU graph logits to %s\n", dump_gpu);
             }
+```
+
+### DS4_METAL_GRAPH_DUMP_NAME
+
+DS4_METAL_GRAPH_DUMP_NAME: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19554`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        if (cfg.prefix && !cfg.prefix[0]) cfg.prefix = NULL;
+        cfg.name = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_NAME",
+                                       "DS4_METAL_GRAPH_DUMP_NAME");
+        if (cfg.name && !cfg.name[0]) cfg.name = NULL;
+
+        const char *layer_env = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_LAYER",
+                                                    "DS4_METAL_GRAPH_DUMP_LAYER");
+```
+
+### DS4_METAL_GRAPH_DUMP_POS
+
+DS4_METAL_GRAPH_DUMP_POS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19565`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+        const char *pos_env = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_POS",
+                                                  "DS4_METAL_GRAPH_DUMP_POS");
+        if (pos_env && pos_env[0]) {
+            cfg.pos_set = 1;
+            cfg.pos = (uint32_t)strtoul(pos_env, NULL, 10);
+        }
 ```
 
 ### DS4_METAL_GRAPH_DUMP_PREFIX
@@ -14494,6 +16282,90 @@ Source: `engines/ds4/ds4.c:85154`. Unset read: NULL from getenv; the literal con
     if (!gpu_graph_mixed_workspace_compatible(g, batch_graph)) return false;
 ```
 
+Source: `engines/ds4/ds4.c:19551`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        cfg.init = 1;
+        cfg.prefix = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_PREFIX",
+                                         "DS4_METAL_GRAPH_DUMP_PREFIX");
+        if (cfg.prefix && !cfg.prefix[0]) cfg.prefix = NULL;
+        cfg.name = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_NAME",
+                                       "DS4_METAL_GRAPH_DUMP_NAME");
+        if (cfg.name && !cfg.name[0]) cfg.name = NULL;
+```
+
+Source: `engines/ds4/ds4.c:19628`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        uint32_t          pos) {
+    const char *prefix = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_PREFIX",
+                                             "DS4_METAL_GRAPH_DUMP_PREFIX");
+    if (!t || n_f16 == 0 || !gpu_graph_debug_wants(name, il, pos)) return;
+
+    if (ds4_gpu_synchronize() == 0) {
+        fprintf(stderr, "ds4: failed to synchronize before dumping %s layer %u pos %u\n", name, il, pos);
+```
+
+Source: `engines/ds4/ds4.c:20793`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
+           !glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_PREFIX",
+                                  "DS4_METAL_GRAPH_DUMP_PREFIX");
+}
+
+static void gpu_graph_stream_readahead_range_impl(
+        const ds4_model *model,
+```
+
+### DS4_METAL_GRAPH_DUMP_TRACE
+
+DS4_METAL_GRAPH_DUMP_TRACE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:19595`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *prefix = gpu_graph_debug_prefix_for(name, il, pos);
+    if (glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_TRACE",
+                              "DS4_METAL_GRAPH_DUMP_TRACE"))
+        fprintf(stderr, "ds4: dump? name=%s il=%u pos=%u t=%p n=%llu wants=%d\n",
+                name, il, pos, (void *)t, (unsigned long long)n_f32,
+                gpu_graph_debug_wants(name, il, pos));
+    if (!t || n_f32 == 0 || !gpu_graph_debug_wants(name, il, pos)) return;
+```
+
+### DS4_METAL_GRAPH_OUTPUT_ROW
+
+DS4_METAL_GRAPH_OUTPUT_ROW: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:37988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        const char *output_row_env = glm_graph_env_value(
+                "DS4_ROCM_GRAPH_OUTPUT_ROW",
+                "DS4_METAL_GRAPH_OUTPUT_ROW");
+        if (output_row_env && output_row_env[0]) {
+            char *end = NULL;
+            unsigned long v = strtoul(output_row_env, &end, 10);
+            if (end != output_row_env && v < (unsigned long)n_tokens) {
+```
+
+Source: `engines/ds4/ds4.c:38483`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *output_row_env = glm_graph_env_value(
+            "DS4_ROCM_GRAPH_OUTPUT_ROW",
+            "DS4_METAL_GRAPH_OUTPUT_ROW");
+    if (output_row_env && output_row_env[0]) {
+        char *end = NULL;
+        unsigned long v = strtoul(output_row_env, &end, 10);
+        if (end != output_row_env && v < (unsigned long)n_tokens) {
+```
+
 ### DS4_METAL_GRAPH_PREFILL_PROFILE
 
 DS4_METAL_GRAPH_PREFILL_PROFILE: advanced engine setting; built-in default retained
@@ -14524,11 +16396,59 @@ Source: `engines/ds4/ds4.c:43558`. Unset read: NULL from getenv; the literal con
     const bool batch_core = batch_attention && !getenv("DS4_METAL_DISABLE_V41_BATCH_CORE");
 ```
 
+Source: `engines/ds4/ds4.c:33924`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_PROFILE",
+                              "DS4_METAL_GRAPH_PREFILL_PROFILE");
+    const double t0 = profile ? now_sec() : 0.0;
+
+    /*
+     * `prefill_chunk` is not just UI progress: ds4_session_sync() wraps it to
+```
+
+Source: `engines/ds4/ds4.c:37925`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_PROFILE",
+                              "DS4_METAL_GRAPH_PREFILL_PROFILE") ||
+        split_profile;
+    const double t0 = profile ? now_sec() : 0.0;
+    double encode_s = 0.0;
+    double execute_s = 0.0;
+```
+
+Source: `engines/ds4/ds4.c:38696`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_PROFILE",
+                              "DS4_METAL_GRAPH_PREFILL_PROFILE");
+    const double t0 = profile ? now_sec() : 0.0;
+    const uint32_t end = start + n_tokens;
+
+    if (progress) {
+```
+
 ### DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE
 
 DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:37910`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool split_profile =
+        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_SPLIT_PROFILE",
+                              "DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE");
+    /*
+     * A full long-prompt prefill can keep the GPU busy for a long time. Split
+     * non-tiny prefills when a frontend asked for display progress: completed
+     * layer command buffers are real scheduling/keepalive points, while
+```
 
 ### DS4_METAL_GRAPH_PROMPT_TOKENS
 
@@ -14612,6 +16532,30 @@ Source: `engines/ds4/ds4.c:34277`. Unset read: NULL from getenv; the literal con
     g_fn_top.pre_t0_s += t0 > 0.0 ? (t0 - t_fn_entry) : 0.0;
     const bool split_top1 =
         allow_split_top1 &&
+```
+
+Source: `engines/ds4/ds4.c:33561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_GRAPH_TOKEN_PROFILE",
+                              "DS4_METAL_GRAPH_TOKEN_PROFILE");
+    const bool throttle = graph_power_throttle_enabled(g);
+    const double t0 = (profile || throttle) ? now_sec() : 0.0;
+    g_fn_streaming.pre_t0_s += t0 > 0.0 ? (t0 - t_fn_entry) : 0.0;
+    const uint32_t raw_row = pos % g->raw_cap;
+```
+
+Source: `engines/ds4/ds4.c:33763`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_GRAPH_TOKEN_PROFILE",
+                              "DS4_METAL_GRAPH_TOKEN_PROFILE");
+    const bool throttle = graph_power_throttle_enabled(g);
+    const double t0 = (profile || throttle) ? now_sec() : 0.0;
+
+    bool ok = ds4_gpu_begin_commands() != 0;
 ```
 
 ### DS4_METAL_GRAPH_TOKEN_SECOND_SPLIT_LAYERS
@@ -14776,6 +16720,18 @@ Source: `engines/ds4/ds4.c:25254`. Unset read: NULL from getenv; the literal con
                         "ds4: decode compressor/indexer failed stage=%s layer=%u pos=%u " \
 ```
 
+Source: `engines/ds4/ds4.c:30748`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool index_stage_profile =
+        glm_graph_env_present("DS4_ROCM_INDEXER_STAGE_PROFILE",
+                              "DS4_METAL_INDEXER_STAGE_PROFILE");
+    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);
+    const bool q_stage_profile =
+        glm_graph_env_present("DS4_ROCM_Q_STAGE_PROFILE",
+                              "DS4_METAL_Q_STAGE_PROFILE");
+```
+
 ### DS4_METAL_LAYER_STAGE_PROFILE
 
 DS4_METAL_LAYER_STAGE_PROFILE: advanced engine setting; built-in default retained
@@ -14792,6 +16748,36 @@ Source: `engines/ds4/ds4.c:85155`. Unset read: NULL from getenv; the literal con
     }
     if (!gpu_graph_mixed_workspace_compatible(g, batch_graph)) return false;
     if (!gpu_graph_session_batch_moe_supported(
+```
+
+Source: `engines/ds4/ds4.c:30542`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                il) ||
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_LAYER_STAGE_PROFILE",
+                "DS4_METAL_LAYER_STAGE_PROFILE_LAYER",
+                il);
+}
+
+```
+
+### DS4_METAL_LAYER_STAGE_PROFILE_LAYER
+
+DS4_METAL_LAYER_STAGE_PROFILE_LAYER: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:30543`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_LAYER_STAGE_PROFILE",
+                "DS4_METAL_LAYER_STAGE_PROFILE_LAYER",
+                il);
+}
+
+static bool gpu_graph_decode_stage_profile_enabled(uint32_t il) {
 ```
 
 ### DS4_METAL_MEMORY_REPORT
@@ -14870,6 +16856,90 @@ Source: `engines/ds4/ds4.c:23444`. Unset read: NULL from getenv; the literal con
         return false;
     }
     const bool q4 =
+```
+
+Source: `engines/ds4/ds4.c:8706`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        DS4_N_EXPERT < 128 ||
+        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
+        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
+                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
+```
+
+Source: `engines/ds4/ds4.c:21065`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") ||
+        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
+        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
+        DS4_N_LAYER == 0) {
+        return false;
+```
+
+Source: `engines/ds4/ds4.c:23291`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        DS4_N_EXPERT >= 128 &&
+        !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                               "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                               "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+        !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                               "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+```
+
+Source: `engines/ds4/ds4.c:23316`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           down_tensor_bytes >= q4_selected_min_tensor_bytes &&
+           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
+            getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
+```
+
+Source: `engines/ds4/ds4.c:23347`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+             down_tensor_bytes >= q4_selected_min_tensor_bytes)) &&
+           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
+                                  "DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS");
+```
+
+Source: `engines/ds4/ds4.c:23366`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           DS4_N_EXPERT >= 128 &&
+           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
+                                  "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
+```
+
+Source: `engines/ds4/ds4.c:23385`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           DS4_N_EXPERT >= 128 &&
+           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
+                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
+                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
+           getenv("DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS") == NULL;
+}
 ```
 
 ### DS4_METAL_NO_PREFILL_KERNEL_WARMUP
@@ -15016,6 +17086,24 @@ Source: `engines/ds4/ds4.c:24622`. Unset read: NULL from getenv; the literal con
         layer->ffn_gate_inp->type == DS4_TENSOR_F16 &&
 ```
 
+### DS4_METAL_Q_STAGE_PROFILE
+
+DS4_METAL_Q_STAGE_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:30752`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool q_stage_profile =
+        glm_graph_env_present("DS4_ROCM_Q_STAGE_PROFILE",
+                              "DS4_METAL_Q_STAGE_PROFILE");
+    double layer_stage_t0 = layer_stage_profile ? now_sec() : 0.0;
+    double q_stage_t0 = q_stage_profile ? now_sec() : 0.0;
+#define DS4_GPU_PROFILE_ATTN_STAGE(name) do { \
+        if (ok && layer_stage_profile) { \
+```
+
 ### DS4_METAL_RESUME_PREFILL_MIN
 
 DS4_METAL_RESUME_PREFILL_MIN: advanced engine setting; built-in default retained
@@ -15100,6 +17188,78 @@ Source: `engines/ds4/ds4.c:80848`. Unset read: NULL from getenv; the literal con
         gpu_graph_use_reference_shared_down_hc() ||
 ```
 
+### DS4_METAL_STREAMING_DECODE_PREFILL_MAX
+
+DS4_METAL_STREAMING_DECODE_PREFILL_MAX: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:33823`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_DECODE_PREFILL_MAX",
+            "DS4_METAL_STREAMING_DECODE_PREFILL_MAX");
+    if (env && env[0]) {
+        char *end = NULL;
+        const long v = strtol(env, &end, 10);
+        if (end != env) {
+```
+
+### DS4_METAL_STREAMING_EXPERT_AUTO_PRELOAD_CAP
+
+DS4_METAL_STREAMING_EXPERT_AUTO_PRELOAD_CAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:23702`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        const char *env = glm_graph_env_value(
+                "DS4_ROCM_STREAMING_EXPERT_AUTO_PRELOAD_CAP",
+                "DS4_METAL_STREAMING_EXPERT_AUTO_PRELOAD_CAP");
+        if (g_ds4_shape.variant == DS4_VARIANT_GLM52 &&
+            (!env || !env[0])) {
+            return 0;
+        }
+```
+
+### DS4_METAL_STREAMING_EXPERT_HOTLIST
+
+DS4_METAL_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:34132`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        ds4_gpu_stream_expert_cache_current_count();
+    const char *path = glm_graph_env_value("DS4_ROCM_STREAMING_EXPERT_HOTLIST",
+                                           "DS4_METAL_STREAMING_EXPERT_HOTLIST");
+    const bool from_file = path && path[0];
+    const bool refresh_builtin_glm =
+        !from_file && g_ds4_shape.variant == DS4_VARIANT_GLM52;
+    const bool profile =
+```
+
+### DS4_METAL_STREAMING_EXPERT_HOTLIST_PROFILE
+
+DS4_METAL_STREAMING_EXPERT_HOTLIST_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:34138`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_STREAMING_EXPERT_HOTLIST_PROFILE",
+                              "DS4_METAL_STREAMING_EXPERT_HOTLIST_PROFILE");
+    if (!from_file && !refresh_builtin_glm && current_count >= preload_count) {
+        if (profile) {
+            fprintf(stderr,
+                    "ds4: streaming expert hotlist seed skipped preload=%u current=%u\n",
+```
+
 ### DS4_METAL_STREAMING_IQ2_CPU_ROUTER_PROFILE
 
 DS4_METAL_STREAMING_IQ2_CPU_ROUTER_PROFILE: advanced engine setting; built-in default retained
@@ -15116,6 +17276,438 @@ Source: `engines/ds4/ds4.c:23790`. Unset read: NULL from getenv; the literal con
     if (ds4_gpu_end_commands() == 0) return false;
     const double t_sync = profile ? now_sec() : 0.0;
     if (ds4_gpu_tensor_read(gpu_graph_ffn_norm(g),
+```
+
+### DS4_METAL_STREAMING_MAP_TRACE
+
+DS4_METAL_STREAMING_MAP_TRACE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:48224`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    if (full_layer_prefill) {
+        const char *trace = glm_graph_env_value("DS4_ROCM_STREAMING_MAP_TRACE",
+                                                "DS4_METAL_STREAMING_MAP_TRACE");
+        if (trace && trace[0] && strcmp(trace, "0") != 0) {
+            fprintf(stderr,
+                    "ds4: GLM SSD prefill map layer=%u tokens=%u mode=full-prefill\n",
+                    il,
+```
+
+Source: `engines/ds4/ds4.c:48240`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                                       n_tokens);
+    const char *trace = glm_graph_env_value("DS4_ROCM_STREAMING_MAP_TRACE",
+                                            "DS4_METAL_STREAMING_MAP_TRACE");
+    if (trace && trace[0] && strcmp(trace, "0") != 0) {
+        fprintf(stderr,
+                "ds4: GLM SSD prefill map layer=%u tokens=%u mode=%s\n",
+                il,
+```
+
+### DS4_METAL_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MAX
+
+DS4_METAL_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MAX: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21018`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MAX",
+            "DS4_METAL_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MAX");
+    if (env && env[0]) {
+        char *end = NULL;
+        const long v = strtol(env, &end, 10);
+        if (end != env) {
+```
+
+### DS4_METAL_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MIN
+
+DS4_METAL_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MIN: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21036`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MIN",
+            "DS4_METAL_STREAMING_PREFILL_BATCH_SELECTED_ADDR_MIN");
+    if (env && env[0]) {
+        char *end = NULL;
+        const long v = strtol(env, &end, 10);
+        if (end != env) {
+```
+
+### DS4_METAL_STREAMING_PREFILL_CACHE_SEED_K
+
+DS4_METAL_STREAMING_PREFILL_CACHE_SEED_K: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:23483`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    uint32_t k = 1;
+    const char *env = glm_graph_env_value("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K",
+                                          "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_K");
+    if (env && env[0]) {
+        char *end = NULL;
+        unsigned long v = strtoul(env, &end, 10);
+        if (end != env && *end == '\0') {
+```
+
+Source: `engines/ds4/ds4.c:51790`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    uint32_t k = 1;
+    const char *env = glm_graph_env_value("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K",
+                                          "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_K");
+    if (env && env[0]) {
+        char *end = NULL;
+        unsigned long v = strtoul(env, &end, 10);
+        if (end != env && *end == '\0') {
+```
+
+### DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:34039`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE");
+    const double t0 = profile ? now_sec() : 0.0;
+    uint32_t seeded_layers = 0;
+    uint32_t seeded_rows = 0;
+    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+```
+
+Source: `engines/ds4/ds4.c:51914`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE");
+    const double t0 = profile ? now_sec() : 0.0;
+    uint32_t seeded_layers = 0;
+    uint32_t seeded_rows = 0;
+    for (uint32_t il = g->layer_start;
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21884`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE");
+    job->layer = il;
+    job->n_tokens = n_tokens;
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21591`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
+                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP");
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21880`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    job->profile =
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_THREADS
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_THREADS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21549`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        env = glm_graph_env_value(
+                "DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_THREADS",
+                "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_THREADS");
+    }
+    if (!env || !env[0]) return 8;
+    char *end = NULL;
+    unsigned long v = strtoul(env, &end, 10);
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21882`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE");
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_AHEAD
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_AHEAD: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21603`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_AHEAD",
+            "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_AHEAD");
+    if (!env || !env[0]) return 1;
+    char *end = NULL;
+    unsigned long v = strtoul(env, &end, 10);
+    if (end == env || *end != '\0' || v == 0) return 1;
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21589`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+static bool gpu_graph_stream_prefill_layer_pagein_overlap_enabled(void) {
+    return !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP",
+                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
+                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_THREADS
+
+DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_THREADS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21545`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_THREADS",
+            "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_THREADS");
+    if (!env || !env[0]) {
+        env = glm_graph_env_value(
+                "DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_THREADS",
+                "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_THREADS");
+```
+
+### DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21886`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE");
+    job->layer = il;
+    job->n_tokens = n_tokens;
+
+    if (pread_only) {
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21630`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                              "DS4_METAL_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE");
+    job->layer = il;
+    job->n_tokens = n_tokens;
+
+    const bool madvise_only =
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_THREADS
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_THREADS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21567`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        env = glm_graph_env_value(
+                "DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_THREADS",
+                "DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_THREADS");
+    }
+    if (!env || !env[0]) return gpu_graph_stream_prefill_layer_pagein_threads();
+    char *end = NULL;
+    unsigned long v = strtoul(env, &end, 10);
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21628`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    job->profile =
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE") ||
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE");
+    job->layer = il;
+    job->n_tokens = n_tokens;
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_PREPARE_GAP
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_PREPARE_GAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21579`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_SELECTED_PREPARE_GAP",
+            "DS4_METAL_STREAMING_PREFILL_SELECTED_PREPARE_GAP");
+    if (!env || !env[0]) return 0;
+    char *end = NULL;
+    unsigned long v = strtoul(env, &end, 10);
+    if (end == env || *end != '\0') return 0;
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_PREPARE_THREADS
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_PREPARE_THREADS: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21563`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_SELECTED_PREPARE_THREADS",
+            "DS4_METAL_STREAMING_PREFILL_SELECTED_PREPARE_THREADS");
+    if (!env || !env[0]) {
+        env = glm_graph_env_value(
+                "DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_THREADS",
+                "DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_THREADS");
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:21180`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+           g->ssd_streaming &&
+           glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE",
+                                 "DS4_METAL_STREAMING_PREFILL_SELECTED_PROFILE") &&
+           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE",
+                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE");
+}
+
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_GAP
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_GAP: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:22252`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const char *env = glm_graph_env_value(
+            "DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_GAP",
+            "DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_GAP");
+    if (!env || !env[0]) return 0;
+    char *end = NULL;
+    unsigned long v = strtoul(env, &end, 10);
+    if (end == env || *end != '\0') return 0;
+```
+
+### DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE
+
+DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE: advanced engine setting; built-in default retained
+
+Scope: ds4. Class: advanced.
+
+Source: `engines/ds4/ds4.c:22337`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const bool profile =
+        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE",
+                              "DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE");
+    const double t0 = profile ? now_sec() : 0.0;
+    bool ok = ds4_gpu_tensor_read(gpu_graph_batch_router_selected(g),
+                                  0,
+                                  selected,
 ```
 
 ### DS4_METAL_STREAMING_SELECTED_READAHEAD_PROFILE
@@ -16726,820 +19318,34 @@ DS4_ROCM_DECODE_STAGE_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20790`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30549`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
-           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
-                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
-           !glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_PREFIX",
-                                  "DS4_METAL_GRAPH_DUMP_PREFIX");
-}
+static bool gpu_graph_decode_stage_profile_enabled(uint32_t il) {
+    return gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_ROCM_DECODE_STAGE_PROFILE",
+                "DS4_ROCM_DECODE_STAGE_PROFILE_LAYER",
+                il) ||
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_DECODE_STAGE_PROFILE",
 ```
 
-### DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD
+### DS4_ROCM_DECODE_STAGE_PROFILE_LAYER
 
-DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; built-in default retained
+DS4_ROCM_DECODE_STAGE_PROFILE_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50566`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30550`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD",
-                              "DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_LOAD") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD",
-                              "DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD")) {
-        return false;
-    }
-    return getenv("DS4_METAL_ENABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD") != NULL;
-```
-
-### DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS
-
-DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:8720`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    if (l->ffn_down_exps->type == DS4_TENSOR_Q2_K) {
-        return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-                                      "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
-    }
-    if (l->ffn_down_exps->type == DS4_TENSOR_IQ2_XXS) {
-        return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE",
-```
-
-Source: `engines/ds4/ds4.c:23294`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                               "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-                               "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
-    return pro_q4 || streaming_iq2;
-}
-
-```
-
-Source: `engines/ds4/ds4.c:23369`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-                                  "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
-}
-
-static bool gpu_graph_decode_mxfp4_selected_slots_expected(
-```
-
-### DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE
-
-DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:8724`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    }
-    if (l->ffn_down_exps->type == DS4_TENSOR_IQ2_XXS) {
-        return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_STREAM_ADDR_TABLE",
-                                      "DS4_METAL_DISABLE_IQ2_STREAM_ADDR_TABLE");
-    }
-    return false;
-}
-```
-
-### DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS
-
-DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:23350`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
-                                  "DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS");
-}
-
-static bool gpu_graph_decode_iq2_selected_slots_expected(
-```
-
-### DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION
-
-DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:8707`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
-        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
-                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
-        return false;
-```
-
-Source: `engines/ds4/ds4.c:21066`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
-        DS4_N_LAYER == 0) {
-        return false;
-    }
-```
-
-Source: `engines/ds4/ds4.c:23292`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                               "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                               "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-                               "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
-    return pro_q4 || streaming_iq2;
-```
-
-Source: `engines/ds4/ds4.c:23317`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
-            getenv("DS4_METAL_ENABLE_Q4_EXPERT_TABLE") != NULL) &&
-           getenv("DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
-```
-
-Source: `engines/ds4/ds4.c:23348`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
-                                  "DS4_METAL_DISABLE_Q4_SELECTED_EXPERT_VIEWS");
-}
-```
-
-Source: `engines/ds4/ds4.c:23367`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-                                  "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
-}
-```
-
-Source: `engines/ds4/ds4.c:23386`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           getenv("DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS") == NULL;
-}
-
-```
-
-### DS4_ROCM_DISABLE_STREAMING_DECODE_PREFILL
-
-DS4_ROCM_DISABLE_STREAMING_DECODE_PREFILL: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:33816`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        const ds4_weights   *weights) {
-    (void)g;
-    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_DECODE_PREFILL",
-                              "DS4_METAL_DISABLE_STREAMING_DECODE_PREFILL")) {
-        return 0;
-    }
-
-```
-
-### DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE
-
-DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21062`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR",
-                              "DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE",
-                              "DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") ||
-        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-```
-
-### DS4_ROCM_DISABLE_STREAMING_EXPERT_HOTLIST
-
-DS4_ROCM_DISABLE_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:23504`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           g->ssd_streaming &&
-           !g->ssd_streaming_cold &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_HOTLIST",
-                                  "DS4_METAL_DISABLE_STREAMING_EXPERT_HOTLIST");
-}
-
-static bool gpu_graph_streaming_expert_hotlist_add(
-```
-
-### DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE
-
-DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20788`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-                                   "DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE") ||
-            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
-           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
-                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
-           !glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_PREFIX",
-```
-
-### DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH
-
-DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20784`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           g->ssd_streaming &&
-           !g_expert_profile.active &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH",
-                                  "DS4_METAL_DISABLE_STREAMING_LAYER_BATCH") &&
-           (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-                                   "DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE") ||
-            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-```
-
-### DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED
-
-DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20762`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED",
-                                 "DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED",
-                                  "DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED");
-}
-
-static bool gpu_graph_stream_decode_static_map_enabled(void) {
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21060`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !weights ||
-        n_tokens <= 1 ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR",
-                              "DS4_METAL_DISABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE",
-                              "DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") ||
-        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21011`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
-}
-
-static uint32_t gpu_graph_stream_prefill_batch_selected_addr_auto_max(void) {
-```
-
-Source: `engines/ds4/ds4.c:21915`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE")) {
-            return true;
-        }
-    } else {
-```
-
-Source: `engines/ds4/ds4.c:53989`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
-    const bool layer_prepare =
-        layer_pagein || layer_pread || layer_readahead || layer_madvise;
-    const bool layer_prepare_overlap =
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20979`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
-}
-
-static bool gpu_graph_stream_prefill_layer_readahead_enabled(
-```
-
-Source: `engines/ds4/ds4.c:21924`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN")) {
-            return true;
-        }
-    }
-```
-
-Source: `engines/ds4/ds4.c:53963`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
-    const bool layer_readahead =
-        full_layer_prepare_base &&
-        !layer_pagein &&
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21594`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP");
-}
-
-enum { DS4_STREAM_PREFILL_MAX_PREPARE_AHEAD = 4 };
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20999`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-}
-```
-
-Source: `engines/ds4/ds4.c:21893`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        if (g) {
-            if (!gpu_graph_stream_prefill_layer_pread_enabled(g)) return true;
-        } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
-            return true;
-```
-
-Source: `engines/ds4/ds4.c:53978`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !layer_pagein &&
-        !layer_readahead &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-    const bool layer_madvise =
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20991`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-}
-
-static bool gpu_graph_stream_prefill_layer_pread_enabled(
-```
-
-Source: `engines/ds4/ds4.c:21001`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-}
-
-static bool gpu_graph_stream_prefill_layer_madvise_enabled(
-```
-
-Source: `engines/ds4/ds4.c:21009`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
-}
-```
-
-Source: `engines/ds4/ds4.c:21895`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
-            return true;
-        }
-    } else if (readahead_only) {
-```
-
-Source: `engines/ds4/ds4.c:21906`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
-            return true;
-        }
-    } else if (madvise_only) {
-```
-
-Source: `engines/ds4/ds4.c:21913`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        if (g) {
-            if (!gpu_graph_stream_prefill_layer_madvise_enabled(g)) return true;
-        } else if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE")) {
-            return true;
-```
-
-Source: `engines/ds4/ds4.c:53972`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-    const bool layer_pread =
-        full_layer_prepare_base &&
-        !layer_pagein &&
-```
-
-Source: `engines/ds4/ds4.c:53980`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREAD",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-    const bool layer_madvise =
-        full_layer_prepare_base &&
-        !layer_pagein &&
-```
-
-Source: `engines/ds4/ds4.c:53987`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !layer_pread &&
-        !layer_readahead &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_MADVISE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_MADVISE");
-    const bool layer_prepare =
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21592`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
-                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP");
-}
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20989`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-}
-```
-
-Source: `engines/ds4/ds4.c:21904`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
-            return true;
-```
-
-Source: `engines/ds4/ds4.c:53970`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE");
-    const bool layer_pread =
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20969`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE");
-}
-
-static bool gpu_graph_stream_prefill_layer_pagein_enabled(
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20959`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN");
-}
-
-static bool gpu_graph_stream_prefill_selected_madvise_enabled(
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21181`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE",
-                                 "DS4_METAL_STREAMING_PREFILL_SELECTED_PROFILE") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE");
-}
-
-static void gpu_graph_stream_prefill_selected_profile_reset(
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:22233`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED")) &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
-}
-
-static bool gpu_graph_stream_prefill_selected_readahead_shared_enabled(
-```
-
-Source: `engines/ds4/ds4.c:22245`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
-}
-
-static uint32_t gpu_graph_stream_prefill_selected_readahead_gap(void) {
-```
-
-### DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED
-
-DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:22243`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
-}
-```
-
-### DS4_ROCM_DISABLE_STREAMING_READAHEAD
-
-DS4_ROCM_DISABLE_STREAMING_READAHEAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20755`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_READAHEAD",
-                                 "DS4_METAL_ENABLE_STREAMING_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_READAHEAD");
-}
-
-static bool gpu_graph_stream_madvise_willneed_enabled(void) {
-```
-
-### DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD
-
-DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:50564`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        const ds4_glm_gpu_graph *g) {
-    if (!g || !g->ssd_streaming) return false;
-    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_SELECTED_ASYNC_LOAD",
-                              "DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_LOAD") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD",
-                              "DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD")) {
-        return false;
-```
-
-### DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP
-
-DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20767`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-static bool gpu_graph_stream_decode_static_map_enabled(void) {
-    if (glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_DECODE_MAP",
-                              "DS4_METAL_DISABLE_STREAMING_STATIC_DECODE_MAP")) {
-        return false;
-    }
-    return true;
-```
-
-### DS4_ROCM_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE
-
-DS4_ROCM_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20775`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-static bool gpu_graph_stream_decode_static_map_state_cache_enabled(void) {
-    return !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE",
-                                  "DS4_METAL_DISABLE_STREAMING_STATIC_MAP_STATE_CACHE");
-}
-
-static bool gpu_graph_stream_decode_layer_batch_enabled(
+    return gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_ROCM_DECODE_STAGE_PROFILE",
+                "DS4_ROCM_DECODE_STAGE_PROFILE_LAYER",
+                il) ||
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_DECODE_STAGE_PROFILE",
+                "DS4_METAL_DECODE_STAGE_PROFILE_LAYER",
 ```
 
 ### DS4_ROCM_DSPARK_GREEDY_GPU_MARKOV
@@ -17560,1066 +19366,58 @@ Source: `engines/ds4/ds4.c:79538`. Unset read: NULL from getenv; the literal con
                     ds4_session_dspark_rocm_gfx1151_fast_path(s);
 ```
 
-### DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE
+### DS4_ROCM_LAYER_STAGE_PROFILE
 
-DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20786`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_LAYER_BATCH",
-                                  "DS4_METAL_DISABLE_STREAMING_LAYER_BATCH") &&
-           (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-                                   "DS4_METAL_ENABLE_STREAMING_FULL_EXPERT_ADDR_TABLE") ||
-            glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE",
-                                  "DS4_METAL_DISABLE_STREAMING_FULL_EXPERT_ADDR_TABLE")) &&
-           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
-```
-
-### DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED
-
-DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED: advanced engine setting; built-in default retained
+DS4_ROCM_LAYER_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20760`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30538`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-
-static bool gpu_graph_stream_madvise_willneed_enabled(void) {
-    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_MADVISE_WILLNEED",
-                                 "DS4_METAL_ENABLE_STREAMING_MADVISE_WILLNEED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_MADVISE_WILLNEED",
-                                  "DS4_METAL_DISABLE_STREAMING_MADVISE_WILLNEED");
-}
+static bool gpu_graph_layer_stage_profile_enabled(uint32_t il) {
+    return gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_ROCM_LAYER_STAGE_PROFILE",
+                "DS4_ROCM_LAYER_STAGE_PROFILE_LAYER",
+                il) ||
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_LAYER_STAGE_PROFILE",
 ```
 
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR
+### DS4_ROCM_LAYER_STAGE_PROFILE_LAYER
 
-DS4_ROCM_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21090`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    }
-
-    if (glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR")) {
-        return true;
-    }
-
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED: advanced engine setting; built-in default retained
+DS4_ROCM_LAYER_STAGE_PROFILE_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:23473`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30539`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-static uint32_t gpu_graph_streaming_prefill_cache_seed_k(const ds4_gpu_graph *g) {
-    const bool enabled =
-        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED");
-    if (!g ||
-        !g->ssd_streaming ||
-        !enabled) {
+    return gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_ROCM_LAYER_STAGE_PROFILE",
+                "DS4_ROCM_LAYER_STAGE_PROFILE_LAYER",
+                il) ||
+           gpu_graph_stage_profile_enabled_for_layer(
+                "DS4_METAL_LAYER_STAGE_PROFILE",
+                "DS4_METAL_LAYER_STAGE_PROFILE_LAYER",
 ```
 
-Source: `engines/ds4/ds4.c:51780`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+### DS4_ROCM_MMQ_TIGHT_NCOLS
 
-```text
-        const ds4_glm_gpu_graph *g) {
-    const bool enabled =
-        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_CACHE_SEED",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_CACHE_SEED");
-    if (!g ||
-        !g->ssd_streaming ||
-        !enabled) {
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN: advanced engine setting; built-in default retained
+DS4_ROCM_MMQ_TIGHT_NCOLS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:20977`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/cuda/mmq/ds4_mmq.cu:1480`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
-    return g &&
-           g->ssd_streaming &&
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
-}
-```
+    const bool tight_iq2_ncols =
+        type == GGML_TYPE_IQ2_XXS &&
+        ds4_mmq_gfx1151_flag("DS4_ROCM_MMQ_TIGHT_NCOLS", cc);
+    const int64_t routed_ncols_max = (fused_down || tight_iq2_ncols)
+        ? (int64_t)n_tokens
+        : ne_get_rows;
 
-Source: `engines/ds4/ds4.c:21922`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        if (g) {
-            if (!gpu_graph_stream_prefill_layer_pagein_enabled(g)) return true;
-        } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN")) {
-            return true;
-```
-
-Source: `engines/ds4/ds4.c:53961`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    const bool layer_pagein =
-        full_layer_prepare_base &&
-        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN");
-    const bool layer_readahead =
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20987`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-```
-
-Source: `engines/ds4/ds4.c:21902`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        if (g) {
-            if (!gpu_graph_stream_prefill_layer_readahead_enabled(g)) return true;
-        } else if (!glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                          "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                                         "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") ||
-                   glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-```
-
-Source: `engines/ds4/ds4.c:53968`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        full_layer_prepare_base &&
-        !layer_pagein &&
-        glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                              "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD",
-                               "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE",
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20967`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_MADVISE") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_MADVISE");
-}
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20957`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_PAGEIN") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PAGEIN");
-}
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:22229`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           (glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD") ||
-            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED")) &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-```
-
-### DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED
-
-DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:22231`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           (glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD") ||
-            glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                  "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED")) &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD");
-}
-```
-
-Source: `engines/ds4/ds4.c:22241`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                 "DS4_METAL_ENABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD_SHARED") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_READAHEAD",
-```
-
-### DS4_ROCM_ENABLE_STREAMING_READAHEAD
-
-DS4_ROCM_ENABLE_STREAMING_READAHEAD: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:20753`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-static bool gpu_graph_stream_readahead_enabled(void) {
-    return glm_graph_env_present("DS4_ROCM_ENABLE_STREAMING_READAHEAD",
-                                 "DS4_METAL_ENABLE_STREAMING_READAHEAD") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_READAHEAD",
-                                  "DS4_METAL_DISABLE_STREAMING_READAHEAD");
-}
-```
-
-### DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE
-
-DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:8650`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        DS4_N_EXPERT_USED > 8 ||
-        DS4_N_EXPERT < 128 ||
-        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
-                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
-        return false;
-    }
-    if (!weights_streaming_layer_experts_uniform(w, il) &&
-```
-
-Source: `engines/ds4/ds4.c:8709`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
-        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
-                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
-        return false;
-    }
-
-```
-
-Source: `engines/ds4/ds4.c:23412`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        DS4_N_EXPERT_USED <= 8 &&
-        DS4_N_EXPERT >= 128 &&
-        !glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
-                               "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
-        return true;
-    }
-    if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_GLM_DSA ||
-```
-
-Source: `engines/ds4/ds4.c:23423`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        DS4_N_EXPERT_USED > 8 ||
-        DS4_N_EXPERT < 128 ||
-        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
-                              "DS4_METAL_GLM_DISABLE_STREAMING_EXPERT_CACHE")) {
-        return false;
-    }
-    const uint32_t type = layer->ffn_gate_exps->type;
-```
-
-### DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL
-
-DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:58820`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    const bool seed_before_prefill =
-        ssd_streaming &&
-        !glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL",
-                               "DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL");
-    const double t_prefill0 = now_sec();
-    if (seed_before_prefill) {
-        ds4_gpu_graph seed_graph;
-```
-
-Source: `engines/ds4/ds4.c:75392`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        }
-        if (e->ssd_streaming &&
-            !glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL",
-                                   "DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL")) {
-            ds4_gpu_graph seed_graph;
-            memset(&seed_graph, 0, sizeof(seed_graph));
-            seed_graph.quality = e->quality;
-```
-
-### DS4_ROCM_GLM_DISABLE_STREAMING_TOKEN_PREFILL
-
-DS4_ROCM_GLM_DISABLE_STREAMING_TOKEN_PREFILL: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:57053`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    if (!g || !g->ssd_streaming || g->quality || n_tokens == 0) return false;
-    if (getenv("DS4_GLM_DISABLE_STREAMING_TOKEN_PREFILL") != NULL ||
-        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_TOKEN_PREFILL",
-                              "DS4_METAL_GLM_DISABLE_STREAMING_TOKEN_PREFILL")) {
-        return false;
-    }
-    if (!glm_graph_span_fits_full_attention(g, pos0, n_tokens)) return false;
-```
-
-### DS4_ROCM_GLM_STREAMING_ASYNC_PROFILE
-
-DS4_ROCM_GLM_STREAMING_ASYNC_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:50595`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-static bool glm_graph_streaming_async_profile_enabled(void) {
-    return glm_graph_env_present("DS4_ROCM_GLM_STREAMING_ASYNC_PROFILE",
-                                 "DS4_METAL_GLM_STREAMING_ASYNC_PROFILE");
-}
-
-static void glm_graph_streaming_async_profile_print(void) {
-```
-
-### DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP
-
-DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:48195`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    if (!g || !g->ssd_streaming) return true;
-    g->streaming_static_decode_map_current = false;
-    if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP",
-                              "DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP") ||
-        getenv("DS4_GLM_STREAMING_DECODE_FULL_LAYER_MAP") != NULL) {
-        return gpu_graph_stream_map_layer(model, weights, il);
-    }
-```
-
-### DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER
-
-DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:48279`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        return false;
-    }
-    if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_PREFILL_FULL_LAYER",
-                              "DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER")) {
-        return true;
-    }
-    return n_tokens >= glm_graph_stream_prefill_full_layer_min_tokens();
-```
-
-### DS4_ROCM_GRAPH_DUMP_LAYER
-
-DS4_ROCM_GRAPH_DUMP_LAYER: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:19557`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        if (cfg.name && !cfg.name[0]) cfg.name = NULL;
-
-        const char *layer_env = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_LAYER",
-                                                    "DS4_METAL_GRAPH_DUMP_LAYER");
-        if (layer_env && layer_env[0] && strcmp(layer_env, "all") != 0) {
-            cfg.layer_set = 1;
-            cfg.layer = (uint32_t)strtoul(layer_env, NULL, 10);
-```
-
-### DS4_ROCM_GRAPH_DUMP_NAME
-
-DS4_ROCM_GRAPH_DUMP_NAME: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:19553`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-                                         "DS4_METAL_GRAPH_DUMP_PREFIX");
-        if (cfg.prefix && !cfg.prefix[0]) cfg.prefix = NULL;
-        cfg.name = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_NAME",
-                                       "DS4_METAL_GRAPH_DUMP_NAME");
-        if (cfg.name && !cfg.name[0]) cfg.name = NULL;
-
-        const char *layer_env = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_LAYER",
-```
-
-### DS4_ROCM_GRAPH_DUMP_POS
-
-DS4_ROCM_GRAPH_DUMP_POS: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:19564`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        }
-
-        const char *pos_env = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_POS",
-                                                  "DS4_METAL_GRAPH_DUMP_POS");
-        if (pos_env && pos_env[0]) {
-            cfg.pos_set = 1;
-            cfg.pos = (uint32_t)strtoul(pos_env, NULL, 10);
-```
-
-### DS4_ROCM_GRAPH_DUMP_PREFIX
-
-DS4_ROCM_GRAPH_DUMP_PREFIX: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:19550`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    if (!cfg.init) {
-        cfg.init = 1;
-        cfg.prefix = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_PREFIX",
-                                         "DS4_METAL_GRAPH_DUMP_PREFIX");
-        if (cfg.prefix && !cfg.prefix[0]) cfg.prefix = NULL;
-        cfg.name = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_NAME",
-                                       "DS4_METAL_GRAPH_DUMP_NAME");
-```
-
-Source: `engines/ds4/ds4.c:19627`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        uint32_t          il,
-        uint32_t          pos) {
-    const char *prefix = glm_graph_env_value("DS4_ROCM_GRAPH_DUMP_PREFIX",
-                                             "DS4_METAL_GRAPH_DUMP_PREFIX");
-    if (!t || n_f16 == 0 || !gpu_graph_debug_wants(name, il, pos)) return;
-
-    if (ds4_gpu_synchronize() == 0) {
-```
-
-Source: `engines/ds4/ds4.c:20792`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           !glm_graph_env_present("DS4_ROCM_DECODE_STAGE_PROFILE",
-                                  "DS4_METAL_DECODE_STAGE_PROFILE") &&
-           !glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_PREFIX",
-                                  "DS4_METAL_GRAPH_DUMP_PREFIX");
-}
-
-static void gpu_graph_stream_readahead_range_impl(
-```
-
-### DS4_ROCM_GRAPH_DUMP_TRACE
-
-DS4_ROCM_GRAPH_DUMP_TRACE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:19594`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        uint32_t          pos) {
-    const char *prefix = gpu_graph_debug_prefix_for(name, il, pos);
-    if (glm_graph_env_present("DS4_ROCM_GRAPH_DUMP_TRACE",
-                              "DS4_METAL_GRAPH_DUMP_TRACE"))
-        fprintf(stderr, "ds4: dump? name=%s il=%u pos=%u t=%p n=%llu wants=%d\n",
-                name, il, pos, (void *)t, (unsigned long long)n_f32,
-                gpu_graph_debug_wants(name, il, pos));
-```
-
-### DS4_ROCM_GRAPH_PREFILL_PROFILE
-
-DS4_ROCM_GRAPH_PREFILL_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:33923`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_PROFILE",
-                              "DS4_METAL_GRAPH_PREFILL_PROFILE");
-    const double t0 = profile ? now_sec() : 0.0;
-
-    /*
-```
-
-Source: `engines/ds4/ds4.c:37924`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-                                n_tokens > 2048 || imatrix != NULL;
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_PROFILE",
-                              "DS4_METAL_GRAPH_PREFILL_PROFILE") ||
-        split_profile;
-    const double t0 = profile ? now_sec() : 0.0;
-    double encode_s = 0.0;
-```
-
-Source: `engines/ds4/ds4.c:38695`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_PROFILE",
-                              "DS4_METAL_GRAPH_PREFILL_PROFILE");
-    const double t0 = profile ? now_sec() : 0.0;
-    const uint32_t end = start + n_tokens;
-
-```
-
-### DS4_ROCM_GRAPH_PREFILL_SPLIT_PROFILE
-
-DS4_ROCM_GRAPH_PREFILL_SPLIT_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:37909`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool split_profile =
-        glm_graph_env_present("DS4_ROCM_GRAPH_PREFILL_SPLIT_PROFILE",
-                              "DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE");
-    /*
-     * A full long-prompt prefill can keep the GPU busy for a long time. Split
-     * non-tiny prefills when a frontend asked for display progress: completed
-```
-
-### DS4_ROCM_GRAPH_TOKEN_PROFILE
-
-DS4_ROCM_GRAPH_TOKEN_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:33560`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_GRAPH_TOKEN_PROFILE",
-                              "DS4_METAL_GRAPH_TOKEN_PROFILE");
-    const bool throttle = graph_power_throttle_enabled(g);
-    const double t0 = (profile || throttle) ? now_sec() : 0.0;
-    g_fn_streaming.pre_t0_s += t0 > 0.0 ? (t0 - t_fn_entry) : 0.0;
-```
-
-Source: `engines/ds4/ds4.c:33762`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_GRAPH_TOKEN_PROFILE",
-                              "DS4_METAL_GRAPH_TOKEN_PROFILE");
-    const bool throttle = graph_power_throttle_enabled(g);
-    const double t0 = (profile || throttle) ? now_sec() : 0.0;
-
-```
-
-### DS4_ROCM_INDEXER_STAGE_PROFILE
-
-DS4_ROCM_INDEXER_STAGE_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:30747`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        (g->tp_rank == 0 ? tp_half_rows : n_tokens - tp_half_rows) : n_tokens;
-    const bool index_stage_profile =
-        glm_graph_env_present("DS4_ROCM_INDEXER_STAGE_PROFILE",
-                              "DS4_METAL_INDEXER_STAGE_PROFILE");
-    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);
-    const bool q_stage_profile =
-        glm_graph_env_present("DS4_ROCM_Q_STAGE_PROFILE",
-```
-
-### DS4_ROCM_MOE_WRITE_CLAMPED_ACT
-
-DS4_ROCM_MOE_WRITE_CLAMPED_ACT: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:8705`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        DS4_N_EXPERT_USED > 8 ||
-        DS4_N_EXPERT < 128 ||
-        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
-        glm_graph_env_present("DS4_ROCM_GLM_DISABLE_STREAMING_EXPERT_CACHE",
-```
-
-Source: `engines/ds4/ds4.c:21064`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_EXPERT_ADDR_TABLE",
-                              "DS4_METAL_DISABLE_STREAMING_EXPERT_ADDR_TABLE") ||
-        glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                              "DS4_METAL_MOE_WRITE_CLAMPED_ACT") ||
-        glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                              "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") ||
-        DS4_N_LAYER == 0) {
-```
-
-Source: `engines/ds4/ds4.c:23290`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        DS4_N_EXPERT_USED == 6 &&
-        DS4_N_EXPERT >= 128 &&
-        !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                               "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                               "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-        !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-```
-
-Source: `engines/ds4/ds4.c:23315`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           gate_tensor_bytes >= q4_selected_min_tensor_bytes &&
-           down_tensor_bytes >= q4_selected_min_tensor_bytes &&
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           (gpu_graph_use_pro_q4_expert_table_auto(g) ||
-```
-
-Source: `engines/ds4/ds4.c:23346`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-            (gate_tensor_bytes >= q4_selected_min_tensor_bytes &&
-             down_tensor_bytes >= q4_selected_min_tensor_bytes)) &&
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_Q4_SELECTED_EXPERT_VIEWS",
-```
-
-Source: `engines/ds4/ds4.c:23365`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           DS4_N_EXPERT_USED == 6 &&
-           DS4_N_EXPERT >= 128 &&
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
-```
-
-Source: `engines/ds4/ds4.c:23384`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-           DS4_N_EXPERT_USED == 6 &&
-           DS4_N_EXPERT >= 128 &&
-           !glm_graph_env_present("DS4_ROCM_MOE_WRITE_CLAMPED_ACT",
-                                  "DS4_METAL_MOE_WRITE_CLAMPED_ACT") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_ROUTED_PAIR_SWIGLU_FUSION",
-                                  "DS4_METAL_DISABLE_ROUTED_PAIR_SWIGLU_FUSION") &&
-           getenv("DS4_METAL_DISABLE_MXFP4_SELECTED_EXPERT_VIEWS") == NULL;
-```
-
-### DS4_ROCM_Q_STAGE_PROFILE
-
-DS4_ROCM_Q_STAGE_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:30751`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    const bool layer_stage_profile = gpu_graph_layer_stage_profile_enabled(il);
-    const bool q_stage_profile =
-        glm_graph_env_present("DS4_ROCM_Q_STAGE_PROFILE",
-                              "DS4_METAL_Q_STAGE_PROFILE");
-    double layer_stage_t0 = layer_stage_profile ? now_sec() : 0.0;
-    double q_stage_t0 = q_stage_profile ? now_sec() : 0.0;
-#define DS4_GPU_PROFILE_ATTN_STAGE(name) do { \
-```
-
-### DS4_ROCM_STREAMING_EXPERT_HOTLIST
-
-DS4_ROCM_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:34131`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    const uint32_t current_count =
-        ds4_gpu_stream_expert_cache_current_count();
-    const char *path = glm_graph_env_value("DS4_ROCM_STREAMING_EXPERT_HOTLIST",
-                                           "DS4_METAL_STREAMING_EXPERT_HOTLIST");
-    const bool from_file = path && path[0];
-    const bool refresh_builtin_glm =
-        !from_file && g_ds4_shape.variant == DS4_VARIANT_GLM52;
-```
-
-### DS4_ROCM_STREAMING_EXPERT_HOTLIST_PROFILE
-
-DS4_ROCM_STREAMING_EXPERT_HOTLIST_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:34137`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        !from_file && g_ds4_shape.variant == DS4_VARIANT_GLM52;
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_STREAMING_EXPERT_HOTLIST_PROFILE",
-                              "DS4_METAL_STREAMING_EXPERT_HOTLIST_PROFILE");
-    if (!from_file && !refresh_builtin_glm && current_count >= preload_count) {
-        if (profile) {
-            fprintf(stderr,
-```
-
-### DS4_ROCM_STREAMING_MAP_TRACE
-
-DS4_ROCM_STREAMING_MAP_TRACE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:48223`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    g->streaming_static_decode_map_current = false;
-    if (full_layer_prefill) {
-        const char *trace = glm_graph_env_value("DS4_ROCM_STREAMING_MAP_TRACE",
-                                                "DS4_METAL_STREAMING_MAP_TRACE");
-        if (trace && trace[0] && strcmp(trace, "0") != 0) {
-            fprintf(stderr,
-                    "ds4: GLM SSD prefill map layer=%u tokens=%u mode=full-prefill\n",
-```
-
-Source: `engines/ds4/ds4.c:48239`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-                                                       il,
-                                                       n_tokens);
-    const char *trace = glm_graph_env_value("DS4_ROCM_STREAMING_MAP_TRACE",
-                                            "DS4_METAL_STREAMING_MAP_TRACE");
-    if (trace && trace[0] && strcmp(trace, "0") != 0) {
-        fprintf(stderr,
-                "ds4: GLM SSD prefill map layer=%u tokens=%u mode=%s\n",
-```
-
-### DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K
-
-DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:23482`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    uint32_t k = 1;
-    const char *env = glm_graph_env_value("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K",
-                                          "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_K");
-    if (env && env[0]) {
-        char *end = NULL;
-        unsigned long v = strtoul(env, &end, 10);
-```
-
-Source: `engines/ds4/ds4.c:51789`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    uint32_t k = 1;
-    const char *env = glm_graph_env_value("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_K",
-                                          "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_K");
-    if (env && env[0]) {
-        char *end = NULL;
-        unsigned long v = strtoul(env, &end, 10);
-```
-
-### DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:34038`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE");
-    const double t0 = profile ? now_sec() : 0.0;
-    uint32_t seeded_layers = 0;
-    uint32_t seeded_rows = 0;
-```
-
-Source: `engines/ds4/ds4.c:51913`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_CACHE_SEED_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE");
-    const double t0 = profile ? now_sec() : 0.0;
-    uint32_t seeded_layers = 0;
-    uint32_t seeded_rows = 0;
-```
-
-### DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21883`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE");
-    job->layer = il;
-```
-
-### DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP
-
-DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21590`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP",
-                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
-                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PAGEIN_OVERLAP",
-```
-
-### DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21879`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    job->readahead_only = readahead_only;
-    job->profile =
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
-```
-
-### DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21881`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREAD_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_PREAD_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE",
-```
-
-### DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP
-
-DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21588`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-static bool gpu_graph_stream_prefill_layer_pagein_overlap_enabled(void) {
-    return !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP",
-                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PREPARE_NO_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP",
-                                  "DS4_METAL_STREAMING_PREFILL_LAYER_PAGEIN_NO_OVERLAP") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_LAYER_PREPARE_OVERLAP",
-```
-
-### DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21885`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_MADVISE_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_MADVISE_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_LAYER_READAHEAD_PROFILE");
-    job->layer = il;
-    job->n_tokens = n_tokens;
-
-```
-
-### DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21629`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE");
-    job->layer = il;
-    job->n_tokens = n_tokens;
-
-```
-
-### DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21627`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    job->ok = true;
-    job->profile =
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_SELECTED_PAGEIN_PROFILE") ||
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_SELECTED_MADVISE_PROFILE");
-    job->layer = il;
-```
-
-### DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:21179`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    return g &&
-           g->ssd_streaming &&
-           glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_PROFILE",
-                                 "DS4_METAL_STREAMING_PREFILL_SELECTED_PROFILE") &&
-           !glm_graph_env_present("DS4_ROCM_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE",
-                                  "DS4_METAL_DISABLE_STREAMING_PREFILL_SELECTED_PROFILE");
-}
-```
-
-### DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE
-
-DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE: advanced engine setting; built-in default retained
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4.c:22336`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-
-    const bool profile =
-        glm_graph_env_present("DS4_ROCM_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE",
-                              "DS4_METAL_STREAMING_PREFILL_SELECTED_READAHEAD_PROFILE");
-    const double t0 = profile ? now_sec() : 0.0;
-    bool ok = ds4_gpu_tensor_read(gpu_graph_batch_router_selected(g),
-                                  0,
 ```
 
 ### DS4_ROUTED_TOKEN_PARALLEL
@@ -20852,18 +21650,6 @@ Source: `vendor/engines/gguf/utility.py:269`. Unset read: KeyError unless an ear
 @dataclass
 ```
 
-Source: `engines/mlx-serve/src/cli.zig:304`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-fn curlBaseArgs(list: *std.ArrayList([]const u8), allocator: std.mem.Allocator) !?[]u8 {
-    try list.appendSlice(allocator, &.{ "curl", "-fL", "--retry", "3", "--retry-delay", "2" });
-    if (std.c.getenv("HF_TOKEN")) |tok| {
-        const header = try std.fmt.allocPrint(allocator, "Authorization: Bearer {s}", .{std.mem.span(tok)});
-        try list.appendSlice(allocator, &.{ "-H", header });
-        return header;
-    }
-```
-
 ### HOME
 
 HOME: advanced engine setting; built-in default retained
@@ -20964,150 +21750,6 @@ Source: `engines/ds4/ds4_web.c:1362`. Unset read: NULL from getenv; the literal 
     snprintf(web->home, sizeof(web->home), "%s", home);
     snprintf(web->profile_dir, sizeof(web->profile_dir), "%s/.ds4/browser", home);
     web->port = cfg && cfg->port > 0 ? cfg->port : DS4_WEB_DEFAULT_PORT;
-```
-
-Source: `engines/mlx-serve/src/arch/ds4.zig:139`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    if (kernels_extracted.load(.acquire)) return;
-
-    const home_z = std.c.getenv("HOME");
-    if (home_z == null) {
-        log.err("[ds4] HOME not set; cannot stage Metal kernels\n", .{});
-        return Error.KernelExtractionFailed;
-    }
-```
-
-Source: `engines/mlx-serve/src/cli.zig:199`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-fn homeDir() []const u8 {
-    return std.mem.span(std.c.getenv("HOME") orelse return "/tmp");
-}
-
-// ── HF tree listing ─────────────────────────────────────────────────────
-
-```
-
-Source: `engines/mlx-serve/src/gen.zig:1747`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        return error.NoGemmaDir;
-    }
-    const home = std.mem.span(std.c.getenv("HOME") orelse return error.NoGemmaDir);
-    if (!std.fs.path.isAbsolute(home)) return error.NoGemmaDir;
-    // 2-level `<author>/<name>` layout (what DownloadManager writes), then a
-    // flat `<name>` layout (legacy / manual placement).
-    const candidates = [_][]const u8{ LTX_GEMMA_REPO_DIR, "gemma-3-12b-it-4bit" };
-```
-
-Source: `engines/mlx-serve/src/gen.zig:3996`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        if (std.fs.path.isAbsolute(e)) return sumSafetensorsAt(io, e);
-    }
-    const home = std.mem.span(std.c.getenv("HOME") orelse return 0);
-    for ([_][]const u8{ LTX_GEMMA_REPO_DIR, "gemma-3-12b-it-4bit" }) |rel| {
-        const p = std.fmt.bufPrint(&buf, "{s}/.mlx-serve/models/{s}", .{ home, rel }) catch continue;
-        const n = sumSafetensorsAt(io, p);
-        if (n > 0) return n;
-```
-
-Source: `engines/mlx-serve/src/kv_disk_cache.zig:3301`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-/// Default persistence root: `~/.mlx-serve/kv-cache`.
-pub fn defaultBaseDir(allocator: std.mem.Allocator) ![]u8 {
-    const home = std.mem.span(std.c.getenv("HOME") orelse return error.NoHome);
-    return std.fmt.allocPrint(allocator, "{s}/.mlx-serve/kv-cache", .{home});
-}
-
-// ── Small fs helpers ──
-```
-
-Source: `engines/mlx-serve/src/launch.zig:538`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-fn homeDir() []const u8 {
-    return std.mem.span(std.c.getenv("HOME") orelse return "/tmp");
-}
-
-fn curlGet(allocator: std.mem.Allocator, io: std.Io, url: []const u8) ![]u8 {
-    // Plain fetch, no HF token header — this talks to OUR server, never HF.
-```
-
-Source: `engines/mlx-serve/src/main.zig:1014`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        const chosen: ?[]const u8 = if (log_file_arg) |a|
-            (if (std.mem.eql(u8, a, "off") or std.mem.eql(u8, a, "none")) null else a)
-        else if (std.c.getenv("HOME")) |h|
-            log.defaultLogPath(&log_path_buf, std.mem.span(h), port) catch null
-        else
-            null;
-        if (chosen) |p| {
-```
-
-Source: `engines/mlx-serve/src/main.zig:992`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        .has_explicit_model = model_dir.len > 0,
-    })) {
-        const home = std.mem.span(std.c.getenv("HOME") orelse "/tmp");
-        default_models_root_storage = try cli_mod.modelsRootPath(allocator, home);
-        models_root = default_models_root_storage;
-    }
-
-```
-
-Source: `engines/mlx-serve/src/model_settings.zig:94`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-pub fn defaultPath(buf: []u8) []const u8 {
-    const home = std.mem.span(std.c.getenv("HOME") orelse "/tmp");
-    return std.fmt.bufPrint(buf, "{s}/.mlx-serve/model-settings.json", .{home}) catch "";
-}
-
-/// The one call load sites make: read the default file, look the model up, log a hit.
-```
-
-Source: `engines/mlx-serve/src/round_cost.zig:1026`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-
-fn homeDir() []const u8 {
-    return std.mem.span(std.c.getenv("HOME") orelse return "/tmp");
-}
-
-fn cachePath(buf: []u8, key: []const u8) ?[]const u8 {
-    return std.fmt.bufPrint(buf, "{s}/.mlx-serve/round-cost/{s}.txt", .{ homeDir(), key }) catch null;
-```
-
-Source: `engines/mlx-serve/src/server.zig:1798`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    if (!build_options.mas) {
-        var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const home = std.mem.span(std.c.getenv("HOME") orelse "/tmp");
-        const path = std.fmt.bufPrint(&path_buf, "{s}/.mlx-serve/providers.json", .{home}) catch "";
-        g_providers = providers_mod.Providers.start(allocator, io, path, port) catch |err| blk: {
-            log.warn("[providers] failed to start ({s}); providers disabled\n", .{@errorName(err)});
-            break :blk null;
-```
-
-Source: `engines/mlx-serve/src/server.zig:2903`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-        return;
-    };
-    const home = std.mem.span(std.c.getenv("HOME") orelse "/tmp");
-    const dest = try cli_mod.modelDestPath(allocator, home, resolved.repo);
-    defer allocator.free(dest);
-
-    log.info("POST /api/pull {s} -> {s}\n", .{ requested, dest });
 ```
 
 ### HUGGINGFACE_HUB_CACHE
@@ -31968,6 +32610,42 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20803`.
                         const size_t es = (mt->type == GGML_TYPE_F16) ? sizeof(uint16_t) : sizeof(float);
 ```
 
+### LLAMA_MLA_SPARSE
+
+LLAMA_MLA_SPARSE: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1558`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    kv_sync_batch_size       = params.kv_sync_batch_size;
+
+    cparams.sparse_mla = resolve_tristate_flag(params.sparse_mla, "LLAMA_MLA_SPARSE", false);
+    cparams.sparse_mla_trace = resolve_tristate_flag(params.sparse_mla_trace, "LLAMA_MLA_SPARSE_TRACE", false);
+    cparams.sparse_mla_prefill = resolve_tristate_flag(params.sparse_mla_prefill, "LLAMA_MLA_SPARSE_PREFILL", true);
+    cparams.sparse_mla_decode = resolve_tristate_flag(params.sparse_mla_decode, "LLAMA_MLA_SPARSE_DECODE", true);
+    cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
+```
+
+### LLAMA_MLA_SPARSE_DECODE
+
+LLAMA_MLA_SPARSE_DECODE: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla_trace = resolve_tristate_flag(params.sparse_mla_trace, "LLAMA_MLA_SPARSE_TRACE", false);
+    cparams.sparse_mla_prefill = resolve_tristate_flag(params.sparse_mla_prefill, "LLAMA_MLA_SPARSE_PREFILL", true);
+    cparams.sparse_mla_decode = resolve_tristate_flag(params.sparse_mla_decode, "LLAMA_MLA_SPARSE_DECODE", true);
+    cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
+    cparams.sparse_mla_prefill_top_k =
+        resolve_int_override(params.sparse_mla_prefill_top_k, "LLAMA_MLA_SPARSE_PREFILL_TOP_K", 0);
+    cparams.sparse_mla_prefill_selector = resolve_sparse_mla_selector(
+```
+
 ### LLAMA_MLA_SPARSE_FA_DECOUPLE
 
 LLAMA_MLA_SPARSE_FA_DECOUPLE: advanced engine setting; built-in default retained
@@ -32112,6 +32790,42 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:710`. U
 }
 ```
 
+### LLAMA_MLA_SPARSE_FUSED_KERNEL
+
+LLAMA_MLA_SPARSE_FUSED_KERNEL: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1580`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla_fa_mode = resolve_sparse_mla_fa_mode(params.sparse_mla_fa_mode);
+    cparams.sparse_mla_fused_kernel =
+        resolve_tristate_flag(params.sparse_mla_fused_kernel, "LLAMA_MLA_SPARSE_FUSED_KERNEL", false);
+    cparams.sparse_mla_fused_topk =
+        resolve_tristate_flag(params.sparse_mla_fused_topk, "LLAMA_MLA_SPARSE_FUSED_TOPK", false);
+    cparams.moe_prefill_expert_cap =
+        resolve_int_override(params.moe_prefill_expert_cap, "LLAMA_MOE_PREFILL_EXPERT_CAP", 0);
+```
+
+### LLAMA_MLA_SPARSE_FUSED_TOPK
+
+LLAMA_MLA_SPARSE_FUSED_TOPK: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1582`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        resolve_tristate_flag(params.sparse_mla_fused_kernel, "LLAMA_MLA_SPARSE_FUSED_KERNEL", false);
+    cparams.sparse_mla_fused_topk =
+        resolve_tristate_flag(params.sparse_mla_fused_topk, "LLAMA_MLA_SPARSE_FUSED_TOPK", false);
+    cparams.moe_prefill_expert_cap =
+        resolve_int_override(params.moe_prefill_expert_cap, "LLAMA_MOE_PREFILL_EXPERT_CAP", 0);
+    cparams.mtp_mode = sanitize_mtp_mode(params.mtp_mode, LLAMA_MTP_MODE_OFF);
+    cparams.mtp_max_draft = sanitize_mtp_max_draft(params.mtp_max_draft);
+```
+
 ### LLAMA_MLA_SPARSE_FUSED_TOPK_AUTO
 
 LLAMA_MLA_SPARSE_FUSED_TOPK_AUTO: advanced engine setting; built-in default retained
@@ -32148,6 +32862,60 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek2.cpp:741`
                             && n_tokens > 1
 ```
 
+### LLAMA_MLA_SPARSE_PREFILL
+
+LLAMA_MLA_SPARSE_PREFILL: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1560`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla = resolve_tristate_flag(params.sparse_mla, "LLAMA_MLA_SPARSE", false);
+    cparams.sparse_mla_trace = resolve_tristate_flag(params.sparse_mla_trace, "LLAMA_MLA_SPARSE_TRACE", false);
+    cparams.sparse_mla_prefill = resolve_tristate_flag(params.sparse_mla_prefill, "LLAMA_MLA_SPARSE_PREFILL", true);
+    cparams.sparse_mla_decode = resolve_tristate_flag(params.sparse_mla_decode, "LLAMA_MLA_SPARSE_DECODE", true);
+    cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
+    cparams.sparse_mla_prefill_top_k =
+        resolve_int_override(params.sparse_mla_prefill_top_k, "LLAMA_MLA_SPARSE_PREFILL_TOP_K", 0);
+```
+
+### LLAMA_MLA_SPARSE_PREFILL_PREFIX
+
+LLAMA_MLA_SPARSE_PREFILL_PREFIX: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1568`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        params.sparse_mla_prefill_selector,
+        "LLAMA_MLA_SPARSE_PREFILL_RECENT",
+        "LLAMA_MLA_SPARSE_PREFILL_PREFIX",
+        LLAMA_SPARSE_MLA_SELECTOR_SCORE);
+    cparams.sparse_mla_prefill_indexer = params.sparse_mla_prefill_indexer >= 0 ?
+        params.sparse_mla_prefill_indexer != 0 :
+        !env_truthy_value(std::getenv("LLAMA_MLA_SPARSE_PREFILL_SKIP_INDEXER"));
+```
+
+### LLAMA_MLA_SPARSE_PREFILL_RECENT
+
+LLAMA_MLA_SPARSE_PREFILL_RECENT: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1567`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla_prefill_selector = resolve_sparse_mla_selector(
+        params.sparse_mla_prefill_selector,
+        "LLAMA_MLA_SPARSE_PREFILL_RECENT",
+        "LLAMA_MLA_SPARSE_PREFILL_PREFIX",
+        LLAMA_SPARSE_MLA_SELECTOR_SCORE);
+    cparams.sparse_mla_prefill_indexer = params.sparse_mla_prefill_indexer >= 0 ?
+        params.sparse_mla_prefill_indexer != 0 :
+```
+
 ### LLAMA_MLA_SPARSE_PREFILL_SKIP_INDEXER
 
 LLAMA_MLA_SPARSE_PREFILL_SKIP_INDEXER: advanced engine setting; built-in default retained
@@ -32164,6 +32932,96 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1572`. 
         params.sparse_mla_decode_baseline,
         "LLAMA_MLA_SPARSE_RECENT",
         "LLAMA_MLA_SPARSE_PREFIX",
+```
+
+### LLAMA_MLA_SPARSE_PREFILL_TOP_K
+
+LLAMA_MLA_SPARSE_PREFILL_TOP_K: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1564`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
+    cparams.sparse_mla_prefill_top_k =
+        resolve_int_override(params.sparse_mla_prefill_top_k, "LLAMA_MLA_SPARSE_PREFILL_TOP_K", 0);
+    cparams.sparse_mla_prefill_selector = resolve_sparse_mla_selector(
+        params.sparse_mla_prefill_selector,
+        "LLAMA_MLA_SPARSE_PREFILL_RECENT",
+        "LLAMA_MLA_SPARSE_PREFILL_PREFIX",
+```
+
+### LLAMA_MLA_SPARSE_PREFIX
+
+LLAMA_MLA_SPARSE_PREFIX: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1576`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        params.sparse_mla_decode_baseline,
+        "LLAMA_MLA_SPARSE_RECENT",
+        "LLAMA_MLA_SPARSE_PREFIX",
+        LLAMA_SPARSE_MLA_SELECTOR_SCORE);
+    cparams.sparse_mla_fa_mode = resolve_sparse_mla_fa_mode(params.sparse_mla_fa_mode);
+    cparams.sparse_mla_fused_kernel =
+        resolve_tristate_flag(params.sparse_mla_fused_kernel, "LLAMA_MLA_SPARSE_FUSED_KERNEL", false);
+```
+
+### LLAMA_MLA_SPARSE_RECENT
+
+LLAMA_MLA_SPARSE_RECENT: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1575`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla_decode_baseline = resolve_sparse_mla_selector(
+        params.sparse_mla_decode_baseline,
+        "LLAMA_MLA_SPARSE_RECENT",
+        "LLAMA_MLA_SPARSE_PREFIX",
+        LLAMA_SPARSE_MLA_SELECTOR_SCORE);
+    cparams.sparse_mla_fa_mode = resolve_sparse_mla_fa_mode(params.sparse_mla_fa_mode);
+    cparams.sparse_mla_fused_kernel =
+```
+
+### LLAMA_MLA_SPARSE_TOP_K
+
+LLAMA_MLA_SPARSE_TOP_K: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1562`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    cparams.sparse_mla_prefill = resolve_tristate_flag(params.sparse_mla_prefill, "LLAMA_MLA_SPARSE_PREFILL", true);
+    cparams.sparse_mla_decode = resolve_tristate_flag(params.sparse_mla_decode, "LLAMA_MLA_SPARSE_DECODE", true);
+    cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
+    cparams.sparse_mla_prefill_top_k =
+        resolve_int_override(params.sparse_mla_prefill_top_k, "LLAMA_MLA_SPARSE_PREFILL_TOP_K", 0);
+    cparams.sparse_mla_prefill_selector = resolve_sparse_mla_selector(
+        params.sparse_mla_prefill_selector,
+```
+
+### LLAMA_MLA_SPARSE_TRACE
+
+LLAMA_MLA_SPARSE_TRACE: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1559`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+
+    cparams.sparse_mla = resolve_tristate_flag(params.sparse_mla, "LLAMA_MLA_SPARSE", false);
+    cparams.sparse_mla_trace = resolve_tristate_flag(params.sparse_mla_trace, "LLAMA_MLA_SPARSE_TRACE", false);
+    cparams.sparse_mla_prefill = resolve_tristate_flag(params.sparse_mla_prefill, "LLAMA_MLA_SPARSE_PREFILL", true);
+    cparams.sparse_mla_decode = resolve_tristate_flag(params.sparse_mla_decode, "LLAMA_MLA_SPARSE_DECODE", true);
+    cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
+    cparams.sparse_mla_prefill_top_k =
 ```
 
 ### LLAMA_MLX_ENGRAM_CACHE_FRACTION
@@ -32250,6 +33108,24 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id.cu:
     }
 ```
 
+### LLAMA_MMQ_ID_ADAPTIVE_RECHECK
+
+LLAMA_MMQ_ID_ADAPTIVE_RECHECK: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/mmq_id.cu:160`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+    const mmq_id_tile_cache_key key = {src0->data, ggml_cuda_get_device()};
+    static const int recheck_uses = mmq_id_env_int(
+        "LLAMA_MMQ_ID_ADAPTIVE_RECHECK", MMQ_ID_TILE_CACHE_RECHECK_USES);
+
+    {
+        std::lock_guard<std::mutex> lock(mmq_id_tile_cache_mutex);
+        const auto it = mmq_id_tile_cache.find(key);
+```
+
 ### LLAMA_MMQ_ID_ADAPTIVE_TRACE
 
 LLAMA_MMQ_ID_ADAPTIVE_TRACE: advanced engine setting; built-in default retained
@@ -32302,6 +33178,24 @@ static bool moe_grouped_enabled = []() {
 }();
 
 static bool ggml_cuda_topk_moe_fusion(const struct ggml_cgraph * cgraph, int node_idx, ggml_cuda_topk_moe_args & args) {
+```
+
+### LLAMA_MOE_PREFILL_EXPERT_CAP
+
+LLAMA_MOE_PREFILL_EXPERT_CAP: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1584`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+        resolve_tristate_flag(params.sparse_mla_fused_topk, "LLAMA_MLA_SPARSE_FUSED_TOPK", false);
+    cparams.moe_prefill_expert_cap =
+        resolve_int_override(params.moe_prefill_expert_cap, "LLAMA_MOE_PREFILL_EXPERT_CAP", 0);
+    cparams.mtp_mode = sanitize_mtp_mode(params.mtp_mode, LLAMA_MTP_MODE_OFF);
+    cparams.mtp_max_draft = sanitize_mtp_max_draft(params.mtp_max_draft);
+
+    LLAMA_LOG_INFO("%s: sparse MLA = %s (prefill=%s, decode=%s, fa_mode=%d, prefill_selector=%d, decode_baseline=%d, fused=%s/%s)\n",
 ```
 
 ### LLAMA_MROPE_FULL_POS
@@ -36888,6 +37782,24 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                 SRV_WRN("slots debug = %d\n", slots_debug);
 ```
 
+### LLAMA_SERVER_TRUST_PROMPT_CACHE_KV_RAM
+
+LLAMA_SERVER_TRUST_PROMPT_CACHE_KV_RAM: advanced engine setting; built-in default retained
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4079`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+
+```text
+                                // never produced a real speedup before this.
+                                const char * trust_env = std::getenv(
+                                    "LLAMA_SERVER_TRUST_PROMPT_CACHE_KV_RAM");
+                                const bool trust_kv_ram = trust_env && trust_env[0]
+                                    && trust_env[0] != '0';
+                                if (pos_min == -1 && !trust_kv_ram) {
+                                    SLT_WRN(slot,
+```
+
 ### LLAMA_SETROWS_PROBE
 
 LLAMA_SETROWS_PROBE: advanced engine setting; built-in default retained
@@ -39921,18 +40833,6 @@ Source: `vendor/engines/cosmos_windows/weight_streaming/hunyuan3d_backend.py:337
         if hasattr(os, 'add_dll_directory'):
             try:
                 handles.append(os.add_dll_directory(s))
-```
-
-Source: `engines/mlx-serve/app/Sources/MLXServe/Services/CLIInstaller.swift:190`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
-
-```text
-    /// process PATH if the shell misbehaves or hangs.
-    static func userShellPathEntries() -> [String] {
-        let fallback = parsePathEntries(ProcessInfo.processInfo.environment["PATH"] ?? "")
-        guard let path = LoginShellEnv.values(of: ["PATH"])["PATH"] else { return fallback }
-        return parsePathEntries(path)
-    }
-
 ```
 
 ### PID_ALLOW_LOW_VRAM
@@ -45171,22 +46071,4 @@ Source: `vendor/engines/cosmos_windows/weight_streaming/zimage_backend.py:43`. U
         from cosmos_windows import mem_guard
     except Exception:
         mem_guard = None
-```
-
-### DS4_DISABLE_HOST_MEMORY_WATCHDOG
-
-Linux host-memory watchdog switch: unset (default) admits allocations from /proc/meminfo, /proc/self/status and the cgroup memory limit, and asks for a graceful abort when a GPU-resident process would exceed them; set disables the check. DS4_EXTERNAL_DECODE also disables it, because a decode library must not kill the process that loaded it.
-
-Scope: ds4. Class: advanced.
-
-Source: `engines/ds4/ds4_host_memory.c:262`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
-
-```text
-    goto done;
-#endif
-    if (!getenv("DS4_DISABLE_HOST_MEMORY_WATCHDOG")) {
-        pthread_t thread;
-        if (pthread_create(&thread, NULL, host_memory_watchdog, NULL) != 0) {
-            fprintf(stderr, "ds4: HOST_MEMORY_REFUSED_WATCHDOG: cannot start host watchdog (%d)\n", errno);
-            g_host_memory_limit = 0;
 ```

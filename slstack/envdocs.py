@@ -12,12 +12,7 @@ def source_defaults(table):
     python_calls = {}
     for row in table:
         evidence = []
-        pinned = {item['source']: item for item in row.get('code_defaults', [])
-                  if item['source'].startswith('engines/mlx-serve/')}
         for reference in row['reads']:
-            if reference in pinned:
-                evidence.append(pinned[reference])
-                continue
             relative, number = reference.rsplit(':', 1)
             file = ROOT / relative
             if not file.is_file():
@@ -145,10 +140,7 @@ def reference_table():
     # Source locations and literal consumers are documentation metadata. Derive
     # them from this checkout without rewriting the runtime environment table.
     for row in table:
-        # The separately pinned upstream gitlink may be uninitialized. Its
-        # checked-in source evidence stays valid at that immutable revision.
-        external = [ref for ref in row['reads'] if ref.startswith('engines/mlx-serve/')]
-        row['reads'] = list(dict.fromkeys(references.get(row['var'], []) + external))
+        row['reads'] = list(references.get(row['var'], []))
     return source_defaults(table)
 
 
