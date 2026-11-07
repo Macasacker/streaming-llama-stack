@@ -501,42 +501,88 @@ grep 'warning:' build/43/host.log | sed 's/^[^:]*:[0-9]*:[0-9]*: //' | sed -E 's
 # 37 occurrences, 23 kinds, identical to the baseline tree's log; the CPU object set is 8 and 6.
 ```
 
-### Measuring the AMD vocabulary before folding it (chunk 4.3c, not applied)
+### Folding the AMD and Moore Threads vocabulary (chunk 4.3c)
 
 `docs/evidence/collapse-4.3c-tokens.txt` is the 22 names 4.2b and 4.3a left undefined everywhere:
 the last `#define AMD_MFMA_AVAILABLE`/`AMD_WMMA_AVAILABLE` went with the HIP branches, and
-`vendors/hip.h` was what defined `CDNA*`/`RDNA*`/`GCN*`/`__gfx*__`. Run the pass over **copies** of
-both trees to size the chunk and read its `BLOCKED` shapes without touching the checkout:
+`vendors/hip.h` was what defined `CDNA*`/`RDNA*`/`GCN*`/`__gfx*__`. Nothing in this checkout defines
+any of them, so `--never-defined` is sound and the fold is mechanical - which is what the scoping
+commit corrected in the plan: 4.2 and 4.3 had both recorded these guards as undecidable.
 
 ```bash
 tok=$(cat docs/evidence/collapse-4.3c-tokens.txt)
-rm -rf build/43/amd && mkdir -p build/43/amd/llama
-cp engines/ds4/cuda/mmq/*.cu engines/ds4/cuda/mmq/*.cuh engines/ds4/cuda/mmq/*.h build/43/amd/
-cp engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/*.cu \
-   engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/*.cuh \
-   engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/*.h build/43/amd/llama/
-for p in 1 2; do
+llama=engines/streaming-llama/prefill_llama.cpp
+for root in engines/ds4/cuda/mmq $llama/ggml/src/ggml-cuda; do
+  files=$(find $root -maxdepth 1 -name '*.cu' -o -maxdepth 1 -name '*.cuh' -o -maxdepth 1 -name '*.h' | sort)
+  for p in 1 2; do   # pass 2 must report "no edits"
+    TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
+        --never-defined "$tok" --apply $files
+  done
+  # whatever is still BLOCKED is the manual work; see the shapes below
   TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
-      --never-defined "$tok" --apply $(find build/43/amd -name '*.cu' -o -name '*.cuh' -o -name '*.h')
+      --never-defined "$tok" $files | grep -v "no edits, 0 blocked"
+  # 1. promote a surviving #elif above a provably-dead prefix (the collapse declines to do this
+  #    because the surviving condition is undecided, not because the fold is unsafe):
+  python3 -B docs/evidence/collapse-promote.py --tokens "$tok" --never-defined "$tok" --apply $files
+  # 2. rewrite trailing #endif/#else comments that quote a condition the pass just shortened:
+  python3 -B docs/evidence/collapse-guard-comments.py --tokens "$tok" --apply $files
+  # 3. re-run both: all three must now report nothing, and the balance must be clean
+  for f in $(git ls-files $root | grep -E '\.(cu|cuh|h)$'); do
+    b=$(grep -c "^[[:space:]]*#[[:space:]]*\(if\|ifdef\|ifndef\)" $f || true)
+    e=$(grep -c "^[[:space:]]*#[[:space:]]*endif" $f || true)
+    [ "$b" = "$e" ] || echo "UNBALANCED $f if=$b endif=$e"
+  done
+  git diff -U0 -- $root | grep '^+[^+]' | grep -v '^+[[:space:]]*#' | grep -vP '^\+[[:space:]]*(//|\*|;?)$'
+  # prints nothing: every insertion in a fold of this shape is a directive or a comment
+  python3 -B scripts/port/cuda_live_equiv.py build/wt-base . $(git diff --name-only HEAD -- $root)
+  # engine: --defs _GNU_SOURCE,NDEBUG,DS4_CUDA_HAVE_MXF4=1 --include engines/ds4/cuda/mmq \
+  #         --include engines/ds4; 0 differing live lines on all six files, identical counts
+  # llama: defaults are right for this tree; 0 differing live lines on all twelve, identical counts
 done
-TMPDIR=$PWD/build python3 -B scripts/port/collapse_conditionals.py --tokens "$tok" \
-    --never-defined "$tok" $(find build/43/amd -name '*.cu' -o -name '*.cuh' -o -name '*.h') | grep BLOCKED
-# 22 nodes on that tree: nine dead `#if defined(AMD_WMMA_AVAILABLE)` whose live branch is
-# `#elif defined(TURING_MMA_AVAILABLE)`, seven genuine rewrites where the AMD term sits inside a
-# parenthesised group or the live `#elif` tests `__CUDA_ARCH__`, three `#elif ... //wmma instructions
-# can handle ...` where the trailing comment makes the condition unparsable (the tool reports those
-# instead of rewriting them, which is the correct answer), and three `#else // defined(...)` lines
-# flagged only because a comment on an unconditional `#else` names a pinned macro - those are comment
-# rewrites, not decisions. Sizes: 662 deletions and 75 insertions in the engine tier, 1,040 and 132
-# in the llama tree.
 ```
 
-Whether that is behaviour-preserving is answerable without doing the chunk: fold a copy of the
-engine tier, compile one TU from it with the Makefile's own flags, and compare its machine code with
-the committed object's. Identical (name hash normalised) means the fold changed no surviving kernel.
-`ds4_q4k_half.o` reads identical on the 4.3b tree; the host-side half - `amd_mfma_available(cc)`,
-`GGML_CUDA_CC_IS_CDNA(cc)` in `ds4_mmq.cu`'s selection code, `ds4_mmq_gfx1151_flag()` - is plain C on
-a runtime `cc` and no collapse can reach it.
+The BLOCKED shapes, so a later reader does not re-derive them: a dead `#if` whose live branch is the
+`#elif` (promote - 6 in the engine, 9 in the llama tree); a dead term inside a **parenthesised**
+group, which the operand-drop patterns cannot reach (`|| (defined(AMD_WMMA_AVAILABLE) &&
+defined(RDNA4))` in `fattn-mma-f16.cuh`, four of them - delete the group, keep the disjunction); a
+branch whose condition has a trailing comment, which the collapse reports `unparsable` and refuses
+to re-emit - the comment is not part of the condition, so `collapse-promote.py` strips one before
+deciding and puts it back on the promoted guard; and a `#else` line whose **comment** names a pinned
+macro, which is a comment fix and never a decision.
+
+Machine code is the stronger gate and needs no GPU. The whole CUDA backend rebuilds (168 objects,
+`ninja -C build/llama -j8 ggml-cuda`), and the only thing that may differ is the unused-instantiation
+marker nvcc emits at prologue offset `0x0050`:
+
+```bash
+D=$PWD/build/43c/sass; mkdir -p $D/b $D/a     # snapshot BEFORE editing the tree, then rebuild
+find build/llama/ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir -name '*.o' | while read o; do
+  k=$(echo "$o" | sed 's|.*/ggml-cuda.dir/||; s|/|_|g')
+  cuobjdump --dump-sass "$o" | sed -E 's/_GLOBAL__N__[0-9a-f]+_/_H_/' > $D/b/$k.sass
+done
+# after the fold and the rebuild, the same loop into $D/a, then:
+python3 - <<'EOF'
+import os, re
+pat = re.compile(r"/\*0050\*/\s+HFMA2 R2, -RZ, RZ, 0, [^;]+ ;\s+/\* 0x[0-9a-f]+ \*/")
+norm = lambda p: "\n".join(pat.sub("MARKER", l.rstrip()).rstrip() for l in open(p))
+bad = [k for k in sorted(os.listdir("build/43c/sass/b")) if norm(f"build/43c/sass/b/{k}") != norm(f"build/43c/sass/a/{k}")]
+print(f"differing after masking the marker: {len(bad)} of {len(os.listdir('build/43c/sass/b'))}")
+EOF
+```
+
+On the 4.3c tree that reads `0 of 168`, and the unmasked comparison differs in 77 objects with every
+differing line being that one marker instruction - the `no_device_code(__FILE__, __LINE__, ...)`
+argument, which moves by the lines deleted above it where fp16 can hold the number exactly
+(`mmf.cuh` 75 -> 60 and 326 -> 299, `fattn-mma-f16.cuh` 1970 -> 1885). `nm --defined-only`, normalised
+the same way, matches for all 168. A `sed` version of that mask is a trap: `s_..._..._` terminates at
+the first `_` in the replacement, and the empty-output comparison then reports 0 differing objects for
+a mask that never ran.
+
+What this chunk does **not** touch is the host-side half: `amd_mfma_available(cc)`,
+`GGML_CUDA_CC_IS_CDNA(cc)` in `ds4_mmq.cu`'s selection code, `ds4_mmq_gfx1151_flag()`,
+`mmvq.cu`'s `MMVQ_PARAMETERS_*` chooser and `common.cuh`'s `GGML_CUDA_CC_*` constants are plain C on
+a runtime `cc`, and guards keyed on `__CUDA_ARCH__` alone stay undecided by design. Deleting them
+deletes kernel selection, and `DS4_ROCM_MMQ_TIGHT_NCOLS` would lose its last reader with them.
 
 ### The producer's platform layer, with no test target to run
 

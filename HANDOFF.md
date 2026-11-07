@@ -32,42 +32,15 @@ four suite names Phase 7 owned plus two scripts that still named `engines/ds4-wi
 the census gate the remaining text sweep needs and made the rewording chunk 4.1 had claimed but
 never did. Chunk 4.3a folded the same HIP and MUSA branches out of the engine's vendored mmq tier,
 so `GGML_USE_HIP`, `GGML_USE_MUSA` and the macros their toolchains defined are gone from
-`engines/ds4` entirely. Chunk 4.3b folded the host layer's `DS4_ROCM_BUILD` guards, so what is left
-of Phase 4 is the compute-capability vocabulary below.
+`engines/ds4` entirely. Chunk 4.3b folded the host layer's `DS4_ROCM_BUILD` guards, and 4.3c folded
+the AMD and Moore Threads compute-capability vocabulary in both trees, so **Phase 4 is closed**:
+none of the 22 names in `docs/evidence/collapse-4.3c-tokens.txt` - `AMD_MFMA_AVAILABLE`,
+`AMD_WMMA_AVAILABLE`, `CDNA*`, `RDNA*`, `GCN*`, `__GFX*__`, `V_DOT2_F32_F16_AVAILABLE` - appears in
+a preprocessor directive anywhere in this checkout, and what survives of that vocabulary is the
+host-side runtime `cc` selection code the port keeps on purpose (the plan's 4.3c entry lists it and
+says why deleting it is not a text sweep).
 
-1. **Chunk 4.3c - the AMD and Moore Threads compute-capability vocabulary.** Chunk 4.2 deleted
-   `ggml-hip` and `ggml-musa`, which were the only things that ever defined `GGML_USE_HIP` and
-   `GGML_USE_MUSA`; 4.3a folded every branch keyed on those names, in the llama tree and in the
-   engine's copy of it, and 4.3b folded the engine's host layer on `DS4_ROCM_BUILD`. What is left is
-   one layer deeper, and it splits in half - the plan's 4.3c entry has the measurement, done on
-   scratch copies of both trees and not applied:
-   - **Mechanical, and bigger than it was recorded as.** 4.2b and 4.3a deleted the last
-     `#define AMD_MFMA_AVAILABLE`/`#define AMD_WMMA_AVAILABLE`, and `vendors/hip.h` - now gone - was
-     what defined `CDNA*`/`RDNA*`/`GCN*`/`__gfx*__`. Pinning those 22 names collapses 662 lines out
-     of the engine's `cuda/mmq/` and 1,040 out of the llama tree's `ggml/src/ggml-cuda`, and
-     `ds4_q4k_half.o` rebuilt from a folded copy is SASS-identical to the committed object. 22 nodes
-     come back `BLOCKED`: nine dead `#if defined(AMD_WMMA_AVAILABLE)` whose live branch is
-     `#elif defined(TURING_MMA_AVAILABLE)`, seven genuine rewrites where the AMD term sits inside a
-     parenthesised group or the live `#elif` tests `__CUDA_ARCH__`, three whose condition ends in a
-     `//` comment the tool refuses to parse, and three `#else // defined(AMD_MFMA_AVAILABLE) || ...`
-     lines flagged only because the comment on an unconditional `#else` names a pinned macro.
-   - **Not a sweep.** Guards keyed on `__CUDA_ARCH__` alone stay undecided by design, and the host
-     side is plain C on a runtime `cc`: `amd_mfma_available(cc)` / `amd_wmma_available(cc)` at
-     `ds4_mmq.cu:440,448`, `GGML_CUDA_CC_IS_CDNA(cc)` at `ds4_mmq.cu:462,645,761,1109,1469` and
-     `common.cuh:262,268,276,280,284`, `ds4_mmq_gfx1151_flag("DS4_ROCM_MMQ_TIGHT_NCOLS", cc)` at
-     `ds4_mmq.cu:1480`, the `QY*`/`PH1` terms in `fp16_available`/`fast_fp16_available`, and the
-     `QY*`/`PH1`/`CDNA*`/`RDNA*` constants themselves. Deleting those deletes kernel-selection
-     logic, and `DS4_ROCM_MMQ_TIGHT_NCOLS` would lose its last reader with it.
-   Measured on the current tree: 286 `hip`/`musa`/`rocm`/`moore` matches remain in `engines/ds4`
-   sources, 13 in `cuda/mmq/`, and 210 `AMD_MFMA_AVAILABLE`/`AMD_WMMA_AVAILABLE` mentions there
-   beside 381 in the llama tree. `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment, in both
-   copies, never matched its guard even upstream - 4.3a rewrote the engine's to name the three MMA
-   macros that guard does test, and the llama copy's is still the old text.
-   `GGML_ACCELERATE` and the Apple cmake logic in the llama tree (`ggml-cpu/CMakeLists.txt`'s APPLE
-   branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants, `HAVE_BUGGY_APPLE_LINKER`,
-   `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of leftover and belongs with it or
-   with Phase 7, not with a backend prune.
-2. **Chunk 7.1d - the env inventory and `docs/VARIABLES.md`.** `envvars.py:inventory()` sees
+1. **Chunk 7.1d - the env inventory and `docs/VARIABLES.md`.** `envvars.py:inventory()` sees
    only literal `getenv("NAME")`, so a read through a wrapper such as
    `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is invisible; the census counts 118
    such names in `engines/ds4` today (`ENV_NAME_CITED 118`, down from 123 when chunk 4.3b folded
@@ -76,18 +49,27 @@ of Phase 4 is the compute-capability vocabulary below.
    kept them for recipe compatibility. The same chunk decides what the 28 `engines/mlx-serve/`
    read references in `envvars.json` mean now that the gitlink is gone, since
    `envvars.validate_table()` and `envdocs.py` still exempt that prefix.
-3. **Chunk 7.1e - the Mac peer's text in the llama tree**: 51 comment lines across 20 files
+2. **Chunk 7.1e - the Mac peer's text in the llama tree**: 51 comment lines across 20 files
    and 3 printed strings, plus the ten retired-backend mentions chunk 4.2 left in comment position
    (`src/llama-context.cpp` x2, `src/llama-prefill-stream.cpp`, `common/common.h` x2,
    `ggml/src/ggml-cpu/simd-mappings.h`, `ggml/src/ggml-backend.cpp`, `ggml/include/ggml-backend.h`,
-   `ggml/src/ggml-cuda/mma.cuh`, `ggml/src/ggml-cuda/common.cuh`'s Moore Threads heading), plus
+   `ggml/src/ggml-cuda/mma.cuh`, `ggml/src/ggml-cuda/common.cuh`'s Moore Threads heading), plus what
+   chunk 4.3c left in comment position: `ggml/src/ggml-cuda/mma.cuh:187`'s
+   `#endif // defined(GGML_USE_HIP)` - the engine's copy was rewritten in 4.3a, this one never
+   matched its guard even upstream - `fattn-new-mma.cu:30`'s `GGML_USE_HIPBLAS` comparison, and 22
+   comment lines in `ggml/src` beside 30 in `engines/ds4` naming CDNA/RDMA/HIP/ROCm/Moore Threads.
+   Read those before rewording: most describe the `GGML_CUDA_CC_*` constants this port deliberately
+   keeps, so they are correct text about platforms nothing builds for.
    `tools/decode-receiver`'s 13 comment lines and its printed
    `LLAMA_PD_CACHE_CAPTURE` warning. `comment_code_diff.py`, `string_text_replace.py`, a
    `__LINE__` check first, and `metal_word_census --strict` as the gate.
-4. **Chunk 6.1's remainder** - `vendor/engines/cosmos_windows` (the media workers the media
+3. **Chunk 6.1's remainder** - `vendor/engines/cosmos_windows` (the media workers the media
    tests import) and `slstack/media_tools.py`'s pinned Windows FFmpeg archive: port media to
-   Linux or delete it.
-5. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start
+   Linux or delete it. `GGML_ACCELERATE` and the Apple cmake logic in the llama tree
+   (`ggml-cpu/CMakeLists.txt`'s APPLE branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants,
+   `HAVE_BUGGY_APPLE_LINKER`, `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of
+   leftover: it belongs with Phase 7's text and cmake cleanup, not with a backend prune.
+4. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start
    without a download or a quantize run in the accepted type set (see "Constraints on this
    box" 2). Its name set includes `test_yoco`, the suite's one stable failure.
 
@@ -157,8 +139,10 @@ model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4)
 (2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), `270d7a9` (5.1a), `65e54bd` (5.1b),
 `c17d6a6` (5.1c), `63c8dc1` (5.1d), `5fb07f7` (5.2), `1279063` (5.3), `0c9d01d` (4.1),
 `5b941ff` (7.1a), `9a822c8` (7.1b), `050e0b1` (7.1c), `9125df4` (4.2a), `eaccc5e` (4.2b),
-`26dacf6` + `cb3b58f` (4.2 recorded, baseline position), `4c368e7` (4.3 scoped), `e47c111` (4.3a)
-and `463cd31` (4.3b), plus the plan/handoff commits. The branch was in sync with
+`26dacf6` + `cb3b58f` (4.2 recorded, baseline position), `4c368e7` (4.3 scoped), `e47c111` (4.3a),
+`463cd31` (4.3b) and `bc63367` (4.3b recorded), `37b2bf1` (4.3c scoped, with the correction to what
+4.2 and 4.3 had recorded), `41bc18a` (4.3c, the engine's `cuda/mmq/`) and `a50a7bb` (4.3c, the llama
+tree's `ggml/src/ggml-cuda`), plus the plan/handoff commits. The branch was in sync with
 `origin/linux-only` when this session opened and was pushed again after each chunk; check
 `git status -sb` rather than assuming it still is.
 
@@ -166,7 +150,7 @@ The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyE
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **673 passed, 2 failed, 38 skipped** - runs of it have read 1, 2, 3 and 7 failures,
+this tree reads **674 passed, 1 failed, 38 skipped** - runs of it have read 1, 2, 3 and 7 failures,
 since the two process tests named below move. Without it, the same tree reads a much worse line -
 chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
 Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
@@ -189,17 +173,21 @@ baseline worktree. The first two also fail in a worktree of the commit before ch
 are the box, not the tree.
 
 Working tree is clean apart from scratch under `build/` and `runtime/`; `build/wt-base` is a
-worktree now checked out at `463cd31` (chunk 4.3b, the current HEAD), so move it wherever a
-comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
+worktree now checked out at `a50a7bb` - chunk 4.3c's code, the same tree HEAD has apart from this
+file and the plan; move it to `41bc18a` to compare the engine tier against its parent, or to
+`463cd31` for the llama half - so move it wherever a comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove it with
 `git worktree remove build/wt-base`. Note that a comparison after a chunk that moved lines in
 `ds4.c` needs the *parent* commit, not HEAD, or the re-anchored `envvars.json` and the fold itself
 show up as changes. `build/llama` is configured with `build.sh`'s CUTLASS and
 split-F32 flags and `build/42/plain` holds the plain flag set from chunk 4.2's gate; both are
-scratch, and chunks 4.3a and 4.3b touched no llama source so neither was rebuilt and no
-hand-compiled program needed relinking. `engines/ds4` holds all five executables and
+scratch, and chunks 4.3a and 4.3b touched no llama source so neither was rebuilt. Chunk 4.3c's
+llama half did: `ninja -C build/llama -j8 ggml-cuda` rebuilt all 168 CUDA objects, the rest of the
+llama tree relinked, and the five hand-compiled programs plus the three test sources without build
+rules were recompiled and re-run against those objects. `engines/ds4` holds all five executables and
 `ds4-decode.so` rebuilt from the folded tree (CUDA_ARCH=sm_120), so `./ds4 --help`, `./ds4 --metal`,
 `make test-batch-io`, `make test-decode-library` and the platform selftest's `dlopen` arm all run
-against the current engine without a rebuild. Chunks 5.1, 5.2 and 5.3 touched no engine source. Chunk 7.1c touched one: `llama-context.cpp`'s
+against the current engine without a rebuild; chunk 4.3c rebuilt the tier's nine CUDA objects and
+relinked the five binaries and the `.so`, so that sentence is still true. Chunks 5.1, 5.2 and 5.3 touched no engine source. Chunk 7.1c touched one: `llama-context.cpp`'s
 `llama_split_graph_create` refusal line, which sits inside `#ifndef GGML_USE_CUDA` and so cannot
 reach a CUDA build's compiled text (`preprocess_equiv` shows 0 differing positions with
 `-DGGML_USE_CUDA`). It also regenerated `tools/dsv41-prefill/studio-sampling.c`, whose only change
@@ -214,7 +202,7 @@ reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPa
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
-`STUDIO_RUNTIME_ROOT` set (see the paragraph above): **673 passed, 2 failed, 38 skipped**. The one
+`STUDIO_RUNTIME_ROOT` set (see the paragraph above): **674 passed, 1 failed, 38 skipped**. The one
 stable failure is `test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the
 49152 it asserts), which chunk 8.1 owns, and this run's second failure was the moving process test
 that passes when its file runs alone; the rest are the process tests that move. Chunk 7.1b
@@ -226,7 +214,9 @@ and un-skipped 21 more; chunk 5.3 un-skipped three more and fixed none. Check a 
 regression by running the same file in a worktree at the baseline
 (`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
 between runs - compare the set of names, never the counts. `envdocs --check` reports **2,143**
-documented variables after chunk 4.3b dropped seven whose last reader sat in a folded guard.
+documented variables: chunk 4.3b dropped seven whose last reader sat in a folded guard, and chunk
+4.3c dropped none - it re-anchored one row in the engine half (`GGML_CUDA_DISABLE_GRAPHS`) and eleven
+rows / fourteen reads in the llama half, all of them in `fattn-mma-f16.cuh`.
 
 Five hand-compiled programs cover what has no test target, all passing on this tree - and all
 relinked and re-run after chunk 4.2b rebuilt every CUDA object, since four of them link
@@ -431,6 +421,16 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   the number of lines the fold deleted above it. `--dump-ptx` is no help with
   `-gencode …code=sm_120a`: no PTX is embedded, and it prints eight lines of nothing.
   `nm --defined-only`, normalised the same way, is the host-side half of the check.
+- That marker immediate is a **half-precision** value, so it only decodes to a line number exactly
+  when the line fits fp16's mantissa (75 -> 60 and 326 -> 299 in `mmf.cuh`, 1970 -> 1885 in
+  `fattn-mma-f16.cuh` did; the mmq tier's did not). For a sweep that touches a header included by a
+  hundred template instances, the honest gate is: mask the marker instruction and require every
+  other byte to match, and separately show that *only* that instruction differs. On 4.3c's llama
+  tree 77 of 168 objects differed, all of them in the single
+  `/*0050*/ HFMA2 R2, -RZ, RZ, 0, <imm>` prologue marker, and masking it reads 0 differing objects.
+  Do that mask in Python, not `sed`: `s_…_…_` terminates at the first `_` in the replacement, the
+  substitution then fails on every file, and the empty-vs-empty comparison reports 0 differing
+  objects for a mask that never ran - the exact failure mode this file's own rule warns about.
 - Warning-profile comparison: `git worktree add build/wt-base HEAD` then
   `scripts/port/warning_profile.py build/wt-base .`, which compiles the same TU list in both trees
   with the same commands and prints the texts with line numbers stripped. 2.2c: 26 vs 26 occurrences
@@ -450,7 +450,13 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   if you need it). Eleven members reported identical. Pair it with the warning-profile comparison,
   which for a rewrite should only *lose* warnings (the deleted stubs' own).
 
-- Sweep inputs a later session may need to re-run are committed under `docs/evidence/` -
+- Sweep inputs a later session may need to re-run are committed under `docs/evidence/`. Two of
+  them are scripts rather than data: `collapse-promote.py` (promote a surviving `#elif` above a
+  provably-dead prefix, using `collapse_conditionals`'s own evaluator and its in-scope gate, so a
+  node whose first condition names no swept macro is left for another chunk) and
+  `collapse-guard-comments.py` (comment-only, and it also strips a trailing comment from a dead
+  `#elif` so the branch becomes decidable). Run both over the tree after the collapse, then re-run
+  the collapse - all three must report nothing before the equivalence gates mean anything.
   `rename-2.2d.json` is chunk 2.2d's rename map, `rename-2.2e.json` is 2.2e's (both halves: the
   `DS4_GLM_METAL_` prefix entry and the seven exact macro entries, so re-running it is idempotent),
   `messages-2.2e.json` is 2.2e's message map, `platform-selftest.cpp` is chunk 3.1c's
@@ -519,7 +525,33 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunks 4.3a and 4.3b, one commit each):
+This session's (chunk 4.3c, two commits - `41bc18a` the engine's `cuda/mmq/`, `a50a7bb` the llama
+tree's `ggml/src/ggml-cuda`):
+
+- **The AMD and Moore Threads compute-capability vocabulary is gone from every preprocessor
+  directive in both trees, and no kernel changed.** The 22 names in
+  `docs/evidence/collapse-4.3c-tokens.txt` are undefined everywhere since 4.2b and 4.3a removed their
+  last definitions, so pinning them folded 1,020 lines out of the engine tier and 1,799 out of the
+  llama tree, and `docs/evidence/collapse-promote.py` resolved the 15 dead-prefix-with-live-`#elif`
+  nodes the collapse declines (6 in the engine, 9 in the llama tree) while
+  `docs/evidence/collapse-guard-comments.py` rewrote 81 + 145 trailing `#endif`/`#else` comments that
+  quoted conditions the pass had shortened. Four `fattn-mma-f16.cuh` guards needed the dead
+  parenthesised group deleted by hand, and three `#else` lines were comment fixes wearing a
+  decision's clothes. Nothing a user can observe changed: the engine's nine objects are SASS-identical at
+  `sm_120` except nvcc's content hash and the one `__LINE__` marker the fold moved by exactly the 309
+  lines `mmq.cuh` lost, and the llama tree's 168 objects differ only in the unused-instantiation
+  marker instruction (masking it makes all 168 byte-identical), with `nm` matching on all 168.
+  No environment name moved; twelve rows had their `path:line` re-anchored.
+- **The host-side half stays, deliberately.** `amd_mfma_available(cc)`, `amd_wmma_available(cc)`,
+  `GGML_CUDA_CC_IS_CDNA(cc)` and siblings, `ds4_mmq_gfx1151_flag("DS4_ROCM_MMQ_TIGHT_NCOLS", cc)`,
+  `mmvq.cu`'s `MMVQ_PARAMETERS_*` chooser, `ds4_q4k_half_common.cuh`'s `mmf_get_max_block_size()` and
+  `common.cuh`'s `GGML_CUDA_CC_CDNA*`/`RDNA*` constants are plain C on a runtime `cc`, and guards
+  keyed on `__CUDA_ARCH__` alone are undecided by design. Removing those is removing kernel selection
+  and would take `DS4_ROCM_MMQ_TIGHT_NCOLS`'s last reader with it; that is a decision with runtime
+  gates, not a sweep, and this port does not need it. 30 comment lines in `engines/ds4` and 22 in the
+  llama tree's `ggml/src` still name those architectures - 7.1e's, and mostly correct text.
+
+Before that (chunks 4.3a and 4.3b, one commit each):
 
 - **The engine's vendored mmq tier loses the HIP and MUSA branches the deleted backends defined.**
   18 tokens, 13 files, 426 deletions and 42 insertions to a fixed point, plus `vendors/hip.h`
@@ -824,11 +856,14 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   `-fdirectives-only` at the file's own level. Count the directives per changed file after any
   collapse (`docs/linux-port-commands.md` has the loop).
 - **A `BLOCKED` line is a report, not a verdict - read which directive it names.** On the 4.3c
-  measurement three of the 22 nodes are `#else // defined(AMD_MFMA_AVAILABLE) || ...`: an `#else` has
-  no condition, and the tool only flags them because the trailing comment names a pinned macro. They
-  are comment rewrites, not decisions. The same file's three `#elif defined(AMD_WMMA_AVAILABLE) //wmma
-  instructions can handle 16x4 tiles...` come back `unparsable` for the same reason - a comment after
-  a condition - and the tool correctly refuses to rewrite one.
+  tree three nodes are `#else // defined(AMD_MFMA_AVAILABLE) || ...`: an `#else` has no condition, and
+  the tool only flags them because the trailing comment names a pinned macro. They are comment
+  rewrites, not decisions. Three more came back `unparsable` for the same reason -
+  `#elif defined(AMD_WMMA_AVAILABLE) //wmma instructions can handle 16x4 tiles...` - and the tool
+  correctly refuses to *re-emit* such a condition. Deciding it is nonetheless safe, because the
+  preprocessor ignores a trailing comment too: `docs/evidence/collapse-promote.py` strips one before
+  evaluating a branch and puts it back on the guard it promotes. The tool itself still reports the
+  node, which is the right division of labour - it never writes text it could not parse.
 - **A claim about what a tool *cannot* decide is still a claim, and this file carried a wrong one.**
   4.2b and this file both said the AMD and Moore Threads vocabulary cannot be collapsed because its
   guards key on `defined(RDNA3)` or `__CUDA_ARCH__`. `__CUDA_ARCH__` is right and permanent; the
@@ -906,6 +941,9 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   wrapper: `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live but undocumented, and 2.2e
   counted 123 such names - `metal_word_census` reads 118 since chunk 4.3b folded four away with
   their guards. Do not rename them to make the table honest; fix the inventory.
+- `files=$(find ...) $extra_paths` is not an assignment: bash reads the words after a `VAR=$(…)`
+  assignment as a command to run, and dies with "Permission denied" naming the first path. Put the
+  list in one quoted assignment.
 - Gate greps must be scoped: `grep -rn "..." engines/ds4` also matches build outputs, engine
   binaries, `*.o`, `ds4-decode.so` and `__pycache__`, and `build/wt-base` holds a second copy of
   every engine file. Use `--exclude-dir=build --exclude-dir=.git` plus
