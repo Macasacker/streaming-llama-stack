@@ -124,8 +124,8 @@ model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4)
 `26dacf6` + `cb3b58f` (4.2 recorded, baseline position), `4c368e7` (4.3 scoped), `e47c111` (4.3a),
 `463cd31` (4.3b) and `bc63367` (4.3b recorded), `37b2bf1` (4.3c scoped, with the correction to what
 4.2 and 4.3 had recorded), `41bc18a` (4.3c, the engine's `cuda/mmq/`) and `a50a7bb` (4.3c, the llama
-tree's `ggml/src/ggml-cuda`, `caa8a9e` (4.3c recorded), `f197552` (7.1d), the 7.1d-recorded commit,
-the chunk 7.1e code commit and this file's and the
+tree's `ggml/src/ggml-cuda`, `caa8a9e` (4.3c recorded), `f197552` (7.1d) and `fe001b2` (7.1d
+recorded), `1d47e54` (7.1e) and this file's and the
 plan's commits after it. The branch was in sync with
 `origin/linux-only` when this session opened and was pushed again after each chunk; check
 `git status -sb` rather than assuming it still is.
