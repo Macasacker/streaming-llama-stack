@@ -22292,11 +22292,11 @@
     ],
     "doc": "GGML_BACKEND_PATH: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend-reg.cpp:521"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend-reg.cpp:459"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend-reg.cpp:521",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-backend-reg.cpp:459",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * backend_path = std::getenv(\"GGML_BACKEND_PATH\");",
         "consumer": "    ggml_backend_load_best(\"cpu\", silent, dir_path);\n    // check the environment variable GGML_BACKEND_PATH to load an out-of-tree backend\n    const char * backend_path = std::getenv(\"GGML_BACKEND_PATH\");\n    if (backend_path) {\n        ggml_backend_load(backend_path);\n    }\n}"
@@ -22322,210 +22322,6 @@
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * GGML_BACKTRACE_LLDB = getenv(\"GGML_BACKTRACE_LLDB\");",
         "consumer": "    // 2. lldb has issues attaching to parent from forked child\n    // Use simple backtrace() instead to avoid Terminal.app crashes\n    const char * GGML_BACKTRACE_LLDB = getenv(\"GGML_BACKTRACE_LLDB\");\n    if (!GGML_BACKTRACE_LLDB) {\n        fprintf(stderr, \"WARNING: Using native backtrace. Set GGML_BACKTRACE_LLDB for more info.\\n\");\n        fprintf(stderr, \"WARNING: GGML_BACKTRACE_LLDB may cause native MacOS Terminal.app to crash.\\n\");\n        fprintf(stderr, \"See: https://github.com/ggml-org/llama.cpp/pull/17869\\n\");"
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_ACL_GRAPH",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_ACL_GRAPH: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/common.h:576"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/common.h:576",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "acl_graph_mode = parse_bool(get_env_as_lowercase(\"GGML_CANN_ACL_GRAPH\").value_or(\"on\"));",
-        "consumer": "\n#ifdef USE_ACL_GRAPH\n        acl_graph_mode = parse_bool(get_env_as_lowercase(\"GGML_CANN_ACL_GRAPH\").value_or(\"on\"));\n        GGML_LOG_INFO(\"%s: device %d execution mode is %s (%s)\\n\", __func__, device, acl_graph_mode ? \"GRAPH\" : \"EAGER\",\n                      acl_graph_mode ? \"acl graph enabled\" : \"acl graph disabled\");\n#endif\n    }"
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_DISABLE_BUF_POOL_CLEAN",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_DISABLE_BUF_POOL_CLEAN: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:251",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:444"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:251",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "disable_clean = parse_bool(get_env_as_lowercase(\"GGML_CANN_DISABLE_BUF_POOL_CLEAN\").value_or(\"\"));",
-        "consumer": "     */\n    explicit ggml_cann_pool_buf_prio(int device) : device(device) {\n        disable_clean = parse_bool(get_env_as_lowercase(\"GGML_CANN_DISABLE_BUF_POOL_CLEAN\").value_or(\"\"));\n    }\n\n    /**\n     * @brief Destructor to free all buffers in the pool."
-      },
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:444",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "disable_clean = parse_bool(get_env_as_lowercase(\"GGML_CANN_DISABLE_BUF_POOL_CLEAN\").value_or(\"\"));",
-        "consumer": "     */\n    explicit ggml_cann_pool_buf(int device) : device(device) {\n        disable_clean = parse_bool(get_env_as_lowercase(\"GGML_CANN_DISABLE_BUF_POOL_CLEAN\").value_or(\"\"));\n    }\n\n    /**\n     * @brief Destructor to free all buffers in the pool."
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_GRAPH_CACHE_CAPACITY",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_GRAPH_CACHE_CAPACITY: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/common.h:384"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/common.h:384",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "ggml_cann_graph_lru_cache() { capacity = parse_integer(get_env_as_lowercase(\"GGML_CANN_GRAPH_CACHE_CAPACITY\").value_or(\"12\")); }",
-        "consumer": "    std::list<ggml_cann_graph *> cache_list; /**< List storing cached graphs as raw pointers. */\n\n    ggml_cann_graph_lru_cache() { capacity = parse_integer(get_env_as_lowercase(\"GGML_CANN_GRAPH_CACHE_CAPACITY\").value_or(\"12\")); }\n\n    /**\n     * @brief Push a new graph to the front of the cache.\n     * If the cache exceeds capacity, the least recently used graph is deleted."
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_MEM_POOL",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_MEM_POOL: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:756"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:756",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "std::string mem_pool_type = get_env_as_lowercase(\"GGML_CANN_MEM_POOL\").value_or(\"\");",
-        "consumer": " */\nstd::unique_ptr<ggml_cann_pool> ggml_backend_cann_context::new_pool_for_device(int device) {\n    std::string mem_pool_type = get_env_as_lowercase(\"GGML_CANN_MEM_POOL\").value_or(\"\");\n\n    if (mem_pool_type == \"prio\") {\n        GGML_LOG_INFO(\"%s: device %d use buffer pool with priority queue\\n\", __func__, device);\n        return std::unique_ptr<ggml_cann_pool>(new ggml_cann_pool_buf_prio(device));"
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_NO_PINNED",
-    "flag": null,
-    "default": null,
-    "code_default": "NULL from getenv; the literal consumer below supplies any fallback",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_NO_PINNED: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:1572",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2645"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:1572",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "if (getenv(\"GGML_CANN_NO_PINNED\") != nullptr) {",
-        "consumer": " */\nstatic void * ggml_cann_host_malloc(size_t size) {\n    if (getenv(\"GGML_CANN_NO_PINNED\") != nullptr) {\n        return nullptr;\n    }\n\n    const size_t alignment = 128;"
-      },
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2645",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "bool host_buffer = getenv(\"GGML_CANN_NO_PINNED\") == nullptr;",
-        "consumer": "    ggml_backend_cann_device_get_memory(dev, &props->memory_free, &props->memory_total);\n\n    bool host_buffer = getenv(\"GGML_CANN_NO_PINNED\") == nullptr;\n\n    props->caps = {\n        /* .async                 = */ false,\n        /* .host_buffer           = */ host_buffer,"
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_OPERATOR_FUSION",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_OPERATOR_FUSION: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2131"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2131",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "static bool opt_fusion = parse_bool(get_env_as_lowercase(\"GGML_CANN_OPERATOR_FUSION\").value_or(\"\"));",
-        "consumer": "    // Only perform the graph execution if CANN graphs are not enabled, or we are capturing the graph.\n    // With the use of CANN graphs, the execution will be performed by the graph launch.\n    static bool opt_fusion = parse_bool(get_env_as_lowercase(\"GGML_CANN_OPERATOR_FUSION\").value_or(\"\"));\n\n    if (!use_cann_graph || cann_graph_capture_required) {\n        for (int i = 0; i < cgraph->n_nodes; i++) {\n            ggml_tensor * node = cgraph->nodes[i];"
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_PREFILL_USE_GRAPH",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_PREFILL_USE_GRAPH: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2200"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2200",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "static bool prefill_use_graph = parse_bool(get_env_as_lowercase(\"GGML_CANN_PREFILL_USE_GRAPH\").value_or(\"\"));",
-        "consumer": "    bool use_cann_graph = true;\n\n    static bool prefill_use_graph = parse_bool(get_env_as_lowercase(\"GGML_CANN_PREFILL_USE_GRAPH\").value_or(\"\"));\n    if (!prefill_use_graph) {\n        // Do not use acl_graph for prefill.\n        for (int i = 0; i < cgraph->n_nodes; i++) {\n            ggml_tensor * node = cgraph->nodes[i];"
-      }
-    ]
-  },
-  {
-    "var": "GGML_CANN_WEIGHT_NZ",
-    "flag": null,
-    "default": null,
-    "code_default": "Wrapper/conditional default: see the literal call and consumer below",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_CANN_WEIGHT_NZ: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/aclnn_ops.cpp:1967",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:1209",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:1434"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/aclnn_ops.cpp:1967",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "static bool weight_to_nz = parse_bool(get_env_as_lowercase(\"GGML_CANN_WEIGHT_NZ\").value_or(\"on\"));",
-        "consumer": "\n    // Only check env once.\n    static bool weight_to_nz = parse_bool(get_env_as_lowercase(\"GGML_CANN_WEIGHT_NZ\").value_or(\"on\"));\n    if (weight_to_nz && is_matmul_weight(weight)) {\n        acl_weight_tensor = ggml_cann_create_tensor(weight, transpose_ne, transpose_nb, n_dims, ACL_FORMAT_FRACTAL_NZ);\n    } else {\n        acl_weight_tensor = ggml_cann_create_tensor(weight, transpose_ne, transpose_nb, n_dims, ACL_FORMAT_ND);"
-      },
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:1209",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "static bool weight_to_nz = parse_bool(get_env_as_lowercase(\"GGML_CANN_WEIGHT_NZ\").value_or(\"on\"));",
-        "consumer": "\n    // Only check env once.\n    static bool weight_to_nz = parse_bool(get_env_as_lowercase(\"GGML_CANN_WEIGHT_NZ\").value_or(\"on\"));\n    if (!need_transform(tensor->type)) {\n        ACL_CHECK(aclrtMemcpy((char *) tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE));\n        if (weight_to_nz && is_matmul_weight((const ggml_tensor *) tensor)) {\n            GGML_ASSERT(tensor->ne[2] == 1);"
-      },
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:1434",
-        "unset": "Wrapper/conditional default: see the literal call and consumer below",
-        "read": "static bool weight_to_nz = parse_bool(get_env_as_lowercase(\"GGML_CANN_WEIGHT_NZ\").value_or(\"on\"));",
-        "consumer": "\n    // Only check env once.\n    static bool weight_to_nz = parse_bool(get_env_as_lowercase(\"GGML_CANN_WEIGHT_NZ\").value_or(\"on\"));\n\n    // last line must bigger than 32, because every single op deal at\n    // least 32 bytes.\n    // TODO: quantized type?"
       }
     ]
   },
@@ -22801,72 +22597,6 @@
     ]
   },
   {
-    "var": "GGML_OPENCL_DEVICE",
-    "flag": null,
-    "default": null,
-    "code_default": "NULL from getenv; the literal consumer below supplies any fallback",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_OPENCL_DEVICE: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-opencl/ggml-opencl.cpp:2453"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-opencl/ggml-opencl.cpp:2453",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "char *      user_device_string   = getenv(\"GGML_OPENCL_DEVICE\");",
-        "consumer": "\n    char *      user_platform_string = getenv(\"GGML_OPENCL_PLATFORM\");\n    char *      user_device_string   = getenv(\"GGML_OPENCL_DEVICE\");\n    int         user_platform_number = -1;\n    int         user_device_number   = -1;\n    cl_device * candidate_devices    = nullptr;\n    unsigned    n_candidate_devices  = 0;"
-      }
-    ]
-  },
-  {
-    "var": "GGML_OPENCL_DISABLE_FUSION",
-    "flag": null,
-    "default": null,
-    "code_default": "NULL from getenv; the literal consumer below supplies any fallback",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_OPENCL_DISABLE_FUSION: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-opencl/ggml-opencl.cpp:2799"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-opencl/ggml-opencl.cpp:2799",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "backend_ctx->disable_fusion = getenv(\"GGML_OPENCL_DISABLE_FUSION\") != nullptr;",
-        "consumer": "#endif // GGML_OPENCL_USE_ADRENO_KERNELS\n\n    backend_ctx->disable_fusion = getenv(\"GGML_OPENCL_DISABLE_FUSION\") != nullptr;\n\n    dev_ctx->backend_ctx = backend_ctx.release();\n    return dev_ctx->backend_ctx;\n}"
-      }
-    ]
-  },
-  {
-    "var": "GGML_OPENCL_PLATFORM",
-    "flag": null,
-    "default": null,
-    "code_default": "NULL from getenv; the literal consumer below supplies any fallback",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_OPENCL_PLATFORM: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-opencl/ggml-opencl.cpp:2452"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-opencl/ggml-opencl.cpp:2452",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "char *      user_platform_string = getenv(\"GGML_OPENCL_PLATFORM\");",
-        "consumer": "    }\n\n    char *      user_platform_string = getenv(\"GGML_OPENCL_PLATFORM\");\n    char *      user_device_string   = getenv(\"GGML_OPENCL_DEVICE\");\n    int         user_platform_number = -1;\n    int         user_device_number   = -1;\n    cl_device * candidate_devices    = nullptr;"
-      }
-    ]
-  },
-  {
     "var": "GGML_OP_OFFLOAD_MIN_BATCH",
     "flag": null,
     "default": null,
@@ -22878,8 +22608,7 @@
     "doc": "GGML_OP_OFFLOAD_MIN_BATCH: advanced engine setting; built-in default retained",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1607",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8043",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2829"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:8043"
     ],
     "code_defaults": [
       {
@@ -22893,12 +22622,6 @@
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const int min_batch_size = getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\") ? atoi(getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\")) : 32;",
         "consumer": "        if (!initialized) {\n            ggml_backend_cuda_reg_context * ctx = new ggml_backend_cuda_reg_context;\n            const int min_batch_size = getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\") ? atoi(getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\")) : 32;\n\n            for (int i = 0; i < ggml_cuda_info().device_count; i++) {\n                ggml_backend_cuda_device_context * dev_ctx = new ggml_backend_cuda_device_context;\n                dev_ctx->device = i;"
-      },
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cann/ggml-cann.cpp:2829",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "const int min_batch_size = getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\") ? atoi(getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\")) : 32;",
-        "consumer": "            aclInit(nullptr);\n            ggml_backend_cann_reg_context * ctx = new ggml_backend_cann_reg_context;\n            const int min_batch_size = getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\") ? atoi(getenv(\"GGML_OP_OFFLOAD_MIN_BATCH\")) : 32;\n\n            for (int i = 0; i < ggml_cann_info().device_count; i++) {\n                ggml_backend_cann_device_context * dev_ctx = new ggml_backend_cann_device_context();\n                dev_ctx->description                       = aclrtGetSocName();"
       }
     ]
   },
@@ -22922,28 +22645,6 @@
         "unset": "''",
         "read": "os.environ.get('GGML_QUANT_DLL', '')",
         "consumer": "def _candidate_dlls() -> list[Path]:\n    root = Path(__file__).resolve().parents[2]\n    explicit = os.environ.get('GGML_QUANT_DLL', '').strip()\n    candidates = [Path(explicit)] if explicit else []\n    candidates.extend([root / 'prefill_llama.cpp' / 'build' / 'bin' / 'ggml-base.dll', root / 'prefill_llama.cpp' / 'build4' / 'bin' / 'ggml-base.dll', root / 'prefill_llama.cpp' / 'build3' / 'bin' / 'ggml-base.dll'])\n    return candidates\n"
-      }
-    ]
-  },
-  {
-    "var": "GGML_REMOTING_USE_APIR_CAPSET",
-    "flag": null,
-    "default": null,
-    "code_default": "NULL from getenv; the literal consumer below supplies any fallback",
-    "classification": "advanced",
-    "scopes": [
-      "rtx-llama"
-    ],
-    "doc": "GGML_REMOTING_USE_APIR_CAPSET: advanced engine setting; built-in default retained",
-    "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-virtgpu/virtgpu.cpp:181"
-    ],
-    "code_defaults": [
-      {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-virtgpu/virtgpu.cpp:181",
-        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
-        "read": "gpu->use_apir_capset = getenv(\"GGML_REMOTING_USE_APIR_CAPSET\") != nullptr;",
-        "consumer": "    virtgpu * gpu = new virtgpu();\n\n    gpu->use_apir_capset = getenv(\"GGML_REMOTING_USE_APIR_CAPSET\") != nullptr;\n    util_sparse_array_init(&gpu->shmem_array, sizeof(virtgpu_shmem), 1024);\n\n    // Initialize mutex to protect shared data_shmem buffer\n    if (mtx_init(&gpu->data_shmem_mutex, mtx_plain) != thrd_success) {"
       }
     ]
   },

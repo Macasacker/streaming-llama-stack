@@ -158,7 +158,6 @@ endfunction()
 llama_option_depr(FATAL_ERROR LLAMA_CUBLAS              GGML_CUDA)
 llama_option_depr(WARNING     LLAMA_CUDA                GGML_CUDA)
 llama_option_depr(WARNING     LLAMA_NATIVE              GGML_NATIVE)
-llama_option_depr(WARNING     LLAMA_CANN                GGML_CANN)
 
 include("cmake/license.cmake")
 license_add_file("llama.cpp" "LICENSE")
