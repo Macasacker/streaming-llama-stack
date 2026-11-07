@@ -4,8 +4,15 @@ The retired Windows Job Object gave a guardian two things Linux has no per-proce
 equivalent of: a memory ceiling that applies from the child's first instruction, and
 containment of descendants born between the guardian's ownership polls. A cgroup v2
 subgroup provides both, because membership is inherited across fork and exec.
+
+`memory.min` is the floor half of the same mechanism, and it is conditional in a way
+the ceiling is not: the kernel zeroes a subgroup's protection as soon as any ancestor
+between it and the root carries no floor of its own. `memory_floor` reports that rather
+than assuming the write bought residency, and `memory.swap.max=0` set by `open_scope`
+remains what actually keeps a tree's pages in RAM here.
 """
 from __future__ import annotations
+import mmap
 import os
 from pathlib import Path
 import re
@@ -15,6 +22,9 @@ import threading
 CGROUP_ROOT = Path('/sys/fs/cgroup')
 SCOPE_PREFIX = 'slstack-'
 GiB = 1024 ** 3
+# mlock and the memory controller account whole pages; a partial-page floor under-reports
+# what the kernel holds, which chunk 3.1h measured for the carry tier.
+PAGE_BYTES = mmap.PAGESIZE
 
 
 class ScopeUnavailable(RuntimeError):
@@ -161,6 +171,88 @@ class MemoryScope:
                     'removed': False, 'error': repr(error)}
         self.closed = True
         return {'path': str(self.path), 'remaining_members': [], 'removed': True}
+
+
+def is_own_scope(location):
+    """Whether this stack created the scope, which is what makes it ours to floor.
+
+    A job launched without a guardian inherits whatever scope the controller sits in -
+    a terminal's or a desktop session's. Raising a floor there would set a reclaim floor
+    on processes this stack does not own, so a foreign scope is reported, not modified.
+    """
+    return Path(location).name.startswith(SCOPE_PREFIX)
+
+
+def page_floor(requested):
+    """The largest whole-page floor not above `requested`; 0 when there is nothing to protect."""
+    if type(requested) is not int or requested < 0:
+        raise ValueError('Resident floor must be a nonnegative byte count')
+    return requested - requested % PAGE_BYTES
+
+
+def read_limit(location):
+    """A memory controller's byte limit, or None for `max` and for anything unreadable.
+
+    `memory.max` takes the literal `max` as well as a number, so a caller that reads it as an
+    int raises on a scope with no ceiling.
+    """
+    try:
+        text = Path(location).read_text().split()[0]
+    except (OSError, IndexError):
+        return None
+    return int(text) if text.isdigit() else None
+
+
+def ancestor_floors(scope):
+    """(path, floor bytes) from a scope's parent up to the root, where the kernel looks.
+
+    The root cgroup has no `memory.min` file and is protected implicitly, so the walk
+    ends there. A file that cannot be read is reported as None, which the caller treats
+    as a floor it cannot rely on rather than as zero.
+    """
+    chain = []
+    here = Path(scope).parent
+    while True:
+        floor = here / 'memory.min'
+        chain.append((here, read_limit(floor) if floor.is_file() else None))
+        if here == CGROUP_ROOT:
+            return chain
+        here = here.parent
+
+
+def memory_floor(scope, floor_bytes):
+    """Set a subgroup's `memory.min` and report whether the kernel will honour it.
+
+    The write itself always succeeds; the honour is the part that is conditional, so the
+    caller is told which ancestor zeroes the protection rather than being handed a number
+    that looks like a residency guarantee. A floor the kernel does not read back unchanged
+    is a refusal, as the retired hard working-set minimum was.
+    """
+    requested = int(floor_bytes)
+    if requested <= 0:
+        raise ValueError('Resident floor must be a positive byte count')
+    floor = Path(scope) / 'memory.min'
+    if not floor.is_file():
+        raise ScopeUnavailable(f'{scope} has no memory.min, so it carries no memory controller')
+    original = read_limit(floor)
+    ceiling = read_limit(Path(scope) / 'memory.max')
+    if original is None:
+        raise ScopeUnavailable(f'{floor} does not report a numeric floor')
+    try:
+        floor.write_text(str(requested))
+    except OSError as error:
+        raise ScopeUnavailable(f'cannot floor {Path(scope).name}: {error}') from error
+    retained = read_limit(floor)
+    if retained != requested:
+        raise MemoryError(f'The kernel retained a floor of {retained} bytes, not the admitted {requested}')
+    blocker = next((node for node, value in ancestor_floors(scope)
+                    if value is None or value < requested), None)
+    return {'scope': str(scope), 'applied': True, 'floor_bytes': retained, 'ceiling_bytes': ceiling,
+            'original_floor_bytes': original, 'retained': True,
+            'honored': blocker is None,
+            'blocked_by': str(blocker) if blocker is not None else None,
+            'reason': ('the kernel will protect these pages' if blocker is None else
+                       f'{blocker} carries no floor of its own, so the kernel zeroes this protection')}
 
 
 def scope_hint(spec):

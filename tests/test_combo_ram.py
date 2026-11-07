@@ -1,14 +1,20 @@
+"""The parent-owned checkpoint tier: bounded transfers, a name another process attaches to,
+and a page lock reported as what the kernel actually granted."""
+import contextlib
 import ctypes
+import errno
 import hashlib
+import io
 import os
 import subprocess
 import sys
-import time
-import json
 from pathlib import Path
-import uuid
 import unittest
-from slstack.combo_ram import LockedRam, kernel_api, protect_working_set,wait_for_host_capacity,wait_owned_initialization,runtime_min_free_gib
+
+from slstack.combo_ram import (KERNEL_PAGE, LockedRam, attach, kernel_api, memlock_allowance_bytes,
+                               reap_stale_sections, runtime_min_free_gib, section_name,
+                               wait_for_host_capacity)
+from slstack.working_set import wait_owned_initialization
 
 
 class RuntimeFloorTest(unittest.TestCase):
@@ -100,40 +106,6 @@ class OwnedInitializationTest(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform=='win32','Windows shared RAM contract')
 class LockedRamTest(unittest.TestCase):
-    def test_owned_child_has_resident_admission_before_token_bootstrap(self):
-        from slstack.native_broker import vendor
-        vendor()
-        from studio.dsv41_windows_runner import _Native
-        native=_Native();fds=[];job=None
-        try:
-            source,send=os.pipe();output,sink=os.pipe();errors,diagnostic=os.pipe()
-            fds=[source,send,output,sink,errors,diagnostic]
-            job=native.suspended([sys.executable,'-B','-c','import sys;sys.stdin.buffer.read(1);print("CPU_RESIDENT_PASS")'],
-                dict(os.environ),os.environ['STUDIO_RUNTIME_ROOT'],source,sink,diagnostic)
-            for fd in (source,sink,diagnostic):os.close(fd);fds.remove(fd)
-            job.resume()
-            receipt=Path(os.environ['STUDIO_RUNTIME_ROOT'])/('resident-cpu-'+uuid.uuid4().hex+'.json')
-            admission=protect_working_set(job,128<<20,4<<30,512<<20,receipt=receipt)
-            self.assertEqual(json.loads(receipt.read_text()),admission)
-            self.assertEqual(admission['pid'],job.pid)
-            self.assertEqual(admission['minimum'],128<<20)
-            self.assertEqual(admission['flags']&5,1)
-            self.assertIsNone(job.poll())
-            os.write(send,b'G');deadline=time.monotonic()+10
-            while job.poll() is None and time.monotonic()<deadline:time.sleep(.01)
-            self.assertEqual(job.poll(),0)
-            self.assertIn(b'CPU_RESIDENT_PASS',os.read(output,4096))
-        finally:
-            if job is not None:job.stop();job.close()
-            for fd in fds:os.close(fd)
-
-    def test_resident_admission_refuses_unbudgeted_controller_before_any_handle(self):
-        class NoHandle:
-            @property
-            def pi(self):raise AssertionError('Refused aggregate must not touch a process')
-        with self.assertRaisesRegex(MemoryError,'aggregate resident'):
-            protect_working_set(NoHandle(),128<<20,4<<30,128<<20)
-
     def test_locked_shared_pages_and_bounded_transfer(self):
         with LockedRam(8<<20,session='1'*32,host_budget_gib=.5,min_available_gib=4) as ram:
             ram.write(0,b'checkpoint-owned-RAM')
@@ -165,6 +137,115 @@ class LockedRamTest(unittest.TestCase):
             result=subprocess.run([sys.executable,'-B','-c',program,ram.name],capture_output=True,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn('SHARED_RAM_CHILD_PASS',result.stdout)
+
+
+@unittest.skipUnless(os.name!='nt','Linux shared checkpoint contract')
+class SharedCheckpointTests(unittest.TestCase):
+    """The same tier on `/dev/shm`: bounded transfers, one name two processes share, and a
+    page lock that reports only what the kernel granted."""
+    def test_shared_pages_and_bounded_transfer(self):
+        with LockedRam(8<<20,session='1'*32,host_budget_gib=.5,min_available_gib=4) as ram:
+            ram.write(0,b'checkpoint-owned-RAM')
+            self.assertTrue(ram.locked)
+            attached=attach(ram.name,ram.capacity)
+            try:
+                self.assertEqual(attached.read(0,20),b'checkpoint-owned-RAM')
+                attached.write(20,b'!')
+                self.assertEqual(ram.read(0,21),b'checkpoint-owned-RAM!')
+            finally:
+                attached.close()
+            self.assertEqual(ram.sha256(0,21),hashlib.sha256(b'checkpoint-owned-RAM!').hexdigest())
+            for offset,count in ((0,65537),(ram.capacity,1),(-1,4),(ram.capacity-1,2)):
+                with self.subTest(offset=offset,count=count),self.assertRaises(ValueError):
+                    ram.read(offset,count)
+            with ram.lease(),self.assertRaises(RuntimeError):ram.close()
+            self.assertEqual(section_name(ram.name).read_bytes()[:20],b'checkpoint-owned-RAM')
+        self.assertIsNone(ram.address)
+        self.assertIsNone(ram.handle)
+        self.assertIsNone(ram.mapping)
+        self.assertFalse(section_name(ram.name).exists(),'the name must not outlive the owner')
+        with self.assertRaises(RuntimeError):ram.read(0,1)
+
+    def test_the_page_lock_reports_only_what_the_kernel_granted(self):
+        allowance=memlock_allowance_bytes()
+        capacity=16<<20 if allowance<16<<20 else 1<<20
+        captured=Capture()
+        with captured:
+            ram=LockedRam(capacity,session='3'*32,host_budget_gib=.5,min_available_gib=4)
+        try:
+            self.assertLessEqual(ram.locked_bytes,capacity)
+            self.assertEqual(ram.locked_bytes%KERNEL_PAGE,0,'lock chunks must stay whole pages')
+            short=ram.locked_bytes<capacity
+            self.assertEqual('DS4COMBO_LOCKED_RAM_PARTIAL' in captured.text(),short)
+            if short:
+                self.assertIn('"shortfall_bytes":'+str(capacity-ram.locked_bytes),captured.text())
+                self.assertIn('"memlock_allowance_bytes":'+str(allowance),captured.text())
+                self.assertEqual(ram.lock_reason,errno.ENOMEM,
+                                 'this kernel answers a lock past RLIMIT_MEMLOCK with ENOMEM, not EAGAIN')
+        finally:
+            ram.close()
+        self.assertFalse(section_name(ram.name).exists())
+
+    def test_budget_and_floor_refuse_before_allocation(self):
+        with self.assertRaises(MemoryError):LockedRam(1<<20,session='1'*32,host_budget_gib=.0001,min_available_gib=4)
+        with self.assertRaises(MemoryError):LockedRam(1<<20,session='1'*32,host_budget_gib=.5,min_available_gib=64)
+        with self.assertRaises(ValueError):LockedRam(3*1024**3,session='1'*32,host_budget_gib=8,min_available_gib=4)
+        with self.assertRaises(ValueError):LockedRam(1<<20,session='not-a-nonce',host_budget_gib=.5,min_available_gib=4)
+
+    def test_only_one_creator_can_take_a_name(self):
+        with LockedRam(1<<20,session='4'*32,host_budget_gib=.5,min_available_gib=4) as ram:
+            location=section_name(ram.name)
+            self.assertTrue(location.exists())
+            with self.assertRaises(FileExistsError):
+                os.close(os.open(str(location),os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600))
+            with self.assertRaises(FileNotFoundError):attach('DS4COMBO-'+'7'*32+'-1-'+'e'*32,1<<20)
+
+    def test_cross_process_reads_the_same_section(self):
+        with LockedRam(1<<20,session='2'*32,host_budget_gib=.5,min_available_gib=4) as ram:
+            ram.write(123,b'native-to-ultra')
+            program=('from slstack.combo_ram import attach;import sys;'
+                     'a=attach(sys.argv[1],1<<20);'
+                     'assert a.read(123,15)==b"native-to-ultra";'
+                     'a.write(138,b"-child");'
+                     'assert a.read(123,21)==b"native-to-ultra-child";'
+                     'a.close();print("SHARED_RAM_CHILD_PASS")')
+            result=subprocess.run([sys.executable,'-B','-c',program,ram.name],capture_output=True,text=True,timeout=15,
+                                  env=dict(os.environ,PYTHONPATH=os.pathsep.join([os.getcwd(),'tests'])))
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('SHARED_RAM_CHILD_PASS',result.stdout)
+            self.assertEqual(ram.read(123,21),b'native-to-ultra-child')
+
+    def test_a_name_that_could_escape_the_shared_memory_directory_is_refused(self):
+        for name in ('../passwd','DS4COMBO-../../x','plain',''):
+            with self.subTest(name=name),self.assertRaises(ValueError):section_name(name)
+
+    def test_a_section_whose_creating_process_is_gone_is_reaped(self):
+        parent=os.getpid()
+        stale=section_name('DS4COMBO-'+'5'*32+'-999999-'+hashlib.sha256(b'stale').hexdigest()[:32])
+        stale.write_bytes(b'left behind by a killed controller')
+        self.assertEqual(stale.stat().st_uid,os.getuid())
+        self.assertIn(stale.name,reap_stale_sections())
+        self.assertFalse(stale.exists())
+        live=section_name('DS4COMBO-'+'6'*32+'-'+str(parent)+'-'+hashlib.sha256(b'live').hexdigest()[:32])
+        live.write_bytes(b'held by a controller that is still here')
+        try:
+            self.assertNotIn(live.name,reap_stale_sections())
+            self.assertTrue(live.exists())
+        finally:
+            live.unlink()
+
+
+class Capture:
+    """Captures what the tier prints, so a shortfall is asserted rather than eyeballed."""
+    def __enter__(self):
+        self.buffer=io.StringIO()
+        self.redirect=contextlib.redirect_stdout(self.buffer)
+        self.redirect.__enter__()
+        return self
+
+    def __exit__(self,*args):self.redirect.__exit__(*args)
+
+    def text(self):return self.buffer.getvalue()
 
 
 if __name__=='__main__':unittest.main()

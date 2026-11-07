@@ -60,6 +60,9 @@ STATFS_BUFFER_BYTES = 128
 # src/llama-dsv41-weights.cpp): Linux has no fixed-versus-removable indicator and no
 # substituted-drive namespace, so network and RAM-backed filesystems are refused by their
 # statfs magic numbers and an unknown local type is accepted, as the producer's rule does.
+# It is the producer's paths this refuses - weights, receipts, outputs. The checkpoint tier
+# (slstack/combo_ram.py) is RAM by construction, never goes through this list, and is not
+# covered by it.
 REFUSED_VOLUME_MAGICS = frozenset({
     0x6969,        # NFS_SUPER_MAGIC
     0x65735546,    # FUSE_SUPER_MAGIC

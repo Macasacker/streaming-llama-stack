@@ -1,13 +1,17 @@
-"""cgroup v2 containment: the ceiling applies from the first instruction and to descendants."""
+"""cgroup v2 containment: the ceiling applies from the first instruction and to descendants,
+and the floor half reports what the kernel will actually honour."""
 import os
 import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
-from slstack.cgroup_scope import (ScopeUnavailable, controller_parent, open_containment,
-                                  open_scope, reap_stale, scope_hint, scope_name)
+from slstack.cgroup_scope import (ScopeUnavailable, ancestor_floors, controller_parent,
+                                  is_own_scope, memory_floor, open_containment, open_scope,
+                                  page_floor, read_limit, reap_stale, scope_hint, scope_name,
+                                  PAGE_BYTES)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MiB = 1024 ** 2
@@ -128,6 +132,118 @@ class ScopeTests(unittest.TestCase):
             open_scope(0, hint='zero')
         with self.assertRaises(ValueError):
             open_scope(None, hint='none')
+
+
+@unittest.skipUnless(SUPPORTED is True, 'no delegated cgroup memory controller: ' + str(SUPPORTED))
+class FloorTests(unittest.TestCase):
+    """`memory.min`, the floor half. It is written in whole pages and its honour depends on
+    the ancestors, so the gate asserts the kernel's answer rather than the write's success."""
+    MiB = 1024 ** 2
+    TOUCH = ('import os,sys,mmap,time\n'
+             'path, scope, mb = sys.argv[1], sys.argv[2], int(sys.argv[3])\n'
+             'with open(scope + "/cgroup.procs", "w") as stream:\n'
+             '    stream.write(str(os.getpid()))\n'
+             'fd = os.open(path, os.O_RDWR | os.O_CREAT)\n'
+             'os.ftruncate(fd, mb * 1024 * 1024)\n'
+             'view = mmap.mmap(fd, mb * 1024 * 1024)\n'
+             'for offset in range(0, mb * 1024 * 1024, 4096):\n'
+             '    view[offset] = 7\n'
+             'view.flush()\n'
+             'print("TOUCHED", flush=True)\n'
+             'time.sleep(60)\n')
+
+    def test_only_a_scope_this_stack_created_is_ours_to_floor(self):
+        self.assertTrue(is_own_scope(controller_parent() / scope_name('owned', os.getpid())))
+        self.assertFalse(is_own_scope(controller_parent()))
+        self.assertFalse(is_own_scope('/sys/fs/cgroup/user.slice'))
+
+    def test_the_floor_is_a_whole_number_of_pages_and_is_read_back(self):
+        scope = open_scope(512 * self.MiB, hint='floor')
+        try:
+            requested = 130 * self.MiB + 17
+            self.assertEqual(page_floor(requested), requested - requested % PAGE_BYTES)
+            row = memory_floor(scope.path, page_floor(requested))
+            self.assertEqual(row['floor_bytes'], page_floor(requested))
+            self.assertEqual(int((scope.path / 'memory.min').read_text()), row['floor_bytes'])
+            self.assertEqual(row['original_floor_bytes'], 0)
+            self.assertEqual(row['ceiling_bytes'], 512 * self.MiB)
+            self.assertTrue(row['retained'])
+            self.assertEqual((scope.path / 'memory.min').read_text().strip(), str(row['floor_bytes']))
+            self.assertEqual(row['honored'], all(value is not None and value >= row['floor_bytes']
+                                                 for _, value in ancestor_floors(scope.path)))
+            if not row['honored']:
+                self.assertIn(row['blocked_by'], [str(node) for node, _ in ancestor_floors(scope.path)])
+                self.assertIn('zeroes this protection', row['reason'])
+        finally:
+            self.assertTrue(scope.close()['removed'])
+
+    def test_a_limit_written_as_max_reads_as_no_limit(self):
+        folder = pathlib.Path(tempfile.mkdtemp(prefix='cgroup-limits-'))
+        try:
+            unlimited = folder / 'memory.max'
+            unlimited.write_text('max\n')
+            self.assertIsNone(read_limit(unlimited))
+            number = folder / 'memory.min'
+            number.write_text('4096\n')
+            self.assertEqual(read_limit(number), 4096)
+            self.assertIsNone(read_limit(folder / 'absent'))
+        finally:
+            for created in folder.iterdir():
+                created.unlink()
+            folder.rmdir()
+
+    def test_a_floor_is_refused_where_there_is_no_memory_controller_or_no_floor_to_set(self):
+        empty = pathlib.Path(tempfile.mkdtemp(prefix='no-memory-controller-'))
+        try:
+            with self.assertRaises(ScopeUnavailable):
+                memory_floor(empty, 4096)
+        finally:
+            empty.rmdir()
+        scope = open_scope(64 * self.MiB, hint='empty-floor')
+        try:
+            with self.assertRaises(ValueError):
+                memory_floor(scope.path, 0)
+        finally:
+            scope.close()
+
+    @unittest.skipUnless((controller_parent() / 'memory.reclaim').is_file(),
+                         'no memory.reclaim interface to apply pressure with')
+    @unittest.skipUnless(os.environ.get('STUDIO_RUNTIME_ROOT'),
+                         'needs a disk-backed fixture directory (STUDIO_RUNTIME_ROOT)')
+    def test_the_reported_honour_is_the_kernel_s_actual_answer(self):
+        """A subgroup's pages stay only while every ancestor carries the floor too.
+
+        The claim is checked against the kernel, not against the write: the child holds
+        64 MiB of page cache inside the scope and the parent then asks for exactly that
+        back. An inert floor loses the pages; an honoured one does not.
+        """
+        scope = open_scope(512 * self.MiB, hint='honour')
+        fixture = pathlib.Path(os.environ['STUDIO_RUNTIME_ROOT']) / ('floor-fixture-' + os.urandom(8).hex() + '.bin')
+        holder = None
+        try:
+            row = memory_floor(scope.path, 64 * self.MiB)
+            holder = subprocess.Popen([sys.executable, '-B', '-c', self.TOUCH, str(fixture), str(scope.path), '64'],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            assert holder.stdout.readline().startswith('TOUCHED')
+            before = scope.resident_bytes()
+            try:
+                (scope.path / 'memory.reclaim').write_text(str(64 * self.MiB))
+            except OSError:
+                pass       # nothing to take back is an answer of its own, read below
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and scope.resident_bytes() == before:
+                time.sleep(.05)
+            reclaimed = before - scope.resident_bytes()
+            if row['honored']:
+                self.assertLess(reclaimed, 8 * self.MiB, f'an honoured floor lost {reclaimed} bytes')
+            else:
+                self.assertGreater(reclaimed, 32 * self.MiB,
+                                   f"{row['reason']}, yet the kernel kept {reclaimed} bytes off")
+        finally:
+            if holder is not None:
+                holder.kill(); holder.wait(timeout=10)
+            fixture.unlink(missing_ok=True)
+            scope.close()
 
 
 if __name__ == '__main__':

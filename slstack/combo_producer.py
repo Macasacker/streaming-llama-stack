@@ -17,7 +17,8 @@ from .native_profiles import profile
 from .combo_contract import validate
 from .combo_state import transport_checkpoint, payload_bytes
 from .combo_release import certified
-from .combo_ram import protect_working_set,runtime_min_free_gib
+from .combo_ram import runtime_min_free_gib
+from .working_set import protect_working_set
 from . import combo_abort
 
 

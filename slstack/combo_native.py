@@ -17,7 +17,8 @@ from .config import path,environment
 from .native_broker import vendor,model_receipt
 from .journal import atomic_json,sha256
 from .combo_release import certified
-from .combo_ram import protect_working_set,runtime_min_free_gib
+from .combo_ram import runtime_min_free_gib
+from .working_set import protect_working_set
 from .progress import Window,activity,readiness_seconds
 from . import combo_abort
 
