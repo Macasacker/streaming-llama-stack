@@ -536,9 +536,9 @@ and the repo size drops from about 150 MB.
   (7.1b). What is still Windows-shaped is two test sources with no build rule,
   `tests/dsv41_producer_abort.cpp` and `tests/studio_generation.cpp`, which need POSIX ports
   rather than deletion, and `vendor/engines/cosmos_windows` behind the media tests (chunk 6.1).
-- `docs/VARIABLES.md`: still owed. The scope rename is done, but the inventory cannot see a
-  wrapper read (chunk 7.1d), so regenerating it now would only re-render the same understated
-  table.
+- `docs/VARIABLES.md`: done in 7.1d, which is also what made it honest - the inventory now
+  follows a read through a wrapper helper, and a name handed to an argument the wrapper discards
+  is no longer counted as one.
 
 ## Phase 8: qualification
 
@@ -1726,31 +1726,74 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     on the CUDA build (the line is inside `#ifndef GGML_USE_CUDA`) and exactly one on a CPU-only
     preprocessing. `docs/linux-port-commands.md` carries the corrected recipe and numbers.
 
-7.1d The env inventory cannot see a wrapper read, so `docs/VARIABLES.md` understates the engine.
-    Pending, and it is the largest remaining piece of this phase. `envvars.py:inventory()` matches
-    literal `getenv("NAME")`; a read through a wrapper such as `glm_graph_env_present(
-    "DS4_ROCM_X", "DS4_METAL_X")`, `gpu_graph_tp_env_flag("NAME", dflt)`,
-    `cuda_stream_tier_bound_env("NAME")` or `ds41_env_flag(name)` is invisible, and the census
-    counts 123 `DS4_*METAL*`/`ENV_NAME_CITED` names in that class today. Fix the inventory (a
-    second pass: functions whose body calls `getenv` on a parameter, then the string literals at
-    their call sites, joining continuation lines), then add a row per name by hand before
-    `--refresh-defaults`, then regenerate. Renaming the names is not the fix - 2.2b kept them for
-    recipe compatibility. The same chunk must decide what `engines/mlx-serve/` read references
-    mean now that the gitlink is gone: `envvars.py:validate_table()` and `envdocs.py` still
-    exempt references under that path, and `envvars.json` holds 28 of them, so those rows are
-    documented reads in a tree this checkout does not contain.
-    Gate: `envdocs --check` passes with the new rows, the name set only grows, and
-    `metal_word_census` reports `ENV_NAME_CITED 0`.
+7.1d The env inventory could not see a wrapper read, so `docs/VARIABLES.md` understated the
+    engine. Done, one commit. `envvars.py:inventory()` matched a literal `getenv("NAME")` on one
+    physical line; three classes of read escaped it. It now scans in three passes over the whole
+    file: (1) the same name-literal call shapes, no longer line-bound, so `foo(\n  "NAME")` counts;
+    (2) every name literal inside a direct `getenv`/`setenv` argument, which is what makes
+    `getenv(tp == 2 ? "DS4_METAL_DISABLE_V41_TP_DECODE_QUEUE" : "DS4_METAL_DISABLE_V41_DECODE_QUEUE")`
+    two reads; (3) a wrapper pass - functions whose body hands a parameter to a direct env call or
+    to another wrapper (run to a fixed point, so a forwarding helper qualifies), then the name
+    literals at their call sites at the parameter positions that reach `getenv`. 38 wrapper
+    functions qualify in this checkout; the pass is 1910 names where the old scan found 1866, and
+    nothing the old scan found was lost (checked by running both over the same tree: 0 names lost,
+    0 recorded references removed except the four this chunk decided on).
+    Renaming was not the fix - 2.2b kept the names for recipe compatibility - but the census's
+    `ENV_NAME_CITED` number also had a second half nobody had read: `glm_graph_env_present(
+    "DS4_ROCM_X", "DS4_METAL_X")` and `glm_graph_env_value()` discard their first parameter
+    (`(void)rocm_name; return getenv(cuda_name) != NULL;`), so the old scan documented the
+    *ignored* spelling of each pair and missed the live one. A literal at an argument the wrapper
+    discards is now reported by `discarded_alias_reads()` and is not a read. That dropped **71
+    rows** whose every reference was such an argument, and 114 rows were added for the names that
+    are genuinely read: 2,143 documented variables to **2,186**. The plan's gate said "the name set
+    only grows"; that was written before the discard was measured, and keeping those rows would
+    document 71 knobs that do nothing, which is the thing `drop_rows.py` exists to prevent. No
+    preset, config example, script or test names any of the 71 - the only text holding them was
+    `docs/VARIABLES.md` itself.
+    `engines/mlx-serve/` is decided: the gitlink and its `.gitmodules` entry went in 1.10a, so the
+    exemption in `envvars.py:validate_table()`, `envdocs.py` and `scripts/port/reanchor_env_reads.py`
+    is deleted and the 28 references (14 reads and 14 pinned `code_defaults` entries, on `PATH`,
+    `HOME` and `HF_TOKEN`) go with it. All three names stay documented from reads in trees this
+    checkout has. `scripts/release_check.py` keeps its pinned-OID branch, because `scan_history()`
+    walks historical trees that really do contain the gitlink.
+    Behaviour change to know about: the 114 newly documented names are now launcher-owned, so an
+    inherited `DS4_METAL_DISABLE_STREAMING_READAHEAD=1` in the shell is removed with the
+    `Environment override:` warning and only `env_overrides`/`ds4_env` reaches the engine. The 71
+    dropped aliases are the reverse - no row, so an inherited value passes through untouched and
+    nothing reads it. `inventory()` is now ~11 s rather than ~3 s.
+    Gates: `envdocs --check` reports 2,186 documented variables; `metal_word_census` reports
+    `ENV_NAME_CITED` 118 to **7**, not 0 - the seven are cited and never read: six are arguments of
+    `gpu_graph_ported_m5_decode_feature_enabled()`, a stub that returns false and `(void)`-discards
+    both, and one is the `DS4_METAL_DISABLE_*_FUSION` wildcard in a comment above it. Chunk 7.1e
+    owns them. `tests/test_env_inventory.py` (12 checks) proves the three passes on synthetic
+    source - including that the old line-bound rule found the *discarded* alias and not the live
+    name - and asserts the tree facts this entry claims. Suite: **685 passed, 1 failed, 38
+    skipped**; the one failure is still `test_yoco`, and `test_environment_contract`'s
+    pinned-external-evidence case was rewritten as `test_a_read_outside_this_checkout_is_stale`.
+    `release_check.py` reports 0 findings. Three wrapper call sites remain unresolved by design - a
+    name reaching `setenv` through a variable (`names[i]`, `format->env_name`, the launcher's
+    `env`) - listed by `unresolved_wrapper_reads()`; all three name knobs the table already
+    documents from their engine reads.
 
 7.1e The Mac peer's text in the llama tree. Pending: 51 comment lines across 20 files and 3
     printed strings (`ds4split-expert-projection.cuh`, `ds4split-projection-fixture.cuh`,
     `tools/decode-receiver/main.cpp`), plus `decode-receiver`'s 13 comment lines and its printed
-    `LLAMA_PD_CACHE_CAPTURE` warning that describes the deleted Mac backend. Use
-    `scripts/port/comment_code_diff.py` and `string_text_replace.py`, check `__LINE__` first, and
-    keep provenance comments that say what was deleted rather than pretending it exists.
-    Gate: `metal_word_census --strict` reports 0 identifiers and the comment count drops to the
-    provenance lines, `comment_code_diff.py` reports 0 changed code lines for a comment-only
-    sweep, and the warning profile loses no kind.
+    `LLAMA_PD_CACHE_CAPTURE` warning that describes the deleted Mac backend. Chunk 7.1d left two
+    more items on this list. `metal_word_census` reports `ENV_NAME_CITED 7`, and all seven are
+    cited but never read: `gpu_graph_ported_m5_decode_feature_enabled()` at `ds4.c:24461` returns
+    false and `(void)`-discards both of its parameters, so the six `DS4_METAL_*_FUSE` literals at
+    its three call sites are dead arguments of a dead branch, and the seventh is the
+    `DS4_METAL_DISABLE_*_FUSION` wildcard in the comment at `ds4.c:22660` that describes them.
+    Deleting the stub's parameters (and rewording that comment) is what takes the count to 0;
+    documenting them is not, because nothing reads them. And `scripts/release_check.py:161` still
+    skips `engines/mlx-serve/` in the working-tree scan although 1.10a deleted the gitlink - the
+    pinned-OID branches at 191 and 242 must stay, because `scan_history()` walks historical trees
+    that really do contain it.
+    Use `scripts/port/comment_code_diff.py` and `string_text_replace.py`, check `__LINE__` first,
+    and keep provenance comments that say what was deleted rather than pretending it exists.
+    Gate: `metal_word_census --strict` reports 0 identifiers and `ENV_NAME_CITED 0`, and the
+    comment count drops to the provenance lines, `comment_code_diff.py` reports 0 changed code
+    lines for a comment-only sweep, and the warning profile loses no kind.
 
 8.1 Qualification. Needs a qualified GGUF on disk: 262K exact-cone runs, 200K real-text fixture
     with password recall and logits SHA-256, Engram extent reads against the pread baseline, then
@@ -1861,10 +1904,11 @@ three provenance lines (`slstack/producer_runner.py`'s mapping table and `workin
 docstring) naming the retired API those arms replace.
 `media_tools.py`'s Windows FFmpeg download is not in that
 number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside
-`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 195 lines, ENV_NAME_CITED 118
-lines and COMMENT 25 lines: the documented `DS4_METAL_*` names are kept on purpose, the 118 cited
-ones are the wrapper reads chunk 7.1d owes the inventory (123 until chunk 4.3b folded four away with
-their guards), and the 25 comment lines are the provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0,
+`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 306 lines, ENV_NAME_CITED 7
+lines and COMMENT 25 lines: the documented `DS4_METAL_*` names are kept on purpose, the 7 cited
+ones are dead arguments of a folded-to-false stub plus one wildcard in a comment (chunk 7.1e -
+7.1d took the count from 118 by documenting the wrapper reads that really are knobs), and the 25
+comment lines are the provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0,
 STRING 3 and COMMENT 51 lines and `--strict` passes, since chunk 4.2 deleted the tree holding the
 one code-position mention (`USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/`). The 51
 comment lines and 3 printed strings are the Mac peer's measurement history and the ten
@@ -1891,7 +1935,8 @@ before trusting any of these numbers.
 in chunk 1.10b.
 
 Python suite: `timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B
--m pytest tests/ -q` reports **672 passed, 3 failed, 38 skipped** after chunk 7.1b. Set
+-m pytest tests/ -q` reports **686 passed, 1 failed, 38 skipped** after chunk 7.1d (12 of the
+passing checks are `tests/test_env_inventory.py`, chunk 7.1d's gate). Set
 `STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or 21
 process tests raise `KeyError: STUDIO_RUNTIME_ROOT`, and chunk 5.3's floor-honour check needs a
 disk-backed fixture directory too; without it the same tree reads a much worse line, which is why

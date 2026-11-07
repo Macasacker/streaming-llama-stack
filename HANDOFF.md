@@ -17,8 +17,8 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-**Phase 4, Phase 5 and chunks 4.3a and 4.3b are done, and Phase 7 has landed its first three
-commits.** Phase 3's producer CLI, its weight
+**Phase 4, Phase 5 and chunks 4.3a, 4.3b and 4.3c are done, and Phase 7 has landed four of its
+five chunks.** Phase 3's producer CLI, its weight
 fetcher, its native weight provider, its Engram row loader, its carry store and its locked RAM
 tier are Linux; the orchestrator (`slstack/`) has no `msvcrt` and no `CREATE_SUSPENDED`, the
 guardian caps its tree in the kernel, ULTRA and mode1 producers launch here, and resident
@@ -38,18 +38,13 @@ none of the 22 names in `docs/evidence/collapse-4.3c-tokens.txt` - `AMD_MFMA_AVA
 `AMD_WMMA_AVAILABLE`, `CDNA*`, `RDNA*`, `GCN*`, `__GFX*__`, `V_DOT2_F32_F16_AVAILABLE` - appears in
 a preprocessor directive anywhere in this checkout, and what survives of that vocabulary is the
 host-side runtime `cc` selection code the port keeps on purpose (the plan's 4.3c entry lists it and
-says why deleting it is not a text sweep).
+says why deleting it is not a text sweep). Chunk 7.1d taught `inventory()` to follow a read through
+a wrapper helper and to refuse a name the wrapper discards, and regenerated `docs/VARIABLES.md`
+from that: 2,143 documented variables to 2,186, with 114 names added and 71 dropped, and the
+`engines/mlx-serve/` exemption gone from `validate_table()`, `envdocs.py` and
+`reanchor_env_reads.py`.
 
-1. **Chunk 7.1d - the env inventory and `docs/VARIABLES.md`.** `envvars.py:inventory()` sees
-   only literal `getenv("NAME")`, so a read through a wrapper such as
-   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is invisible; the census counts 118
-   such names in `engines/ds4` today (`ENV_NAME_CITED 118`, down from 123 when chunk 4.3b folded
-   away four of them). Fix the inventory, add a row per
-   name by hand before `--refresh-defaults`, then regenerate. Do not rename the names - 2.2b
-   kept them for recipe compatibility. The same chunk decides what the 28 `engines/mlx-serve/`
-   read references in `envvars.json` mean now that the gitlink is gone, since
-   `envvars.validate_table()` and `envdocs.py` still exempt that prefix.
-2. **Chunk 7.1e - the Mac peer's text in the llama tree**: 51 comment lines across 20 files
+1. **Chunk 7.1e - the Mac peer's text in the llama tree**: 51 comment lines across 20 files
    and 3 printed strings, plus the ten retired-backend mentions chunk 4.2 left in comment position
    (`src/llama-context.cpp` x2, `src/llama-prefill-stream.cpp`, `common/common.h` x2,
    `ggml/src/ggml-cpu/simd-mappings.h`, `ggml/src/ggml-backend.cpp`, `ggml/include/ggml-backend.h`,
@@ -62,14 +57,21 @@ says why deleting it is not a text sweep).
    keeps, so they are correct text about platforms nothing builds for.
    `tools/decode-receiver`'s 13 comment lines and its printed
    `LLAMA_PD_CACHE_CAPTURE` warning. `comment_code_diff.py`, `string_text_replace.py`, a
-   `__LINE__` check first, and `metal_word_census --strict` as the gate.
-3. **Chunk 6.1's remainder** - `vendor/engines/cosmos_windows` (the media workers the media
+   `__LINE__` check first, and `metal_word_census --strict` as the gate. Chunk 7.1d left two
+   things on this list: `metal_word_census` now reports `ENV_NAME_CITED 7` rather than 0, and all
+   seven are cited but never read - six are the parameters of
+   `gpu_graph_ported_m5_decode_feature_enabled()` (`engines/ds4/ds4.c:24461`), a stub that returns
+   false and `(void)`-discards both, and the seventh is the `DS4_METAL_DISABLE_*_FUSION` wildcard
+   in the comment above it; and `scripts/release_check.py:161` still skips `engines/mlx-serve/` in
+   the working-tree scan although 1.10a deleted that gitlink (the pinned-OID branches at 191 and
+   242 must stay, because `scan_history()` walks trees that really do contain it).
+2. **Chunk 6.1's remainder** - `vendor/engines/cosmos_windows` (the media workers the media
    tests import) and `slstack/media_tools.py`'s pinned Windows FFmpeg archive: port media to
    Linux or delete it. `GGML_ACCELERATE` and the Apple cmake logic in the llama tree
    (`ggml-cpu/CMakeLists.txt`'s APPLE branch, the `apple_m1`/`apple_m2_m3`/`apple_m4` CPU variants,
    `HAVE_BUGGY_APPLE_LINKER`, `_DARWIN_C_SOURCE`, the visionOS definition) is the same kind of
    leftover: it belongs with Phase 7's text and cmake cleanup, not with a backend prune.
-4. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start
+3. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start
    without a download or a quantize run in the accepted type set (see "Constraints on this
    box" 2). Its name set includes `test_yoco`, the suite's one stable failure.
 
@@ -80,15 +82,13 @@ it carries is 13 comment lines and one printed `LLAMA_PD_CACHE_CAPTURE` warning 
 deleted Mac backend, which is chunk 7.1e's text sweep. Three findings from 2.2e that belong to those chunks and
 to no chunk yet: 35 declarations in the engine's GPU headers are dead - declared by the deleted
 Mac backend, defined nowhere, called nowhere (the scan is in this file's method section, and the
-three that named Metal were deleted in 2.2e's comment half); 118 `DS4_METAL_*` environment names
-are read but not documented (123 until chunk 4.3b folded four away with their guards), because
-their only reader is a wrapper such as
-`glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` and `envvars.py:inventory()` only sees
-literal `getenv("NAME")` calls, so `docs/VARIABLES.md` understates the engine's knobs (chunk 7.1d
-now owns this, with the `engines/mlx-serve/` exemption beside it); and names
-handed to a folded-to-false stub, such as `DS4_METAL_DISABLE_M5_QKV_PAIR_QUAD_FUSE`, are never read
-at all. Do not "fix" the wrapper reads by renaming the names - 2.2b kept them for recipe
-compatibility - fix the inventory. Four findings from 5.1 in the same category: `lease.py`'s
+three that named Metal were deleted in 2.2e's comment half). The other two findings in that group
+are settled by chunk 7.1d, one each way: the wrapper reads are now in the table (114 rows added),
+and the names handed to a folded-to-false stub, such as
+`DS4_METAL_DISABLE_M5_QKV_PAIR_QUAD_FUSE`, turned out to be the *reason* the table had to shrink -
+`glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` discards its first parameter, so the 71
+`DS4_ROCM_*` rows the old scan carried documented aliases nothing reads and went. Nothing was
+renamed: 2.2b kept the names for recipe compatibility, and 7.1d fixed the inventory. Four findings from 5.1 in the same category: `lease.py`'s
 CPU-reservation recognition matches hold lines by their *wording*, including the word Windows, so
 a Linux CPU hold worded differently preempts the engine - settle the wording with the owner of the
 other agent rather than widening the regex; `scripts/perfexp_pair.py` hashes
@@ -142,7 +142,8 @@ model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4)
 `26dacf6` + `cb3b58f` (4.2 recorded, baseline position), `4c368e7` (4.3 scoped), `e47c111` (4.3a),
 `463cd31` (4.3b) and `bc63367` (4.3b recorded), `37b2bf1` (4.3c scoped, with the correction to what
 4.2 and 4.3 had recorded), `41bc18a` (4.3c, the engine's `cuda/mmq/`) and `a50a7bb` (4.3c, the llama
-tree's `ggml/src/ggml-cuda`), plus the plan/handoff commits. The branch was in sync with
+tree's `ggml/src/ggml-cuda`, `caa8a9e` (4.3c recorded), `f197552` (7.1d) and this file's and the
+plan's commits after it. The branch was in sync with
 `origin/linux-only` when this session opened and was pushed again after each chunk; check
 `git status -sb` rather than assuming it still is.
 
@@ -150,8 +151,9 @@ The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyE
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **674 passed, 1 failed, 38 skipped** - runs of it have read 1, 2, 3 and 7 failures,
-since the two process tests named below move. Without it, the same tree reads a much worse line -
+this tree reads **686 passed, 1 failed, 38 skipped** - 12 of the passing checks are chunk 7.1d's
+`tests/test_env_inventory.py`, which calls `inventory()` and so adds about 25 s to a run - runs of
+it have read 1, 2, 3 and 7 failures, since the two process tests named below move. Without it, the same tree reads a much worse line -
 chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
 Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
 count - the process tests flip and the skip set changes when a platform gate starts running.
@@ -202,10 +204,12 @@ reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPa
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
-`STUDIO_RUNTIME_ROOT` set (see the paragraph above): **674 passed, 1 failed, 38 skipped**. The one
+`STUDIO_RUNTIME_ROOT` set (see the paragraph above): **686 passed, 1 failed, 38 skipped**. The one
 stable failure is `test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the
 49152 it asserts), which chunk 8.1 owns, and this run's second failure was the moving process test
-that passes when its file runs alone; the rest are the process tests that move. Chunk 7.1b
+that passes when its file runs alone; the rest are the process tests that move. Chunk 7.1d read both
+lines on the same tree: 686/1/38 and 685/2/38, the difference being
+`test_disconnect_inside_reasoning_then_next_turn_appends_only`. Chunk 7.1b
 removed the four names this phase owned, including the two that had been attributed to a missing
 `cosmos_windows` module - their real cause was that the suite's own command does not put
 `vendor/studio` and `vendor/engines` on `sys.path`, which is what `slstack.native_broker.vendor()`
@@ -213,10 +217,12 @@ and the launcher's `library_pythonpath` do. Chunk 5.1 fixed four names that used
 and un-skipped 21 more; chunk 5.3 un-skipped three more and fixed none. Check a suspected
 regression by running the same file in a worktree at the baseline
 (`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
-between runs - compare the set of names, never the counts. `envdocs --check` reports **2,143**
-documented variables: chunk 4.3b dropped seven whose last reader sat in a folded guard, and chunk
-4.3c dropped none - it re-anchored one row in the engine half (`GGML_CUDA_DISABLE_GRAPHS`) and eleven
-rows / fourteen reads in the llama half, all of them in `fattn-mma-f16.cuh`.
+between runs - compare the set of names, never the counts. `envdocs --check` reports **2,186**
+documented variables: chunk 4.3b dropped seven whose last reader sat in a folded guard, chunk 4.3c
+dropped none, and chunk 7.1d dropped 71 and added 114 - the drops are the `DS4_ROCM_*` aliases whose
+only reference is an argument the wrapper discards, and the additions are the wrapper reads the old
+scan could not see. `metal_word_census` over `engines/ds4` now reads IDENTIFIER 0, ENV_NAME 306,
+ENV_NAME_CITED 7, COMMENT 25 lines, STRING 0; the seven are cited but never read (see 7.1e).
 
 Five hand-compiled programs cover what has no test target, all passing on this tree - and all
 relinked and re-run after chunk 4.2b rebuilt every CUDA object, since four of them link
@@ -525,7 +531,31 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunk 4.3c, two commits - `41bc18a` the engine's `cuda/mmq/`, `a50a7bb` the llama
+This session's (chunk 7.1d, one commit - `f197552`, no engine or llama source touched):
+
+- **The environment table is now what the engine actually reads, and it is both bigger and
+  smaller than it was.** `inventory()` follows a read through a wrapper helper and refuses one
+  the wrapper discards, so 114 names gained rows and 71 lost them: 2,143 documented variables to
+  **2,186**. Nothing a recipe sets was renamed. What changed for a user: the 114 newly documented
+  names are launcher-owned, so an inherited `DS4_METAL_DISABLE_STREAMING_READAHEAD=1` in the shell
+  is now removed with the `Environment override:` warning and only `env_overrides`/`ds4_env`
+  reaches the engine; the 71 dropped `DS4_ROCM_*` aliases are the reverse - no row, so an
+  inherited value passes through untouched and nothing reads it, which is what it always was.
+  `engines/mlx-serve/` references and their exemption are gone (`PATH`, `HOME`, `HF_TOKEN` stay,
+  documented from trees this checkout has). `docs/VARIABLES.md` is regenerated from the new table.
+- **The claim that was wrong**: the census's `ENV_NAME_CITED 118` was read as "118 live knobs the
+  table omits". Half of that pair-class was the opposite - `glm_graph_env_present(
+  "DS4_ROCM_X", "DS4_METAL_X")` is `(void)rocm_name; return getenv(cuda_name) != NULL;`, so the
+  old line-bound scan documented the ignored spelling and missed the live one. `inventory()`'s own
+  comparison (both scans over the same tree) shows 0 names lost and no recorded reference removed
+  except the four this chunk decided on. `ENV_NAME_CITED` is 7 now, and those 7 are cited but
+  never read - six dead arguments of `gpu_graph_ported_m5_decode_feature_enabled()` and one
+  wildcard in a comment - which is 7.1e's, not a row to add.
+- `inventory()` is ~11 s rather than ~3 s, and `tests/test_env_inventory.py` (12 checks) is the
+  gate for the passes; `discarded_alias_reads()` and `unresolved_wrapper_reads()` are the two
+  things it cannot decide, printed rather than guessed at.
+
+Before that (chunk 4.3c, two commits - `41bc18a` the engine's `cuda/mmq/`, `a50a7bb` the llama
 tree's `ggml/src/ggml-cuda`):
 
 - **The AMD and Moore Threads compute-capability vocabulary is gone from every preprocessor
@@ -817,6 +847,30 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   platforms, which is what the `docs/linux-port-commands.md` gate of 8 lines means now.
 
 ## Gotchas
+
+- **A per-file dedupe set is a name-loss machine.** Chunk 7.1d's first `inventory()` kept
+  `references = set()` per file and skipped any reference already in it, so on a line with two
+  reads (`getenv(A) == NULL || getenv(B)`) the second name vanished: 17 documented names "lost",
+  which read like a regression in the new passes. Dedupe per name. `tests/test_env_inventory.py`
+  asserts the tree's read set is a superset of the old scan's, which is what caught it.
+- **`text.count('\n', 0, offset)` per hit is O(offset), and `ds4.c` has thousands of hits.**
+  The wrapper pass took the inventory from 3 s to 32 s until line numbers came from one
+  newline-offset list plus a bisect (~11 s). Compare against the *old* scan's runtime, not against
+  nothing, before concluding a pass is too slow.
+- **A call statement ends at a `;`, exactly like a prototype.** Skipping `name(...);` as a
+  declaration deleted every real wrapper call chunk 7.1d wanted to find (`set_env_value("X", "1");`
+  included). The test is the argument list's shape (`type name` pairs), not the terminator.
+- **A wrapper's argument position is not a read.** `glm_graph_env_present("DS4_ROCM_X",
+  "DS4_METAL_X")` is `(void)rocm_name; return getenv(cuda_name) != NULL;`, so a regex keyed on
+  function names containing `env` documented the ignored spelling of each pair and missed the live
+  one - which is why fixing this class both added and removed rows. `discarded_alias_reads()` is
+  the report, and the same rule means a name at a *mapped* position is a read even when the value
+  is thrown away by the caller.
+- **A comparison of two scans has to run over the same tree.** `build/wt-base` sits at `41bc18a`,
+  so a llama-tree read's line "moved" 91 lines and looked like a bug in the new pass; and
+  `sys.path.insert(0, 'build/wt-base')` followed by `from slstack.envvars import inventory`
+  imports the *baseline* module, which is how one run reported the new scan losing 17 names it did
+  not lose. Load the baseline by file path and check which module you got.
 
 - **A gate that reports zero is only evidence if you have seen it report non-zero.**
   `scripts/port/metal_word_census.py` classified a mention by character state, but its scanner

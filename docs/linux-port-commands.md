@@ -151,10 +151,14 @@ grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel
 # 2.2e's first run missed). The census classifies each mention by its position in the file, which is
 # the only honest test, and --strict fails on anything the compiler sees.
 python3 -B scripts/port/metal_word_census.py --strict
-# IDENTIFIER 0, ENV_NAME 195, ENV_NAME_CITED 118, COMMENT 25 lines, STRING 0 lines
+# IDENTIFIER 0, ENV_NAME 306, ENV_NAME_CITED 7, COMMENT 25 lines, STRING 0 lines
 # (the 25 comments are provenance: they name the retired backend or its source files;
 #  no engine message names Metal since chunk 2.2e 4/4. ENV_NAME_CITED was 123 until chunk 4.3b
-#  folded four wrapper names away with their guards)
+#  folded four wrapper names away with their guards, and 118 until chunk 7.1d taught
+#  `inventory()` to follow a wrapper, which documented 78 of them as the knobs they are.
+#  The 7 left are cited but never read: six are arguments of
+#  `gpu_graph_ported_m5_decode_feature_enabled()`, a stub that returns false and discards
+#  both, and one is the `DS4_METAL_DISABLE_*_FUSION` wildcard in a comment)
 python3 -B scripts/port/metal_word_census.py --strict --list   # names the tokens and the files
 # --strict exit 1 means a code identifier names Metal again.
 grep -rn "\bmetal_\|\bMETAL_" engines/ds4 \
@@ -249,9 +253,23 @@ python3 -B scripts/port/drop_rows.py --names build/42/dropped-names-42.json --ke
 python3 -B scripts/port/drop_rows.py --names build/42/dropped-names-42.json --apply
 python3 -B scripts/port/reanchor_env_reads.py --apply   # reads are anchored to path:line
 python3 -B -m slstack.envdocs --refresh-defaults
-python3 -B -m slstack.envdocs --check                   # 2,143 documented variables
+python3 -B -m slstack.envdocs --check                   # 2,186 documented variables
 python3 -B -m unittest tests.test_environment_contract  # 11 tests, OK
 ```
+
+Chunk 7.1d changed what `inventory()` counts, and `tests/test_env_inventory.py` is the gate for it:
+
+```bash
+env PYTHONPATH=.:tests python3 -B -m pytest tests/test_env_inventory.py tests/test_environment_contract.py -q   # 23 checks
+python3 -B -c "import sys; sys.path.insert(0,'.'); from slstack.envvars import inventory, discarded_alias_reads, unresolved_wrapper_reads; \
+r=inventory(); print(len(r),'names read,',len(discarded_alias_reads()),'discarded names,',len(unresolved_wrapper_reads()),'unresolved call sites')"
+```
+
+`discarded_alias_reads()` is the reason 71 rows went: `glm_graph_env_present("DS4_ROCM_X",
+"DS4_METAL_X")` discards its first parameter, so the `DS4_ROCM_*` spelling is cited in the source
+and never read. `unresolved_wrapper_reads()` lists the three call sites a name reaches through a
+variable, which no scan can resolve; all three are test-fixture or launcher-internal names that
+the table documents from their real engine reads.
 
 `reanchor_env_reads.py` is needed whenever a source edit moves a line above a read; it remaps each
 recorded reference onto the live read in the same file by order and reports, rather than fixing,
