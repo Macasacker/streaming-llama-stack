@@ -1403,8 +1403,13 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     is genuinely undefined for the host pass and defined for the device pass, so no collapse can
     decide them; deleting them is deleting AMD kernel paths by hand. The engine's host layer has a
     third layer of the same kind: 152 `#if`s on `DS4_ROCM_BUILD`, which no build of this fork
-    defines either, spread over `ds4.c` and nine other files - mechanical, and bigger than this
-    chunk, and the 78 `DS4_ROCM_*` rows would need a whole-tree reader scan before any of them go.
+    defines either, spread over `ds4.c` and nine other files - mechanical, since
+    `collapse_conditionals` already treats that name as a false platform macro, and bigger than this
+    chunk. Of the 102 `DS4_ROCM_*` names the engine cites, 93 are read outside any `DS4_ROCM_BUILD`
+    guard - `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is live code that survives a fold -
+    so only nine rows (`DS4_ROCM_DSPARK_FAST`, `DS4_ROCM_DSPARK_VERIFY_FAST`, the two
+    selected-async-load names and five more) lose their last reader with that chunk, and they go
+    through `drop_rows.py --keep` rather than a name pattern.
 
 5.1 Python orchestrator. Done in four commits: `270d7a9` (memory_counters reads
     /proc/meminfo, /proc/vmstat and /proc/swaps), `65e54bd` (journal.advisory_lock, the
@@ -1710,13 +1715,15 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunk 7.1c with the commands above plus `-I` (skip binary files - the
+Counts, re-counted after chunk 4.3a with the commands above plus `-I` (skip binary files - the
 built engine binaries and `*.o` under `engines/ds4` match these patterns and are not source) and
-`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__`: 443 Windows references and
-691 Apple/MLX ones repo-wide, down from the 488 and 920 this file quoted after chunk 5.1 because
-7.1a deleted the Mac docs, receipts and test sources. Earlier figures in this file (504, 532 and
-491) were counted differently - some without `-I` - so they are not comparable; re-run the command
-rather than trusting any number here. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
+`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__`: 440 Windows references and 693
+Apple/MLX ones repo-wide. Earlier figures in this file (443 and 691 after 7.1c, 504, 532, 491, 488
+and 920 after 5.1) were counted at different commits and some without `-I`, so they are not
+comparable; re-run the command rather than trusting any number here. The AMD and Moore Threads
+vocabulary is a third count and chunk 4.3b's: 674 `hip`/`musa`/`rocm`/`moore` matches in
+`engines/ds4` sources after 4.3a folded the HIP and MUSA branches out of `cuda/mmq/` (6 more are
+vendored under `external/` and `linenoise.c`), 441 of them in that directory alone. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
 `scripts/port`'s own sweep `--tokens` list does not count, the gate in
 `docs/linux-port-commands.md` reports 5 lines after chunk 7.1b: the two `ctypes.WinDLL('kernel32')`
 calls in the Windows arms of `combo_ram.py` and `working_set.py`, which run on both platforms, and
