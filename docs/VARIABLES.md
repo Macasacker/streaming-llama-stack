@@ -967,7 +967,7 @@ A/B switch: set to restore the old 2048-row rounding of CUDA SSD V4.1 layer swee
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43282`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43273`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * longer than the carry still split on the 2048 grid. */
@@ -1027,7 +1027,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-attribution.h
         ggml_backend_tensor_get(tensor,row.data(),uint64_t(p-first)*words*4,words*4);
 ```
 
-Source: `engines/ds4/ds4.c:42479`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42470`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_dump_on(void) {
@@ -1039,7 +1039,7 @@ static bool ds41_dump_on(void) {
             if (!list || !list[0]) list = "0,128,275,549";
 ```
 
-Source: `engines/ds4/ds4.c:42633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42624`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->tp_world == 1 && !g->streaming && !g->quality && !g->imatrix && !g->image_count &&
@@ -1069,7 +1069,7 @@ inline std::vector<uint32_t> llama_dsv41_attribution_positions() {
         char *end=nullptr;const unsigned long long n=std::strtoull(text,&end,10);
 ```
 
-Source: `engines/ds4/ds4.c:42482`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42473`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_ds41_dump_state = -1;
@@ -1273,7 +1273,7 @@ DS4_ALLOW_MTP_STREAMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:73359`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73350`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * Default behaviour is unchanged; this only allows the combination to be TESTED. */
@@ -1453,7 +1453,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72577`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -1471,7 +1471,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE_MAX: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float bounds[2]={opt->cache_affinity_adaptive_min_set?opt->cache_affinity_adaptive_min:0.0f,
@@ -1489,7 +1489,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE_MIN: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float bounds[2]={opt->cache_affinity_adaptive_min_set?opt->cache_affinity_adaptive_min:0.0f,
@@ -1507,7 +1507,7 @@ DS4_CACHE_AFFINITY_ADAPTIVE_TRACE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:79924`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79915`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g_quality.applied = mean;
@@ -1525,7 +1525,7 @@ CUDA expert-cache routing bias,0..1.36125.0 preserves baseline selection; live c
 
 Scope: ds4. Class: preset.
 
-Source: `engines/ds4/ds4.c:72576`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72567`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                      const ds4_gpu_config *gpu_cfg) {
@@ -1543,7 +1543,7 @@ Record unbiased per-layer routing spreads and write their calibration when the e
 
 Scope: ds4, rtx-llama. Class: runtime.
 
-Source: `engines/ds4/ds4.c:72639`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72630`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -1573,7 +1573,7 @@ DS4_CACHE_AFFINITY_MODE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72624`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     pthread_mutex_unlock(&g_quality_mu);
@@ -1591,7 +1591,7 @@ DS4_CACHE_AFFINITY_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72658`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool router_confidence=opt->cache_affinity_router_confidence_set ?
@@ -1621,7 +1621,7 @@ DS4_CACHE_AFFINITY_PROMOTION: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72640`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         fprintf(stderr,"ds4: invalid cache affinity token/rate limit\n");*out=NULL;return 1;
@@ -1639,7 +1639,7 @@ DS4_CACHE_AFFINITY_PROMOTION_CAP: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;
@@ -1669,7 +1669,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-sess
         handoff.bind_ms=ms(t0);
 ```
 
-Source: `engines/ds4/ds4.c:72643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;
@@ -1687,7 +1687,7 @@ DS4_CACHE_AFFINITY_ROUTER_CONFIDENCE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72651`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char *promotion_env=getenv("DS4_CACHE_AFFINITY_PROMOTION");
@@ -1705,7 +1705,7 @@ Per-model routing calibration. The packaged 1017 default contains40 numeric spre
 
 Scope: ds4. Class: runtime-preset.
 
-Source: `engines/ds4/ds4.c:72638`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72629`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         fprintf(stderr,"ds4: cache affinity mode must be spread or flat\n"); *out=NULL;return 1;
@@ -1735,7 +1735,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-sess
         handoff.bind_ms=ms(t0);
 ```
 
-Source: `engines/ds4/ds4.c:72643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ramp = opt->cache_affinity_ramp_set ? opt->cache_affinity_ramp_tokens : 8u;
@@ -1852,7 +1852,7 @@ DS4_CPU_DISABLE_UNROLLED_ARGMAX: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46181`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:46172`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -1864,7 +1864,7 @@ static int sample_argmax(const float *logits, uint32_t n_vocab) {
     float best_v = DS4_NEG_INF;
 ```
 
-Source: `engines/ds4/ds4.c:46861`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:46852`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                      int excluded_id) {
@@ -1876,7 +1876,7 @@ Source: `engines/ds4/ds4.c:46861`. Unset read: NULL from getenv; the literal con
     float best_v = DS4_NEG_INF;
 ```
 
-Source: `engines/ds4/ds4.c:79004`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78995`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 int ds4_session_argmax_excluding(ds4_session *s, int excluded_id) {
@@ -1894,7 +1894,7 @@ DS4_CPU_DUMP_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40244`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -1912,7 +1912,7 @@ DS4_CPU_DUMP_PREFILL_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46956`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:46947`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double t_prefill1 = now_sec();
@@ -1930,7 +1930,7 @@ CUDA SSD DSV4.1 context buffers grow on demand in steps; 0 restores fixed full-c
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40893`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40884`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -1948,7 +1948,7 @@ Context growth step in tokens; a positive multiple of 2048.
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40894`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40885`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -2260,7 +2260,7 @@ DS4_CUDA_DECODE_FLUSH_COMMANDS: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24531`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24528`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int keep = -1;
@@ -2314,7 +2314,7 @@ DS4_CUDA_DECODE_HEADS8_ONLINE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83073`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83064`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_EXACT_SCORE_SPLIT_DECODE") != NULL ||
@@ -2362,7 +2362,7 @@ DS4_CUDA_DECODE_SCORE4: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83074`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83065`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_SPLITKV_DECODE") != NULL ||
@@ -2392,7 +2392,7 @@ DS4_CUDA_DECODE_SCORE8: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83075`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83066`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DECODE_HEADS8_ONLINE") != NULL ||
@@ -2482,7 +2482,7 @@ DS4_CUDA_DISABLE_PREFILL_PIPELINE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38118`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool cuda_prefill_pipeline = false;
@@ -2614,7 +2614,7 @@ DS4_CUDA_DISABLE_SSD_MEDIUM_SWEEP: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43270`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43261`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g->carry_cap >= remaining &&
@@ -2632,7 +2632,7 @@ DS4_CUDA_DISABLE_SSD_PREFETCH: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:77741`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:77732`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_prefill_borrow(ds41_gpu_graph *g, const ds4_weights *w, uint32_t count,
@@ -2734,7 +2734,7 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42758`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42749`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             n_expert, n_used, g->tp_rank * (n_expert / 2u),
@@ -2746,7 +2746,7 @@ Source: `engines/ds4/ds4.c:42758`. Unset read: NULL from getenv; the literal con
             l->ffn_down_exps->abs_offset, l->ffn_gate_exps->type, l->ffn_down_exps->type,
 ```
 
-Source: `engines/ds4/ds4.c:42759`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42750`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             n_expert / 2u, DS4_SWIGLU_CLAMP_EXP, b->norm, il, count, &mid_f16) :
@@ -2758,7 +2758,7 @@ Source: `engines/ds4/ds4.c:42759`. Unset read: NULL from getenv; the literal con
             gate_row * DS4_N_FF_EXP, gate_row, down_row * DS4_N_EMBD, down_row,
 ```
 
-Source: `engines/ds4/ds4.c:73906`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73897`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const uint64_t support_bias=(e->model.size+4095ull)&~4095ull;
@@ -2776,7 +2776,7 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42758`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42749`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             n_expert, n_used, g->tp_rank * (n_expert / 2u),
@@ -2788,7 +2788,7 @@ Source: `engines/ds4/ds4.c:42758`. Unset read: NULL from getenv; the literal con
             l->ffn_down_exps->abs_offset, l->ffn_gate_exps->type, l->ffn_down_exps->type,
 ```
 
-Source: `engines/ds4/ds4.c:73911`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73902`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if(mapped && full_aux) mapped=ds4_gpu_dspark_aux_map_all(e->mtp_model.map,e->mtp_model.size,e->mtp_model.tensor_data_pos,1)!=0;
@@ -2806,7 +2806,7 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44168`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44159`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->streaming) {
@@ -2830,7 +2830,7 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40738`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40729`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int token,int *tokens,float *confidence,bool public_confidence,bool *drained);
@@ -2848,7 +2848,7 @@ Native engine setting; retains its built-in default. The exact source consumer b
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43085`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43076`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * prior refusal until their placement has been qualified. */
@@ -2860,7 +2860,7 @@ Source: `engines/ds4/ds4.c:43085`. Unset read: NULL from getenv; the literal con
         dw->missing_tensors || dw->invalid_tensors || dw->metadata_errors ||
 ```
 
-Source: `engines/ds4/ds4.c:73360`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73351`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (e->ssd_streaming) {
@@ -2872,7 +2872,7 @@ Source: `engines/ds4/ds4.c:73360`. Unset read: NULL from getenv; the literal con
                 fprintf(stderr, "ds4: --ssd-streaming is not compatible with --mtp yet"
 ```
 
-Source: `engines/ds4/ds4.c:73896`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73887`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         bool resident_ds41_support = false;
@@ -2884,7 +2884,7 @@ Source: `engines/ds4/ds4.c:73896`. Unset read: NULL from getenv; the literal con
                 fprintf(stderr,"ds4: resident streaming DSpark requires --mtp-model with its complete sidecar\n");
 ```
 
-Source: `engines/ds4/ds4.c:73897`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73888`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         resident_ds41_support = e->backend == DS4_BACKEND_CUDA && e->ssd_streaming &&
@@ -2896,7 +2896,7 @@ Source: `engines/ds4/ds4.c:73897`. Unset read: NULL from getenv; the literal con
                 free(load_offsets);free(load_sizes);ds4_engine_close(e);*out=NULL;return 1;
 ```
 
-Source: `engines/ds4/ds4.c:75200`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75191`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                              e->mtp_model.map ? &e->mtp_model : &e->model)) {
@@ -2908,7 +2908,7 @@ Source: `engines/ds4/ds4.c:75200`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:75201`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75192`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             fprintf(stderr, "ds4: DSpark drafting unavailable for this V4.1 session\n");
@@ -3160,7 +3160,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83085`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83076`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_SCORE_TILE") != NULL ||
@@ -3244,7 +3244,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_DIM2: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83081`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83072`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_VEC4") != NULL ||
@@ -3274,7 +3274,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_FUSE_INV_ROPE: advanced engine setting; built-in defa
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83082`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83073`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_VEC4_PLAIN") != NULL ||
@@ -3304,7 +3304,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_GRAPH: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83077`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83068`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DECODE_SCORE8") != NULL ||
@@ -3334,7 +3334,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_LDG: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83078`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83069`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_NO_DECODE_VALUE512") != NULL ||
@@ -3364,7 +3364,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_MIN_SCORE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83084`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83075`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_FUSE_INV_ROPE") != NULL ||
@@ -3406,7 +3406,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_S: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83088`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83079`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR") != NULL ||
@@ -3448,7 +3448,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_S_FLOOR: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83086`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83077`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_MIN_SCORE") != NULL ||
@@ -3490,7 +3490,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_S_MAX: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83087`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83078`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_CHUNK") != NULL ||
@@ -3532,7 +3532,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_VEC4: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83079`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83070`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_GRAPH") != NULL ||
@@ -3562,7 +3562,7 @@ DS4_CUDA_EXACT_SCORE_SPLIT_VEC4_PLAIN: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83080`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83071`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_LDG") != NULL ||
@@ -3670,7 +3670,7 @@ DS4_CUDA_GLM_DISABLE_FFN_GRAPHS: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:58031`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58022`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                        gpu_graph_debug_get_config()->prefix == NULL &&
@@ -3688,7 +3688,7 @@ DS4_CUDA_GLM_DISABLE_KDA_QK_PAIR: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:49961`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:49952`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (l->kda_q->type == DS4_TENSOR_Q4_K &&
@@ -3772,7 +3772,7 @@ DS4_CUDA_GREEDY_SPLITKV_FALLBACK_LOG: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:66557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66548`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         anchor_ready = s->greedy_splitkv_anchor_valid;
@@ -3784,7 +3784,7 @@ Source: `engines/ds4/ds4.c:66557`. Unset read: NULL from getenv; the literal con
                     "ds4: greedy %s frontier snapshot failed at pos=%u; using exact attention\n",
 ```
 
-Source: `engines/ds4/ds4.c:66605`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66596`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             ok = ds4_session_greedy_splitkv_replay_exact(s, token, &top, err, errlen);
@@ -3796,7 +3796,7 @@ Source: `engines/ds4/ds4.c:66605`. Unset read: NULL from getenv; the literal con
                         replay_segment_len,
 ```
 
-Source: `engines/ds4/ds4.c:66658`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if (ok &&
@@ -3886,7 +3886,7 @@ DS4_CUDA_GREEDY_SPLITKV_TRACE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:66592`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66583`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const float margin = top2.value0 - top2.value1;
@@ -3940,7 +3940,7 @@ DS4_CUDA_GREEDY_TOP1: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:67020`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:67011`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             int n_generated = 0;
@@ -4000,7 +4000,7 @@ DS4_CUDA_GREEDY_VEC4_FALLBACK_LOG: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:66558`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66549`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!anchor_ready &&
@@ -4012,7 +4012,7 @@ Source: `engines/ds4/ds4.c:66558`. Unset read: NULL from getenv; the literal con
                     vec4_fallback ? "vec4" : "split-kv",
 ```
 
-Source: `engines/ds4/ds4.c:66634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66625`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             ok = ds4_session_greedy_splitkv_replay_exact(s, token, &top, err, errlen);
@@ -4024,7 +4024,7 @@ Source: `engines/ds4/ds4.c:66634`. Unset read: NULL from getenv; the literal con
                         replay_segment_len,
 ```
 
-Source: `engines/ds4/ds4.c:66657`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66648`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             replayed_exact = ok;
@@ -4078,7 +4078,7 @@ DS4_CUDA_GREEDY_VEC4_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:66621`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66612`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const float margin = top2.value0 - top2.value1;
@@ -4108,7 +4108,7 @@ E10 synchronizing-independent host encoding timer: 1 logs per-token HC call/repl
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42592`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42583`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_hc_graph_profile_on(void) {
@@ -4258,7 +4258,7 @@ DS4_CUDA_KV_CACHE_VERBOSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25220`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                        DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0)
@@ -4270,7 +4270,7 @@ Source: `engines/ds4/ds4.c:25220`. Unset read: NULL from getenv; the literal con
                         "kv_bytes=%llu raw_cache_bytes=%llu\n",
 ```
 
-Source: `engines/ds4/ds4.c:25252`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool emit = ((pos + 1u) % ratio) == 0u;
@@ -4516,7 +4516,7 @@ DS4_CUDA_MIXED_PREFILL_DECODE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81391`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:81382`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     }
@@ -4528,7 +4528,7 @@ Source: `engines/ds4/ds4.c:81391`. Unset read: Wrapper/conditional default: see 
 #endif
 ```
 
-Source: `engines/ds4/ds4.c:85620`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:85611`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         (uint32_t)prefill_prompt->len - start;
@@ -4546,7 +4546,7 @@ DS4_CUDA_MIXED_ROUTED_MAX_PREFILL: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85123`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85114`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * must use the serialized public-API fallback. */
@@ -4564,7 +4564,7 @@ DS4_CUDA_MIXED_ROUTED_SCATTER: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84584`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84575`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
             "DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS", true);
@@ -5038,7 +5038,7 @@ DS4_CUDA_MOE_NO_DIRECT_DOWN_SUM6: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43951`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43942`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!placement || g->quality || g->imatrix || g->image_count ||
@@ -5590,7 +5590,7 @@ DS4_CUDA_MOE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42623`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                     const ds4_layer_weights *l, uint32_t il, int token) {
@@ -5602,7 +5602,7 @@ Source: `engines/ds4/ds4.c:42632`. Unset read: NULL from getenv; the literal con
             ds41_attention(g, m, l, il, false) && DS41_MARK(2) &&
 ```
 
-Source: `engines/ds4/ds4.c:42642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->tp_world != 2 || g->streaming || g->quality || g->imatrix ||
@@ -5890,7 +5890,7 @@ DS4_CUDA_NO_COMPRESSOR_PREFILL_BATCH: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31380`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:31371`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const uint32_t n_aligned = n_tokens - (n_tokens % ratio);
@@ -5902,7 +5902,7 @@ Source: `engines/ds4/ds4.c:31380`. Unset read: NULL from getenv; the literal con
                  (n_aligned != 0u &&
 ```
 
-Source: `engines/ds4/ds4.c:31728`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:31719`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 const uint32_t n_aligned = n_tokens - (n_tokens % ratio);
@@ -5920,7 +5920,7 @@ DS4_CUDA_NO_COMPRESSOR_PREFILL_RAGGED: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30673`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:30664`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -5986,7 +5986,7 @@ DS4_CUDA_NO_DECODE_VALUE512: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83076`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83067`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_DECODE_SCORE4") != NULL ||
@@ -6076,7 +6076,7 @@ DS4_CUDA_NO_EXACT_SCORE_SPLIT_DECODE: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83071`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83062`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         DS4_N_HEAD_DIM != 512u || gpu_graph_attn_comp_cache_is_f16() ||
@@ -7054,7 +7054,7 @@ DS4_CUDA_NO_SCORE_TILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:83083`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83074`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_CUDA_EXACT_SCORE_SPLIT_DIM2") != NULL ||
@@ -7684,7 +7684,7 @@ DS4_CUDA_PREFILL_PIPELINE_SEQUENTIAL: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37660`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37651`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double t0 = getenv("DS4_METAL_GRAPH_PREFILL_PROFILE") ? now_sec() : 0.0;
@@ -7702,7 +7702,7 @@ DS4_CUDA_PREFILL_PIPELINE_SYNC_BOUNDARY: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37707`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37698`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     ds4_gpu_tensor *src = g->batch_cur_hc_by_tier[stages[stage_i].tier];
@@ -7714,7 +7714,7 @@ Source: `engines/ds4/ds4.c:37707`. Unset read: NULL from getenv; the literal con
                     ok = src && dst &&
 ```
 
-Source: `engines/ds4/ds4.c:37781`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37772`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     ds4_gpu_tensor *src = g->batch_cur_hc_by_tier[stages[stage_i].tier];
@@ -8290,7 +8290,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_ALIAS: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84835`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84826`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool alias_attn_pre =
@@ -8308,7 +8308,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_CORE: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84838`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84829`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_core =
@@ -8320,7 +8320,7 @@ Source: `engines/ds4/ds4.c:84838`. Unset read: Wrapper/conditional default: see 
         gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_QKV", true) &&
 ```
 
-Source: `engines/ds4/ds4.c:85198`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:85189`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -8338,7 +8338,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_POST: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84850`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84841`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_post =
@@ -8350,7 +8350,7 @@ Source: `engines/ds4/ds4.c:84850`. Unset read: Wrapper/conditional default: see 
         int32_t *router_tokens = malloc((size_t)count * sizeof(*router_tokens));
 ```
 
-Source: `engines/ds4/ds4.c:85203`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:85194`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_post =
@@ -8368,7 +8368,7 @@ DS4_CUDA_SESSION_BATCH_ATTN_PRE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84831`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84822`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_attn_pre =
@@ -8386,7 +8386,7 @@ DS4_CUDA_SESSION_BATCH_FFN_PRE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84827`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84818`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_ffn_pre =
@@ -8404,7 +8404,7 @@ DS4_CUDA_SESSION_BATCH_INTERLEAVE: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85505`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85496`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -8422,7 +8422,7 @@ DS4_CUDA_SESSION_BATCH_KV_STORE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84846`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84837`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_kv_store =
@@ -8434,7 +8434,7 @@ Source: `engines/ds4/ds4.c:84846`. Unset read: Wrapper/conditional default: see 
         gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_ATTN_POST", true) &&
 ```
 
-Source: `engines/ds4/ds4.c:85213`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:85204`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_kv_store =
@@ -8452,7 +8452,7 @@ DS4_CUDA_SESSION_BATCH_MOE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43950`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:43941`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         (!g->streaming && g->tp_world == 2);
@@ -8464,7 +8464,7 @@ Source: `engines/ds4/ds4.c:43950`. Unset read: Wrapper/conditional default: see 
         if (l->ffn_gate_exps->type != DS4_TENSOR_IQ2_XXS ||
 ```
 
-Source: `engines/ds4/ds4.c:80823`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:80814`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         return false;
@@ -8476,7 +8476,7 @@ Source: `engines/ds4/ds4.c:80823`. Unset read: Wrapper/conditional default: see 
         ds4_session *s = items[i].session;
 ```
 
-Source: `engines/ds4/ds4.c:84819`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84810`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -8494,7 +8494,7 @@ DS4_CUDA_SESSION_BATCH_MOE_COMBINE_ROWS: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84364`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84355`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -8506,7 +8506,7 @@ Source: `engines/ds4/ds4.c:84364`. Unset read: Wrapper/conditional default: see 
                 (uint32_t)routed_out_dim, DS4_N_EXPERT / 2u,
 ```
 
-Source: `engines/ds4/ds4.c:84582`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84573`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const uint64_t out_stride = routed_out_dim * sizeof(float);
@@ -8524,7 +8524,7 @@ DS4_CUDA_SESSION_BATCH_QKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84842`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84833`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_qkv =
@@ -8536,7 +8536,7 @@ Source: `engines/ds4/ds4.c:84842`. Unset read: Wrapper/conditional default: see 
         gpu_graph_tp_env_flag("DS4_CUDA_SESSION_BATCH_KV_STORE", true) &&
 ```
 
-Source: `engines/ds4/ds4.c:85208`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:85199`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_qkv =
@@ -8554,7 +8554,7 @@ DS4_CUDA_SESSION_BATCH_SHARED: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:84823`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:84814`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool group_shared_ffn =
@@ -8572,7 +8572,7 @@ E10 default CUDA single-GPU V4.1 HC input graphs. Explicit0 keeps eager executio
 
 Scope: ds4, rtx-llama. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42587`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42578`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_single_hc_graphs_on(void) {
@@ -8620,7 +8620,7 @@ static bool gpu_graph_cuda_q_norm_rope_fuse_requested(void) {
     return gpu_graph_tp_env_flag("DS4_CUDA_Q_NORM_ROPE_FUSE", true);
 ```
 
-Source: `engines/ds4/ds4.c:83072`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83063`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_GRAPH_DUMP_PREFIX") != NULL ||
@@ -8776,7 +8776,7 @@ DS4_CUDA_SPLITKV_SPEC_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:66706`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66697`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t start = (uint32_t)s->checkpoint.len;
@@ -8788,7 +8788,7 @@ Source: `engines/ds4/ds4.c:66706`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:66714`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66705`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8800,7 +8800,7 @@ Source: `engines/ds4/ds4.c:66714`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:66724`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66715`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int draft0 = sample_argmax(s->logits, DS4_N_VOCAB);
@@ -8812,7 +8812,7 @@ Source: `engines/ds4/ds4.c:66724`. Unset read: NULL from getenv; the literal con
                     draft0 < 0 ? "no-draft0" : "eos",
 ```
 
-Source: `engines/ds4/ds4.c:66737`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66728`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     memset(&frontier, 0, sizeof(frontier));
@@ -8824,7 +8824,7 @@ Source: `engines/ds4/ds4.c:66737`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:66769`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66760`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8836,7 +8836,7 @@ Source: `engines/ds4/ds4.c:66769`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:66838`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66829`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -8848,7 +8848,7 @@ Source: `engines/ds4/ds4.c:66838`. Unset read: NULL from getenv; the literal con
                     draft0,
 ```
 
-Source: `engines/ds4/ds4.c:66943`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66934`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -8866,7 +8866,7 @@ DS4_CUDA_SPLITKV_SPEC_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:66745`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:66736`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -9250,7 +9250,7 @@ DS4_CUDA_STREAMING_HOST_HOTLIST: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:70861`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:70852`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t hot_experts = 0;
@@ -9268,7 +9268,7 @@ DS4_CUDA_STREAMING_HOST_SKIP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:70871`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:70862`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int host_skip_zero = 0;
@@ -9718,7 +9718,7 @@ static bool gpu_graph_cuda_greedy_split_top1_requested(void) {
     const char *no = getenv("DS4_CUDA_NO_GREEDY_SPLIT_TOP1");
 ```
 
-Source: `engines/ds4/ds4.c:61466`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61457`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint64_t output_logits_elems  = vocab_dim;
@@ -9730,7 +9730,7 @@ Source: `engines/ds4/ds4.c:61466`. Unset read: NULL from getenv; the literal con
     if (planner_n_gpus >= 2 && (planner_n_gpus & 1) == 0 &&
 ```
 
-Source: `engines/ds4/ds4.c:71375`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71366`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -9760,7 +9760,7 @@ static uint32_t gpu_graph_cuda_tp_output_requested_ways(void) {
     if (end != env && *end == '\0' && v >= 2 && v <= DS4_MAX_GPUS) {
 ```
 
-Source: `engines/ds4/ds4.c:61473`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61464`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         tp_decode_requested && tp_output_requested) {
@@ -10258,7 +10258,7 @@ DS4_DISABLE_EAGER_DECODE_MAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60926`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60917`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      *     If it somehow fails here, decode still builds it lazily exactly as before.
@@ -10270,7 +10270,7 @@ Source: `engines/ds4/ds4.c:60926`. Unset read: NULL from getenv; the literal con
         const double t_map0 = now_sec();
 ```
 
-Source: `engines/ds4/ds4.c:60949`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60940`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -10624,7 +10624,7 @@ DS4_DS41_DSPARK_ADAPTIVE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62170`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62161`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (n >= 0 && n <= DS4_DSPARK_MAX_BLOCK_SIZE) c.min_draft = (uint32_t)n;
@@ -10642,7 +10642,7 @@ DS4_DS41_DSPARK_FAIL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85769`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85760`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * once per process, to exercise the ordinary fault exit. */
@@ -10660,7 +10660,7 @@ DS4_DS41_DSPARK_LOSS_BUDGET: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62171`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62162`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     }
@@ -10678,7 +10678,7 @@ DS4_DS41_DSPARK_MIN_DRAFT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62165`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62156`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (n >= 0.0 && n <= 1.0) c.p_min = (float)n;
@@ -10696,7 +10696,7 @@ DS4_DS41_DSPARK_MIN_SERIAL_TOKENS: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62146`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static ds41_adapt_config ds41_admission_config(void) {
@@ -10714,7 +10714,7 @@ DS4_DS41_DSPARK_P_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62160`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62151`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (n >= 0 && n <= DS41_ADAPT_ENTRY_MAX) c.min_serial_tokens = (uint32_t)n;
@@ -10732,7 +10732,7 @@ DS4_DS41_DSPARK_REASONING_SERIAL: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62172`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62163`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     c.enabled = ds41_admission_enabled("DS4_DS41_DSPARK_ADAPTIVE");
@@ -10750,7 +10750,7 @@ DS4_DSPARK_CACHE_RESERVE_GB: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72053`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72044`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint64_t reserve = 4ull * 1024ull * 1024ull * 1024ull + (1ull << 29);
@@ -10768,7 +10768,7 @@ DS4_DSPARK_CONFIDENCE_THRESHOLD: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72746`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72737`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * Markov block. */
@@ -10786,7 +10786,7 @@ DS4_DSPARK_CYCLE_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81982`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81973`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -10798,7 +10798,7 @@ Source: `engines/ds4/ds4.c:81982`. Unset read: NULL from getenv; the literal con
                         (now_sec() - verify_t0) * 1000.0, verify_timing.upload_ms, verify_timing.layer_ms,
 ```
 
-Source: `engines/ds4/ds4.c:82057`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82048`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -10810,7 +10810,7 @@ Source: `engines/ds4/ds4.c:82057`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:82132`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82123`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -10828,7 +10828,7 @@ DS4_DSPARK_DISABLE_ADAPTIVE_DRAFTING: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85682`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85673`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static int ds41_draft_adapt_off(void) {
@@ -10846,7 +10846,7 @@ DS4_DSPARK_DISABLE_FINAL_OUTPUT_ALIAS: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35791`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35782`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ok &&
@@ -10858,7 +10858,7 @@ Source: `engines/ds4/ds4.c:35791`. Unset read: NULL from getenv; the literal con
                                   0,
 ```
 
-Source: `engines/ds4/ds4.c:36038`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36029`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static ds4_gpu_tensor *gpu_graph_dspark_final_output_hc(const ds4_gpu_graph *g) {
@@ -10876,7 +10876,7 @@ DS4_DSPARK_DISABLE_FUSED_CPU_MARKOV_ARGMAX: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36577`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cache = -1;
@@ -10894,7 +10894,7 @@ DS4_DSPARK_DISABLE_REUSE_CONFIDENCE0_MARKOV: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36595`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36586`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cache = -1;
@@ -10912,7 +10912,7 @@ DS4_DSPARK_DISABLE_VERIFY_SELECTED_PROFILE: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38825`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38816`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool gpu_graph_dspark_verify_selected_profile_enabled(void) {
@@ -10930,7 +10930,7 @@ DS4_DSPARK_EXEC_TIER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72019`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72010`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -10948,7 +10948,7 @@ DS4_DSPARK_EXPERT_OVERLAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38960`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38951`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ok) ok = ds4_gpu_end_commands() != 0;
@@ -10966,7 +10966,7 @@ DS4_DSPARK_FAKE_ARGMAX_PROPOSAL: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:79249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79240`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool probe_log = probe && probe[0];
@@ -10984,7 +10984,7 @@ DS4_DSPARK_GUARD_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35470`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35461`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * the leading suspect. Print which term trips and the values behind it. */
@@ -11002,7 +11002,7 @@ DS4_DSPARK_NO_GPU_MARKOV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36876`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36867`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * full logits row; the CPU path applies the bias and argmax instead. */
@@ -11014,7 +11014,7 @@ Source: `engines/ds4/ds4.c:36876`. Unset read: NULL from getenv; the literal con
             final->markov_w2->type == DS4_TENSOR_Q8_0) {
 ```
 
-Source: `engines/ds4/ds4.c:79545`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79536`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if (gpu_markov_enabled &&
@@ -11032,7 +11032,7 @@ DS4_DSPARK_NO_MARKOV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:36577`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:36568`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -11050,7 +11050,7 @@ DS4_DSPARK_PROBE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:79246`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79237`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                                   int token,
@@ -11068,7 +11068,7 @@ DS4_DSPARK_PROP_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34827`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:34818`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* DS4_DSPARK_PROP_PROFILE=1: break the setup block into phases to
@@ -11086,7 +11086,7 @@ DS4_DSPARK_SCHEDULER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62054`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62045`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11104,7 +11104,7 @@ DS4_DSPARK_SCHEDULER_BREAK_EVEN_WINDOW: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62102`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62093`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11122,7 +11122,7 @@ DS4_DSPARK_SCHEDULER_COLD_LOW_CONFIDENCE_MILLI: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62122`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62113`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11140,7 +11140,7 @@ DS4_DSPARK_SCHEDULER_COLD_LOW_CONFIDENCE_SKIP: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62114`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62105`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11158,7 +11158,7 @@ DS4_DSPARK_SCHEDULER_MAX_EXTRA_SAVED_RATIO_MILLI: advanced engine setting; built
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62098`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62089`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static uint32_t ds4_dspark_scheduler_max_extra_saved_ratio_milli(void) {
@@ -11176,7 +11176,7 @@ DS4_DSPARK_SCHEDULER_MAX_MS_PER_ACCEPT_MILLI: advanced engine setting; built-in 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62093`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62084`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static uint32_t ds4_dspark_scheduler_max_ms_per_accept_milli(void) {
@@ -11194,7 +11194,7 @@ DS4_DSPARK_SCHEDULER_MIN_AVG_MILLI: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62088`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62079`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         ds4_dspark_rocm_gfx1151_fast_path() ? 4000u : 1500u;
@@ -11212,7 +11212,7 @@ DS4_DSPARK_SCHEDULER_NO_DRAFT_SKIP: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62106`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62097`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11230,7 +11230,7 @@ DS4_DSPARK_SCHEDULER_SHORT_ACCEPT_NO_DRAFT_SKIP: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62110`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62101`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11248,7 +11248,7 @@ DS4_DSPARK_SCHEDULER_SKIP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62077`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62068`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         ds4_session_dspark_seed_batch_enabled(s) && ds4_gpu_device_is_spark())
@@ -11266,7 +11266,7 @@ DS4_DSPARK_SCHEDULER_SLOW_SKIP: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62081`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62072`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11284,7 +11284,7 @@ DS4_DSPARK_SCHEDULER_TAIL_MIN_TOKENS: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62118`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62109`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -11302,7 +11302,7 @@ DS4_DSPARK_SCHEDULER_WINDOW: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62063`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:62054`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const uint32_t fallback =
@@ -11320,7 +11320,7 @@ DS4_DSPARK_SEED_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62031`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62022`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds4_session_dspark_seed_batch_enabled(
@@ -11338,7 +11338,7 @@ DS4_DSPARK_SEED_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35076`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35067`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * says which half fails, instead of another paper derivation. */
@@ -11350,7 +11350,7 @@ Source: `engines/ds4/ds4.c:35076`. Unset read: NULL from getenv; the literal con
                     stage, n_tokens,
 ```
 
-Source: `engines/ds4/ds4.c:35122`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35113`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * depend on `stage` - so print which step diverges rather than reasoning about it. */
@@ -11362,7 +11362,7 @@ Source: `engines/ds4/ds4.c:35122`. Unset read: NULL from getenv; the literal con
          * for stage 1 - so presence and type/dim are not the issue. Print the OFFSETS: the support
 ```
 
-Source: `engines/ds4/ds4.c:35308`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35299`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * separately so the actual blocker is named rather than guessed. */
@@ -11374,7 +11374,7 @@ Source: `engines/ds4/ds4.c:35308`. Unset read: NULL from getenv; the literal con
                     "| zero=%d over_prefill=%d over_cache=%d nostage=%d maxstage=%d "
 ```
 
-Source: `engines/ds4/ds4.c:35337`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35328`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool ok = ds4_gpu_begin_commands() != 0;
@@ -11386,7 +11386,7 @@ Source: `engines/ds4/ds4.c:35337`. Unset read: NULL from getenv; the literal con
         ok = gpu_graph_eval_dspark_stage0_batch(g,
 ```
 
-Source: `engines/ds4/ds4.c:72029`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72020`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* [DIAG 2026-08-16] Does this run at all, and with which pointer? Three principled edits in a
@@ -11404,7 +11404,7 @@ DS4_DSPARK_SPEC_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:62284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62275`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     s->dspark_sched_skipped_cycle = true;
@@ -11416,7 +11416,7 @@ Source: `engines/ds4/ds4.c:62284`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:62351`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62342`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             s->dspark_sched_skip = skip;
@@ -11428,7 +11428,7 @@ Source: `engines/ds4/ds4.c:62351`. Unset read: NULL from getenv; the literal con
                     s->dspark_sched_skip,
 ```
 
-Source: `engines/ds4/ds4.c:62381`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62372`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         measured_unprofitable) {
@@ -11440,7 +11440,7 @@ Source: `engines/ds4/ds4.c:62381`. Unset read: NULL from getenv; the literal con
                     s->dspark_sched_cycles,
 ```
 
-Source: `engines/ds4/ds4.c:62418`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62409`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             s->dspark_sched_bypass = true;
@@ -11452,7 +11452,7 @@ Source: `engines/ds4/ds4.c:62418`. Unset read: NULL from getenv; the literal con
                         s->dspark_sched_accepted,
 ```
 
-Source: `engines/ds4/ds4.c:62436`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:62427`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -11464,7 +11464,7 @@ Source: `engines/ds4/ds4.c:62436`. Unset read: NULL from getenv; the literal con
                     "saved=%.3fms extra=%.3fms skip=%u\n",
 ```
 
-Source: `engines/ds4/ds4.c:81788`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int scheduler_seed_tokens =
@@ -11476,7 +11476,7 @@ Source: `engines/ds4/ds4.c:81788`. Unset read: NULL from getenv; the literal con
         (stats_enabled ||
 ```
 
-Source: `engines/ds4/ds4.c:85808`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85799`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -11488,7 +11488,7 @@ Source: `engines/ds4/ds4.c:85808`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:85906`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85897`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         d->rewind_pos == P1 && d->rewind_rows == k + 1u;
@@ -11500,7 +11500,7 @@ Source: `engines/ds4/ds4.c:85906`. Unset read: NULL from getenv; the literal con
     else ds41_draft_adapt(d, true, k, 1u + j + (replacement >= 0), now_sec() - t0, propose_s);
 ```
 
-Source: `engines/ds4/ds4.c:86059`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86050`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             dspark_tail_skip = true;
@@ -11518,7 +11518,7 @@ DS4_DSPARK_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35422`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:35413`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11536,7 +11536,7 @@ DS4_DSPARK_STAGE_PROFILE_STAGE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:35423`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:35414`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool gpu_graph_dspark_stage_profile_enabled(uint32_t stage) {
@@ -11554,7 +11554,7 @@ DS4_DSPARK_STATS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:74995`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:74986`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #ifndef DS4_NO_GPU
@@ -11590,7 +11590,7 @@ DS4_DSPARK_VERIFY_CAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:79305`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:79296`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         const ds4_dspark_weights *dw = &s->engine->dspark_weights;
@@ -11608,7 +11608,7 @@ DS4_DSPARK_VERIFY_HEAD_NO_TP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:28169`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:28160`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                  weights->output->dim[1] == vocab_dim &&
@@ -11644,7 +11644,7 @@ DS4_DSPARK_VERIFY_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38903`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38894`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (verify_profile_left < 0) {
@@ -11662,7 +11662,7 @@ DS4_DSPARK_VERIFY_SELECTED_PROFILE: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38824`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38815`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -11680,7 +11680,7 @@ DS4_DSPARK_VERIFY_SPLIT_HEAD: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:38871`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:38862`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * Seed-plus-five blocks still need fresh states for every partial prefix. */
@@ -11698,7 +11698,7 @@ DS4_DSPARK_VERIFY_TOPS_CHECK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39025`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39016`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                    row_tops,
@@ -11782,7 +11782,7 @@ DS4_EXPERT_HOTLIST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72990`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72981`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         expert_profile_path = getenv("DS4_EXPERT_PROFILE");
@@ -11800,7 +11800,7 @@ DS4_EXPERT_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:72988`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:72979`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char *expert_profile_path = opt->expert_profile_path;
@@ -11908,7 +11908,7 @@ DS4_GLM53_DISABLE_INDEXED_PREFILL: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48026`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48017`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ds4_model_is_glm53()) {
@@ -11926,7 +11926,7 @@ DS4_GLM53_DISABLE_MIXED_PREFILL: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48009`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48000`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * from causal dense to indexed sparse inside one layer-major chunk. */
@@ -11944,7 +11944,7 @@ DS4_GLM_ABLATE_COMBINE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50417`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50408`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t bytes = (uint64_t)n_tokens * DS4_N_EMBD * sizeof(float);
@@ -12028,7 +12028,7 @@ DS4_GLM_DECODE_ABLATE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50662`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50653`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -12046,7 +12046,7 @@ DS4_GLM_DECODE_FLUSH_INTERVAL: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:57162`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:57153`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         decode_layer_flush_interval = use_indexed_attention ? 4u : 32u;
@@ -12064,7 +12064,7 @@ DS4_GLM_DISABLE_FLASH_PREFILL: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:51378`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:51369`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -12082,7 +12082,7 @@ DS4_GLM_DISABLE_STREAMING_TOKEN_PREFILL: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:57052`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:57043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t                 n_tokens) {
@@ -12136,7 +12136,7 @@ DS4_GLM_HIDDEN_DUMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39561`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39552`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * on each call — run with -n 0 so the file ends as the final prompt row. */
@@ -12148,7 +12148,7 @@ static void glm_debug_dump_hidden_row(const ds4_gpu_tensor *t, uint32_t row) {
     if (ds4_gpu_tensor_read((ds4_gpu_tensor *)t,
 ```
 
-Source: `engines/ds4/ds4.c:39597`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39588`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                      uint32_t il,
@@ -12160,7 +12160,7 @@ Source: `engines/ds4/ds4.c:39597`. Unset read: NULL from getenv; the literal con
         snprintf(full, sizeof(full), "%s.%s.L%02u.T%02u", path, tag, il, pos);
 ```
 
-Source: `engines/ds4/ds4.c:39625`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39616`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                         uint32_t il,
@@ -12178,7 +12178,7 @@ DS4_GLM_HIDDEN_DUMP_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39581`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39572`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * -2 = every layer, one file per layer). */
@@ -12196,7 +12196,7 @@ DS4_GLM_KV_DUMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:77603`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:77594`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (rc == 0) glm_debug_dump_prefill_logits(s->logits);
@@ -12214,7 +12214,7 @@ DS4_GLM_LOGIT_DUMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39647`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39638`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static void glm_debug_dump_prefill_logits(const float *logits) {
@@ -12232,7 +12232,7 @@ DS4_GLM_MEMORY_GUARD: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:47033`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47024`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -12250,7 +12250,7 @@ DS4_GLM_MEMORY_GUARD_FRACTION: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:47534`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:47525`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -12268,7 +12268,7 @@ DS4_GLM_MEMORY_GUARD_REPORT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:47488`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47479`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -12280,7 +12280,7 @@ Source: `engines/ds4/ds4.c:47488`. Unset read: NULL from getenv; the literal con
                     "ds4: GLM streaming largest active model group %s: %.2f GiB\n",
 ```
 
-Source: `engines/ds4/ds4.c:47662`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:47653`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -12298,7 +12298,7 @@ DS4_GLM_MEMORY_GUARD_RESERVE_GB: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:47539`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:47530`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                 budget_base, model_bytes, ds4_model_is_glm53());
@@ -12490,7 +12490,7 @@ DS4_GLM_MTP_PROBE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80012`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80003`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          * Both TP ranks must set the env (the draft's routed experts ride
@@ -12502,7 +12502,7 @@ Source: `engines/ds4/ds4.c:80012`. Unset read: NULL from getenv; the literal con
             float nbest = s->logits[0];
 ```
 
-Source: `engines/ds4/ds4.c:85974`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85965`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!accepted || accepted_cap <= 0) return 0;
@@ -12520,7 +12520,7 @@ DS4_GLM_PREFILL_TRUNC: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:78048`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78039`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_tokens glm_trunc_prompt;
@@ -12538,7 +12538,7 @@ DS4_GLM_RESUME_PREFILL_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39403`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39394`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -12550,7 +12550,7 @@ static uint32_t glm_graph_resume_prefill_min_tokens(void) {
         if (endp != env) {
 ```
 
-Source: `engines/ds4/ds4.c:39418`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39409`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* Measured on M5 Max and GB10: one token is marginally faster through
@@ -12604,7 +12604,7 @@ DS4_GLM_STREAMING_DECODE_FULL_LAYER_MAP: advanced engine setting; built-in defau
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48197`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:48188`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (glm_graph_env_present("DS4_ROCM_GLM_STREAMING_DECODE_FULL_LAYER_MAP",
@@ -12622,7 +12622,7 @@ DS4_GLM_STREAMING_TOKEN_PREFILL_MAX: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:57034`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:57025`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             "DS4_ROCM_GLM_STREAMING_TOKEN_PREFILL_MAX",
@@ -12640,7 +12640,7 @@ DS4_GLM_SYNC_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:78285`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78276`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             s->glm_graph.full_kv_cache &&
@@ -12658,7 +12658,7 @@ DS4_GLM_TP_DEBUG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50318`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50309`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!g->routed_gate || !g->routed_up || !g->routed_down ||
@@ -12670,7 +12670,7 @@ Source: `engines/ds4/ds4.c:50318`. Unset read: NULL from getenv; the literal con
                         (void *)g->routed_down,
 ```
 
-Source: `engines/ds4/ds4.c:50977`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50968`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t tp_ffn_slot = il * DS4_TP_GATES_PER_LAYER + DS4_TP_GATE_FFN;
@@ -12682,7 +12682,7 @@ Source: `engines/ds4/ds4.c:50977`. Unset read: NULL from getenv; the literal con
         ok = glm_graph_routed_moe_one_dispatch(
 ```
 
-Source: `engines/ds4/ds4.c:57141`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:57132`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         bool               defer_completion) {
@@ -12694,7 +12694,7 @@ Source: `engines/ds4/ds4.c:57141`. Unset read: NULL from getenv; the literal con
         token < 0 || token >= (int)DS4_N_VOCAB ||
 ```
 
-Source: `engines/ds4/ds4.c:58266`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58257`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (void)ds4_gpu_synchronize();
@@ -12724,7 +12724,7 @@ DS4_GLM_TP_EXACT_PREFILL_MAX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:78220`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:78211`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         uint32_t glm_exact_prefill_max = 64;
@@ -12742,7 +12742,7 @@ DS4_GLM_TP_HEAD_SPLIT_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39551`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39542`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -12802,7 +12802,7 @@ DS4_HOTLIST_SEED_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34098`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:34089`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * seed to the prefill->decode transition" or something else. Print a sequence number and let
@@ -12820,7 +12820,7 @@ DS4_INDEXER_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:31643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:31634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
              * topk_prefill_needed - so print the state instead of deriving a fourth. */
@@ -12838,7 +12838,7 @@ DS4_LOCK_FILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:61774`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61765`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * stale accidental second run is more dangerous than a normal CLI error. */
@@ -12904,7 +12904,7 @@ Source: `engines/ds4/ds4.c:20088`. Unset read: NULL from getenv; the literal con
     const bool enable_splitkv_batch_verify =
 ```
 
-Source: `engines/ds4/ds4.c:25221`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25214`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 : gpu_graph_decode_kv_store(gpu_graph_kv(g), raw_cache, raw_cap, raw_row);
@@ -12916,7 +12916,7 @@ Source: `engines/ds4/ds4.c:25221`. Unset read: NULL from getenv; the literal con
                         il,
 ```
 
-Source: `engines/ds4/ds4.c:25253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25246`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool decode_index_diag =
@@ -12940,7 +12940,7 @@ Source: `engines/ds4/ds4.c:20791`. Unset read: Wrapper/conditional default: see 
 
 ```
 
-Source: `engines/ds4/ds4.c:30553`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30544`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                 il) ||
@@ -12958,7 +12958,7 @@ DS4_METAL_DECODE_STAGE_PROFILE_LAYER: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30554`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30545`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            gpu_graph_stage_profile_enabled_for_layer(
@@ -13036,7 +13036,7 @@ DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48276`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48267`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (glm_graph_env_present(
@@ -13054,7 +13054,7 @@ DS4_METAL_DISABLE_GLM_STREAMING_PREFILL_FULL_LAYER_PREPARE: advanced engine sett
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48294`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48285`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            !glm_graph_env_present(
@@ -13072,7 +13072,7 @@ DS4_METAL_DISABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50567`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:50558`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                               "DS4_METAL_DISABLE_STREAMING_SELECTED_ASYNC_LOAD") ||
@@ -13294,7 +13294,7 @@ DS4_METAL_DISABLE_PRE_M5_ATTN_INV_ROPE_FUSE: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24555`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24552`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * 64-threadgroup dispatch per layer. */
@@ -13312,7 +13312,7 @@ DS4_METAL_DISABLE_PRE_M5_COMPRESSOR_QUAD_STORE: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25291`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (ok && quad_store == 0 && ratio == 4u &&
@@ -13372,7 +13372,7 @@ DS4_METAL_DISABLE_PRE_M5_HC_NORM_MIX_FUSE: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24742`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24739`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             layer->hc_attn_fn->type == DS4_TENSOR_F16 &&
@@ -13384,7 +13384,7 @@ Source: `engines/ds4/ds4.c:24742`. Unset read: NULL from getenv; the literal con
         if (ok && !attn_hc_producer_pre_norm_fused) {
 ```
 
-Source: `engines/ds4/ds4.c:26321`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26312`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             layer->hc_ffn_fn->type == DS4_TENSOR_F16 &&
@@ -13402,7 +13402,7 @@ DS4_METAL_DISABLE_PRE_M5_KV_ROPE_FP8_FUSE: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25191`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25184`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !gpu_graph_use_reference_kv_decode() &&
@@ -13426,7 +13426,7 @@ DS4_METAL_DISABLE_PRE_M5_QKV_NORM_KV_STORE_FUSE: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:25050`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 raw_row < raw_cap &&
@@ -13444,7 +13444,7 @@ DS4_METAL_DISABLE_PRE_M5_ROUTER_SHARED_FUSE: advanced engine setting; built-in d
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26427`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26418`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             layer->ffn_gate_inp->dim[1] == DS4_N_EXPERT &&
@@ -13492,7 +13492,7 @@ DS4_METAL_DISABLE_PRO_Q4_EXPERT_TABLE_PRELOAD: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:71119`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71110`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         e->ssd_streaming ||
@@ -13756,7 +13756,7 @@ DS4_METAL_DISABLE_STREAMING_COLD_DECODE_PREFILL: advanced engine setting; built-
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:33892`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:33883`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (glm_graph_env_present(
@@ -13774,7 +13774,7 @@ DS4_METAL_DISABLE_STREAMING_DECODE_PREFILL: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:33817`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:33808`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     (void)g;
@@ -13972,7 +13972,7 @@ Source: `engines/ds4/ds4.c:21916`. Unset read: Wrapper/conditional default: see 
         if (g) {
 ```
 
-Source: `engines/ds4/ds4.c:53990`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53981`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE") &&
@@ -14014,7 +14014,7 @@ Source: `engines/ds4/ds4.c:21925`. Unset read: Wrapper/conditional default: see 
     if (!model || !weights || il >= DS4_N_LAYER) return false;
 ```
 
-Source: `engines/ds4/ds4.c:53964`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53955`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                               "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_PAGEIN") &&
@@ -14074,7 +14074,7 @@ Source: `engines/ds4/ds4.c:21894`. Unset read: Wrapper/conditional default: see 
         }
 ```
 
-Source: `engines/ds4/ds4.c:53979`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53970`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !layer_readahead &&
@@ -14164,7 +14164,7 @@ Source: `engines/ds4/ds4.c:21914`. Unset read: Wrapper/conditional default: see 
         }
 ```
 
-Source: `engines/ds4/ds4.c:53973`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53964`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
@@ -14176,7 +14176,7 @@ Source: `engines/ds4/ds4.c:53973`. Unset read: Wrapper/conditional default: see 
         !layer_readahead &&
 ```
 
-Source: `engines/ds4/ds4.c:53981`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53972`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREAD") &&
@@ -14188,7 +14188,7 @@ Source: `engines/ds4/ds4.c:53981`. Unset read: Wrapper/conditional default: see 
         !layer_pread &&
 ```
 
-Source: `engines/ds4/ds4.c:53988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53979`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !layer_readahead &&
@@ -14248,7 +14248,7 @@ Source: `engines/ds4/ds4.c:21905`. Unset read: Wrapper/conditional default: see 
         }
 ```
 
-Source: `engines/ds4/ds4.c:53971`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53962`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                               "DS4_METAL_ENABLE_STREAMING_PREFILL_LAYER_READAHEAD") &&
@@ -14416,7 +14416,7 @@ static bool gpu_graph_use_iq2_selected_async_early_commit(
         const ds4_gpu_graph *g) {
 ```
 
-Source: `engines/ds4/ds4.c:50565`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:50556`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (!g || !g->ssd_streaming) return false;
@@ -14518,7 +14518,7 @@ DS4_METAL_DISABLE_TP_BATCH_MOE: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:32920`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:32911`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         n_tokens > 1 && n_tokens <= 6 &&
@@ -14542,7 +14542,7 @@ DS4_METAL_DISABLE_V41_8K_CHUNK: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40558`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40549`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t ds41_prefill_limit(uint32_t ctx) {
@@ -14560,7 +14560,7 @@ DS4_METAL_DISABLE_V41_BATCH_ATTN: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43241`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_tp_batch_enabled(const ds41_gpu_graph *g) {
@@ -14572,7 +14572,7 @@ static bool ds41_tp_batch_enabled(const ds41_gpu_graph *g) {
 }
 ```
 
-Source: `engines/ds4/ds4.c:43561`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43552`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool stage_profile = getenv("DS4_METAL_V41_STAGE_PROFILE") != NULL;
@@ -14590,7 +14590,7 @@ DS4_METAL_DISABLE_V41_BATCH_COMPRESS: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42334`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42325`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_INDEX");
@@ -14608,7 +14608,7 @@ DS4_METAL_DISABLE_V41_BATCH_CORE: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43251`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43242`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return g->tp_world == 1 || (g->tp_world == 2 &&
@@ -14620,7 +14620,7 @@ Source: `engines/ds4/ds4.c:43251`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:43562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43553`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batch_moe = !getenv("DS4_METAL_DISABLE_V41_BATCH_MOE");
@@ -14638,7 +14638,7 @@ DS4_METAL_DISABLE_V41_BATCH_ENGRAM: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43578`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43569`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool xsweep = !getenv("DS4_METAL_DISABLE_V41_ENGRAM_XSWEEP") && g->tp_world == 1 && !g->streaming && !g->image_count &&
@@ -14650,7 +14650,7 @@ Source: `engines/ds4/ds4.c:43578`. Unset read: NULL from getenv; the literal con
             !memcmp(g->engram_carry.ids, ids, (size_t)total_count * sizeof(*ids))) {
 ```
 
-Source: `engines/ds4/ds4.c:43606`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43597`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool overlap_engram = total_count >= 1024u &&
@@ -14662,7 +14662,7 @@ Source: `engines/ds4/ds4.c:43606`. Unset read: NULL from getenv; the literal con
     if (carry_ok[0]) {
 ```
 
-Source: `engines/ds4/ds4.c:43740`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43731`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         ds41_engram_prefetch_wait(engram_pf, off + count, cancel, cancel_ud) :
@@ -14680,7 +14680,7 @@ DS4_METAL_DISABLE_V41_BATCH_HC: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43244`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_CORE") &&
@@ -14692,7 +14692,7 @@ static uint32_t ds41_prefill_count(const ds41_gpu_graph *g, uint32_t remaining) 
     /* TP batches use the bulk protocol; row-gate ablations stay token-major. */
 ```
 
-Source: `engines/ds4/ds4.c:43564`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43555`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool batch_core = batch_attention && !getenv("DS4_METAL_DISABLE_V41_BATCH_CORE");
@@ -14710,7 +14710,7 @@ DS4_METAL_DISABLE_V41_BATCH_HEAD: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:44101`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:44092`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * rather than allocating another vocabulary-sized buffer per session. */
@@ -14728,7 +14728,7 @@ DS4_METAL_DISABLE_V41_BATCH_INDEX: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42332`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42323`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool exact_rows = count <= DS4_TP_BATCH_MAX_ROWS && ds41_rows_attention_on();
@@ -14746,7 +14746,7 @@ DS4_METAL_DISABLE_V41_BATCH_INDEX_PROJ: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42226`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42217`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     ds41_prefill_row *b = &g->batch;
@@ -14764,7 +14764,7 @@ DS4_METAL_DISABLE_V41_BATCH_MOE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43252`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43243`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_ATTN") &&
@@ -14776,7 +14776,7 @@ Source: `engines/ds4/ds4.c:43252`. Unset read: NULL from getenv; the literal con
 static uint32_t ds41_prefill_count(const ds41_gpu_graph *g, uint32_t remaining) {
 ```
 
-Source: `engines/ds4/ds4.c:43560`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43551`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool profile = getenv("DS4_METAL_GRAPH_PREFILL_PROFILE") != NULL;
@@ -14794,7 +14794,7 @@ DS4_METAL_DISABLE_V41_BATCH_PUBLISH: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43349`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43340`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool ok = true;
@@ -14812,7 +14812,7 @@ DS4_METAL_DISABLE_V41_BATCH_TOPK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42263`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42254`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         /* on the exact rows path a few rows pick as decode steps do (the same
@@ -14830,7 +14830,7 @@ DS4_METAL_DISABLE_V41_COMPACT_CARRY: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40568`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40559`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -14842,7 +14842,7 @@ static uint32_t ds41_carry_cap(uint32_t ctx) {
     uint64_t cap = (UINT64_C(3) << 30) / row_bytes;
 ```
 
-Source: `engines/ds4/ds4.c:40820`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40811`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .carry_cap = ds41_carry_cap(ctx),
@@ -14854,7 +14854,7 @@ Source: `engines/ds4/ds4.c:40820`. Unset read: NULL from getenv; the literal con
     floats += (uint64_t)2 * 2 * DS4_N_EMBD * DS4_N_HC;
 ```
 
-Source: `engines/ds4/ds4.c:41006`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40997`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .carry_cap = ds41_carry_cap(ctx),
@@ -14866,7 +14866,7 @@ Source: `engines/ds4/ds4.c:41006`. Unset read: NULL from getenv; the literal con
 }
 ```
 
-Source: `engines/ds4/ds4.c:41194`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41185`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->prefill_cap = ds41_prefill_limit(ctx);
@@ -14890,7 +14890,7 @@ DS4_METAL_DISABLE_V41_DECODER_SUFFIX: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43570`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43561`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t suffix_rows = kept + (DS4_N_LAYER - 20u) * 127u;
@@ -14902,7 +14902,7 @@ Source: `engines/ds4/ds4.c:43570`. Unset read: NULL from getenv; the literal con
     if (!ds41_hash_tokens(g, &next_history, tokens, total_count, &ids[0][0][0]))
 ```
 
-Source: `engines/ds4/ds4.c:77975`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:77966`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const bool defer_decoder = !g->encoder_resident && count >= 16384u &&
@@ -14920,7 +14920,7 @@ DS4_METAL_DISABLE_V41_DECODE_QUEUE: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43175`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:43166`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool queue_layers = !g->imatrix && !layer_resident &&
@@ -14938,7 +14938,7 @@ DS4_METAL_DISABLE_V41_DEFER_DECODER: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:77976`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:77967`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 remaining - count >= 8192u &&
@@ -14962,7 +14962,7 @@ DS4_METAL_DISABLE_V41_ENGRAM_PIPELINE: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43608`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43599`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_BATCH_ENGRAM");
@@ -14980,7 +14980,7 @@ DS4_METAL_DISABLE_V41_ENGRAM_PREFETCH: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43577`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43568`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return false;
@@ -14992,7 +14992,7 @@ Source: `engines/ds4/ds4.c:43577`. Unset read: NULL from getenv; the literal con
         if (xsweep && g->engram_carry.ids && g->engram_carry.count == total_count &&
 ```
 
-Source: `engines/ds4/ds4.c:43605`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43596`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t engram_src_row = 0;
@@ -15010,7 +15010,7 @@ DS4_METAL_DISABLE_V41_ENGRAM_XSWEEP: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43576`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43567`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!ds41_hash_tokens(g, &next_history, tokens, total_count, &ids[0][0][0]))
@@ -15028,7 +15028,7 @@ DS4_METAL_DISABLE_V41_EXPAND_FUSION: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41439`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:41430`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return *cached != 0;
@@ -15046,7 +15046,7 @@ DS4_METAL_DISABLE_V41_HC_BLOCK_INPUT: advanced engine setting; built-in default 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41440`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:41431`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 }
@@ -15064,7 +15064,7 @@ DS4_METAL_DISABLE_V41_LAYER_PREFILL: qualified preset/runtime setting; override 
 
 Scope: ds4. Class: preset.
 
-Source: `engines/ds4/ds4.c:43259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* TP batches use the bulk protocol; row-gate ablations stay token-major. */
@@ -15076,7 +15076,7 @@ Source: `engines/ds4/ds4.c:43259`. Unset read: NULL from getenv; the literal con
     if (!g->streaming && g->tp_world == 1) minimum = 8u;
 ```
 
-Source: `engines/ds4/ds4.c:43964`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43955`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                         uint32_t remaining) {
@@ -15094,7 +15094,7 @@ DS4_METAL_DISABLE_V41_PACKED_INDEX: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:42245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42236`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * per-row causal width, including padding and tie order. */
@@ -15112,7 +15112,7 @@ DS4_METAL_DISABLE_V41_PREFILL_ALIAS: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40819`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40810`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .prefill_cap = ds41_prefill_limit(ctx),
@@ -15124,7 +15124,7 @@ Source: `engines/ds4/ds4.c:40819`. Unset read: NULL from getenv; the literal con
         floats += ((uint64_t)ctx / (i < 3 ? 2u : 1u) + 1u) * (512u + 128u) + 2u * 512u;
 ```
 
-Source: `engines/ds4/ds4.c:41005`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40996`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         .prefill_cap = ds41_prefill_limit(ctx),
@@ -15136,7 +15136,7 @@ Source: `engines/ds4/ds4.c:41005`. Unset read: NULL from getenv; the literal con
     return full - all + first;
 ```
 
-Source: `engines/ds4/ds4.c:41195`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41186`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     g->carry_cap = ds41_carry_cap(ctx);
@@ -15160,7 +15160,7 @@ DS4_METAL_DISABLE_V41_QUEUED_HEAD: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41563`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:41554`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 }
@@ -15190,7 +15190,7 @@ DS4_METAL_DISABLE_V41_SHORT_SWEEP: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41564`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:41555`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -15214,7 +15214,7 @@ DS4_METAL_DISABLE_V41_TP_DECODE_QUEUE: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43174`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43165`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * the GPU start while the host keeps encoding. */
@@ -15238,7 +15238,7 @@ DS4_METAL_DISABLE_V41_TP_SHARED_OWNER: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41882`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41873`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !tensor_nbytes(l->ffn_down_exps->type, DS4_N_FF_EXP, &down_row)) return false;
@@ -15250,7 +15250,7 @@ Source: `engines/ds4/ds4.c:41882`. Unset read: NULL from getenv; the literal con
     const ds4_tensor *bias = ds41_image_at(g, g->pos) ? l->ffn_exp_probs_vl : l->ffn_exp_probs_b;
 ```
 
-Source: `engines/ds4/ds4.c:41972`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:41963`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool ds41_moe_finish(ds41_gpu_graph *g, uint32_t il) {
@@ -15262,7 +15262,7 @@ static bool ds41_moe_finish(ds41_gpu_graph *g, uint32_t il) {
     if (!ds41_sum_partial(g, routed, il, DS4_TP_GATE_FFN)) return false;
 ```
 
-Source: `engines/ds4/ds4.c:42641`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:42632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             ds41_graph_after_moe(g, m, l, il, il + 1u == DS4_N_LAYER) && DS41_MARK(5);
@@ -15274,7 +15274,7 @@ Source: `engines/ds4/ds4.c:42641`. Unset read: NULL from getenv; the literal con
         return ds41_graph_layer(g, m, l, il, token);
 ```
 
-Source: `engines/ds4/ds4.c:43182`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43173`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -15286,7 +15286,7 @@ Source: `engines/ds4/ds4.c:43182`. Unset read: NULL from getenv; the literal con
             ok = gpu_graph_stream_map_layer(m, w, il) && ds4_gpu_begin_commands();
 ```
 
-Source: `engines/ds4/ds4.c:43988`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43979`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool prefill_only = prefill_rows == rows;
@@ -15310,7 +15310,7 @@ DS4_METAL_DISABLE_V41_TP_SLAB_WRITE: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41442`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:41433`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool ds41_hc_block_input_off(void) { static int c = -1; return ds41_env_flag("DS4_METAL_DISABLE_V41_HC_BLOCK_INPUT", &c); }
@@ -15328,7 +15328,7 @@ DS4_METAL_DISABLE_V41_TP_SMALL_PREFILL: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43967`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43958`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -15346,7 +15346,7 @@ DS4_METAL_DISABLE_V41_WIDE_CHUNK: advanced engine setting; built-in default reta
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40548`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -15364,7 +15364,7 @@ DS4_METAL_DISABLE_V41_WIDE_PREFILL: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43271`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43262`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         remaining > 2048u && remaining < 8192u && remaining % 2048u >= 256u &&
@@ -15376,7 +15376,7 @@ Source: `engines/ds4/ds4.c:43271`. Unset read: NULL from getenv; the literal con
         /* a short sweep keeps its final partial tile instead of a second decoder pass */
 ```
 
-Source: `engines/ds4/ds4.c:43273`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43264`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !getenv("DS4_METAL_DISABLE_V41_WIDE_PREFILL")) return remaining;
@@ -15394,7 +15394,7 @@ DS4_METAL_DUMP_PREFILL_LOGITS: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60965`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60956`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -15430,7 +15430,7 @@ DS4_METAL_ENABLE_GLM_STREAMING_SELECTED_ASYNC_LOAD: advanced engine setting; bui
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50570`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:50561`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return false;
@@ -15460,7 +15460,7 @@ static bool gpu_graph_q4_selected_paths_allowed(const ds4_gpu_graph *g) {
     if (!g) return false;
 ```
 
-Source: `engines/ds4/ds4.c:71127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71118`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ds4_gpu_pro_q4_expert_table_auto_available() == 0 &&
@@ -15502,7 +15502,7 @@ Source: `engines/ds4/ds4.c:23260`. Unset read: NULL from getenv; the literal con
     return ds4_gpu_pro_q4_expert_table_auto_available() != 0;
 ```
 
-Source: `engines/ds4/ds4.c:71126`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71117`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -15550,7 +15550,7 @@ Source: `engines/ds4/ds4.c:23222`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:71129`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71120`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_ADDRESS_AUTO") == NULL &&
@@ -15592,7 +15592,7 @@ Source: `engines/ds4/ds4.c:23320`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:71128`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:71119`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         getenv("DS4_METAL_ENABLE_PRO_Q4_EXPERT_TABLE_AUTO") == NULL &&
@@ -15712,7 +15712,7 @@ Source: `engines/ds4/ds4.c:23474`. Unset read: Wrapper/conditional default: see 
         return 0;
 ```
 
-Source: `engines/ds4/ds4.c:51781`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:51772`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool enabled =
@@ -15754,7 +15754,7 @@ Source: `engines/ds4/ds4.c:21923`. Unset read: Wrapper/conditional default: see 
         }
 ```
 
-Source: `engines/ds4/ds4.c:53962`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53953`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         full_layer_prepare_base &&
@@ -15796,7 +15796,7 @@ Source: `engines/ds4/ds4.c:21903`. Unset read: Wrapper/conditional default: see 
                                          "DS4_METAL_DISABLE_STREAMING_PREFILL_LAYER_PREPARE")) {
 ```
 
-Source: `engines/ds4/ds4.c:53969`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:53960`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         !layer_pagein &&
@@ -15934,7 +15934,7 @@ DS4_METAL_ENABLE_V41_ROWS_ATTENTION: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:41441`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:41432`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool ds41_expand_fusion_off(void) { static int c = -1; return ds41_env_flag("DS4_METAL_DISABLE_V41_EXPAND_FUSION", &c); }
@@ -16006,7 +16006,7 @@ DS4_METAL_GLM_DISABLE_STREAMING_SEED_BEFORE_PREFILL: advanced engine setting; bu
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:58821`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:58812`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         ssd_streaming &&
@@ -16018,7 +16018,7 @@ Source: `engines/ds4/ds4.c:58821`. Unset read: Wrapper/conditional default: see 
         memset(&seed_graph, 0, sizeof(seed_graph));
 ```
 
-Source: `engines/ds4/ds4.c:75393`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:75384`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         if (e->ssd_streaming &&
@@ -16036,7 +16036,7 @@ DS4_METAL_GLM_DISABLE_STREAMING_TOKEN_PREFILL: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:57054`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:57045`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (getenv("DS4_GLM_DISABLE_STREAMING_TOKEN_PREFILL") != NULL ||
@@ -16054,7 +16054,7 @@ DS4_METAL_GLM_STREAMING_ASYNC_PROFILE: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:50596`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:50587`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool glm_graph_streaming_async_profile_enabled(void) {
@@ -16072,7 +16072,7 @@ DS4_METAL_GLM_STREAMING_DECODE_FULL_LAYER_MAP: advanced engine setting; built-in
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48196`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48187`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     g->streaming_static_decode_map_current = false;
@@ -16090,7 +16090,7 @@ DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48280`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48271`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     }
@@ -16108,7 +16108,7 @@ DS4_METAL_GLM_STREAMING_PREFILL_FULL_LAYER_MIN_TOKENS: advanced engine setting; 
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48259`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48250`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *env = glm_graph_env_value(
@@ -16126,7 +16126,7 @@ DS4_METAL_GLM_STREAMING_TOKEN_PREFILL_MAX: advanced engine setting; built-in def
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:57033`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:57024`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *env = glm_graph_env_value(
@@ -16144,7 +16144,7 @@ DS4_METAL_GPU_BATCH_EMBED_MIN: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30317`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:30308`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -16180,7 +16180,7 @@ DS4_METAL_GRAPH_DUMP_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40247`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40238`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -16234,7 +16234,7 @@ DS4_METAL_GRAPH_DUMP_PREFIX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:82925`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:82916`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const ds4_weights *weights) {
@@ -16246,7 +16246,7 @@ Source: `engines/ds4/ds4.c:82925`. Unset read: NULL from getenv; the literal con
     ds4_gpu_graph *first = &items[0].session->graph;
 ```
 
-Source: `engines/ds4/ds4.c:83070`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83061`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         count > (int)DS4_GPU_ATTENTION_DECODE_BATCH_MAX ||
@@ -16258,7 +16258,7 @@ Source: `engines/ds4/ds4.c:83070`. Unset read: NULL from getenv; the literal con
         getenv("DS4_CUDA_DECODE_SCORE4") != NULL ||
 ```
 
-Source: `engines/ds4/ds4.c:83210`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:83201`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         count > (int)DS4_GPU_ATTENTION_DECODE_BATCH_MAX ||
@@ -16270,7 +16270,7 @@ Source: `engines/ds4/ds4.c:83210`. Unset read: NULL from getenv; the literal con
     if (!first->placement || first->quality || first->cuda_tp_q ||
 ```
 
-Source: `engines/ds4/ds4.c:85154`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85145`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (start % g->prefill_cap) + prefill_rows > g->prefill_cap ||
@@ -16342,7 +16342,7 @@ DS4_METAL_GRAPH_OUTPUT_ROW: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37988`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:37979`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         const char *output_row_env = glm_graph_env_value(
@@ -16354,7 +16354,7 @@ Source: `engines/ds4/ds4.c:37988`. Unset read: Wrapper/conditional default: see 
             if (end != output_row_env && v < (unsigned long)n_tokens) {
 ```
 
-Source: `engines/ds4/ds4.c:38483`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:38474`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *output_row_env = glm_graph_env_value(
@@ -16372,7 +16372,7 @@ DS4_METAL_GRAPH_PREFILL_PROFILE: advanced engine setting; built-in default retai
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37658`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:37649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t hc_dim = (uint64_t)DS4_N_HC * DS4_N_EMBD;
@@ -16384,7 +16384,7 @@ Source: `engines/ds4/ds4.c:37658`. Unset read: NULL from getenv; the literal con
         !gpu_graph_cuda_prefill_pipeline_q8_cache_requested();
 ```
 
-Source: `engines/ds4/ds4.c:43558`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43549`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return false;
@@ -16396,7 +16396,7 @@ Source: `engines/ds4/ds4.c:43558`. Unset read: NULL from getenv; the literal con
     const bool batch_core = batch_attention && !getenv("DS4_METAL_DISABLE_V41_BATCH_CORE");
 ```
 
-Source: `engines/ds4/ds4.c:33924`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:33915`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -16408,7 +16408,7 @@ Source: `engines/ds4/ds4.c:33924`. Unset read: Wrapper/conditional default: see 
      * `prefill_chunk` is not just UI progress: ds4_session_sync() wraps it to
 ```
 
-Source: `engines/ds4/ds4.c:37925`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:37916`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -16420,7 +16420,7 @@ Source: `engines/ds4/ds4.c:37925`. Unset read: Wrapper/conditional default: see 
     double execute_s = 0.0;
 ```
 
-Source: `engines/ds4/ds4.c:38696`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:38687`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -16438,7 +16438,7 @@ DS4_METAL_GRAPH_PREFILL_SPLIT_PROFILE: advanced engine setting; built-in default
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:37910`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:37901`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool split_profile =
@@ -16456,7 +16456,7 @@ DS4_METAL_GRAPH_PROMPT_TOKENS: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40189`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40180`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int                ctx_size) {
@@ -16474,7 +16474,7 @@ DS4_METAL_GRAPH_RAW_CAP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39363`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39354`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (raw_cap < raw_window) raw_cap = raw_window;
@@ -16486,7 +16486,7 @@ Source: `engines/ds4/ds4.c:39363`. Unset read: NULL from getenv; the literal con
         if (endp != env && v > 0) {
 ```
 
-Source: `engines/ds4/ds4.c:61292`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:61283`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -16504,7 +16504,7 @@ DS4_METAL_GRAPH_TEACHER_FORCE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:29267`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29258`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (trace_layers && ok) {
@@ -16522,7 +16522,7 @@ DS4_METAL_GRAPH_TOKEN_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34277`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:34268`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int old_fast_attention =
@@ -16534,7 +16534,7 @@ Source: `engines/ds4/ds4.c:34277`. Unset read: NULL from getenv; the literal con
         allow_split_top1 &&
 ```
 
-Source: `engines/ds4/ds4.c:33561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:33552`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -16546,7 +16546,7 @@ Source: `engines/ds4/ds4.c:33561`. Unset read: Wrapper/conditional default: see 
     const uint32_t raw_row = pos % g->raw_cap;
 ```
 
-Source: `engines/ds4/ds4.c:33763`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:33754`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -16570,7 +16570,7 @@ DS4_METAL_GRAPH_TOKEN_SPLIT_LAYERS: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:29404`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29395`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t gpu_graph_token_split_after_layers(void) {
@@ -16588,7 +16588,7 @@ DS4_METAL_GRAPH_TRACE_CACHE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -16606,7 +16606,7 @@ DS4_METAL_GRAPH_TRACE_COMP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40260`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40251`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -16624,7 +16624,7 @@ DS4_METAL_GRAPH_TRACE_LAYERS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:29264`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29255`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool ok = gpu_graph_alloc(&g, weights, &weights->layer[0]);
@@ -16642,7 +16642,7 @@ DS4_METAL_GRAPH_TRACE_STAGE_LAYER: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:29268`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:29259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         g.materialize_ffn_out = true;
@@ -16708,7 +16708,7 @@ Source: `engines/ds4/ds4.c:20089`. Unset read: NULL from getenv; the literal con
         enable_splitkv_spec && gpu_graph_cuda_splitkv_spec_batch_verify_requested();
 ```
 
-Source: `engines/ds4/ds4.c:25254`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:25247`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             getenv("DS4_CUDA_KV_CACHE_VERBOSE") != NULL ||
@@ -16720,7 +16720,7 @@ Source: `engines/ds4/ds4.c:25254`. Unset read: NULL from getenv; the literal con
                         "ds4: decode compressor/indexer failed stage=%s layer=%u pos=%u " \
 ```
 
-Source: `engines/ds4/ds4.c:30748`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30739`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool index_stage_profile =
@@ -16738,7 +16738,7 @@ DS4_METAL_LAYER_STAGE_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:85155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:85146`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         gpu_graph_directional_steering_ffn_enabled(g) ||
@@ -16750,7 +16750,7 @@ Source: `engines/ds4/ds4.c:85155`. Unset read: NULL from getenv; the literal con
     if (!gpu_graph_session_batch_moe_supported(
 ```
 
-Source: `engines/ds4/ds4.c:30542`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30533`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                 il) ||
@@ -16768,7 +16768,7 @@ DS4_METAL_LAYER_STAGE_PROFILE_LAYER: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30543`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30534`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
            gpu_graph_stage_profile_enabled_for_layer(
@@ -16786,7 +16786,7 @@ DS4_METAL_MEMORY_REPORT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40214`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40205`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -16798,7 +16798,7 @@ Source: `engines/ds4/ds4.c:40214`. Unset read: NULL from getenv; the literal con
     kv_cache_init(&cpu_cache, (uint32_t)ctx_size, raw_cap);
 ```
 
-Source: `engines/ds4/ds4.c:58813`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58804`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -16810,7 +16810,7 @@ Source: `engines/ds4/ds4.c:58813`. Unset read: NULL from getenv; the literal con
     bool ok = true;
 ```
 
-Source: `engines/ds4/ds4.c:60876`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60867`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 1;
@@ -16948,7 +16948,7 @@ DS4_METAL_NO_PREFILL_KERNEL_WARMUP: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30399`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:30390`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g && g->ssd_streaming) return true;
@@ -17074,7 +17074,7 @@ DS4_METAL_Q8_MV_NSG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:24622`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:24619`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool parallel_full_ffn_eligible =
@@ -17092,7 +17092,7 @@ DS4_METAL_Q_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30752`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30743`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool q_stage_profile =
@@ -17110,7 +17110,7 @@ DS4_METAL_RESUME_PREFILL_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:39390`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:39381`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * as a conservative crossover.  The env knob remains useful for retuning. */
@@ -17128,7 +17128,7 @@ DS4_METAL_SESSION_BATCH_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:81361`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81352`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -17140,7 +17140,7 @@ Source: `engines/ds4/ds4.c:81361`. Unset read: NULL from getenv; the literal con
                 ds4_backend_name(e->backend), count, prefill_rows,
 ```
 
-Source: `engines/ds4/ds4.c:81568`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:81559`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         ds4_session_dspark_capture_note_checkpoint(s);
@@ -17158,7 +17158,7 @@ DS4_METAL_SESSION_BATCH_QKV: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80898`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80889`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int count,
@@ -17176,7 +17176,7 @@ DS4_METAL_SESSION_BATCH_SHARED: advanced engine setting; built-in default retain
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80848`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80839`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int count,
@@ -17194,7 +17194,7 @@ DS4_METAL_STREAMING_DECODE_PREFILL_MAX: advanced engine setting; built-in defaul
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:33823`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:33814`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const char *env = glm_graph_env_value(
@@ -17230,7 +17230,7 @@ DS4_METAL_STREAMING_EXPERT_HOTLIST: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34132`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34123`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         ds4_gpu_stream_expert_cache_current_count();
@@ -17248,7 +17248,7 @@ DS4_METAL_STREAMING_EXPERT_HOTLIST_PROFILE: advanced engine setting; built-in de
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34138`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34129`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -17284,7 +17284,7 @@ DS4_METAL_STREAMING_MAP_TRACE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:48224`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48215`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (full_layer_prefill) {
@@ -17296,7 +17296,7 @@ Source: `engines/ds4/ds4.c:48224`. Unset read: Wrapper/conditional default: see 
                     il,
 ```
 
-Source: `engines/ds4/ds4.c:48240`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:48231`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                                                        n_tokens);
@@ -17362,7 +17362,7 @@ Source: `engines/ds4/ds4.c:23483`. Unset read: Wrapper/conditional default: see 
         if (end != env && *end == '\0') {
 ```
 
-Source: `engines/ds4/ds4.c:51790`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:51781`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     uint32_t k = 1;
@@ -17380,7 +17380,7 @@ DS4_METAL_STREAMING_PREFILL_CACHE_SEED_PROFILE: advanced engine setting; built-i
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:34039`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:34030`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -17392,7 +17392,7 @@ Source: `engines/ds4/ds4.c:34039`. Unset read: Wrapper/conditional default: see 
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
 ```
 
-Source: `engines/ds4/ds4.c:51914`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:51905`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     const bool profile =
@@ -17740,7 +17740,7 @@ DS4_METAL_V41_DECODE_FLUSH_LAYERS: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43139`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int cached = -1;
@@ -17758,7 +17758,7 @@ DS4_METAL_V41_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:43559`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:43550`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!ds41_ctx_resize(g, g->pos + total_count, false)) return false;
@@ -17998,7 +17998,7 @@ DS4_MOE_REPLAY_SELECTED_IDS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:26956`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26947`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !gpu_graph_decode_cpu_router_applicable(g, layer) &&
@@ -18010,7 +18010,7 @@ Source: `engines/ds4/ds4.c:26956`. Unset read: NULL from getenv; the literal con
          cuda_selected_shared_overlap);
 ```
 
-Source: `engines/ds4/ds4.c:26977`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26968`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         !gpu_graph_decode_cpu_router_applicable(g, layer) &&
@@ -18022,7 +18022,7 @@ Source: `engines/ds4/ds4.c:26977`. Unset read: NULL from getenv; the literal con
         !selected_readahead_shared_delay &&
 ```
 
-Source: `engines/ds4/ds4.c:26985`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:26976`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         gpu_graph_decode_cuda_selected_slots_expected(g, layer) &&
@@ -18040,7 +18040,7 @@ DS4_MTP_BATCH_VERIFY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86330`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86321`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         draft_n == 2 &&
@@ -18058,7 +18058,7 @@ DS4_MTP_CAPTURE_PREFIX1: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86436`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86427`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
          */
@@ -18076,7 +18076,7 @@ DS4_MTP_CONF_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86198`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86189`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -18094,7 +18094,7 @@ DS4_MTP_EXACT_REPLAY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86437`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86428`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool capture_prefix1 =
@@ -18112,7 +18112,7 @@ DS4_MTP_FORCE_SNAPSHOT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86441`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86432`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             draft_n > 2 ||
@@ -18130,7 +18130,7 @@ DS4_MTP_FULL_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:79231`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79222`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                    token,
@@ -18142,7 +18142,7 @@ Source: `engines/ds4/ds4.c:79231`. Unset read: NULL from getenv; the literal con
         return true;
 ```
 
-Source: `engines/ds4/ds4.c:86200`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86191`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool mtp_conf_log = getenv("DS4_MTP_CONF_LOG") != NULL;
@@ -18160,7 +18160,7 @@ DS4_MTP_MIN_MARGIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86191`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86182`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool strict_mtp = e->quality || getenv("DS4_MTP_STRICT") != NULL;
@@ -18178,7 +18178,7 @@ DS4_MTP_PROBE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:80043`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:80034`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return 0;
@@ -18286,7 +18286,7 @@ DS4_MTP_SPEC_LOG: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86214`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86205`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      */
@@ -18298,7 +18298,7 @@ Source: `engines/ds4/ds4.c:86214`. Unset read: NULL from getenv; the literal con
     }
 ```
 
-Source: `engines/ds4/ds4.c:86415`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86406`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         free(row0_logits);
@@ -18310,7 +18310,7 @@ Source: `engines/ds4/ds4.c:86415`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:86681`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86672`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         free(row_logits);
@@ -18322,7 +18322,7 @@ Source: `engines/ds4/ds4.c:86681`. Unset read: NULL from getenv; the literal con
 
 ```
 
-Source: `engines/ds4/ds4.c:86698`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86689`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     for (int i = 0; i < draft_n && n_accept < accepted_cap; i++) {
@@ -18334,7 +18334,7 @@ Source: `engines/ds4/ds4.c:86698`. Unset read: NULL from getenv; the literal con
                         drafts[i],
 ```
 
-Source: `engines/ds4/ds4.c:86755`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86746`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 (now_sec() - mtp_t0) * 1000.0);
@@ -18352,7 +18352,7 @@ DS4_MTP_STRICT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86189`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86180`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ignore_eos && ds4_token_is_stop_for_think_mode(
@@ -18370,7 +18370,7 @@ DS4_MTP_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:86197`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:86188`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (end != mtp_margin_env && v >= 0.0f) mtp_margin_threshold = v;
@@ -18478,7 +18478,7 @@ DS4_ORACLE_LOGITS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40223`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40214`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *oracle_logits = NULL;
@@ -18736,7 +18736,7 @@ DS4_QWEN4_FAKE_IMAGE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:59081`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59072`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!parsed) {
@@ -18754,7 +18754,7 @@ DS4_QWEN4_FLUSH_LAYER: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60215`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60206`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * command queue preserves layer order; zero restores one submission. */
@@ -18772,7 +18772,7 @@ DS4_QWEN4_FT_HIDDEN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69781`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69772`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t V = DS4_N_VOCAB, hc_dim = DS4_N_EMBD * DS4_N_HC;
@@ -18790,7 +18790,7 @@ DS4_QWEN4_FT_LIST: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69679`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69670`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * [n][vocab] f32 logits are written to the path.  One model load covers
@@ -18808,7 +18808,7 @@ DS4_QWEN4_FT_OUT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69933`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69924`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #endif
@@ -18826,7 +18826,7 @@ DS4_QWEN4_FT_TOKENS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69769`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69760`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int *seq = xmalloc(4096 * sizeof(int));
@@ -18844,7 +18844,7 @@ DS4_QWEN4_GPU: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69682`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69673`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ft_list && ft_list[0]) {
@@ -18856,7 +18856,7 @@ Source: `engines/ds4/ds4.c:69682`. Unset read: NULL from getenv; the literal con
         FILE *lf = fopen(ft_list, "r");
 ```
 
-Source: `engines/ds4/ds4.c:69789`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
@@ -18868,7 +18868,7 @@ Source: `engines/ds4/ds4.c:69789`. Unset read: NULL from getenv; the literal con
     for (uint32_t t = 0; t < n_seq && !gpu_only; t++) {
 ```
 
-Source: `engines/ds4/ds4.c:69818`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69809`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * DS4_QWEN4_GPU_CHUNK tokens, default 1) and reports it against the CPU
@@ -18880,7 +18880,7 @@ Source: `engines/ds4/ds4.c:69818`. Unset read: NULL from getenv; the literal con
         if (chunk > n_seq) chunk = n_seq;
 ```
 
-Source: `engines/ds4/ds4.c:73104`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:73095`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 bool ready = ds4_gpu_init() &&
@@ -18898,7 +18898,7 @@ DS4_QWEN4_GPU_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69819`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69810`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
      * reference; the dumped logits (and MTP drafts) are then the GPU's. */
@@ -18916,7 +18916,7 @@ DS4_QWEN4_GPU_ONLY: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69789`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     /* DS4_QWEN4_GPU_ONLY skips the (slow) CPU reference: dumps are then the
@@ -18958,7 +18958,7 @@ DS4_QWEN4_MOE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60047`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60038`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -18976,7 +18976,7 @@ DS4_QWEN4_MTP_BATCH_CHECK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69823`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69814`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (chunk == 0) chunk = 1;
@@ -18994,7 +18994,7 @@ DS4_QWEN4_MTP_DEPTH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76471`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76462`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
  * signal across modes. */
@@ -19012,7 +19012,7 @@ DS4_QWEN4_MTP_DRAFT_ROWS: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:59791`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59782`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static uint32_t qwen4_mtp_draft_rows(void) {
@@ -19030,7 +19030,7 @@ DS4_QWEN4_MTP_DRAFT_VOCAB: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:59731`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59722`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (g->draft_head_tried) return g->draft_head != NULL;
@@ -19048,7 +19048,7 @@ DS4_QWEN4_MTP_GPU_ARGMAX: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60566`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (ok) ok = qwen4_graph_moe(g, m, l, T);
@@ -19066,7 +19066,7 @@ DS4_QWEN4_MTP_OUT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:69801`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:69792`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     qwen4_ref_state_free(&st);
@@ -19084,7 +19084,7 @@ DS4_QWEN4_MTP_SWAP_RESTORE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60424`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60415`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_graph_state_swap(ds4_qwen4_gpu_graph *g) {
@@ -19144,7 +19144,7 @@ DS4_QWEN4_NO_FUSE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:59782`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59773`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_graph_fused(const ds4_qwen4_gpu_graph *g, uint32_t T) {
@@ -19162,7 +19162,7 @@ DS4_QWEN4_NO_IDX_SELECT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:59799`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:59790`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             uint32_t n_blocks, uint32_t n_tokens, uint32_t top_k) {
@@ -19180,7 +19180,7 @@ DS4_QWEN4_NO_MTP_BATCH: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76515`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76506`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint32_t pos = g->pos;
@@ -19204,7 +19204,7 @@ DS4_QWEN4_NO_STATE_POOL: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:75268`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:75259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         s->qwen4_slot = -1;
@@ -19222,7 +19222,7 @@ DS4_QWEN4_PREFILL_CHUNK: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:40045`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:40036`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #endif
@@ -19246,7 +19246,7 @@ DS4_QWEN4_SPEC_FORCE_ACCEPT: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76449`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76440`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -19264,7 +19264,7 @@ DS4_QWEN4_SPEC_TRACE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:76444`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:76435`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool qwen4_spec_trace(void) {
@@ -19282,7 +19282,7 @@ DS4_QWEN4_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:60209`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60200`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static int timing = -1;
@@ -19318,7 +19318,7 @@ DS4_ROCM_DECODE_STAGE_PROFILE: advanced engine setting; built-in default retaine
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30549`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30540`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool gpu_graph_decode_stage_profile_enabled(uint32_t il) {
@@ -19336,7 +19336,7 @@ DS4_ROCM_DECODE_STAGE_PROFILE_LAYER: advanced engine setting; built-in default r
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30550`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30541`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return gpu_graph_stage_profile_enabled_for_layer(
@@ -19354,7 +19354,7 @@ DS4_ROCM_DSPARK_GREEDY_GPU_MARKOV: advanced engine setting; built-in default ret
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:79538`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:79529`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         } else if (markov_ready) {
@@ -19372,7 +19372,7 @@ DS4_ROCM_LAYER_STAGE_PROFILE: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30538`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30529`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 static bool gpu_graph_layer_stage_profile_enabled(uint32_t il) {
@@ -19390,7 +19390,7 @@ DS4_ROCM_LAYER_STAGE_PROFILE_LAYER: advanced engine setting; built-in default re
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30539`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/ds4/ds4.c:30530`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     return gpu_graph_stage_profile_enabled_for_layer(
@@ -19528,7 +19528,7 @@ DS4_SSD_PREFETCH_TOP_N: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:70923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:70914`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     uint32_t ssd_prefetch_top_n = 0;
@@ -19600,7 +19600,7 @@ DS4_TOKEN_TIMING: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46969`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:46960`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int n_generated = 0;
@@ -19612,7 +19612,7 @@ Source: `engines/ds4/ds4.c:46969`. Unset read: NULL from getenv; the literal con
             char label[64];
 ```
 
-Source: `engines/ds4/ds4.c:58860`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58851`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int n_decode_eval = 0;
@@ -19624,7 +19624,7 @@ Source: `engines/ds4/ds4.c:58860`. Unset read: NULL from getenv; the literal con
             char label[64];
 ```
 
-Source: `engines/ds4/ds4.c:60881`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60872`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(logits[0]));
@@ -19804,7 +19804,7 @@ DS4_TP_PREFILL_SPLIT_MIN: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:30626`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:30617`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (cached < 0) {
@@ -19888,7 +19888,7 @@ DS4_TRACE_TOP: advanced engine setting; built-in default retained
 
 Scope: ds4. Class: advanced.
 
-Source: `engines/ds4/ds4.c:46938`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:46929`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     float *logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(logits[0]));
@@ -19900,7 +19900,7 @@ Source: `engines/ds4/ds4.c:46938`. Unset read: NULL from getenv; the literal con
         fprintf(stderr, "ds4: prompt is empty or exceeds context size\n");
 ```
 
-Source: `engines/ds4/ds4.c:58738`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58729`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -19912,7 +19912,7 @@ Source: `engines/ds4/ds4.c:58738`. Unset read: NULL from getenv; the literal con
     if (!vocab_token_is_generation_stop(vocab, token) && emit) emit(emit_ud, token);
 ```
 
-Source: `engines/ds4/ds4.c:58863`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:58854`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const double t_decode0 = now_sec();
@@ -19924,7 +19924,7 @@ Source: `engines/ds4/ds4.c:58863`. Unset read: NULL from getenv; the literal con
         }
 ```
 
-Source: `engines/ds4/ds4.c:60880`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/ds4/ds4.c:60871`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -20740,7 +20740,7 @@ CUDA graph kill switch: production RTX default 1. Literal 0 explicitly allows ca
 
 Scope: ds4, rtx-llama. Class: preset.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:25083`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:25085`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // inside ggml_cuda_graph::is_enabled() at first compute — so it must
@@ -21022,7 +21022,7 @@ GGML_OP_OFFLOAD_MIN_BATCH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1607`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1608`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool prefill_streaming_min_batch_from_cli = params.prefill_min_stream_batch_tokens > 0;
@@ -22045,7 +22045,7 @@ KIMI_FORCE_EXPORT_SEQ0: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4317`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4318`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char * prefill_debug_env = std::getenv("LLAMA_PREFILL_DEBUG");
@@ -23508,7 +23508,7 @@ LLAMA_ALLOC_OUTPUT_GUARD: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13220`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13222`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool glm_dsa_topk_checksum_enabled = glm_dsa_topk_checksum_mode > 0;
@@ -26406,7 +26406,7 @@ LLAMA_C5_HIDIN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15251`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15253`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #ifdef GGML_USE_CUDA
@@ -26424,7 +26424,7 @@ LLAMA_C5_KCUR: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17966`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17968`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // projection produced zero K (upstream); Kcur!=0 but staging zero → SET_ROWS doesn't land.
@@ -26616,7 +26616,7 @@ LLAMA_CUDA_OP_PROFILE_DUMP_EACH: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7772`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7774`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -26868,7 +26868,7 @@ LLAMA_DIAG_DSA_STAGING: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15675`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15677`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // culprit — pinpoint it (name/op) under LLAMA_DIAG_DSA_STAGING so the repro shows the exact sparse
@@ -26934,7 +26934,7 @@ LLAMA_DISABLE_GPU_MASK: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15978`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15980`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -26952,7 +26952,7 @@ LLAMA_DLM_GRAPH_ORDER_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10794`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10796`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // optionally tune N with LLAMA_DLM_GRAPH_ORDER_DUMP_N (default 256).
@@ -26970,7 +26970,7 @@ LLAMA_DLM_GRAPH_ORDER_DUMP_N: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10798`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10800`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             && !graph_order_dumped.exchange(true)) {
@@ -26988,7 +26988,7 @@ LLAMA_DLM_HIDDEN_FNV: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14832`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14834`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -27006,7 +27006,7 @@ LLAMA_DLM_HIDDEN_NAN_SCAN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14828`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14830`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // behavior and shares the synchronized readback when both probes are on.
@@ -27024,7 +27024,7 @@ LLAMA_DLM_NODE_NAN_SCAN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16008`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16010`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // diagnostic only, default off. Disarmed right after the layer loop.
@@ -27042,7 +27042,7 @@ LLAMA_DLM_PHASE_TIMERS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9507`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9509`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool dlm_remainder_gpu_timers_enabled = dlm_remainder_timer_mode >= 2;
@@ -27060,7 +27060,7 @@ LLAMA_DLM_REMAINDER_TIMERS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9501`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9503`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // unless explicitly enabled before the first decode_layer_major() call.
@@ -27072,7 +27072,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9501`. 
     const bool dlm_remainder_gpu_timers_enabled = dlm_remainder_timer_mode >= 2;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9508`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9510`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static const bool dlm_phase_timers_enabled = []() {
@@ -27132,7 +27132,7 @@ LLAMA_DLM_SUBLAYER_FNV: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17631`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // This is intentionally diagnostic-only and stream-synchronizing.
@@ -27222,7 +27222,7 @@ LLAMA_DSA_NODE_SYNC: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8797`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8799`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool dsa_node_sync_enabled() {
@@ -27234,7 +27234,7 @@ static bool dsa_node_sync_enabled() {
 }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8860`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8862`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // (huge overhead); off by default. Localizes the DSA-on multi-ubatch illegal-access.
@@ -27252,7 +27252,7 @@ LLAMA_DSA_NODE_SYNC_LAYER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8805`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8807`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool dsa_node_sync_matches(int il, int u) {
@@ -27270,7 +27270,7 @@ LLAMA_DSA_NODE_SYNC_UBATCH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8809`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8811`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -28128,7 +28128,7 @@ SM120 hc=4,20-iteration Sinkhorn:2(default) imports the DeepSeek fused algorithm
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-graph.cpp:610`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-graph.cpp:612`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if(hc_projection_f16_gemm&&count>8&&fn->type==GGML_TYPE_F16)GGML_ASSERT(ggml_dsv41_hc_half_tag(projected));
@@ -28338,7 +28338,7 @@ LLAMA_DSV41_PV_VIEW_F32: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-graph.cpp:535`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-graph.cpp:536`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     probabilities = ggml_permute(ctx, probabilities, 0, 2, 1, 3);
@@ -28656,7 +28656,7 @@ LLAMA_DSV4_AUX_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7281`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7283`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 void llama_context::dsv4_aux_norm_dump(const char * tag) {
@@ -28674,7 +28674,7 @@ LLAMA_DSV4_AUX_DUMP_MAX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24051`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24053`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // in a 32-tok-per-request bench); tokens beyond 2 get tag "pre-decode-tok<N>".
@@ -28692,7 +28692,7 @@ LLAMA_DSV4_CLEAR_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7439`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7441`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     {
@@ -28704,7 +28704,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7439`. 
             fprintf(stderr, "*** CLEAR_TRACE: prefill-entry n_tokens=%d pos_max=%lld\n",
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24117`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24119`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -28716,7 +28716,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24117`.
                         fprintf(stderr, "*** CLEAR_TRACE: retain-mark pos_max=%lld\n",
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24244`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24246`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -28788,7 +28788,7 @@ LLAMA_DSV4_COMP_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8508`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8510`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // recompute oracle). Env-gated; zero effect otherwise.
@@ -28800,7 +28800,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8508`. 
                 (strncmp(name, "lid_q_rot-", 10) == 0 ||
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2710`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2709`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // the layer-major executor. Bug#2 round-5 oracle: the Python side recomputes the pooling
@@ -28812,7 +28812,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
             LLAMA_LOG_INFO("COMP_DUMP: capture entry '%s' buffer=%p\n",
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:314`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:315`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // free to be recycled before readback, which is what produced the bogus rel=133 "divergence".
@@ -28824,7 +28824,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:31
 
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:449`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:450`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -28836,7 +28836,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:44
         ggml_set_output(comp);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:542`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:543`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // graph's lid_q_rot under COMP_DUMP so post_layer_cb can dump the last ubatch's queries.
@@ -28848,7 +28848,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:54
         ggml_set_output(indexer_q);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:727`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:728`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // symptom (fluent output, wrong facts, only for material outside the raw window).
@@ -28860,7 +28860,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:72
         ggml_set_output(csa_k);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:833`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:834`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     //     _cnv empty   -> the F32->F16 cast (or its scheduling) is
@@ -28872,7 +28872,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:83
         ggml_tensor * cnv_dump = ggml_cont(ctx0, raw_mask);   // still the _cnv, pre-back-cast
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:858`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:859`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // above 1e30 next to a sane pooled result). A cont is a real node with its own buffer.
@@ -28884,7 +28884,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:85
         ggml_tensor * raw_mask_dump = ggml_cont(ctx0, raw_mask);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:891`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:892`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Logged rather than reasoned about, and gated on the dump env so it costs nothing normally.
@@ -28896,7 +28896,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:89
         fprintf(stderr, "DSV4_ALIGN il=%d: raw_k ne2=%lld csa_k ne2=%lld k_all ne2=%lld | "
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1007`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1008`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // on the projection check).
@@ -28908,7 +28908,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:10
         cb(q,   "csa_pre_q",   il);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1454`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1455`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -28920,7 +28920,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:14
                 ggml_set_output(cur);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1484`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1485`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // recycled buffer or a misaligned batch.
@@ -28932,7 +28932,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:14
             cb(inp_dsv4->get_csa().state_pos, "csa_state_pos", il);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1534`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // for pooled rows) was never numerically verified.
@@ -28944,7 +28944,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:15
             ggml_set_output(csa_state_kv);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1609`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1610`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // oracle; first dump attempt read garbage precisely because these are transient).
@@ -28956,7 +28956,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:16
             ggml_set_output(lid_state_kv);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:3242`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:3246`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // it is on the graph that actually produces the tokens here, because this context IS the one
@@ -28974,7 +28974,7 @@ LLAMA_DSV4_COMP_DUMP_FIRINGS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2736`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2735`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // is a later ubatch.
@@ -28992,7 +28992,7 @@ LLAMA_DSV4_COMP_DUMP_LAYER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2850`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2849`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // moves it; the pins in deepseek-v4.cpp read the same variable so both sides agree.
@@ -29070,7 +29070,7 @@ LLAMA_DSV4_FINGERPRINT_DUMPROWS: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 static const std::vector<uint32_t> dump_rows = []() {
@@ -29088,7 +29088,7 @@ LLAMA_DSV4_FINGERPRINT_ROWS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1199`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1200`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static const std::vector<uint32_t> sample_rows = []() {
@@ -29106,7 +29106,7 @@ LLAMA_DSV4_FRESH_RESET_ALL: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7585`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7587`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     {
@@ -29124,7 +29124,7 @@ LLAMA_DSV4_INDEXER_TOP_K: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:618`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:619`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // diagnosis is CONFIRMED and this is a working (band-aid) fix pending the numeric root-cause match.
@@ -29142,7 +29142,7 @@ LLAMA_DSV4_INDEXER_TOP_K_DECODE: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:628`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:629`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // still fails => LID exonerated, bug upstream in the decode hidden state.
@@ -29160,7 +29160,7 @@ LLAMA_DSV4_KV_REUPLOAD: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24132`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24134`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Opt-out: LLAMA_DSV4_KV_REUPLOAD=0.
@@ -29172,7 +29172,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24132`.
                     const size_t re_up = ctx->reupload_kv_ram_to_gpu();
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24258`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24260`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -29190,7 +29190,7 @@ LLAMA_DSV4_KV_REUPLOAD_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7247`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // vs (write not landing) vs (mirror stale). LLAMA_DSV4_KV_REUPLOAD_PROBE=1.
@@ -29208,7 +29208,7 @@ LLAMA_DSV4_KV_REUSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9448`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9450`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // shared-staging path. On any failure fall back silently to the empty-GPU rebuild
@@ -29241,7 +29241,7 @@ Scope: rtx-llama. Class: advanced.
 Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:5130`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    // fusion off, CUDA runs the same math Metal does.
+    // of an argument -- with the fusion off, CUDA runs the math the retired peer ran.
     static const bool fuse_enabled = []() {
         const char * e = std::getenv("LLAMA_DSV4_LID_FUSE");
         return !(e && e[0] == '0' && e[1] == '\0');
@@ -29256,7 +29256,7 @@ LLAMA_DSV4_LID_NEEDLE_ROW: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1302`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1303`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -29268,7 +29268,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1302`. 
     static std::atomic_int probe_step { 0 };
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1492`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1493`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         resident_lid_trace_user_cb   = cparams.cb_eval;
@@ -29298,7 +29298,7 @@ LLAMA_DSV4_LID_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3655`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3656`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // LLAMA_DSV4_LID_PROBE: post-decode LID score/top-k readback on the ordinary/
@@ -29322,7 +29322,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-graph.cpp:2844`. Un
                 ggml_set_output(kq);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1307`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1306`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // unlike LLAMA_DSV4_LID_TOPK_TRACE it does NOT also install the llama-context cb_eval
@@ -29334,7 +29334,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
     const bool dsv4_lid_topk_trace_enabled =
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:532`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // BEFORE the later permute view) + its qr input, for offline score cross-check.
@@ -29346,7 +29346,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:53
         ggml_set_output(indexer_q);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:642`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // ordinary (non-streaming/resident) decode path. Zero effect when the env is unset.
@@ -29358,7 +29358,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:64
         ggml_set_output(indexer_score);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1025`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1026`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // verified. k_all is already named "csa_k_all", out "attn_csa_lid"; name the main decode q here.
@@ -29376,7 +29376,7 @@ LLAMA_DSV4_LID_TOPK_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1486`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1487`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -29388,7 +29388,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1486`. 
         resident_lid_trace_user_cb   = cparams.cb_eval;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1309`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1308`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char * dsv4_lid_topk_trace_path = std::getenv("LLAMA_DSV4_LID_PROBE");
@@ -29406,7 +29406,7 @@ LLAMA_DSV4_LID_TRACE_PREFILL: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3636`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3637`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // cache the decode path reads — the decisive prefill-vs-decode split for bug#2.
@@ -29454,7 +29454,7 @@ LLAMA_DSV4_MIGRATE_FINGERPRINT: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4198`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4199`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -29466,7 +29466,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4198`. 
     }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24203`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24205`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // against the execution it is intended to validate.
@@ -29484,7 +29484,7 @@ LLAMA_DSV4_NEWPROMPT_GPU_KV: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9374`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9376`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const int dlm_pos0 = (batch.pos && batch.n_tokens > 0) ? std::max<int>(0, batch.pos[0]) : 0;
@@ -29502,7 +29502,7 @@ LLAMA_DSV4_NO_F16_MASK: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:934`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:935`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // which exercises the round-trip without changing the type the kernel sees.
@@ -29514,7 +29514,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:93
     // DECODE graphs, where LLAMA_DSV4_PREFILL_DECOMP does NOT apply (it requires n_tokens > 1) -- so
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1154`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // which exercises the round-trip without changing the type the kernel sees.
@@ -29568,7 +29568,7 @@ LLAMA_DSV4_PREFILL_FINGERPRINT: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7634`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -29604,7 +29604,7 @@ LLAMA_DSV4_RAW_MASK_F32: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1315`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1316`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     {
@@ -29622,7 +29622,7 @@ LLAMA_DSV4_RAW_MASK_LEAF: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:751`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:752`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // the discriminator -- if recall RETURNS with it on, the copy was the defect.
@@ -29634,7 +29634,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:75
 
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1116`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1117`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     {
@@ -29646,7 +29646,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:11
             ggml_tensor * leaf = inp_attn->self_kq_mask_swa;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1236`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1237`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     {
@@ -29664,7 +29664,7 @@ LLAMA_DSV4_RAW_MASK_OBS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1283`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:1284`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     {
@@ -29706,7 +29706,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-graph.cpp:3837`. Un
                 ggml_set_output(inp->raw_kq_mask);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:777`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:778`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // half is NOT a defect on this path. See the retraction note. Opt-in only.
@@ -29724,7 +29724,7 @@ LLAMA_DSV4_RESIDENT_GPU_KV: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4106`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4107`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // sets executor_kind=LOCAL_CPU on the true return, but stream_local's token decode uses the resident
@@ -29742,7 +29742,7 @@ LLAMA_DSV4_RETAIN_SLOT_KV: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4059`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4060`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // retain path (maybe_apply_decode_handoff) or any non-DSV4 arch.
@@ -29778,7 +29778,7 @@ LLAMA_DSV4_ROUTE_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1295`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1294`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int n_layer = model->hparams.n_layer;
@@ -29862,7 +29862,7 @@ LLAMA_DSV4_SUFFIX_WRITE_DIAG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24202`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24204`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // the actual post-suffix boundary so cache-row evidence is timed
@@ -29922,7 +29922,7 @@ LLAMA_DSV4_TOPK_FORCE_BITONIC: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama, rtx-producer. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1318`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1317`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             dsv4_lid_topk_trace_enabled ? (size_t) n_layer : 0);
@@ -29952,7 +29952,7 @@ LLAMA_DSV4_WEIGHT_DUMPFILE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7412`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7414`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // LLAMA_DSV4_WEIGHT_DUMPFILE=<dir>: write the read bytes for offline binary diff
@@ -29970,7 +29970,7 @@ LLAMA_DSV4_WEIGHT_SCAN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7374`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7376`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // catch a corrupt upload/re-point — quantized types included. Zero effect when unset.
@@ -30006,7 +30006,7 @@ LLAMA_DSV4_WF_DECODE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23859`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23861`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // prompt-tail, so both fall through to decode_streaming(batch) = the WF GPU path with no CPU migration.
@@ -30024,7 +30024,7 @@ LLAMA_DSV4_ZERO_DECODE_SINK: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:959`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:960`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // consumption mechanism. Diagnostic only, env-gated.
@@ -30042,7 +30042,7 @@ LLAMA_DSV4_ZERO_PREFILL_SINK: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:978`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/models/deepseek-v4.cpp:979`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // every previous FA-side experiment ran against an all-visible mask.
@@ -30108,7 +30108,7 @@ LLAMA_DUMP_LAYER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14999`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15001`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -30120,7 +30120,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14999`.
 
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15058`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15060`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -30174,7 +30174,7 @@ LLAMA_DUMP_LAYER_DETAIL: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15847`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15849`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 dump_fa_io(il, dump_u, fast_multiub ? "c1" : "fast");
@@ -30186,7 +30186,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15847`.
                     debug_dump_tensor(attn_out_dump[il], il, dump_u, ubatch, dump_tag, "attn_out");  // DIAG
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18027`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18029`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -30204,7 +30204,7 @@ LLAMA_FA_CAUSAL_SKIP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19320`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19322`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                         // NB: op_params[3] is the FA PRECISION (ggml_flash_attn_ext_set_prec) — use [4] (free).
@@ -30216,7 +30216,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19320`.
                             // op_params[4]=0 -> n_past_causal=-1 the formula is wrong for every ubatch
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20071`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20073`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // path skips). launch_fattn decodes [4] (0=>disabled; v>0=>n_past=v-1). [3] is FA precision.
@@ -30228,7 +30228,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20071`.
                 static const bool fa_direct_en3 = []() { const char* e=std::getenv("LLAMA_FA_MLA_CAUSAL_DIRECT"); return e && e[0] && e[0]!='0'; }();
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20656`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20658`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     // first at ~9946). op_params[4]=pos_base+1 (0=disabled). [3] is FA precision — use [4].
@@ -30300,7 +30300,7 @@ LLAMA_FA_IO_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11513`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11515`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Gate: LLAMA_FA_IO_PROBE; fires for il<=1, u<2 only.
@@ -30318,7 +30318,7 @@ LLAMA_FA_KTRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15970`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15972`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     double total_kvsync_ms = 0, total_postcb_ms = 0;  // [2026-07-06 perf overhead attribution]
@@ -30330,7 +30330,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15970`.
         const char * env = std::getenv("LLAMA_FA_MLA_FORCE_TILE");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17052`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17054`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         (pcs_fa_m_tensor && pcs_fa_mask_n_kv_visible > 0 && pcs_fa_mask_n_tokens > 0)) {
@@ -30360,7 +30360,7 @@ LLAMA_FA_KTRACE_MAXLAYER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17254`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17256`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // [2026-07-28 M3 KTRACE window] LLAMA_FA_KTRACE_MAXLAYER (default 1) extends the trace past L0/L1
@@ -30426,7 +30426,7 @@ LLAMA_FA_MLA_CAUSAL_DIRECT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16831`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16833`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 #ifdef GGML_USE_CUDA
@@ -30438,7 +30438,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16831`.
     bool fa_direct_causal_all_exact = false;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19326`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19328`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                             // op_params[4]=0 -> n_past_causal=-1 the formula is wrong for every ubatch
@@ -30450,7 +30450,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19326`.
                         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19340`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19342`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                         pcs_fa_mask_device_tokens = 0;
@@ -30462,7 +30462,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19340`.
                             (slm_fa_nkv_visible % (int64_t) ubatch.n_tokens) == 0;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20075`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20077`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // causal mask is position-based. This loop arm is PATH-INDEPENDENT (the one Kimi's
@@ -30474,7 +30474,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20075`.
                     if (cs_dbg3 < 4) { cs_dbg3++; fprintf(stderr, "*** CAUSAL_SKIP_HOST[loop] il=%d skip=%d direct=%d pos_base=%d op4=%d\n", il, (int)causal_skip_en3, (int)fa_direct_en3, (int)ubatch.pos[0], ((int32_t*)fa_nodes[il].raw->op_params)[4]); }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20592`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20594`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                 int nkv_u = kv_ctx_mask ? (int)kv_ctx_mask->get_n_kv_for_ubatch(u) : mask_n_kv_build;
@@ -30486,7 +30486,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20592`.
                     nkv_u > 0 &&
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20657`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20659`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     if (fa_nodes[il].raw) {
@@ -30498,7 +30498,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20657`.
                     }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20671`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20673`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     pcs_fa_mask_device_tokens = 0;
@@ -30558,7 +30558,7 @@ LLAMA_FA_MLA_CAUSAL_DIRECT_STRICT: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16845`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16847`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         // the O(ctx^2) mask cache. Default = engage whenever requested; set
@@ -30594,7 +30594,7 @@ LLAMA_FA_MLA_DISABLE_NKV_PATCH: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15986`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15988`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -30612,7 +30612,7 @@ LLAMA_FA_MLA_FORCE_TILE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15974`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15976`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -30768,7 +30768,7 @@ LLAMA_FA_MLA_SPLIT_STORE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15982`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15984`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -30822,7 +30822,7 @@ LLAMA_FA_NODE_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8645`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8647`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             bool observe_fa = false;
@@ -30834,7 +30834,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8645`. 
                     if (nm && strncmp(nm, "__fattn__-", 10) == 0) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8662`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8664`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // two for L0/L1 u0 to localize whether compute_node_range mis-executes the FA.
@@ -30864,7 +30864,7 @@ LLAMA_FA_NODE_DUMP_LAYER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8646`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8648`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             {
@@ -30876,7 +30876,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8646`. 
                         const int fil = atoi(nm + 10);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8663`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8665`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -30990,7 +30990,7 @@ Advanced backend control LLAMA_FORCE_MLA_STRATEGY_A. Set explicitly only for the
 
 Scope: . Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:2688`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:2691`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool is_iswa = (llama_model_n_swa(model) > 0);
@@ -31008,7 +31008,7 @@ LLAMA_GALLOC_NO_FREE_REUSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10692`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10694`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // therefore inert on every other model -- the inert-arm trap that has cost several arms.
@@ -31026,7 +31026,7 @@ LLAMA_GLM_CONT_PLAN_AUDIT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10925`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int glm_dsa_topk_shared_count = 0;
@@ -31056,7 +31056,7 @@ LLAMA_GLM_EXEC_ORDER_AUDIT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13290`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13292`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // roots whose own ubatch instances overlap receive one slot per ubatch.
@@ -31074,7 +31074,7 @@ LLAMA_GLM_KV_GATHER_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13172`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13174`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     int glm_dsa_kv_gather_trace_target_u = -1;
@@ -31110,7 +31110,7 @@ LLAMA_GLM_TOPKPOS_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18764`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18766`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -31128,7 +31128,7 @@ LLAMA_GLM_TOPK_CKSUM: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13211`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     size_t glm_dsa_topk_write_census_reports = 0;  // function-scope: accumulated across ubatches, read in the WRITE_CENSUS summary
@@ -31140,7 +31140,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13211`.
         const int parsed = std::atoi(env);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13219`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13221`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -31158,7 +31158,7 @@ LLAMA_GLM_TOPK_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13166`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13168`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // them, plus the per-ubatch slab content immediately after each FULL save.
@@ -31176,7 +31176,7 @@ LLAMA_GLM_TOPK_WRITE_CENSUS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12828`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12830`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint8_t glm_pool_poison_byte = []() {
@@ -31188,7 +31188,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12828`.
         // the top-k producer never emits.  An explicit =00 remains available
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13159`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13161`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -31242,7 +31242,7 @@ LLAMA_GRAPH_REUSE_DISABLE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1839`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1840`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -31278,7 +31278,7 @@ Advanced backend control LLAMA_HANDOFF_PREFIX_BACKOFF. Set explicitly only for t
 
 Scope: . Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1378`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1379`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -31296,7 +31296,7 @@ Advanced backend control LLAMA_HANDOFF_SAMPLE_PREFILL_LOGITS. Set explicitly onl
 
 Scope: . Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:2651`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:2654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -31314,10 +31314,10 @@ Advanced backend control LLAMA_HANDOFF_SUFFIX_BATCH. Set explicitly only for the
 
 Scope: . Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1247`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1248`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    // 1243-token suffix, costing ~25 s of avoidable Mac prefill latency.
+    // 1243-token suffix, costing ~25 s of avoidable receiver-side prefill latency.
     int n_batch = std::max(1, (int) llama_n_batch(ctx));
     if (const char * env = std::getenv("LLAMA_HANDOFF_SUFFIX_BATCH")) {
         const int parsed = std::atoi(env);
@@ -31326,7 +31326,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cp
         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1477`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1478`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // round-trip count for typical suffix sizes.
@@ -31338,7 +31338,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cp
             }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1660`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1663`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // unnecessary round-trip count for typical suffix sizes.
@@ -31356,7 +31356,7 @@ LLAMA_IMG_PROMPT_DIRECT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5086`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5088`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // the export then reuses the ship-embd logic ([prefix][suffix]+embd+raw_image) and the
@@ -31392,7 +31392,7 @@ LLAMA_KSTORE_RANGE_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10858`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10860`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -31410,7 +31410,7 @@ LLAMA_KVDL_C5GPU: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12099`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12101`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -31428,7 +31428,7 @@ LLAMA_KVDL_NARROW: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12159`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12161`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -31446,7 +31446,7 @@ LLAMA_KVRAM_FP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16156`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16158`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Gated on LLAMA_KVRAM_FP — default off, zero cost. Reuses llama_debug_count_zero_rows.
@@ -31464,7 +31464,7 @@ LLAMA_KV_ARTIFACT_KEEP_FILE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4683`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4684`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         if (!prefill_kv_state_cache.empty()) return false;
@@ -31476,7 +31476,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4683`. 
     }();
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5630`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // transport path consumes the in-memory buffer; the file is no longer on
@@ -31638,7 +31638,7 @@ LLAMA_KV_CHUNK_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22217`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22219`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -31674,7 +31674,7 @@ LLAMA_KV_DELTA_PD_MAX_CTX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5106`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5108`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }();
@@ -31692,7 +31692,7 @@ LLAMA_KV_DELTA_PD_MAX_TOKENS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5101`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5103`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // context limit only tiny deltas (a re-entry, a short question) go to the Mac.
@@ -31740,7 +31740,7 @@ uint32_t llama_context::kv_decoder_resident_prefix(const llama_token * tokens, s
         return 0;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5140`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5141`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -31758,7 +31758,7 @@ LLAMA_KV_DL_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11969`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11971`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             {
@@ -31776,7 +31776,7 @@ LLAMA_KV_DOWNLOAD_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12069`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12071`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Phase 93 extension: also fire for layers 0-5 with LLAMA_KV_DOWNLOAD_PROBE_LO=1.
@@ -31788,7 +31788,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12069`.
                     bool fire = (kvdl_probe && (il == 6 || il == 7)) || (kvdl_probe_lo && il <= 5);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12329`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12331`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Phase 22 probe: dump first 16 bytes of host-side k_host_dst (after D2H sync) for layers 6,7
@@ -31806,7 +31806,7 @@ LLAMA_KV_DOWNLOAD_PROBE_LO: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12071`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12073`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     static const char * kvdl_probe_env = std::getenv("LLAMA_KV_DOWNLOAD_PROBE");
@@ -31842,7 +31842,7 @@ LLAMA_KV_HASH_WIN_LEN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4953`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4954`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // wrong reason; 512 separates them.
@@ -31860,7 +31860,7 @@ LLAMA_KV_MAG_ALL: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22084`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22086`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // real corruption (if any) accumulates DEEPER. Dequant q8_0 K for EVERY layer (first ~1MB) ->
@@ -31878,7 +31878,7 @@ LLAMA_KV_MAG_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22057`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22059`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // values) from real corruption (substantial magnitude/sample divergence). q8_0 = 34B/blk: fp16 d
@@ -31896,7 +31896,7 @@ LLAMA_KV_NOPE_ROPE_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22194`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22196`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // MLA K cache = [n_embd_head_k, n_head_kv, n_kv]; per head: nope=elems 0..(hd-n_rot-1), k_pe
@@ -31914,7 +31914,7 @@ LLAMA_KV_POS_DIFF: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22146`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22148`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // vs multi-ub at the SAME prompt, diff by position to find WHERE (and whether)
@@ -31932,7 +31932,7 @@ LLAMA_KV_POS_DIFF_POS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22153`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:22155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 static std::vector<long long> probe_p = []() {
@@ -31950,7 +31950,7 @@ LLAMA_KV_RAM_INCLUDE_K_IDX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10085`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10087`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         fprintf(stderr, "*** DLM_DIAG: KV-RAM init: resized to %d layers, measuring sizes...\n", n_layer_kv); fflush(stderr);
@@ -31968,7 +31968,7 @@ LLAMA_KV_SETROWS_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18806`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18808`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // Map every SET_ROWS node to its layer compute-range to see if il>0's K-write is OUTSIDE
@@ -32052,7 +32052,7 @@ LLAMA_KV_TIER_MIRROR: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10206`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10208`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             kv_storage_pageable = want_pageable;
@@ -32070,7 +32070,7 @@ LLAMA_KV_TIER_STREAM_EXPORT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4677`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4678`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool tier_stream_candidate = [&]() -> bool {
@@ -32124,7 +32124,7 @@ LLAMA_KV_UPLOAD_NARROW: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11733`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11735`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             {
@@ -32178,7 +32178,7 @@ LLAMA_LAYER_CMP_DIR: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:781`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool llama_layer_cmp_eval_cb(ggml_tensor * t, bool ask, void * /*user_data*/) {
@@ -32196,7 +32196,7 @@ LLAMA_LAYER_CMP_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1477`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1478`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // and the Mac receiver re-prefill alike (same lib) -> RTX-vs-Mac FA-precision confirmation.
@@ -32214,7 +32214,7 @@ LLAMA_LAYER_CMP_LAYERS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:783`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:784`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static const std::vector<int> layers = []() {
@@ -32232,7 +32232,7 @@ LLAMA_LAYER_CMP_SIDE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 // LLAMA_LAYER_CMP_DIR; layer filter by LLAMA_LAYER_CMP_LAYERS (csv, default 0,1,2,30,60).
@@ -32244,7 +32244,7 @@ static bool llama_layer_cmp_eval_cb(ggml_tensor * t, bool ask, void * /*user_dat
         const char * e = std::getenv("LLAMA_LAYER_CMP_LAYERS");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1482`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1483`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             cparams.cb_eval_user_data = nullptr;
@@ -32262,7 +32262,7 @@ LLAMA_LEAN_GPU: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-model.cpp:8644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-model.cpp:8645`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     // LLAMA_LEAN_GPU: both output AND tok_embd on CPU (~1.2 GB total)
@@ -32406,7 +32406,7 @@ LLAMA_M3_SPARSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10092`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10094`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // wins.) Per-layer get_k_idx_layer_bytes still returns 0 where no k_idx exists, so this is safe.
@@ -32514,7 +32514,7 @@ LLAMA_M3_WF1_NO_FREE_REUSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10672`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10674`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // tradeoff (fits at ctx=12000; re-evaluate at the 150k raise).
@@ -32598,7 +32598,7 @@ LLAMA_MASK_STAGE_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20803`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20805`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // q0_k1 != -inf => the staged f16 mask is corrupt for n_tokens>2048 (mask-staging bug).
@@ -32616,7 +32616,7 @@ LLAMA_MLA_SPARSE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1558`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1559`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     kv_sync_batch_size       = params.kv_sync_batch_size;
@@ -32634,7 +32634,7 @@ LLAMA_MLA_SPARSE_DECODE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1562`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla_trace = resolve_tristate_flag(params.sparse_mla_trace, "LLAMA_MLA_SPARSE_TRACE", false);
@@ -32796,7 +32796,7 @@ LLAMA_MLA_SPARSE_FUSED_KERNEL: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1580`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1581`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla_fa_mode = resolve_sparse_mla_fa_mode(params.sparse_mla_fa_mode);
@@ -32814,7 +32814,7 @@ LLAMA_MLA_SPARSE_FUSED_TOPK: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1582`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1583`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         resolve_tristate_flag(params.sparse_mla_fused_kernel, "LLAMA_MLA_SPARSE_FUSED_KERNEL", false);
@@ -32868,7 +32868,7 @@ LLAMA_MLA_SPARSE_PREFILL: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1560`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1561`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla = resolve_tristate_flag(params.sparse_mla, "LLAMA_MLA_SPARSE", false);
@@ -32886,7 +32886,7 @@ LLAMA_MLA_SPARSE_PREFILL_PREFIX: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1568`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1569`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         params.sparse_mla_prefill_selector,
@@ -32904,7 +32904,7 @@ LLAMA_MLA_SPARSE_PREFILL_RECENT: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1567`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1568`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla_prefill_selector = resolve_sparse_mla_selector(
@@ -32922,7 +32922,7 @@ LLAMA_MLA_SPARSE_PREFILL_SKIP_INDEXER: advanced engine setting; built-in default
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1572`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1573`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     cparams.sparse_mla_prefill_indexer = params.sparse_mla_prefill_indexer >= 0 ?
@@ -32940,7 +32940,7 @@ LLAMA_MLA_SPARSE_PREFILL_TOP_K: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1564`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1565`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla_top_k = resolve_int_override(params.sparse_mla_top_k, "LLAMA_MLA_SPARSE_TOP_K", 0);
@@ -32958,7 +32958,7 @@ LLAMA_MLA_SPARSE_PREFIX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1576`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1577`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         params.sparse_mla_decode_baseline,
@@ -32976,7 +32976,7 @@ LLAMA_MLA_SPARSE_RECENT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1575`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1576`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla_decode_baseline = resolve_sparse_mla_selector(
@@ -32994,7 +32994,7 @@ LLAMA_MLA_SPARSE_TOP_K: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1562`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1563`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     cparams.sparse_mla_prefill = resolve_tristate_flag(params.sparse_mla_prefill, "LLAMA_MLA_SPARSE_PREFILL", true);
@@ -33012,7 +33012,7 @@ LLAMA_MLA_SPARSE_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1559`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1560`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -33186,7 +33186,7 @@ LLAMA_MOE_PREFILL_EXPERT_CAP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1584`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1585`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         resolve_tristate_flag(params.sparse_mla_fused_topk, "LLAMA_MLA_SPARSE_FUSED_TOPK", false);
@@ -33252,7 +33252,7 @@ LLAMA_NO_FAST_PATH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12535`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     ggml_tensor * staging[2] = { nullptr, nullptr };
@@ -33300,7 +33300,7 @@ LLAMA_NO_OUTPUT_GPU: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-model.cpp:8643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-model.cpp:8644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     // LLAMA_NO_OUTPUT_GPU: output tensor on CPU (~580 MB)
@@ -33336,19 +33336,19 @@ Advanced backend control LLAMA_PD_CACHE_CAPTURE. Set explicitly only for the sel
 
 Scope: . Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:632`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:633`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 #if defined(_WIN32) || defined(_WIN64)
     static bool warned_once = false;
     if (const char * cap = std::getenv("LLAMA_PD_CACHE_CAPTURE"); cap && cap[0] == '1' && !warned_once) {
-        fprintf(stderr, "[pd-cache] WARNING: LLAMA_PD_CACHE_CAPTURE=1 is IGNORED on Windows — CUDA KV serialization crashes. Only Mac/Metal receiver supports Phase-2 KV capture.\n");
+        fprintf(stderr, "[pd-cache] WARNING: LLAMA_PD_CACHE_CAPTURE=1 is IGNORED on Windows — CUDA KV serialization crashes. Phase-2 KV capture belonged to the retired Mac receiver.\n");
         warned_once = true;
     }
     return;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:638`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:639`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     return;
@@ -33396,7 +33396,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cp
     auto it = g_prefix_cache.find(prefix_hash);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:622`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:623`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (!ctx) { return; }
@@ -33405,10 +33405,10 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cp
         if (dis[0] == '1') { return; }
     }
     // KV capture is opt-in: must set LLAMA_PD_CACHE_CAPTURE=1 explicitly.
-    // On Mac/Metal, set this to enable Phase-2 KV serialization.
+    // Phase-2 KV serialization belonged to the retired Mac/Metal receiver.
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:712`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:713`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                              const int32_t * token_ids = nullptr, int n_token_ids = 0) {
@@ -33420,7 +33420,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cp
     // Capture KV state from context (Phase-2: full serialization).
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:3084`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:3088`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const bool pd_cache_hit = (meta.flags & LLAMA_KV_ARTIFACT_FLAG_CACHE_HIT) != 0;
@@ -33432,7 +33432,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cp
                         sess.session_id, sid, (unsigned long long) snap_sid);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:3470`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:3474`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Gate: safety env disable
@@ -33516,10 +33516,10 @@ Advanced backend control LLAMA_PD_RESIDENT_SINGLETOK_MAX. Set explicitly only fo
 
 Scope: . Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1498`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1499`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-        // residual (~6s) is RTX-SIDE, not the Mac. Keep the knob for experiments only.
+        // residual (~6s) is RTX-SIDE, not the receiver. Keep the knob for experiments only.
         static const int resident_singletok_max = []() {
             const char * e = std::getenv("LLAMA_PD_RESIDENT_SINGLETOK_MAX");
             return (e && e[0]) ? std::max(0, atoi(e)) : 0;
@@ -33534,7 +33534,7 @@ LLAMA_PERSIST_GPU_BUFS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1594`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1593`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // reuse them. LLAMA_PERSIST_GPU_BUFS=1 enables this. The size must match
@@ -33552,7 +33552,7 @@ LLAMA_PER_LAYER_GRAPH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15577`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15579`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Each layer gets a fresh graph and allocation — no lifetime conflicts.
@@ -33570,7 +33570,7 @@ LLAMA_PHASE1V7_DEV_SYNC: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19703`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19705`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             if (u > 0) {
@@ -33588,7 +33588,7 @@ LLAMA_PHASE1V7_FA_OUT_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20840`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20842`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // state). LLAMA_PHASE1V7_FA_OUT_TRACE=1 enables.
@@ -33606,7 +33606,7 @@ LLAMA_PHASE1V7_FA_PTR_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19178`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19180`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         // patch state.
@@ -33618,7 +33618,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19178`.
                             auto * q_t = fa_nodes[il].raw->src[0];
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20341`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20343`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // settings on the actual layer-major decode path.
@@ -33636,7 +33636,7 @@ LLAMA_PHASE1V7_K_PERSIST_TRACE: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20848`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20850`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // between u=0 and u=1 compute, K-cell persistence is broken.
@@ -33654,7 +33654,7 @@ LLAMA_PHASE1V7_MASK_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20365`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20367`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // determine whether mask differs across ubatches.
@@ -33684,7 +33684,7 @@ LLAMA_POS_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15816`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15818`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             res->set_inputs(&ubatch);
@@ -33702,7 +33702,7 @@ LLAMA_PREFILL_ALLOW_GPU_MASK_MLA: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16768`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16770`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // and still clears the >400 tok/s target.
@@ -33738,7 +33738,7 @@ LLAMA_PREFILL_BOUNDARY_HOST: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18895`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:18897`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -33756,7 +33756,7 @@ LLAMA_PREFILL_CACHED_PREFIX_PROMPT_DIRECT: advanced engine setting; built-in def
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5225`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5227`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             const bool cached_prefix_prompt_direct =
@@ -33792,7 +33792,7 @@ LLAMA_PREFILL_CHUNK_STATE_PROBE: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10069`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10071`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         (batch.pos && batch.n_tokens > 0) ? std::max<int64_t>(0, batch.pos[0]) : 0;
@@ -33810,7 +33810,7 @@ LLAMA_PREFILL_CONTINUATION_SEQ_REHYDRATE: advanced engine setting; built-in defa
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4815`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4817`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     // KV. Escape hatch: LLAMA_PREFILL_CONTINUATION_SEQ_REHYDRATE=0 for A/B.
@@ -33828,7 +33828,7 @@ LLAMA_PREFILL_DEBUG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4315`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4316`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // concurrent slots' data. Override via KIMI_FORCE_EXPORT_SEQ0=1 to keep
@@ -33840,7 +33840,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4315`. 
         force_export_seq0_env && force_export_seq0_env[0] != '\0' && force_export_seq0_env[0] != '0';
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5220`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5221`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // PERF (2026-07-18): diagnostic-only full-blob cksum (485MB serial loop) gated behind LLAMA_PREFILL_DEBUG
@@ -33852,7 +33852,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5220`. 
             for (size_t b = 0; b < check_bytes; b++) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5255`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5256`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // chunk sends (measured: 1.37s compute-done->first-chunk gap). Gate it behind LLAMA_PREFILL_DEBUG so
@@ -33864,7 +33864,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5255`. 
                     blob_cksum = (blob_cksum * 31) + state[b];
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9493`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9495`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -33876,7 +33876,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9493`. 
     // CPU-side wall-clock attribution for the layer-major round path. The
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15998`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16000`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -33888,7 +33888,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15998`.
     fprintf(stderr, "*** DLM: about to enter layer loop\n"); fflush(stderr);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1337`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1336`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool trace_swap = swap_trace_env != nullptr && swap_trace_env[0] != '\0' && std::strcmp(swap_trace_env, "0") != 0;
@@ -33906,7 +33906,7 @@ LLAMA_PREFILL_DEBUG_INPUTS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15464`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15466`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     ctx->staging->push_back({staging_ptr, input_cpy->data, nb, true}); // owns=true
@@ -33918,7 +33918,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15464`.
                     }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15531`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15533`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         n_shared++;
@@ -33930,7 +33930,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15531`.
                         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15548`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15550`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         gpu_input_staging[u].push_back({staging_ptr, cur.data, cur.nbytes, true}); // owns=true
@@ -33942,7 +33942,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15548`.
                         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15990`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15992`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -33978,7 +33978,7 @@ LLAMA_PREFILL_DEBUG_SYNC: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16980`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16982`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -33996,7 +33996,7 @@ LLAMA_PREFILL_DECODE_TOK_S: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1628`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1629`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         (void) parse_env_double("LLAMA_PREFILL_STREAM_FLOOR_MS", stream_floor_ms);
@@ -34014,7 +34014,7 @@ LLAMA_PREFILL_DENSE_ATTN_PROBE: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11466`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11468`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // (or =all) to inspect the actual kq -> softmax -> kqv chain.
@@ -34032,7 +34032,7 @@ LLAMA_PREFILL_DISABLE_KV_RAM_GUARD: advanced engine setting; built-in default re
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4778`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4779`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -34044,7 +34044,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4778`. 
             return true;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21803`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21805`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // can still observe the raw symptom for debugging.
@@ -34062,7 +34062,7 @@ LLAMA_PREFILL_DISABLE_SAVED_LEAF_RESTORE: advanced engine setting; built-in defa
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16194`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16196`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             kv_ram_already_init?1:0); fflush(stderr);
@@ -34098,7 +34098,7 @@ LLAMA_PREFILL_DSA_TOPKPOS_REFRESH: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20243`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // causal-position input must be refreshed for the current ubatch.
@@ -34116,7 +34116,7 @@ LLAMA_PREFILL_DSV4_COALESCE_MAX: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9652`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // the cross-ubatch compressed state nor an oversized single ubatch.
@@ -34134,7 +34134,7 @@ LLAMA_PREFILL_DUMP_LAYERS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2579`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2578`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Activated by LLAMA_PREFILL_DUMP_LAYERS env var
@@ -34152,7 +34152,7 @@ LLAMA_PREFILL_DUMP_ORDER: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2556`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // to write .bin files in compute-buffer order
@@ -34170,7 +34170,7 @@ LLAMA_PREFILL_DYNAMIC_ALLOW_PARTIAL_UB: advanced engine setting; built-in defaul
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6040`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6042`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     _dyn_batch  = _saved_n_batch;
@@ -34188,7 +34188,7 @@ LLAMA_PREFILL_DYNAMIC_TAIL_MAX: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6023`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6025`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     _min_good_ubatch = 512;
@@ -34206,7 +34206,7 @@ LLAMA_PREFILL_DYNAMIC_UB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5835`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5837`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // _dyn_dispatch_tail (which is the Mac-side tail to prefill).
@@ -34224,7 +34224,7 @@ LLAMA_PREFILL_DYNAMIC_UB_MAX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6007`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6009`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     return best;
@@ -34242,7 +34242,7 @@ LLAMA_PREFILL_DYNAMIC_UB_MIN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6018`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6020`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     _target = 512;
@@ -34260,7 +34260,7 @@ LLAMA_PREFILL_EMBD_NO_SPLIT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3184`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3183`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // as ONE FA-on pass (no split) so all image cells get consistent FA-on K layout.
@@ -34278,7 +34278,7 @@ LLAMA_PREFILL_F16_MASK_REFRESH: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19941`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19943`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // (il,u) with THIS ubatch's causal mask. fp-neutral for single-ub / q<=2048 (still correct).
@@ -34296,7 +34296,7 @@ LLAMA_PREFILL_FASTPATH_MULTIUB: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12571`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12573`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // RAM cache; 3x NVMe for Kimi). Requires the WF (cached_wf) so it can reset+re-drive layers 0..N.
@@ -34308,7 +34308,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12571`.
     }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12572`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12574`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool fast_multiub = allow_fast && n_ubatches > 1 && n_sublayers <= 1 && prefill_active_wf != nullptr &&
@@ -34326,7 +34326,7 @@ LLAMA_PREFILL_FAST_FA_PATCH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15823`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15825`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -34344,7 +34344,7 @@ LLAMA_PREFILL_FAST_MASK_INIT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15763`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15765`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                        fast_multiub ? "MULTI-ubatch (C1: fast path per ubatch + WF reset)" : "single ubatch");
@@ -34362,7 +34362,7 @@ LLAMA_PREFILL_FA_F16_MASK_PATCH: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17129`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17131`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
                     const bool iswa_direct_f16_mask = pcs_fa_mask_direct_f16;
@@ -34380,7 +34380,7 @@ LLAMA_PREFILL_FA_MASK_CACHE_MAX_MB: advanced engine setting; built-in default re
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16867`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16869`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -34398,7 +34398,7 @@ LLAMA_PREFILL_FA_MASK_FULLWIDTH: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17116`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17118`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         // unwritten cells, exactly like the fast/C1 path. Set =0 to revert to the old shrink.
@@ -34416,7 +34416,7 @@ LLAMA_PREFILL_FA_MASK_HOST_CACHE: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16931`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16933`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -34434,7 +34434,7 @@ LLAMA_PREFILL_FORCE_FRESH_EXPORT: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4679`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4680`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const char * e = std::getenv("LLAMA_KV_TIER_STREAM_EXPORT");
@@ -34446,7 +34446,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4679`. 
         const char * keep = std::getenv("LLAMA_KV_ARTIFACT_KEEP_FILE");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4764`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4765`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     std::vector<uint8_t> state;
@@ -34464,7 +34464,7 @@ LLAMA_PREFILL_FORCE_SAFE_MLA_MULTIUBATCH: advanced engine setting; built-in defa
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15346`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15348`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // GLM-5.2 streaming (needle "MARIGOLD"->"MARMOT" at ub=1024/4 ubatches; ub=4096/1 ubatch is exact).
@@ -34482,7 +34482,7 @@ LLAMA_PREFILL_FORCE_SINGLE_BUFFER: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2145`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2144`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     bool callbacks_registered = false;
@@ -34500,7 +34500,7 @@ LLAMA_PREFILL_GLM_CONT_RESERVE: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10927`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10929`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -34518,7 +34518,7 @@ LLAMA_PREFILL_GLM_DENSE_MASK_LATE_REFRESH: advanced engine setting; built-in def
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20732`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20734`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // are excluded. A/B: =0 disables only this GLM late restage.
@@ -34536,7 +34536,7 @@ LLAMA_PREFILL_GLM_DSA_BOUNDARY_POOL_EXTERNAL: advanced engine setting; built-in 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11085`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11087`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -34548,7 +34548,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11085`.
         model.arch == LLM_ARCH_GLM_DSA && glm_dsa_boundary_external_enabled;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13225`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13227`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         alloc_output_guard_raw[0] != '0';
@@ -34566,7 +34566,7 @@ LLAMA_PREFILL_GLM_DSA_KV_RAM_COMMIT: advanced engine setting; built-in default r
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11601`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:11603`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     static const bool glm_dsa_kv_ram_commit_gate = []() {
@@ -34584,7 +34584,7 @@ LLAMA_PREFILL_GLM_DSA_TOPK_POOL_EXTERNAL: advanced engine setting; built-in defa
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13127`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13129`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // solely for backend/device routing.
@@ -34602,7 +34602,7 @@ LLAMA_PREFILL_GLM_DSA_TOPK_STAGE: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13135`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // retained only as a negative A/B control.
@@ -34620,7 +34620,7 @@ LLAMA_PREFILL_GLM_EXEC_ORDER_POOL_EXTERNAL: advanced engine setting; built-in de
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13295`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13297`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool glm_exec_order_external_enabled = []() {
@@ -34638,7 +34638,7 @@ LLAMA_PREFILL_GLM_POOL_POISON: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12827`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12829`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Host-side written-state guards remain active for either byte value.
@@ -34650,7 +34650,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12827`.
         // is enabled without an explicit poison selection, use 0xff/-1, which
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13227`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13229`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         std::getenv("LLAMA_PREFILL_GLM_DSA_BOUNDARY_POOL_EXTERNAL");
@@ -34668,7 +34668,7 @@ LLAMA_PREFILL_GLM_TOPK_GATHER_MASK: advanced engine setting; built-in default re
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12820`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12822`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const bool glm_dsa_topk_gather_mask_enabled = []() {
@@ -34698,7 +34698,7 @@ LLAMA_PREFILL_GLM_TOPK_WRITE_COVERAGE: advanced engine setting; built-in default
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13155`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:13157`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // to the written region, NOT fill unwritten cells. See ROADMAP LATEST-131.
@@ -34740,7 +34740,7 @@ LLAMA_PREFILL_GPU_MASK_FIX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16787`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16789`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // disable-gpu-mask-for-MLA-multi-ubatch decision).
@@ -34758,7 +34758,7 @@ LLAMA_PREFILL_HEADPASS_FIX: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21545`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21547`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // producer. Escape hatch: LLAMA_PREFILL_HEADPASS_FIX=0.
@@ -34776,7 +34776,7 @@ LLAMA_PREFILL_HIDDEN_GPU_MAX_MB: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12589`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12591`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (!(use_fast_path || fast_multiub) && hidden_mode == LLAMA_HIDDEN_GPU) {
@@ -34794,7 +34794,7 @@ LLAMA_PREFILL_HIDDEN_MODE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1840`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1839`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     llama_hidden_mode hidden_mode = LLAMA_HIDDEN_CPU;
@@ -34812,7 +34812,7 @@ LLAMA_PREFILL_HIDDEN_PINNED_MAX_MB: advanced engine setting; built-in default re
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12756`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12758`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 #ifdef GGML_USE_CUDA
@@ -34830,7 +34830,7 @@ LLAMA_PREFILL_HIDDEN_REDIRECT: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15207`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15209`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -34842,7 +34842,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15207`.
             const char * env = std::getenv("LLAMA_PREFILL_HIDDEN_REDIRECT");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15211`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }();
@@ -34860,7 +34860,7 @@ LLAMA_PREFILL_HIDDEN_SAVE_SYNC: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17923`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17925`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -34878,7 +34878,7 @@ LLAMA_PREFILL_HIDDEN_ZERO_SCAN: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15994`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15996`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -34896,7 +34896,7 @@ LLAMA_PREFILL_INPUT_STAGING: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15341`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15343`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     };
@@ -34914,7 +34914,7 @@ LLAMA_PREFILL_ISWA_COALESCE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9657`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9659`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             !is_dsv4_memory || (int64_t) n_tokens_all <= dsv4_coalesce_max;
@@ -34932,7 +34932,7 @@ LLAMA_PREFILL_ISWA_MULTIUBATCH: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9656`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:9658`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const bool coalesce_size_ok =
@@ -34968,7 +34968,7 @@ LLAMA_PREFILL_KSTORE_IN_RANGE: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10876`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10878`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // l_out, and stays < first_idx[il+1] so it never pulls in the next layer).
@@ -35136,7 +35136,7 @@ LLAMA_PREFILL_KV_DL_HARD_SYNC: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12247`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     }();
@@ -35154,7 +35154,7 @@ LLAMA_PREFILL_KV_DOWNLOAD_ZERO_SCAN: advanced engine setting; built-in default r
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12269`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12271`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -35172,7 +35172,7 @@ LLAMA_PREFILL_KV_DOWNLOAD_ZERO_SCAN_ALL: advanced engine setting; built-in defau
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12273`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12275`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     }();
@@ -35208,7 +35208,7 @@ LLAMA_PREFILL_KV_IDX_REFRESH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20063`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20065`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // (graph built for build_ubatch.n_tokens) with the safe last cell so FA never reads its garbage.
@@ -35226,7 +35226,7 @@ LLAMA_PREFILL_KV_IDX_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20109`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20111`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     ggml_backend_tensor_set(idx, ibuf.data(), 0, (size_t) n_total * sizeof(int64_t));
@@ -35292,7 +35292,7 @@ LLAMA_PREFILL_KV_PAD_TRIM: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6721`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6723`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         // so this is local-decode-only and Mac-safe. Opt out with LLAMA_PREFILL_KV_PAD_TRIM=0.
@@ -35364,7 +35364,7 @@ LLAMA_PREFILL_KV_RAM_AUTO_CAP_GB: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10179`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10181`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -35400,7 +35400,7 @@ LLAMA_PREFILL_KV_RAM_PINNED_POOL: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10252`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // Allocate the pinned staging pool (pageable mode only).
@@ -35418,7 +35418,7 @@ LLAMA_PREFILL_KV_RAM_STORAGE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10178`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10180`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // 16 GB default picked so 73k MiniMax-Q3 (9.3 GB) keeps the fast pinned path.
@@ -35724,7 +35724,7 @@ LLAMA_PREFILL_KWRITE_FIRST: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19603`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19605`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         {
@@ -35742,7 +35742,7 @@ LLAMA_PREFILL_K_UBATCH_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21249`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21251`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             (il == 0 || il == 2 || il == 8 || il == n_layer_kv - 1)) {
@@ -35766,7 +35766,7 @@ LLAMA_PREFILL_LAYER_MAJOR: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1825`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1824`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // loop: for each layer, process ALL ubatches, then move to the next layer.
@@ -35808,7 +35808,7 @@ LLAMA_PREFILL_LAYER_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8252`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8254`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                       ? (int)model.hparams.n_layer_kv_from_start : (int)model.hparams.n_layer;
@@ -35826,7 +35826,7 @@ LLAMA_PREFILL_LEAF_RESTORE_DIRTY_ONLY: advanced engine setting; built-in default
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16213`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16215`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -35844,7 +35844,7 @@ LLAMA_PREFILL_LEAF_RESTORE_MIN_BYTES: advanced engine setting; built-in default 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16198`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16200`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -35862,7 +35862,7 @@ LLAMA_PREFILL_LOCK_UB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6084`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6086`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             // divides prompt evenly producing non-power-2 ub that
@@ -35880,7 +35880,7 @@ LLAMA_PREFILL_M3_NONFA_F32_DEV_REFRESH: advanced engine setting; built-in defaul
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20034`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20036`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             {
@@ -35898,7 +35898,7 @@ LLAMA_PREFILL_M3_NONFA_MASK_FIX: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20579`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20581`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // diagnostics).
@@ -35934,7 +35934,7 @@ LLAMA_PREFILL_MASK_EVERY_LAYER: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:20559`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // ~14s compute). Set LLAMA_PREFILL_MASK_EVERY_LAYER=1 to revert.
@@ -35952,7 +35952,7 @@ LLAMA_PREFILL_MLA_MATCH_LAYOUT: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4288`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4289`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     };
@@ -35964,7 +35964,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4288`. 
     if (model.hparams.is_mla()) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4645`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const int n_layer = (int) model.hparams.n_layer;
@@ -35976,7 +35976,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4644`. 
     // Resolve the KV cache from the memory module
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5721`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5723`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // namespace matches what export stored.
@@ -35994,7 +35994,7 @@ LLAMA_PREFILL_NARROW_HIDDEN_RESTORE: advanced engine setting; built-in default r
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15141`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15143`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // broad scan, =1 to force narrow on any arch.
@@ -36012,7 +36012,7 @@ LLAMA_PREFILL_NODE_CKSUM: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17615`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17617`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     } node_cksum_trace;
@@ -36030,7 +36030,7 @@ LLAMA_PREFILL_NODE_CKSUM_BYTES: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17699`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17701`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         node_cksum_trace.semantic_target_layer = dlm_sublayer_fnv_layer;
@@ -36048,7 +36048,7 @@ LLAMA_PREFILL_NODE_CKSUM_DUMP: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17818`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17820`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         // and confounded by single-vs-multi batch-tiling fp noise). Tag via env value
@@ -36066,7 +36066,7 @@ LLAMA_PREFILL_NODE_CKSUM_LAYER: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17695`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17697`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         node_cksum_trace.node_trace_enabled = node_cksum_requested;
@@ -36084,7 +36084,7 @@ LLAMA_PREFILL_NODE_CKSUM_UBATCH: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17696`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17698`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         node_cksum_trace.semantic_fnv_enabled = dlm_sublayer_fnv;
@@ -36132,7 +36132,7 @@ LLAMA_PREFILL_NO_FA_DISABLE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3227`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3226`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                            __func__, batch_copy.n_tokens);
@@ -36144,7 +36144,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
                 ctx->invalidate_graph();
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3273`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3272`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // use coherently for MLA.)
@@ -36156,7 +36156,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
                                __func__, batch_copy.n_tokens, fa_tail_align);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3497`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3496`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // the K cells stay FA-on-compatible.
@@ -36174,7 +36174,7 @@ LLAMA_PREFILL_NO_FA_TAIL_SPLIT: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3204`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3203`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     //   still MISSES              -> the loss is at the ubatch level inside a single decode
@@ -36192,7 +36192,7 @@ LLAMA_PREFILL_NO_KV_DL_BARRIER: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12243`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 {
@@ -36210,7 +36210,7 @@ LLAMA_PREFILL_NO_KV_RAM_NEW_PROMPT_RESET: advanced engine setting; built-in defa
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10056`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10058`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const int dlm_pos0 = (batch.pos && batch.n_tokens > 0) ? std::max<int>(0, batch.pos[0]) : 0;
@@ -36228,7 +36228,7 @@ LLAMA_PREFILL_NO_REMOTE_TAIL_HANDOFF: advanced engine setting; built-in default 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3336`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3335`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // one slower tail ubatch on RTX. Required for coherent output on prompts
@@ -36240,7 +36240,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
     // LLAMA_TOKEN_NULL) nor to "the next RTX batch" (the next batch is the text suffix
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4505`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4507`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                     // causing the whole prompt to be dumped on Mac as tail.
@@ -36252,7 +36252,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                     // [n_tokens..task) span to the Mac to prefill locally. That is INVALID
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6368`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6370`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                 (int) slot_batched->task->n_tokens() - keep_n;
@@ -36264,7 +36264,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                             // pixel data). Keep streaming on RTX so update_slots re-enters and the image
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6447`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6449`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             // Same gate as the suffix block above: large remainders stay
@@ -36282,7 +36282,7 @@ LLAMA_PREFILL_NO_UB_DRAIN: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21194`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21196`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         if (strcmp(m, "first_layer_only") == 0) return ub_sync_mode_t::first_layer_only;
@@ -36432,7 +36432,7 @@ LLAMA_PREFILL_PUBLISH_RETRIES: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6212`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6214`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // momentarily unavailable). N controlled by env
@@ -36450,7 +36450,7 @@ LLAMA_PREFILL_REJECT_TINY_TAIL: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5911`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5913`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             continue;
@@ -36462,7 +36462,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                                 (batch_candidate == best.batch && u > best.ubatch)) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5943`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5945`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                 continue;
@@ -36498,7 +36498,7 @@ LLAMA_PREFILL_REQUEST_SCOPED_SCRATCH: advanced engine setting; built-in default 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12909`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12911`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     };
@@ -36516,7 +36516,7 @@ LLAMA_PREFILL_RERESTORE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19917`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19919`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Marker RERESTORE for build-grep.
@@ -36534,7 +36534,7 @@ LLAMA_PREFILL_RESTORE_EVERY_SPLIT: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17004`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17006`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 if (pcs_restore_count > 0) {
@@ -36546,7 +36546,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:17004`.
                         if (pcs_restore_dst[i] && pcs_restore_src[i] && pcs_restore_bytes[i] > 0) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19580`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19582`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             } // end sub-layer loop
@@ -36558,7 +36558,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19580`.
             // Skip the normal ubatch loop below
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21051`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21053`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -36576,7 +36576,7 @@ LLAMA_PREFILL_RESTORE_TOKENS_EVERY_LAYER: advanced engine setting; built-in defa
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19877`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19879`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // m3_nonfa_mask_fix). Cheap (a few KB of I32 per layer). Gate to revert for A/B.
@@ -36594,7 +36594,7 @@ LLAMA_PREFILL_ROUND_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3149`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3148`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // round 2+ inherits from round 1's tail-deferred handoff. Cheap to leave
@@ -36612,7 +36612,7 @@ LLAMA_PREFILL_SAFE_MLA_MULTIUBATCH_OFF: advanced engine setting; built-in defaul
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15360`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:15362`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // multi-ubatch (GLM needle MARIGOLD->MARMOT) — probe runs must check coherence, not just speed.
@@ -36630,7 +36630,7 @@ LLAMA_PREFILL_SHIP_MTP_HIDDEN: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14951`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:14953`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Indexed by absolute token position (ubatch.pos[0]); fp32 l_out -> fp16. Serialize + receiver wiring follow.
@@ -36648,7 +36648,7 @@ LLAMA_PREFILL_SKIP_KV_RAM_CLEAR_AFTER_HANDOFF: advanced engine setting; built-in
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6498`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6500`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // original behaviour and the original comment's contamination guard.
@@ -36684,7 +36684,7 @@ LLAMA_PREFILL_STATE_WIRE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4491`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:4492`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -36732,7 +36732,7 @@ LLAMA_PREFILL_STREAM_FLOOR_MS: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1626`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1627`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
         double decode_tok_s    = 220.0;
@@ -36750,7 +36750,7 @@ LLAMA_PREFILL_STREAM_LOCAL_FA_OFF: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24160`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24162`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // LLAMA_PREFILL_STREAM_LOCAL_FA_OFF=1 restores the old behavior for
@@ -36768,7 +36768,7 @@ LLAMA_PREFILL_STREAM_TOK_S: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1627`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1628`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
 
@@ -36786,7 +36786,7 @@ LLAMA_PREFILL_SWAP_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1334`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1333`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }
@@ -37272,7 +37272,7 @@ LLAMA_PREFILL_TILING_ALGO: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6072`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:6074`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         // Mode select via LLAMA_PREFILL_TILING_ALGO=pad-and-trim
@@ -37290,7 +37290,7 @@ LLAMA_PREFILL_UBATCH_ALIGN_PREFIX: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3245`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3244`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         int fa_prefix_align = fa_tail_align;
@@ -37308,7 +37308,7 @@ LLAMA_PREFILL_UB_BOUNDARY_SYNC: advanced engine setting; built-in default retain
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19562`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19564`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             // (the new default for the v8 fix). Set to 'whole_sched' to keep
@@ -37326,7 +37326,7 @@ LLAMA_PREFILL_UB_SYNC_MODE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19553`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19555`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         enum class ub_sync_mode_t { off, whole_sched, first_layer_only };
@@ -37338,7 +37338,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19553`.
                                 if (strcmp(m, "first_layer_only") == 0) return ub_sync_mode_t::first_layer_only;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21188`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21190`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 enum class ub_sync_mode_t { off, whole_sched, first_layer_only };
@@ -37356,7 +37356,7 @@ LLAMA_PREFILL_UNSAFE_ALLOW_GPU_MASK_MLA: advanced engine setting; built-in defau
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16772`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:16774`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -37374,7 +37374,7 @@ LLAMA_PREFILL_VIABILITY_AS_PREFIX: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4978`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4980`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // for the store to deliver its win. Explicit env still overrides.
@@ -37404,7 +37404,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-model.cpp:3109`. Un
         static std::atomic<bool> g_wf_main_model_loaded{false};
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // (would waste 8.5GB + be clobbered); instead we wrap the WF heap ptr as gpu_buf_a AFTER wf_create below.
@@ -37416,7 +37416,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
     const bool ds_direct = ds_direct_env && ds_direct_env[0] && ds_direct_env[0] != '0' && wf_on_chk;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1714`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1713`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     wf_context * wf = nullptr;
@@ -37452,7 +37452,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                 force_prompt_cache_env && force_prompt_cache_env[0] != '\0' && strcmp(force_prompt_cache_env, "0") != 0;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4780`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4782`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // (decode happens on Mac, not locally). If handoff didn't trigger,
@@ -37494,7 +37494,7 @@ LLAMA_PREFILL_WF_HARD_SYNC: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2521`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2520`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 wf_adapter_remap_tensors(remap_entries, gpu_ptr, wf_actual_buf);
@@ -37512,7 +37512,7 @@ LLAMA_PREFILL_WF_REUSE_CACHED_DANGEROUS: advanced engine setting; built-in defau
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1735`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1734`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // LLAMA_PREFILL_WF_REUSE_CACHED_DANGEROUS=1 to opt back in for
@@ -37530,7 +37530,7 @@ LLAMA_PREFILL_WF_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1753`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1752`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 LLAMA_LOG_INFO("%s: reusing cached weight fetcher for batch %d\n", __func__, batch.n_tokens);
@@ -37548,7 +37548,7 @@ LLAMA_PTR_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12037`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12039`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -37632,7 +37632,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
         // prompt_clear() preserves route_reuse_candidate_ready(). Invalidate
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4902`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4904`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -37668,7 +37668,7 @@ LLAMA_SERVER_NO_REMAP_SEQ: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4791`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4793`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // running RTX-only (no Mac handoff) so multi-slot KV stays separated
@@ -37734,7 +37734,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                             fprintf(stderr,
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4926`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4928`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 chunk_route_fix && batch_prefix_pos > n_past_cached;
@@ -37752,7 +37752,7 @@ LLAMA_SERVER_SKIP_LOGITS_MARK: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4690`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4692`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             // local-decode-after-streaming-prefill flows crash. Allow opt-out
@@ -37824,11 +37824,11 @@ LLAMA_SHIP_IMAGE_EMBD: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4382`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4384`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-                            // RTX SM120 NCOLS=32 MLA FA accumulates VKQ in F16 and loses the
-                            // image's fine glyph detail — see GROUND_TRUTH §11).
+                            // retired backend (the RTX SM120 NCOLS=32 MLA FA accumulates VKQ in
+                            // F16 and loses the image's fine glyph detail — see GROUND_TRUTH §11).
                             if (img_embd && ctx_internal && std::getenv("LLAMA_SHIP_IMAGE_EMBD")) {
                                 ctx_internal->set_prefill_handoff_image_embd(
                                     img_embd, (uint32_t) n_img,
@@ -37836,7 +37836,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.c
                                 SLT_INF(slot, "*** SHIP_EMBD: stashed %zu image cells (n_embd=%d) for handoff at pos0=%d\n",
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4404`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4406`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             // false, the image takes this path; without a stash here the handoff ships
@@ -37854,7 +37854,7 @@ LLAMA_SKIP_IMAGE_PREFILL: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4357`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4359`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                             // the ship-embd handoff + the wait-loop match by image cells still work).
@@ -37872,7 +37872,7 @@ LLAMA_SMALL_IMG_FORWARD: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4420`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:4422`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                         // locally (sidesteps the RTX F16-VKQ entirely). The MLX dispatch checks
@@ -37890,7 +37890,7 @@ LLAMA_SPLIT_CAP_TRACE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26210`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26212`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     auto ta2 = t_clock();
@@ -37956,7 +37956,7 @@ LLAMA_SPLIT_LAYER_DELEGATE_DECODE: advanced engine setting; built-in default ret
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26135`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // delegate-decode path (runs a full llama_decode per call — slower but
@@ -37974,7 +37974,7 @@ LLAMA_SPLIT_LAYER_FULL_GRAPH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26396`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26398`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -37992,7 +37992,7 @@ LLAMA_SPLIT_LAYER_TIMING: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26169`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26171`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // over calls so the caller can dump stats periodically. Keep the enum
@@ -38010,7 +38010,7 @@ LLAMA_STREAM_LOCAL_LOGITS_DEBUG: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7637`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7639`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         dsv4_prefill_fingerprint_done = false;
@@ -38022,7 +38022,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7637`. 
             marked += batch_inp.logits[i] ? 1 : 0;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8010`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8012`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }
@@ -38034,7 +38034,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:8010`. 
         }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21654`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21656`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             output_ids[out_ids[i]] = i;
@@ -38046,7 +38046,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:21654`.
                     ? output_ids[local_last] : -9999;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3371`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:3370`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                                              "local-no-fa";
@@ -38064,7 +38064,7 @@ LLAMA_STREAM_LOCAL_PREFILL_CROSSOVER: advanced engine setting; built-in default 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23963`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23965`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (resident_prompt_tail) {
@@ -38082,7 +38082,7 @@ LLAMA_STREAM_LOCAL_RESIDENT_DECODE: advanced engine setting; built-in default re
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23875`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23877`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // (mode check). keep_mmap=0 (pure re-streaming decode) is untouched.
@@ -38226,7 +38226,7 @@ LLAMA_UB0_ONLY: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19694`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:19696`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // DIAGNOSTIC: skip non-ub0 ubatches at L1+ to test if ub1's L0 processing
@@ -38310,7 +38310,7 @@ LLAMA_WF_BUFDIAG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2531`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:2530`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // recycled/overwritten between a layer's ubatches. Cheap (3 small D2H reads), env-gated, no effect off.
@@ -38328,7 +38328,7 @@ LLAMA_WF_DECODE_RESIDENT_MB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6544`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6546`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 bool llama_context::ensure_dense_resident_for_decode() {
@@ -38340,7 +38340,7 @@ bool llama_context::ensure_dense_resident_for_decode() {
         char * end = nullptr;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12557`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12559`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -38352,7 +38352,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12557`.
         get_prefill_decode_mode() == LLAMA_PREFILL_DECODE_MODE_STREAM_LOCAL &&
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23886`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23888`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // decode no longer needs the mmap weight view — allow keep_mmap=0 (the no-thrash config).
@@ -38370,7 +38370,7 @@ LLAMA_WF_DENSE_RESIDENT_ANY_ARCH: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6563`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6565`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // the preset extra_env, reversible per run.
@@ -38388,7 +38388,7 @@ LLAMA_WF_DS_DIRECT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1649`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1648`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // D3D12-heap compute buffer, allocated inside wf_create/wf_dstorage_init. We must NOT cudaMalloc one here
@@ -38490,7 +38490,7 @@ LLAMA_WF_EXPERT_CACHE_MB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6909`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6911`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // LRU arena sizing (VRAM-only per the RAM rules).
@@ -38568,7 +38568,7 @@ LLAMA_WF_EXPERT_SLAB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6790`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6792`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 bool llama_context::ensure_expert_slab_for_decode() {
@@ -38586,7 +38586,7 @@ LLAMA_WF_EXPERT_SLAB_ANY_ARCH: advanced engine setting; built-in default retaine
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6807`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6809`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // the preset extra_env, reversible per run.
@@ -38604,7 +38604,7 @@ LLAMA_WF_EXPERT_SLAB_DEBUG: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7020`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7022`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -38616,7 +38616,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7020`. 
     if (ids_debug && ids_debug_count < 48) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7166`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:7168`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -38634,7 +38634,7 @@ LLAMA_WF_GPU_BUFS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10676`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10678`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         }();
@@ -38646,7 +38646,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:10676`.
                 model.arch == LLM_ARCH_MINIMAX_M3 && wf_bufs_env == 1;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1644`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1643`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -38778,7 +38778,7 @@ LLAMA_WF_KEEP_MMAP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3630`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3631`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 
@@ -38790,7 +38790,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:3630`. 
         // cache the decode path reads — the decisive prefill-vs-decode split for bug#2.
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12553`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12555`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // resident working set. Non-STREAM_LOCAL modes (prod split_thunderbolt relay) are untouched.
@@ -38802,7 +38802,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:12553`.
         const char * e = std::getenv("LLAMA_WF_DECODE_RESIDENT_MB");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23852`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:23854`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // proceed through ctx->decode() — weights are loaded by the WF callbacks.
@@ -38868,7 +38868,7 @@ LLAMA_WF_LAYER_SPLITS: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1832`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1833`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // MoE expert split (env-controlled for WF sub-layer pipelining)
@@ -38880,7 +38880,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:1832`. 
     }
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1421`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1420`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Group 1..N-1: experts [k*n_exp/N, (k+1)*n_exp/N)
@@ -41285,7 +41285,7 @@ SPLIT_DECODE_BACKEND_AUDIT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26465`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26467`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // [iter24] SPLIT_DECODE_BACKEND_AUDIT: dump per-node backend assignment for layer 5.
@@ -41303,7 +41303,7 @@ SPLIT_DECODE_EMBED_FAST: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:25513`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:25515`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // path, provided no adapter contributes a delta at the embedding layer.
@@ -41321,7 +41321,7 @@ SPLIT_DECODE_EVENT_SYNC: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26612`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26614`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();
@@ -41339,7 +41339,7 @@ SPLIT_DECODE_GRAPH_CACHE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26375`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26377`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // until proven safe.
@@ -41357,7 +41357,7 @@ SPLIT_DECODE_K_IDXS_PROBE: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24894`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24896`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             }
@@ -41369,7 +41369,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:24894`.
                     (int)token_pos, used_arena ? "ARENA" : "HOST_PTR",
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:25327`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:25329`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // whether the k_idxs arena slot is actually wired into the graph.
@@ -41387,7 +41387,7 @@ SPLIT_DECODE_SKIP_SYNC_PER_LAYER: advanced engine setting; built-in default reta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26608`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:26610`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // upper bound of sync overhead (~45ms/token).
@@ -45353,7 +45353,7 @@ Runtime-local cache/temp directory; no model download is performed.
 
 Scope: ds4, image, rtx-llama, studio, video. Class: preset.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5340`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5341`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         const char * tmp_env = std::getenv("TMP");
@@ -45425,7 +45425,7 @@ Runtime-local cache/temp directory; no model download is performed.
 
 Scope: ds4, image, rtx-llama, studio, video. Class: preset.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5338`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:5339`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if (path.empty()) {
@@ -45449,7 +45449,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-tb-transport.cpp:18
         if (!ofs.is_open()) {
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5306`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/tools/server/server-context.cpp:5308`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 // Write token IDs to temp file (legacy — only used by pure

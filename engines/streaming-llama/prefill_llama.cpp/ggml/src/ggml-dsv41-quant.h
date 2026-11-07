@@ -1,8 +1,9 @@
 #pragma once
 
-// Source arithmetic: stack-backend c8aa547e, metal/dsv41.metal and
-// metal/dsv4_kv.metal. Shared scalar functions keep CPU and CUDA selection-
-// critical rounding/scale boundaries identical. V4's old modes are unchanged.
+// Source arithmetic: stack-backend c8aa547e and the retired Mac backend's
+// metal/dsv41.metal and metal/dsv4_kv.metal. Shared scalar functions keep CPU
+// and CUDA selection-critical rounding/scale boundaries identical. V4's old
+// modes are unchanged.
 #include <math.h>
 #include <stdint.h>
 #include <string.h>

@@ -282,7 +282,7 @@ public:
             if(half){auto convert=ggml_get_to_fp16_cuda(GGML_TYPE_Q4_K);require(convert,"projection Q4_K→F16 converter absent");convert(original,reinterpret_cast<::half*>(weight),k*nout,ctx.stream());}
             else{auto convert=ggml_get_to_fp32_cuda(GGML_TYPE_Q4_K);require(convert,"projection Q4_K→F32 converter absent");convert(original,reinterpret_cast<float*>(weight),k*nout,ctx.stream());}
             CUDA_CHECK(cudaGetLastError());const auto converted_hash=gpu_sha(weight,weight_bytes);
-            if(half){auto p=a.half_proofs.find({slot,e});require(p!=a.half_proofs.end()&&p->second.q4_sha==q4hash&&p->second.half_sha==converted_hash,"actual CUDA F16 weight bits do not match pinned native Metal half proof");}
+            if(half){auto p=a.half_proofs.find({slot,e});require(p!=a.half_proofs.end()&&p->second.q4_sha==q4hash&&p->second.half_sha==converted_hash,"actual CUDA F16 weight bits do not match the pinned native half proof (retired Mac backend)");}
             // Normal non-ID MMF selector permits <=16 columns; batching preserves
             // the one weight matrix and allows the worst-case32 selected tokens.
             for(size_t start=0;start<cols.size();start+=16){

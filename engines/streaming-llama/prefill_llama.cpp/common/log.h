@@ -61,14 +61,14 @@ void common_log_add(struct common_log * log, enum ggml_log_level level, const ch
 //
 // regular log output:
 //
-//   ggml_backend_metal_log_allocated_size: allocated buffer, size =  6695.84 MiB, ( 6695.91 / 21845.34)
+//   ggml_backend_cuda_device_malloc: allocated buffer, size =  6695.84 MiB, ( 6695.91 / 21845.34)
 //   llm_load_tensors: ggml ctx size =    0.27 MiB
 //   llm_load_tensors: offloading 32 repeating layers to GPU
 //   llm_load_tensors: offloading non-repeating layers to GPU
 //
 // with prefix = true, timestamps = true, the log output will look like this:
 //
-//   0.00.035.060 D ggml_backend_metal_log_allocated_size: allocated buffer, size =  6695.84 MiB, ( 6695.91 / 21845.34)
+//   0.00.035.060 D ggml_backend_cuda_device_malloc: allocated buffer, size =  6695.84 MiB, ( 6695.91 / 21845.34)
 //   0.00.035.064 I llm_load_tensors: ggml ctx size =    0.27 MiB
 //   0.00.090.578 I llm_load_tensors: offloading 32 repeating layers to GPU
 //   0.00.090.579 I llm_load_tensors: offloading non-repeating layers to GPU

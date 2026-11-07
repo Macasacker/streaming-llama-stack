@@ -8574,9 +8574,10 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
             GGML_ASSERT(!ml.no_alloc);
             for (uint32_t idx = 0; idx < ml.files.size(); idx++) {
                 // only the mmap region containing the tensors in the model is mapped to the backend buffer
-                // this is important for metal with apple silicon: if the entire model could be mapped to a metal buffer,
-                //     then we could just use metal for all layers
-                // this allows using partial offloading when the model size exceeds the metal buffer size, but not the RAM size
+                // (upstream's reason was the deleted Metal backend on Apple silicon: mapping the whole
+                //  model to a metal buffer would have let every layer run on Metal, and mapping only
+                //  this window allows partial offloading when the model size exceeds the backend
+                //  buffer size but not the RAM size)
                 void * addr = nullptr;
                 size_t first, last; // NOLINT
                 ml.get_mapping_range(&first, &last, &addr, idx, ctx);

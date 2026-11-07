@@ -4347,10 +4347,12 @@ private:
                                 /*logits   =*/ v_log.data(),
                             };
                             // IMAGE-DIRECT (opt-in LLAMA_SKIP_IMAGE_PREFILL): skip the wasted image
-                            // LM-prefill (the ~51s weight-stream of the 361 image cells). Both decoders
-                            // re-prefill the image — the llama-receiver clears + re-prefills from the
-                            // shipped embd (Metal F32), and small-img-forward (MLX) uses raw_image via
-                            // generate() — so the RTX image K/V (and any sparse-cache effect on the text
+                            // LM-prefill (the ~51s weight-stream of the 361 image cells). The
+                            // receiver re-prefills the image anyway — the llama-receiver clears +
+                            // re-prefills from the shipped embd (the design target was the Mac
+                            // peer's correct Metal F32 FA, retired), and the retired MLX
+                            // small-img-forward used raw_image via generate() — so the RTX image
+                            // K/V (and any sparse-cache effect on the text
                             // suffix) is UNUSED downstream. The clip embd is already captured above (so
                             // the ship-embd handoff + the wait-loop match by image cells still work).
                             // res==2 = the expected "streaming prefill complete (no logits)" success code.
@@ -4376,9 +4378,9 @@ private:
                             }
                             // v1.8 ship-embeddings (opt-in LLAMA_SHIP_IMAGE_EMBD): stash the
                             // image embeddings so the handoff artifact ships them; the Mac
-                            // receiver re-prefills these cells with correct Metal F32 FA (the
-                            // RTX SM120 NCOLS=32 MLA FA accumulates VKQ in F16 and loses the
-                            // image's fine glyph detail — see GROUND_TRUTH §11).
+                            // receiver re-prefilled these cells with correct Metal F32 FA on its
+                            // retired backend (the RTX SM120 NCOLS=32 MLA FA accumulates VKQ in
+                            // F16 and loses the image's fine glyph detail — see GROUND_TRUTH §11).
                             if (img_embd && ctx_internal && std::getenv("LLAMA_SHIP_IMAGE_EMBD")) {
                                 ctx_internal->set_prefill_handoff_image_embd(
                                     img_embd, (uint32_t) n_img,

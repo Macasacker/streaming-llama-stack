@@ -9,13 +9,16 @@ struct llama_kv_prompt_payload {
     std::string          prompt_text;
     // --- v1.8 (ship-embeddings): image embeddings for receiver-side re-prefill ---
     // img_cell_count * img_n_embd floats, row-major (cell-major). Empty = no image.
-    // The receiver re-prefills these cells via an embd batch (Metal F32 FA) instead of
-    // injecting the RTX's degraded F16-VKQ image K/V. See GROUND_TRUTH §11.
+    // The receiver re-prefills these cells via an embd batch — the design target was
+    // the Mac peer's correct Metal F32 FA (backend deleted; the receiver now runs
+    // CUDA or CPU) instead of injecting the RTX's degraded F16-VKQ image K/V.
+    // See GROUND_TRUTH §11.
     std::vector<float>   image_embd;
     // --- v1.9 (small-image-forward, 2026-06-01): RAW image bytes (PNG/JPEG) ---
-    // When non-empty (+ FLAG_RAW_IMAGE), the receiver processes this SMALL image prompt
-    // END-TO-END LOCALLY via mlx_vlm generate() on these raw bytes (no RTX clip/prefill
-    // degradation). prompt_text carries the question. See GROUND_TRUTH §11 (USER 2026-06-01).
+    // When non-empty (+ FLAG_RAW_IMAGE), this SMALL image prompt was meant to be
+    // processed END-TO-END LOCALLY on the Mac peer via mlx_vlm generate() on these raw
+    // bytes (no RTX clip/prefill degradation); that peer is retired. prompt_text
+    // carries the question. See GROUND_TRUTH §11 (USER 2026-06-01).
     std::vector<uint8_t> raw_image;
     // --- v2.0 (MTP-on-KV-inject, 2026-06-24): per-token LAST-LAYER hidden states (fp16) for the streamed prefix,
     // appended at the very END of the payload (after raw_image). mtp_hidden_n_tokens * mtp_hidden_n_embd uint16 values,
@@ -72,15 +75,16 @@ struct llama_kv_artifact_metadata {
     // --- v1.7 extension (format_minor >= 7) — Phase 5.3 (2026-05-12) ---
     int32_t  source_slot_id             = -1; // RTX-side slot index that produced this blob.
                                               // -1 = unset (legacy single-slot path).
-                                              // Mac receiver may use this to demultiplex
+                                              // The Mac receiver was to use this to demultiplex
                                               // concurrent multi-slot blobs into separate
                                               // decode sessions when kv_unified is true.
-                                              // Without Mac-side support, Mac ignores this
-                                              // and behaves as legacy seq_id=0.
+                                              // Without Mac-side support it ignored this
+                                              // and behaved as legacy seq_id=0.
     // --- v1.8 extension (format_minor >= 8) — ship-embeddings (2026-06-01) ---
     // When img_cell_count > 0, the prompt payload carries img_cell_count*img_n_embd f32
     // image embeddings; the receiver re-prefills those cells [img_pos_start, +img_cell_count)
-    // via an embd batch (correct Metal F32 FA) instead of using the RTX's F16-VKQ image K/V.
+    // via an embd batch — correct on the Mac peer's retired Metal F32 FA, instead of
+    // using the RTX's F16-VKQ image K/V.
     uint32_t img_cell_count             = 0;  // # image cells (embedding rows); 0 = no image embd
     uint32_t img_n_embd                 = 0;  // embedding dim per cell (= model n_embd)
     uint32_t img_pos_start              = 0;  // absolute sequence position of the first image cell

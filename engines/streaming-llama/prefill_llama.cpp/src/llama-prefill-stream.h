@@ -22,7 +22,7 @@ struct ggml_cgraph;
 //   1. Model loads with -ngl 0 (all weights in CPU heap RAM)
 //   2. Allocate 2 GPU buffers sized for the largest layer
 //   3. Temporarily remap all weight tensor->buffer / tensor->data to GPU
-//      so the scheduler routes compute to the Metal backend
+//      so the scheduler routes compute to the CUDA backend
 //   4. Restore original CPU pointers after graph allocation
 //   5. Per-layer callbacks upload weights from CPU heap → rotating GPU buffers
 //

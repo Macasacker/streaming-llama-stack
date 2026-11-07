@@ -3464,7 +3464,7 @@ bool llama_kv_cache::state_read_data(llama_io_read_i & io, uint32_t strm, uint32
         if (cell_count) {
             if (sinfo.is_contiguous()) {
                 // Import into the base tensor so downstream attention views see
-                // the updated bytes on every backend, including Metal.
+                // the updated bytes on every backend this fork builds (CUDA, CPU).
                 ggml_backend_tensor_set(
                         k_dst,
                         io.read(cell_count * k_size_row),

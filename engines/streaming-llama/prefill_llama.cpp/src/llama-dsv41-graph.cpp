@@ -466,8 +466,9 @@ ggml_tensor * llama_dsv41_graph_ops::attention_heads(
         if(compressed_table)gathered=ggml_concat(ctx,gathered,gather_per_query(compressed_table,selected_ids),1);
     }
     if(!fused_gather)tagged(gathered, "dsv41_selected_kv_f32");
-    // Native V4.1 Metal attention reads half Q/K/V, but retains float scores,
-    // probabilities, accumulators and sinks. Round only the bounded compute
+    // The retired Mac backend's native V4.1 Metal attention read half Q/K/V,
+    // but retained float scores, probabilities, accumulators and sinks; this
+    // graph keeps that boundary. Round only the bounded compute
     // inputs; never convert or mutate the canonical full-context F32 caches.
     // Native indexed attention skips invalid rows before loading half KV.
     // Zero masked rows conditionally, rather than multiplying Inf/NaN by zero.
@@ -594,8 +595,9 @@ llama_dsv41_graph_ops::mix llama_dsv41_graph_ops::mixes(
     ggml_tensor * projection_input = flat_norm;
     // Native ds4.c::ds41_hc_mix_batch selects the F16 matrix path only for
     // count > DS4_TP_BATCH_MAX_ROWS (8) and F16 HC weights. Its Metal
-    // kernel_mul_mm_f16_f32_scaled (metal/dense.metal, around line 2898)
-    // rounds x*RMS_scale to F16 at RHS staging, with F32 accumulation.
+    // kernel_mul_mm_f16_f32_scaled (metal/dense.metal, around line 2898, in
+    // the deleted Mac backend) rounded x*RMS_scale to F16 at RHS staging,
+    // with F32 accumulation.
     // Preserve that numerical boundary before the unchanged F32 GEMM;
     // small/scalar batches and other weight types retain their F32 input.
     if (count > 8 && fn->type == GGML_TYPE_F16) {

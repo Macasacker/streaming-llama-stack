@@ -19528,7 +19528,7 @@ static ds4_gpu_tensor *gpu_graph_alloc_kv_cache_tensor(bool managed, uint64_t by
  * =========================================================================
  *
  * The release path calls these after important stages, but they are no-ops
- * unless DS4_METAL_GRAPH_DUMP_PREFIX or DS4_ROCM_GRAPH_DUMP_PREFIX is set.
+ * unless DS4_METAL_GRAPH_DUMP_PREFIX is set.
  * Dumping synchronizes the device and resumes issuing afterwards, so it is
  * intentionally isolated here.
  */
@@ -22657,7 +22657,7 @@ static uint32_t gpu_graph_decode_indexer_sparse_threshold(const ds4_gpu_graph *g
  *
  * The normal generation path uses the fused helpers below.  The older unfused
  * kernels remain available as diagnostic reference paths selected only by the
- * DS4_METAL_DISABLE_*_FUSION environment switches.
+ * rollback switches the helpers read through gpu_graph_env_flag().
  */
 
 static bool gpu_graph_env_flag(const char *name, int *cache) {
@@ -24456,13 +24456,10 @@ typedef enum {
 /* In the retired Mac build, M5 ports defaulted to the standard M1-M4 Metal
  * path and the rollbacks that dominated the benchmark force-enabled the bundle
  * on pre-M5 devices, so the aggregate switch was a reliable whole-bundle
- * control.  Neither device class exists here: this is a constant false, and the
- * two environment names callers hand it are never read. */
-static bool gpu_graph_ported_m5_decode_feature_enabled(
-        const char *pre_m5_disable_env,
-        const char *m5_disable_env) {
-    (void)pre_m5_disable_env;
-    (void)m5_disable_env;
+ * control.  Neither device class exists here: this is a constant false.  The
+ * two rollback environment names callers used to hand it were never read, so
+ * the parameters are gone. */
+static bool gpu_graph_ported_m5_decode_feature_enabled(void) {
     return false;
 }
 
@@ -24863,9 +24860,7 @@ static bool gpu_graph_encode_decode_layer_phase(
         layer->indexer_compressor_gate->dim[0] == DS4_N_EMBD &&
         layer->indexer_compressor_kv->dim[1] == 2u * DS4_N_INDEXER_HEAD_DIM &&
         layer->indexer_compressor_gate->dim[1] == 2u * DS4_N_INDEXER_HEAD_DIM &&
-        gpu_graph_ported_m5_decode_feature_enabled(
-            "DS4_METAL_DISABLE_PRE_M5_QKV_PAIR_QUAD_FUSE",
-            "DS4_METAL_DISABLE_M5_QKV_PAIR_QUAD_FUSE")) {
+        gpu_graph_ported_m5_decode_feature_enabled()) {
         const int fused = ds4_gpu_qkv_pair_quad_compressor_store_tensor(
                 gpu_graph_qr(g),
                 gpu_graph_kv_raw(g),
@@ -24921,9 +24916,7 @@ static bool gpu_graph_encode_decode_layer_phase(
         layer->attn_compressor_gate->dim[0] == DS4_N_EMBD &&
         layer->attn_compressor_kv->dim[1] == DS4_N_HEAD_DIM &&
         layer->attn_compressor_gate->dim[1] == DS4_N_HEAD_DIM &&
-        gpu_graph_ported_m5_decode_feature_enabled(
-            "DS4_METAL_DISABLE_PRE_M5_QKV_PAIR_COMPRESSOR_FUSE",
-            "DS4_METAL_DISABLE_M5_QKV_PAIR_COMPRESSOR_FUSE")) {
+        gpu_graph_ported_m5_decode_feature_enabled()) {
         const int fused = ds4_gpu_qkv_pair_quad_compressor_store_tensor(
                 gpu_graph_qr(g),
                 gpu_graph_kv_raw(g),
@@ -25397,9 +25390,7 @@ static bool gpu_graph_encode_decode_layer_phase(
             layer->indexer_compressor_norm &&
             layer->indexer_compressor_norm->type == DS4_TENSOR_F32 &&
             ds4_gpu_kv_rope_fp8_fuse_available() != 0 &&
-            gpu_graph_ported_m5_decode_feature_enabled(
-                "DS4_METAL_DISABLE_PRE_M5_COMP_FINALIZE_FUSE",
-                "DS4_METAL_DISABLE_M5_COMP_FINALIZE_FUSE");
+            gpu_graph_ported_m5_decode_feature_enabled();
         if (ok) ok = ds4_gpu_compressor_update_tensor(gpu_graph_comp_kv_cur(g),
                                                         gpu_graph_comp_sc_cur(g),
                                                         g->layer_attn_state_kv[il],

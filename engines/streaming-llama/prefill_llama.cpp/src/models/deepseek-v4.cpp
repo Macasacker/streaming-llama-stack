@@ -303,9 +303,10 @@ ggml_tensor * llm_build_deepseek4::build_hca_compressed_kv_from_state(
     //
     // Worth pinning specifically because this softmax reduces over DSV4_HCA_RATIO = 128 rows,
     // where CSA's reduces over 2*ratio = 8. A CUDA soft_max defect at width 128 but not at width 8
-    // would attenuate HCA only, stay invisible to every CSA check, and still differ from Metal --
-    // and unlike a graph-DESIGN bug it survives the E3 filter (Metal runs this same graph and
-    // recalls, so nothing expressible purely in the graph can be the cause).
+    // would attenuate HCA only, stay invisible to every CSA check, and still differ from the
+    // retired Mac peer's Metal path -- and unlike a graph-DESIGN bug it survives the E3 filter
+    // (the Mac peer ran this same graph and recalled, so nothing expressible purely in the
+    // graph can have been the cause).
     //
     // Distinct names from the CSA pins so a name can never resolve to the wrong path, and
     // ggml_set_output + forward_expand rather than cb() alone -- a name by itself leaves the buffer

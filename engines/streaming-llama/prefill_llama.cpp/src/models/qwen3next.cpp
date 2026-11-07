@@ -329,7 +329,6 @@ std::pair<ggml_tensor *, ggml_tensor *> llm_build_qwen3next::build_delta_net_chu
 
         // kgdmulvnew = (key_gdiff).transpose(-1, -2) @ v_new
         ggml_tensor * k_gdiff_t = get_slice_2d(ctx0, key_gdiff_t, chunk);
-        //ggml_tensor * kgdmulvnew = ggml_mul_mat(ctx0, k_gdiff, v_new); // this is slower on metal, why?
         ggml_tensor * kgdmulvnew = ggml_mul_mat(ctx0, v_new_t, k_gdiff_t);
 
         // last_recurrent_state = last_recurrent_state * g_last + kgdmulvnew

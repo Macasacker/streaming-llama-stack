@@ -27,8 +27,6 @@
 #  define CC_VOLTA          GGML_CUDA_CC_VOLTA
 #endif
 
-// ik_llama uses GGML_USE_HIPBLAS, our tree uses GGML_USE_HIP.
-
 using namespace ggml_cuda_mma;
 
 typedef void (* fattn_new_mma_kernel_t)(

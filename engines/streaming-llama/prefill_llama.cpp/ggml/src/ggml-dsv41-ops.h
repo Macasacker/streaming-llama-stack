@@ -1,8 +1,8 @@
 #pragma once
 
-// Native arithmetic: stack-backend c8aa547e03ff14839b32763045a2c86f2e8362b5,
-// metal/dsv41.metal Engram add and stable ratio-2 pooling. Kept separate from
-// old V4 operators; these are forward-only V4.1 graph boundaries.
+// Native arithmetic: stack-backend c8aa547e03ff14839b32763045a2c86f2e8362b5, plus the
+// retired Mac backend's metal/dsv41.metal Engram add and stable ratio-2 pooling. Kept
+// separate from old V4 operators; these are forward-only V4.1 graph boundaries.
 #include "ggml-dsv41-quant.h"
 #include <math.h>
 

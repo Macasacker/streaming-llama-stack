@@ -602,6 +602,63 @@ What this chunk does **not** touch is the host-side half: `amd_mfma_available(cc
 a runtime `cc`, and guards keyed on `__CUDA_ARCH__` alone stay undecided by design. Deleting them
 deletes kernel selection, and `DS4_ROCM_MMQ_TIGHT_NCOLS` would lose its last reader with them.
 
+### The Mac peer's text sweep (chunk 7.1e)
+
+Comments and printed strings, proved with the three text tools rather than with a preprocessor
+comparison. The gate is the census over both trees; `--strict` only fails on a code-position
+identifier, so read the COMMENT bucket with `--list` and check each surviving line is provenance
+(it says *retired* or *deleted*, not *runs*):
+
+```bash
+python3 -B scripts/port/metal_word_census.py --strict --list engines/ds4
+python3 -B scripts/port/metal_word_census.py --strict --list engines/streaming-llama
+```
+
+On the 7.1e tree these read IDENTIFIER 0, ENV_NAME 306, ENV_NAME_CITED 0, COMMENT 25 lines and
+STRING 0 over `engines/ds4`, and IDENTIFIER 0, ENV_NAME_CITED 0, STRING 0 and COMMENT 37 lines
+over the llama tree (from 51; the survivors are provenance). The printed-string sweep is
+re-runnable from the committed map - without `--apply` it reports the hit counts and every literal
+still naming Metal:
+
+```bash
+python3 -B scripts/port/string_text_replace.py --map docs/evidence/messages-7.1e.json \
+    engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ds4split-expert-projection.cuh \
+    engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ds4split-projection-fixture.cuh \
+    engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp
+```
+
+`comment_code_diff.py` against a worktree of HEAD proves the sweep touched no code position a
+comment-only chunk must leave alone; the reworded string lines are the only changed code lines
+apart from the engine stub:
+
+```bash
+for f in $(git diff --name-only | grep -E '\.(c|h|cpp|cu|cuh)$'); do
+    python3 -B scripts/port/comment_code_diff.py build/wt-base/$f $f
+done
+```
+
+`tools/decode-receiver` has no build rule (`LLAMA_BUILD_DECODE_RECEIVER` is OFF), so its edits are
+proved by a hand compile with the producer CLI's own flags plus the common include directories:
+
+```bash
+python3 - <<'SNIPPET'
+import json, subprocess, os, re
+cc = json.load(open('build/llama/compile_commands.json'))
+e = [x for x in cc if x['file'].endswith('tools/dsv41-prefill/main.cpp')][0]
+root = 'engines/streaming-llama/prefill_llama.cpp'
+cmd = e['command'].replace(e['file'], root + '/tools/decode-receiver/main.cpp')
+cmd = re.sub(r'-o \S+', '-o build/71e/decode-receiver.o', cmd)
+cmd += f' -I{root}/include -I{root}/common -I{root}/tools/mtmd -c'
+print(subprocess.run(['bash', '-c', cmd], cwd=os.getcwd()).returncode)
+SNIPPET
+```
+
+The engine stub change (`gpu_graph_ported_m5_decode_feature_enabled` losing its two discarded
+parameters) is the one code-position edit in the chunk, so it is proved by the three compilations
+of `ds4.c` (`ds4.o`, `ds4_ext.o`, `ds4_cpu.o`) warning-matching the baseline: 23, 11 and 5
+occurrences, 20, 8 and 3 kinds, none added or removed. `ds4.c` has no `__LINE__`, so the line
+moves cannot change a reported number.
+
 ### The producer's platform layer, with no test target to run
 
 The producer CLI has no cmake test target, so chunk 3.1c proved its ported

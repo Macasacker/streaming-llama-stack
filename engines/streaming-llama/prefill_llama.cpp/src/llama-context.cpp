@@ -769,10 +769,11 @@ int32_t compute_stream_crossover_tokens(double stream_floor_ms, double stream_to
 //
 
 // STEP 2 (2026-06-01): path-independent per-layer dump to confirm the SM120 F16-VKQ diagnosis.
-// Installed via cparams.cb_eval so it fires on BOTH the RTX streaming layer-major path AND the
-// Mac receiver's full-local re-prefill (same llama lib). With ship-embeddings the receiver
-// re-prefills the SAME shipped RTX embeddings, so diffing the RTX (NCOLS=32 F16 VKQ) vs the Mac
-// (Metal F32) __fattn__ output isolates the FA output-accumulation precision — no clip/weight skew.
+// Installed via cparams.cb_eval so it fires on BOTH the RTX streaming layer-major path AND a
+// receiver's full-local re-prefill (same llama lib). With ship-embeddings the receiver
+// re-prefills the SAME shipped RTX embeddings; the original diagnosis diffed the RTX
+// (NCOLS=32 F16 VKQ) against the retired Mac peer's Metal F32 __fattn__ output, isolating
+// the FA output-accumulation precision — no clip/weight skew.
 // Gated by LLAMA_LAYER_CMP_DUMP=1; SIDE label by LLAMA_LAYER_CMP_SIDE (rtx|mac); output dir by
 // LLAMA_LAYER_CMP_DIR; layer filter by LLAMA_LAYER_CMP_LAYERS (csv, default 0,1,2,30,60).
 static bool llama_layer_cmp_eval_cb(ggml_tensor * t, bool ask, void * /*user_data*/) {
@@ -1894,7 +1895,7 @@ llama_context::llama_context(const llama_model & model, llama_context_params par
             backends.emplace_back(backend);
         }
 
-        // add ACCEL backends (such as BLAS)
+        // add ACCEL backends (this fork's registry defines no accelerator device)
         for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
             ggml_backend_dev_t dev = ggml_backend_dev_get(i);
             if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_ACCEL) {
@@ -5047,9 +5048,9 @@ bool llama_context::export_kv_artifact(std::string *out_path, llama_kv_artifact_
     };
 
     // v1.8 ship-embeddings: SKIP the KV-RAM guard for image+ship-embd exports. The Mac
-    // receiver DISCARDS the imported K/V and re-prefills the whole sequence from the
-    // shipped embeddings (Metal F32 FA), so all-zero K rows (the pos-0 BOS-zero) are
-    // irrelevant. The guard's rejection→no-embd-fallback was the source of the alternating
+    // peer, the retired Metal receiver, DISCARDED the imported K/V and re-prefilled the
+    // whole sequence from the shipped embeddings (Metal F32 FA), so all-zero K rows (the
+    // pos-0 BOS-zero) were irrelevant. The guard's rejection→no-embd-fallback was the source of the alternating
     // vision42/garbage flakiness (some embd exports got rejected and fell back to no-embd).
     // SNAPSHOT the image-embd stash into locals and CLEAR the member immediately, so a
     // stale stash can NEVER leak into a later (text/cache-reuse) export — that leak both
@@ -5491,8 +5492,9 @@ bool llama_context::export_kv_artifact(std::string *out_path, llama_kv_artifact_
     }
 
     // v1.8 ship-embeddings: if this prefill carried an image, attach the image
-    // embeddings to the handoff so the receiver re-prefills the image cells itself
-    // (correct Metal F32 FA) instead of using the RTX's degraded F16-VKQ image K/V.
+    // embeddings to the handoff so the receiver re-prefills the image cells itself —
+    // the retired Mac peer did that with correct Metal F32 FA, instead of using the
+    // RTX's degraded F16-VKQ image K/V.
     // Strictly opt-in: only when an image was stashed AND a prompt payload is sent.
     // Uses the SNAPSHOT locals captured (and cleared from the member) at the guard site
     // above, so there is no dependence on the (now-cleared) stash member here.
@@ -22379,7 +22381,7 @@ llm_graph_cb llama_context::graph_get_cb() const {
 
         // In per-layer streaming mode, force layer nodes to a real GPU backend
         // during graph construction so scheduler assignment does not drift to
-        // CPU/BLAS when model was loaded with -ngl 0.
+        // CPU when model was loaded with -ngl 0.
         if (il != -1 && has_per_layer_callbacks()) {
             ggml_backend_t streaming_gpu_backend = nullptr;
             for (const auto & backend : backends) {

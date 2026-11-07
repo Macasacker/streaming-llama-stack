@@ -184,7 +184,7 @@ namespace ggml_cuda_mma {
                 return -1;
             }
         }
-#endif // defined(GGML_USE_HIP)
+#endif // __CUDA_ARCH__ == GGML_CUDA_CC_VOLTA
     };
 
     template <int I_, int J_>

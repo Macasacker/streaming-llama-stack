@@ -460,7 +460,7 @@ static void llama_prefill_host_cache_evict_layer(llama_prefill_host_cache_runtim
 //   1. Model loaded with -ngl 0 → all weights in CPU heap RAM
 //   2. Allocate 2 GPU buffers sized to hold the largest layer
 //   3. Temporarily remap all weight tensor->buffer/data to GPU buffer
-//      → ggml_backend_sched sees GPU-backed tensors → routes compute to Metal
+//      → ggml_backend_sched sees GPU-backed tensors → routes compute to CUDA
 //   4. Restore original CPU pointers after graph allocation
 //   5. Per-layer callbacks memcpy weights from CPU heap → active GPU buffer
 //   6. Ping-pong between GPU buffers A and B across layers
@@ -993,7 +993,7 @@ bool prefill_allocate_gpu_buffers(ggml_backend_t          backend,
 //
 // This is the core "trick": the ggml_backend_sched looks at tensor->buffer
 // to decide which backend gets the compute. By setting all weight buffers
-// to the GPU buffer, the scheduler will route all matmuls to Metal.
+// to the GPU buffer, the scheduler will route all matmuls to CUDA.
 //
 // The tensor->data field is set to a valid offset within the GPU buffer
 // so that the scheduler can compute buffer sizes. The actual data content
@@ -1116,9 +1116,8 @@ static void collect_persistent_tensors(const llama_model *              model,
 //   2. Upload tensor bytes via backend transfer API
 //
 // Using ggml_backend_tensor_set() keeps this backend-agnostic:
-// - Metal (Apple unified memory)
-// - CUDA (host->device copy)
-// - Vulkan/OpenCL/SYCL backends that implement set_tensor
+// - CUDA (host->device copy) — the only GPU backend this fork builds
+//   (Metal, Vulkan, OpenCL and SYCL existed upstream and are deleted here)
 //
 static float prefill_upload_layer(std::vector<tensor_remap_entry> & layer_entries,
                                   ggml_backend_buffer_t             gpu_buf,
@@ -1536,7 +1535,7 @@ int llama_prefill_stream(llama_context *                     ctx,
             LLAMA_LOG_ERROR("%s: [DIAG] get_sched() returned null!\n", __func__);
             return -1;
         }
-        // Try to find a non-CPU backend (Metal)
+        // Try to find a non-CPU backend (CUDA here)
         int n_backends = ggml_backend_sched_get_n_backends(sched);
         LLAMA_LOG_INFO("%s: [DIAG] scheduler has %d backends\n", __func__, n_backends);
         for (int i = 0; i < n_backends; ++i) {
@@ -3577,7 +3576,7 @@ int llama_prefill_stream(llama_context *                     ctx,
         if (sched) {
             ggml_backend_sched_set_eval_skip_sync(sched, false);
         }
-        // Final sync via the backend API (works for CUDA, Metal, etc.)
+        // Final sync via the backend API (works for CUDA and CPU)
         ggml_backend_synchronize(gpu_backend);
     }
 

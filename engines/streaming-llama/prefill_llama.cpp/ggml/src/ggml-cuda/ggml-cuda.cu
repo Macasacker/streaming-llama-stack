@@ -5120,12 +5120,12 @@ static bool ggml_cuda_lid_can_fuse_subgraph(
         const ggml_cgraph * cgraph, int node_idx, int node_count, const ggml_op * ops, int output_idx) {
     // LLAMA_DSV4_LID_FUSE=0 falls back to the portable ggml-op decomposition this fusion replaces.
     //
-    // Why this knob exists: the Mac's llama-decode-receiver runs THIS SAME FORK's DSV4 code on Metal,
-    // resident, and RECALLS a mid-prompt needle at 596 / 2862 / 11330 tokens. The RTX, CUDA, running
-    // the same source and (tested) the same 153 GB GGUF, does not. Metal has no fused LID kernel and
-    // takes the portable chain; CUDA matches this private seven-node tail and replaces it. So the
-    // fused kernel is a prime suspect, and this makes it an A/B instead of an argument -- with the
-    // fusion off, CUDA runs the same math Metal does.
+    // Why this knob exists: the retired Mac peer ran THIS SAME FORK's DSV4 code on Metal,
+    // resident, and RECALLED a mid-prompt needle at 596 / 2862 / 11330 tokens; the RTX, CUDA,
+    // running the same source and (tested) the same 153 GB GGUF, did not. Metal had no fused
+    // LID kernel and took the portable chain; CUDA matches this private seven-node tail and
+    // replaces it. So the fused kernel was the prime suspect, and this makes it an A/B instead
+    // of an argument -- with the fusion off, CUDA runs the math the retired peer ran.
     static const bool fuse_enabled = []() {
         const char * e = std::getenv("LLAMA_DSV4_LID_FUSE");
         return !(e && e[0] == '0' && e[1] == '\0');

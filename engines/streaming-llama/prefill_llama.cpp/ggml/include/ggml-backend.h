@@ -134,7 +134,7 @@ extern "C" {
         GGML_BACKEND_DEVICE_TYPE_GPU,
         // integrated GPU device using host memory
         GGML_BACKEND_DEVICE_TYPE_IGPU,
-        // accelerator devices intended to be used together with the CPU backend (e.g. BLAS or AMX)
+        // accelerator devices intended to be used together with the CPU backend
         GGML_BACKEND_DEVICE_TYPE_ACCEL
     };
 

@@ -472,8 +472,9 @@ struct llama_context {
         prefill_handoff_streamed_prefix_count = value;
     }
     // v1.8 ship-embeddings: stash the image embeddings (copied) to ship in the handoff
-    // artifact so the receiver can re-prefill the image cells itself (correct Metal F32
-    // FA) instead of using the RTX's degraded F16-VKQ image K/V. See GROUND_TRUTH §11.
+    // artifact so the receiver can re-prefill the image cells itself — the retired Mac
+    // peer did that with correct Metal F32 FA, instead of using the RTX's degraded
+    // F16-VKQ image K/V. See GROUND_TRUTH §11.
     void set_prefill_handoff_image_embd(const float * embd, uint32_t n_cells, uint32_t n_embd, uint32_t pos_start) {
         if (embd && n_cells > 0 && n_embd > 0) {
             prefill_handoff_image_embd.assign(embd, embd + (size_t) n_cells * (size_t) n_embd);
@@ -864,20 +865,23 @@ struct llama_context {
     int32_t wait_split_layer_async();
 
     // Path A Phase D (2026-04-20) — mega-graph split-decode launch.
-    // Builds ONE cgraph for all n_layer FFN_ONLY subgraphs using the per-layer
-    // external tensor arrays on `sg` (attn_out_buf[], hidden_buf[]). ONE call
-    // to model.build_graph + ONE scheduler compute. Per-layer outputs land in
-    // sg->metal_hidden_buf[il+1] via ggml_cpy nodes emitted by the builder.
+    // The retired Mac peer built ONE cgraph for all n_layer FFN_ONLY subgraphs
+    // using the per-layer external tensor arrays on `sg` (attn_out_buf[],
+    // hidden_buf[]), with ONE call to model.build_graph and ONE scheduler
+    // compute; per-layer outputs landed in the peer's next-layer buffers via
+    // ggml_cpy nodes emitted by the builder.
     //
-    // First-iteration semantics: all per-layer attn_out buffers must already
-    // be populated before this is called (e.g. caller either has pre-filled
-    // them synchronously, or on Apple unified memory the RX thread and GPU
-    // happen to serialize). Per-layer event-gated cmd_buf splitting is a
-    // follow-on iteration (requires a new ggml-metal compute-with-events API).
+    // First-iteration semantics: all per-layer attn_out buffers had to be
+    // populated before this was called (the caller either pre-filled them
+    // synchronously, or on the retired Metal backend's unified memory the RX
+    // thread and GPU happened to serialize). Per-layer event-gated cmd_buf
+    // splitting was the follow-on iteration; it needed a compute-with-events API
+    // that only the deleted ggml-metal backend could grow.
     //
-    // Requires Metal backend + shared per-layer MTLBuffers already allocated
-    // on the split_graph (via llama_split_graph_create with FFN_ALL_LAYERS).
-    // Returns 0 on success, negative on error.
+    // It required the deleted Metal backend with shared per-layer buffers on the
+    // split graph (llama_split_graph_create with FFN_ALL_LAYERS). This fork has
+    // no such backend: the call is a stub and returns -99; the CUDA peer
+    // dispatches per layer through build_compute_split_layer.
     int32_t build_compute_split_mega(struct llama_split_graph * sg,
                                        int32_t token_pos,
                                        int32_t seq_id);

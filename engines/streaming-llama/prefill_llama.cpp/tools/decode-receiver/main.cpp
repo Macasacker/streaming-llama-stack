@@ -1,4 +1,4 @@
-// llama-decode-receiver (decode-server): Mac-side daemon that receives a
+// llama-decode-receiver (decode-server): decode-side daemon that receives a
 // KV artifact (via file or network), imports it into a llama context,
 // decodes autonomously, and streams tokens back to the RTX host via the
 // token stream protocol.
@@ -51,11 +51,11 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// PROMPT-DIRECT KV-handshake (Gate #2): Mac-side LRU prefix cache
+// PROMPT-DIRECT KV-handshake (Gate #2): receiver-side LRU prefix cache
 //
-// When Mac completes a prompt-direct prefill session, we snapshot the prefix
+// When the receiver completes a prompt-direct prefill session, we snapshot the prefix
 // token hash + cached_len into a small LRU map. On the next session RTX queries
-// the control socket (kv_port-1); if the hash matches, Mac replies with
+// the control socket (kv_port-1); if the hash matches, the receiver replies with
 // hit=true and skips the prefill, reusing the existing KV cells.
 //
 // Phase A3 (2026-06-10, plan §3 / §6 A3): the RAM map is now backed by a
@@ -76,7 +76,7 @@ struct KvSnapshot {
     uint64_t prefix_hash          = 0;
     uint64_t model_fp             = 0;
     uint32_t prefix_len_tokens    = 0;
-    uint64_t session_id           = 0;   // monotonic counter, used as Mac handle
+    uint64_t session_id           = 0;   // monotonic counter, used as the cache handle
     std::vector<int32_t> token_ids;      // canonical prompt token IDs (token-exact verify truth)
     std::vector<uint8_t> kv_data;        // serialized llama_state_seq_get_data bytes
     std::chrono::steady_clock::time_point last_seen_ts;
@@ -407,7 +407,7 @@ static uint64_t g_active_prefix_hash = 0;  // 0 = no active snapshot
 static bool     g_active_cache_hit   = false;
 
 // ---------------------------------------------------------------------------
-// Stage 1 (2026-05-29): Mac resident-KV retention. When an incoming KV-artifact
+// Stage 1 (2026-05-29): receiver resident-KV retention. When an incoming KV-artifact
 // request EXTENDS the resident conversation, reuse the LIVE ctx + its KV instead
 // of recreating the context + re-importing + re-reserving the decode graph (the
 // measured ~6.2s/turn cost: the post-import graph RE-RESERVE; decode itself is
@@ -416,9 +416,9 @@ static bool     g_active_cache_hit   = false;
 // Staleness-safe (the 6-week bug class): exact-LCP token match, seq_rm trim of
 // the stale decoded tail + any divergent suffix, bit-faithful resident tokens,
 // fail-safe to the full clear+import path on ANY anomaly. NOTE: the per-session
-// context recreate exists to avoid "stale Metal GPU state" garbage — reuse must
-// be validated empirically; g_ctx_generation guards against reusing across a
-// recreate.
+// context recreate existed to avoid the retired Metal backend's "stale GPU state"
+// garbage — reuse must be validated empirically; g_ctx_generation guards against
+// reusing across a recreate.
 // ---------------------------------------------------------------------------
 struct ResidentKvState {
     std::vector<llama_token> token_ids;  // exact tokens materialized in live seq-0 KV
@@ -443,8 +443,8 @@ static bool dsv4_recv_dump_cb(ggml_tensor * t, bool ask, void * user_data) {
     static const char * wanted[] = {
         // csa_comp_input FIRST: every stage of the compressor is now verified correct GIVEN its
         // inputs, so the hidden state arriving at the layer is the prime suspect. Comparing it
-        // across backends is the direct test -- same source, same file, same tokens, and Metal
-        // recalls where CUDA does not.
+        // across backends was the direct test -- same source, same file, same tokens, and the
+        // retired Mac peer's Metal path recalled where CUDA did not.
         "csa_comp_input-",
         "csa_state_kv-", "csa_state_score_ape-", "csa_state_compress_pooled-",
         "csa_state_compress_final-", "lid_state_compress_pooled-", "csa_comp_k-",
@@ -615,7 +615,8 @@ static constexpr size_t KV_SNAPSHOT_MAX_BYTES = 2ull * 1024 * 1024 * 1024;
 // Called after decode completes to fill in the kv_data field.
 // NOTE: Requires LLAMA_PD_CACHE_CAPTURE=1 to enable. Default: disabled.
 // On CUDA/Windows targets, llama_state_seq_get_data can crash (access violation
-// in CUDA KV serialization). Only enable on Metal (Mac) or CPU backends.
+// in CUDA KV serialization). Phase-2 capture belonged to the retired Mac peer;
+// here the CPU backend is the safe target.
 static void pd_cache_update_kv(uint64_t prefix_hash, llama_context * ctx) {
     if (!ctx) { return; }
     // Safety env gate: LLAMA_PD_CACHE_DISABLE=1 → no-op
@@ -623,14 +624,14 @@ static void pd_cache_update_kv(uint64_t prefix_hash, llama_context * ctx) {
         if (dis[0] == '1') { return; }
     }
     // KV capture is opt-in: must set LLAMA_PD_CACHE_CAPTURE=1 explicitly.
-    // On Mac/Metal, set this to enable Phase-2 KV serialization.
+    // Phase-2 KV serialization belonged to the retired Mac/Metal receiver.
     // On Windows/CUDA, the capture path has known CUDA access violations in
-    // llama_state_seq_get_data post-decode — hard-compile-disabled here so
-    // even explicit LLAMA_PD_CACHE_CAPTURE=1 cannot trigger a crash.
+    // llama_state_seq_get_data post-decode — compile-disabled on Windows so
+    // even explicit LLAMA_PD_CACHE_CAPTURE=1 cannot trigger a crash there.
 #if defined(_WIN32) || defined(_WIN64)
     static bool warned_once = false;
     if (const char * cap = std::getenv("LLAMA_PD_CACHE_CAPTURE"); cap && cap[0] == '1' && !warned_once) {
-        fprintf(stderr, "[pd-cache] WARNING: LLAMA_PD_CACHE_CAPTURE=1 is IGNORED on Windows — CUDA KV serialization crashes. Only Mac/Metal receiver supports Phase-2 KV capture.\n");
+        fprintf(stderr, "[pd-cache] WARNING: LLAMA_PD_CACHE_CAPTURE=1 is IGNORED on Windows — CUDA KV serialization crashes. Phase-2 KV capture belonged to the retired Mac receiver.\n");
         warned_once = true;
     }
     return;
@@ -1240,9 +1241,9 @@ static bool apply_legacy_tail_tokens(
     // pos_max can disagree with token_count if import left padding/extra cells.
     const llama_pos tail_pos_start = (llama_pos)effective_token_count;
     // Suffix-prefill batch size: default to the context's launched n_batch
-    // (typically 2048 on Mac), env-overridable. The historical hardcoded
+    // (typically 2048), env-overridable. The historical hardcoded
     // 512 forced 4x as many llama_decode round-trips as needed for a typical
-    // 1243-token suffix, costing ~25 s of avoidable Mac prefill latency.
+    // 1243-token suffix, costing ~25 s of avoidable receiver-side prefill latency.
     int n_batch = std::max(1, (int) llama_n_batch(ctx));
     if (const char * env = std::getenv("LLAMA_HANDOFF_SUFFIX_BATCH")) {
         const int parsed = std::atoi(env);
@@ -1254,7 +1255,7 @@ static bool apply_legacy_tail_tokens(
     // Auto-detect full-prompt mode: if the sidecar carries more tokens than
     // what's already in the imported KV, assume it contains the ENTIRE prompt
     // and skip the imported prefix. This makes the handoff protocol robust to
-    // position-offset mismatches between Windows's n_p_eval and Mac's pos_max.
+    // position-offset mismatches between the producer's n_p_eval and the receiver's pos_max.
     size_t tail_skip = 0;
     if (tail_tokens.size() > effective_token_count) {
         tail_skip = effective_token_count;
@@ -1428,7 +1429,7 @@ static bool apply_handoff_prompt(
                     // The reuse decision (search: "window_covers_reuse") refuses reuse when the window
                     // has moved past the reuse point, so reaching here means that predicate missed a
                     // case. FAIL, loudly and with the numbers. Do NOT quietly clear and re-prefill the
-                    // whole prompt locally: that turns a bug into "the Mac is mysteriously slow this
+                    // whole prompt locally: that turns a bug into "the receiver is mysteriously slow this
                     // turn", which is the failure mode that hid the iSWA trim for a whole session. The
                     // caller invalidates the resident record and the next turn takes the import path.
                     fprintf(stderr,
@@ -1470,7 +1471,7 @@ static bool apply_handoff_prompt(
         fprintf(stderr, "[decode-server] Session %d: prompt verification OK, prefix=%u suffix=%zu - prefilling remaining prompt tokens locally\n",
                 session_id, logical_prefix, suffix_tokens);
 
-        // Default to the context's launched n_batch (typically 2048 on Mac);
+        // Default to the context's launched n_batch (typically 2048);
         // env-overridable. Historical hardcoded 512 caused a 4x prefill
         // round-trip count for typical suffix sizes.
         int n_batch = std::max(1, (int) llama_n_batch(ctx));
@@ -1493,7 +1494,7 @@ static bool apply_handoff_prompt(
         // making the reuse turn WORSE (ttft 7.7s->16.3s). The batched suffix prefill
         // is already 22ms with NO graph reserve (the decode first token is 159-191ms,
         // not ~6s — the "first-decode reserve" premise was wrong). The real reuse-turn
-        // residual (~6s) is RTX-SIDE, not the Mac. Keep the knob for experiments only.
+        // residual (~6s) is RTX-SIDE, not the receiver. Keep the knob for experiments only.
         static const int resident_singletok_max = []() {
             const char * e = std::getenv("LLAMA_PD_RESIDENT_SINGLETOK_MAX");
             return (e && e[0]) ? std::max(0, atoi(e)) : 0;
@@ -1526,15 +1527,17 @@ static bool apply_handoff_prompt(
             }
         }
 
-        // SYNCHRONIZE BEFORE STOPPING THE CLOCK. `llama_decode` ENQUEUES on Metal; it does not
-        // wait. With the sync after t_end this timer measured how long it took to hand work to the
-        // GPU, not how long the GPU took -- and it reported the result as a throughput.
+        // SYNCHRONIZE BEFORE STOPPING THE CLOCK. `llama_decode` ENQUEUES and does not
+        // wait — on the retired Metal peer and on CUDA alike. With the sync after t_end
+        // this timer measured how long it took to hand work to the GPU, not how long the
+        // GPU took -- and it reported the result as a throughput.
         //
         // Measured 2026-08-31 on a resident-reuse turn: "prompt suffix prefill 9.4 ms
         // (1924.6 tok/s)" for an 18-token suffix, inside an enclosing span
         // [RDS_TIMING after_suffix=3324ms] whose other components were all zero
-        // (after_seq_rm=0ms, detokenize=0ms). 1924 tok/s of prefill on a 1T MoE over Metal is not
-        // a plausible number, and it was not one: ~3.3 s of real work was being attributed to
+        // (after_seq_rm=0ms, detokenize=0ms). 1924 tok/s of prefill on a 1T MoE over the
+        // retired Metal peer was not a plausible number, and it was not one: ~3.3 s of real
+        // work was being attributed to
         // nothing at all, because the wait for it happened two lines after the measurement.
         //
         // This is not only a cosmetic mis-report. The comment above ("Stage 1b, REVERTED") rests
@@ -1653,7 +1656,7 @@ static int run_prompt_session(llama_context * ctx, llama_model * model,
         g_active_cache_hit = true;
     } else {
         // MISS PATH: prefill locally in batches. Defaults to the context's
-        // launched n_batch (typically 2048 on Mac), env-overridable via
+        // launched n_batch (typically 2048), env-overridable via
         // LLAMA_HANDOFF_SUFFIX_BATCH. Historical hardcoded 512 was a 4x
         // unnecessary round-trip count for typical suffix sizes.
         int n_batch = std::max(1, (int) llama_n_batch(ctx));
@@ -2381,7 +2384,7 @@ static int run_decode_session(llama_context * ctx, llama_model * model,
 
     // Import KV state
     {
-        // Checksum payload for debugging CUDA→Metal KV transfer
+        // Checksum payload (debugging the retired Mac peer's CUDA→Metal KV transfer)
         uint32_t cksum = 0;
         for (size_t b = 0; b < payload.size(); b++) {
             cksum = (cksum * 31) + payload[b];
@@ -2464,9 +2467,9 @@ static int run_decode_session(llama_context * ctx, llama_model * model,
     bool prompt_applied = false;
 
     // v1.8 ship-embeddings: re-prefill the image cells (+ trailing suffix tokens) from the
-    // shipped embeddings so the receiver computes the image K/V with correct Metal F32 FA.
-    // The RTX SM120 NCOLS=32 MLA FA accumulates VKQ in F16 → degraded glyphs (GROUND_TRUTH
-    // §11). Keep the imported prefix K/V [0,pos0); remove + recompute [pos0,end).
+    // shipped embeddings — the retired Mac peer computed the image K/V this way, with correct
+    // Metal F32 FA. The RTX SM120 NCOLS=32 MLA FA accumulates VKQ in F16 → degraded glyphs
+    // (GROUND_TRUTH §11). Keep the imported prefix K/V [0,pos0); remove + recompute [pos0,end).
     bool image_reprefilled = false;
     if (!resident_reuse && (meta.flags & LLAMA_KV_ARTIFACT_FLAG_IMAGE_EMBD) &&
             meta.img_cell_count > 0 && meta.img_n_embd > 0 &&
@@ -2495,7 +2498,7 @@ static int run_decode_session(llama_context * ctx, llama_model * model,
             llama_memory_t mem = llama_get_memory(ctx);
             // FULL local re-prefill (the proven path — same as mtmd-cli / test_inject2):
             // discard the imported RTX K/V entirely and recompute prefix(tokens) +
-            // image(embd) + suffix(tokens) locally, so the WHOLE sequence uses the Mac's
+            // image(embd) + suffix(tokens) locally, as the retired Mac peer did with its
             // correct Metal F32 FA. (seq_rm-on-imported-cache + partial re-decode produced
             // ineffective image K/V — the model ignored the image and read the prompt.)
             llama_memory_clear(mem, true);
@@ -3053,7 +3056,8 @@ static void session_worker(decode_session & sess, session_manager & mgr,
         sess.active.store(true);
 
         // Always recreate context for KV artifact imports to ensure clean
-        // scheduler/compute state (stale Metal GPU state causes garbage output)
+        // scheduler/compute state (the retired Metal backend's stale GPU state caused
+        // garbage output)
         if (!is_prompt_mode) {
             const bool need_fa = rparams.flash_attn_forced
                 ? rparams.flash_attn
@@ -3233,8 +3237,8 @@ int main(int argc, char ** argv) {
         // RECALLS a mid-prompt needle that the RTX (CUDA) prefill misses. Weights are byte-identical
         // on-device, graph logic is shared, the mask is right, decode consumption is exonerated, and
         // at this prompt length the indexer selects every row -- so the divergence is in what the
-        // CUDA prefill computes. Dumping the same named tensors from the Metal side makes that a
-        // numeric diff instead of an argument.
+        // CUDA prefill computes. Dumping the same named tensors from the retired Mac peer's Metal
+        // side made that a numeric diff instead of an argument.
         //
         // cb_eval sees each tensor the instant its node computes; unlike the RTX post-hoc readback
         // it is on the graph that actually produces the tokens here, because this context IS the one
@@ -3391,8 +3395,8 @@ int main(int argc, char ** argv) {
                     // genuine EXTENSION of the resident — i.e. the LCP covers the ENTIRE resident (reuse_n >=
                     // resident token count). Multi-turn turns ARE extensions (resident = prior convo is a full
                     // prefix), so reuse stays fast there. For an UNRELATED new prompt the LCP is a tiny shared
-                    // prefix (~system prompt); reusing it would trim to reuse_n and force the Mac to LOCALLY
-                    // PREFILL the whole 23k divergent tail (slow + diverges from the RTX's shipped KV -> garbage).
+                    // prefix (~system prompt); reusing it would trim to reuse_n and force the receiver to
+                    // LOCALLY PREFILL the whole 23k divergent tail (slow + diverges from the RTX's shipped KV -> garbage).
                     // Falling back to the import path (resident_reuse=false) uses the RTX's correct shipped KV.
                     const uint32_t resident_len = (uint32_t) g_resident_kv.token_ids.size();
                     // 2026-08-27: the LCP being a full extension is necessary but NOT sufficient. Reuse
@@ -3442,7 +3446,7 @@ int main(int argc, char ** argv) {
             if (!resident_reuse) {
                 // Original path: recreate context for clean scheduler/compute state.
                 // Reusing context between sessions otherwise risks intermittent
-                // garbage (stale Metal GPU state) — hence the gate above.
+                // garbage (the retired Metal backend's stale GPU state) — hence the gate above.
                 fprintf(stderr,
                         "[decode-server] Session %d: recreating context (FA=%s)\n",
                         session_id, need_fa_session ? "on" : "off");
@@ -3490,7 +3494,7 @@ int main(int argc, char ** argv) {
                     }
                 }
             } else {
-                // Normal miss: prefill locally on Mac, then decode
+                // Normal miss: prefill locally, then decode
                 tokens = run_prompt_session(ctx, model, rparams, meta, prompt_payload, session_id);
             }
         } else if (rparams.wir_enabled) {

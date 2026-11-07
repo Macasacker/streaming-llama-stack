@@ -1177,7 +1177,7 @@ void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgra
     // however, we also need to verify that the sources are in compatible buffer types
     // (*) the actual requirement is more relaxed, the buffer type of the backend should be supported by all the users of this tensor further down the graph
     // however, this is slow to verify, so we have a more strict requirement that the buffer type is the same
-    // this is not uncommon since multiple backends can use host memory, with the same buffer type (eg. BLAS and CPU)
+    // this is not uncommon since multiple backends can use host memory, with the same buffer type
     // additionally, set remaining unassigned nodes to the backend with the most supported inputs
     // only nodes that could not be assigned during expansion due to the backend not supporting the op should be unassigned at this point
     for (int i = 0; i < graph->n_nodes; i++) {

@@ -158,8 +158,6 @@ def scan(root=ROOT):
     for relative in paths:
         p = root / relative
         rel = p.relative_to(root)
-        if rel.parts[:2] == ('engines', 'mlx-serve'):
-            continue  # Public upstream is independently pinned/audited; its gitlink is not vendored code.
         if relative not in tracked and any(x in {'.git', 'runtime', 'build', '__pycache__', 'node_modules', '.venv'} for x in rel.parts):
             continue
         if not p.is_file():

@@ -1,0 +1,5 @@
+[
+  ["actual CUDA F16 weight bits do not match pinned native Metal half proof", "actual CUDA F16 weight bits do not match the pinned native half proof (retired Mac backend)"],
+  ["actual CUDA half bits differ from native Metal proof; no MMF continuation", "actual CUDA half bits differ from the pinned native proof (retired Mac backend); no MMF continuation"],
+  ["[pd-cache] WARNING: LLAMA_PD_CACHE_CAPTURE=1 is IGNORED on Windows \u2014 CUDA KV serialization crashes. Only Mac/Metal receiver supports Phase-2 KV capture.", "[pd-cache] WARNING: LLAMA_PD_CACHE_CAPTURE=1 is IGNORED on Windows \u2014 CUDA KV serialization crashes. Phase-2 KV capture belonged to the retired Mac receiver."]
+]
