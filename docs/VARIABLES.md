@@ -156,11 +156,11 @@ Source: `vendor/engines/cosmos_windows/weight_streaming/acestep_backend.py:61`. 
 ```text
         n_globals += 1
     streamer = DirectStorageStreamer(idx, component='transformer', n_gpu_buffers=n_gpu_buffers, device=device)
-    if getattr(streamer, 'mode', None) != 3 and os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"ACE-Step streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Refusing to count this as native streaming. Set ACESTEP_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"ACE-Step streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Refusing to count this as native streaming. Set ACESTEP_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
 ```
 
 ### ANIMA_ALLOW_NON_DIRECTSTORAGE
@@ -174,11 +174,11 @@ Source: `vendor/engines/cosmos_windows/weight_streaming/anima_backend.py:222`. U
 ```text
     idx = build_index(transformer_file)
     streamer = DirectStorageStreamer(_AnimaBlockIndex(idx, source_prefix, expected), component='', n_gpu_buffers=n_gpu_buffers, device=device)
-    if getattr(streamer, 'mode', None) != 3 and _os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and _os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"Anima streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3) — R1 requires the optimised NVMe->GPU path. Set ANIMA_ALLOW_NON_DIRECTSTORAGE=1 for diagnostics.")
+            raise RuntimeError(f"Anima streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) — R1 requires the bounded NVMe->GPU path. Set ANIMA_ALLOW_NON_DIRECTSTORAGE=1 for diagnostics.")
 ```
 
 ### ANIMA_MIN_FREE_RAM_GB
@@ -727,16 +727,16 @@ CUDA_PATH: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:32`. Unset read: None.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:60`. Unset read: None.
 
 ```text
-    dll_path = str(dll_path)
-    search = [os.path.dirname(dll_path)]
-    cuda_path = os.environ.get('CUDA_PATH') or ''
-    search.append(os.path.join(cuda_path, 'bin'))
-    search.append(os.path.join(cuda_path, 'bin', 'x64'))
-    for sub in ('', 'bin'):
-        p = os.path.join(os.path.dirname(os.path.dirname(dll_path)), sub)
+        # and the retired DirectStorage runtime was preloaded so its COM apartment existed first.
+        search = [os.path.dirname(dll_path)]
+        cuda_path = os.environ.get('CUDA_PATH') or ''
+        search.append(os.path.join(cuda_path, 'bin'))
+        search.append(os.path.join(cuda_path, 'bin', 'x64'))
+        for sub in ('', 'bin'):
+            p = os.path.join(os.path.dirname(os.path.dirname(dll_path)), sub)
 ```
 
 ### CUDA_VISIBLE_DEVICES
@@ -21297,11 +21297,11 @@ Source: `vendor/engines/cosmos_windows/weight_streaming/glm_backend.py:156`. Uns
 ```text
     cuda = str(device).startswith('cuda')
     streamer = DirectStorageStreamer(_GlmBlockIndex(idx), component='', n_gpu_buffers=n_gpu_buffers, device=device) if cuda else _PortableGlmStreamer(idx, device)
-    if cuda and getattr(streamer, 'mode', None) != 3 and (not (allow_non_directstorage or _os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE') == '1')):
+    if cuda and not is_streaming_mode(getattr(streamer, 'mode', None)) and (not (allow_non_directstorage or _os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE') == '1')):
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"GLM streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Set GLM_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"GLM streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Set GLM_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
 ```
 
 ### H3_MAX_DURATION
@@ -21812,13 +21812,13 @@ HY_ALLOW_NON_STREAMING: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/hunyuan_gen.py:776`. Unset read: None.
+Source: `vendor/engines/cosmos_windows/hunyuan_gen.py:777`. Unset read: None.
 
 ```text
     model = built[0] if isinstance(built, tuple) else built
     streamer = built[1] if isinstance(built, tuple) and len(built) > 1 else None
-    if not os.environ.get('HY_ALLOW_NON_STREAMING') and streamer is not None and (getattr(streamer, 'mode', None) != 3):
-        print(f"[hunyuan] ABORT: streamer mode={getattr(streamer, 'mode', '?')} is NOT DirectStorage(3) — a non-streaming load would prestage the 80B in RAM on a 32 GB box. Fix DirectStorage init (COM apartment / dstorage*.dll) and retry. (override with HY_ALLOW_NON_STREAMING=1)", flush=True)
+    if not os.environ.get('HY_ALLOW_NON_STREAMING') and streamer is not None and (not is_streaming_mode(getattr(streamer, 'mode', None))):
+        print(f"[hunyuan] ABORT: streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) — a non-streaming load would prestage the 80B in RAM on a 32 GB box. Fix the fetcher library (it must export the wf_* API) and retry. (override with HY_ALLOW_NON_STREAMING=1)", flush=True)
         try:
             streamer.close()
         except Exception:
@@ -38292,16 +38292,16 @@ LLAMA_WF_ASYNC_DRAIN: advanced engine setting; built-in default retained
 
 Scope: image, rtx-llama, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:10`. Unset read: '1'.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:14`. Unset read: '1'.
 
 ```text
 from pathlib import Path
 if os.environ.get('STUDIO_WF_OVERLAP') == '1':
     os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')
     os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')
-WF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)
-WF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)
-WF_POST_HANDOFF_MMAP, WF_POST_KEEP_FETCHER = (0, 1)
+# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.
+# This mirror therefore offers no retired value, and a caller asks for the relay it can get.
+WF_MODE_MMAP = 0
 ```
 
 ### LLAMA_WF_BUFDIAG
@@ -38472,16 +38472,16 @@ LLAMA_WF_DS_USE_COPY_STREAM: advanced engine setting; built-in default retained
 
 Scope: image, rtx-llama, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:11`. Unset read: '1'.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:15`. Unset read: '1'.
 
 ```text
 if os.environ.get('STUDIO_WF_OVERLAP') == '1':
     os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')
     os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')
-WF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)
-WF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)
-WF_POST_HANDOFF_MMAP, WF_POST_KEEP_FETCHER = (0, 1)
-
+# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.
+# This mirror therefore offers no retired value, and a caller asks for the relay it can get.
+WF_MODE_MMAP = 0
+WF_MODE_DIRECT_IO = 1
 ```
 
 ### LLAMA_WF_EXPERT_CACHE_MB
@@ -39036,7 +39036,7 @@ LLAMA_WF_RECORD_COMPUTE_DONE: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:258`. Unset read: _rc_default.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:297`. Unset read: _rc_default.
 
 ```text
             else:
@@ -45251,16 +45251,16 @@ Built weight-fetcher library used by streaming media.
 
 Scope: ds4, image, rtx-llama, studio, video. Class: preset.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:27`. Unset read: ''.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:42`. Unset read: ''.
 
 ```text
 class wf_weight_span(C.Structure):
     _fields_ = [('tensor_name', C.c_char_p), ('file_offset', C.c_uint64), ('nbytes', C.c_size_t), ('alloc_size', C.c_size_t), ('mmap_addr', C.c_void_p), ('file_idx', C.c_int), ('is_expert', C.c_bool), ('expert_idx', C.c_int), ('alloc_offset', C.c_size_t)]
 _DEFAULT_DLL = os.environ.get('STUDIO_WF_DLL', '')
 
-def load_wf(dll_path: str=_DEFAULT_DLL):
-    dll_path = str(dll_path)
-    search = [os.path.dirname(dll_path)]
+# What the transport cannot run without. The optional ones (reverse pass, MoE gating, stats,
+# compute-done records) are probed with hasattr below and by the callers.
+REQUIRED_WF_SYMBOLS = ('wf_create', 'wf_destroy', 'wf_register_layer', 'wf_set_layer_major_mode',
 ```
 
 ### STUDIO_WF_OVERLAP
@@ -45269,7 +45269,7 @@ STUDIO_WF_OVERLAP: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:9`. Unset read: None.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:13`. Unset read: None.
 
 ```text
 import os
@@ -45277,11 +45277,11 @@ from pathlib import Path
 if os.environ.get('STUDIO_WF_OVERLAP') == '1':
     os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')
     os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')
-WF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)
-WF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)
+# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.
+# This mirror therefore offers no retired value, and a caller asks for the relay it can get.
 ```
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:257`. Unset read: None.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:296`. Unset read: None.
 
 ```text
                 self._record_compute_done = bool(self._rc_override) and has_sym
@@ -45833,7 +45833,7 @@ WF_PASS_BOUNDARY: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:196`. Unset read: 'cycle'.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:235`. Unset read: 'cycle'.
 
 ```text
                 s.alloc_offset = ao
@@ -45851,7 +45851,7 @@ WF_TRACE: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:168`. Unset read: '0'.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:207`. Unset read: '0'.
 
 ```text
         p.post_mode = WF_POST_KEEP_FETCHER
@@ -45958,11 +45958,11 @@ Source: `vendor/engines/cosmos_windows/weight_streaming/zimage_backend.py:234`. 
 ```text
         n_glob_resident += 1
     streamer = DirectStorageStreamer(idx, component='', n_gpu_buffers=n_gpu_buffers, device=device)
-    if getattr(streamer, 'mode', None) != 3 and _os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and _os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"Z-Image streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Refusing to run this production path without real NVMe->GPU streaming. Set ZIMAGE_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"Z-Image streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Refusing to run this production path without real NVMe->GPU streaming. Set ZIMAGE_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
 ```
 
 ### ZIMAGE_CONFIG_DIR

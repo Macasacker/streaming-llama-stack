@@ -61,8 +61,12 @@ def install(cfg, *, image=False, video=False, all_engines=False, check=False):
     if not (image or video or all_engines):all_engines=True
     from .media_assets import install as install_assets
     result['media_assets']=install_assets(cfg['runtime_root'],check=check)
-    from .media_tools import install as install_tools
-    result['video_tools']=install_tools(cfg['runtime_root'],check=check)
+    from .media_tools import readiness as video_tools
+    result['video_tools']=video_tools()
+    if not check and not result['video_tools']['ready']:
+        raise RuntimeError('Video delivery needs ffmpeg and ffprobe on PATH: '
+                           + ', '.join(result['video_tools']['missing'])
+                           + '; install the FFmpeg package before setting up media')
     profiles=['studio','qwen21'] if image or all_engines else ['studio']
     result['media_runtimes']=[media_profile(cfg,p,check=check) for p in profiles]
     ready=all(row['ready'] for row in result['media_runtimes']) and result['media_assets']['ready'] and result.get('video_tools',{'ready':True})['ready']

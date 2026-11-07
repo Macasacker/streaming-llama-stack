@@ -27,9 +27,8 @@ def run(request):
     import faulthandler
     faulthandler.enable()
     cfg, kind, args = request['cfg'], request['kind'], request['params']
-    from .media_tools import directory as tools_directory
-    tools=tools_directory(cfg['runtime_root'])
-    if tools.is_dir():os.environ['PATH']=str(tools)+os.pathsep+os.environ.get('PATH','')
+    # FFmpeg is the distribution's, on the PATH this worker already inherited; media_tools.readiness()
+    # is what proved at setup that it starts.
     # Source builds put the media streaming library under build/llama/bin; only an
     # explicit weight_fetcher setting selects it. The Linux fetcher library is an anchor
     # object exporting one data symbol - it carries no fetcher API - so there is no

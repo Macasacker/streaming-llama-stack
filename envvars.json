@@ -18,7 +18,7 @@
         "source": "vendor/engines/cosmos_windows/weight_streaming/acestep_backend.py:61",
         "unset": "None",
         "read": "os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE')",
-        "consumer": "        n_globals += 1\n    streamer = DirectStorageStreamer(idx, component='transformer', n_gpu_buffers=n_gpu_buffers, device=device)\n    if getattr(streamer, 'mode', None) != 3 and os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE') != '1':\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"ACE-Step streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Refusing to count this as native streaming. Set ACESTEP_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.\")"
+        "consumer": "        n_globals += 1\n    streamer = DirectStorageStreamer(idx, component='transformer', n_gpu_buffers=n_gpu_buffers, device=device)\n    if not is_streaming_mode(getattr(streamer, 'mode', None)) and os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE') != '1':\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"ACE-Step streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Refusing to count this as native streaming. Set ACESTEP_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.\")"
       }
     ]
   },
@@ -41,7 +41,7 @@
         "source": "vendor/engines/cosmos_windows/weight_streaming/anima_backend.py:222",
         "unset": "None",
         "read": "_os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE')",
-        "consumer": "    idx = build_index(transformer_file)\n    streamer = DirectStorageStreamer(_AnimaBlockIndex(idx, source_prefix, expected), component='', n_gpu_buffers=n_gpu_buffers, device=device)\n    if getattr(streamer, 'mode', None) != 3 and _os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE') != '1':\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"Anima streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3) \u2014 R1 requires the optimised NVMe->GPU path. Set ANIMA_ALLOW_NON_DIRECTSTORAGE=1 for diagnostics.\")"
+        "consumer": "    idx = build_index(transformer_file)\n    streamer = DirectStorageStreamer(_AnimaBlockIndex(idx, source_prefix, expected), component='', n_gpu_buffers=n_gpu_buffers, device=device)\n    if not is_streaming_mode(getattr(streamer, 'mode', None)) and _os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE') != '1':\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"Anima streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) \u2014 R1 requires the bounded NVMe->GPU path. Set ANIMA_ALLOW_NON_DIRECTSTORAGE=1 for diagnostics.\")"
       }
     ]
   },
@@ -709,14 +709,14 @@
     ],
     "doc": "CUDA_PATH: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:32"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:60"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:32",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:60",
         "unset": "None",
         "read": "os.environ.get('CUDA_PATH')",
-        "consumer": "    dll_path = str(dll_path)\n    search = [os.path.dirname(dll_path)]\n    cuda_path = os.environ.get('CUDA_PATH') or ''\n    search.append(os.path.join(cuda_path, 'bin'))\n    search.append(os.path.join(cuda_path, 'bin', 'x64'))\n    for sub in ('', 'bin'):\n        p = os.path.join(os.path.dirname(os.path.dirname(dll_path)), sub)"
+        "consumer": "        # and the retired DirectStorage runtime was preloaded so its COM apartment existed first.\n        search = [os.path.dirname(dll_path)]\n        cuda_path = os.environ.get('CUDA_PATH') or ''\n        search.append(os.path.join(cuda_path, 'bin'))\n        search.append(os.path.join(cuda_path, 'bin', 'x64'))\n        for sub in ('', 'bin'):\n            p = os.path.join(os.path.dirname(os.path.dirname(dll_path)), sub)"
       }
     ]
   },
@@ -23497,7 +23497,7 @@
         "source": "vendor/engines/cosmos_windows/weight_streaming/glm_backend.py:156",
         "unset": "None",
         "read": "_os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE')",
-        "consumer": "    cuda = str(device).startswith('cuda')\n    streamer = DirectStorageStreamer(_GlmBlockIndex(idx), component='', n_gpu_buffers=n_gpu_buffers, device=device) if cuda else _PortableGlmStreamer(idx, device)\n    if cuda and getattr(streamer, 'mode', None) != 3 and (not (allow_non_directstorage or _os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE') == '1')):\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"GLM streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Set GLM_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.\")"
+        "consumer": "    cuda = str(device).startswith('cuda')\n    streamer = DirectStorageStreamer(_GlmBlockIndex(idx), component='', n_gpu_buffers=n_gpu_buffers, device=device) if cuda else _PortableGlmStreamer(idx, device)\n    if cuda and not is_streaming_mode(getattr(streamer, 'mode', None)) and (not (allow_non_directstorage or _os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE') == '1')):\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"GLM streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Set GLM_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.\")"
       }
     ]
   },
@@ -24050,14 +24050,14 @@
     ],
     "doc": "HY_ALLOW_NON_STREAMING: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/hunyuan_gen.py:776"
+      "vendor/engines/cosmos_windows/hunyuan_gen.py:777"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/hunyuan_gen.py:776",
+        "source": "vendor/engines/cosmos_windows/hunyuan_gen.py:777",
         "unset": "None",
         "read": "os.environ.get('HY_ALLOW_NON_STREAMING')",
-        "consumer": "    model = built[0] if isinstance(built, tuple) else built\n    streamer = built[1] if isinstance(built, tuple) and len(built) > 1 else None\n    if not os.environ.get('HY_ALLOW_NON_STREAMING') and streamer is not None and (getattr(streamer, 'mode', None) != 3):\n        print(f\"[hunyuan] ABORT: streamer mode={getattr(streamer, 'mode', '?')} is NOT DirectStorage(3) \u2014 a non-streaming load would prestage the 80B in RAM on a 32 GB box. Fix DirectStorage init (COM apartment / dstorage*.dll) and retry. (override with HY_ALLOW_NON_STREAMING=1)\", flush=True)\n        try:\n            streamer.close()\n        except Exception:"
+        "consumer": "    model = built[0] if isinstance(built, tuple) else built\n    streamer = built[1] if isinstance(built, tuple) and len(built) > 1 else None\n    if not os.environ.get('HY_ALLOW_NON_STREAMING') and streamer is not None and (not is_streaming_mode(getattr(streamer, 'mode', None))):\n        print(f\"[hunyuan] ABORT: streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) \u2014 a non-streaming load would prestage the 80B in RAM on a 32 GB box. Fix the fetcher library (it must export the wf_* API) and retry. (override with HY_ALLOW_NON_STREAMING=1)\", flush=True)\n        try:\n            streamer.close()\n        except Exception:"
       }
     ]
   },
@@ -34913,7 +34913,7 @@
         "source": "engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1248",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if (const char * env = std::getenv(\"LLAMA_HANDOFF_SUFFIX_BATCH\")) {",
-        "consumer": "    // 1243-token suffix, costing ~25 s of avoidable Mac prefill latency.\n    int n_batch = std::max(1, (int) llama_n_batch(ctx));\n    if (const char * env = std::getenv(\"LLAMA_HANDOFF_SUFFIX_BATCH\")) {\n        const int parsed = std::atoi(env);\n        if (parsed > 0) {\n            n_batch = parsed;\n        }"
+        "consumer": "    // 1243-token suffix, costing ~25 s of avoidable receiver-side prefill latency.\n    int n_batch = std::max(1, (int) llama_n_batch(ctx));\n    if (const char * env = std::getenv(\"LLAMA_HANDOFF_SUFFIX_BATCH\")) {\n        const int parsed = std::atoi(env);\n        if (parsed > 0) {\n            n_batch = parsed;\n        }"
       },
       {
         "source": "engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1478",
@@ -37382,7 +37382,7 @@
         "source": "engines/streaming-llama/prefill_llama.cpp/tools/decode-receiver/main.cpp:1499",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * e = std::getenv(\"LLAMA_PD_RESIDENT_SINGLETOK_MAX\");",
-        "consumer": "        // residual (~6s) is RTX-SIDE, not the Mac. Keep the knob for experiments only.\n        static const int resident_singletok_max = []() {\n            const char * e = std::getenv(\"LLAMA_PD_RESIDENT_SINGLETOK_MAX\");\n            return (e && e[0]) ? std::max(0, atoi(e)) : 0;\n        }();\n        if (resident_reuse_n > 0 && (int) suffix_tokens > 0 && (int) suffix_tokens <= resident_singletok_max) {\n            n_batch = 1;"
+        "consumer": "        // residual (~6s) is RTX-SIDE, not the receiver. Keep the knob for experiments only.\n        static const int resident_singletok_max = []() {\n            const char * e = std::getenv(\"LLAMA_PD_RESIDENT_SINGLETOK_MAX\");\n            return (e && e[0]) ? std::max(0, atoi(e)) : 0;\n        }();\n        if (resident_reuse_n > 0 && (int) suffix_tokens > 0 && (int) suffix_tokens <= resident_singletok_max) {\n            n_batch = 1;"
       }
     ]
   },
@@ -42530,14 +42530,14 @@
     ],
     "doc": "LLAMA_WF_ASYNC_DRAIN: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:10"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:14"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:10",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:14",
         "unset": "'1'",
         "read": "os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')",
-        "consumer": "from pathlib import Path\nif os.environ.get('STUDIO_WF_OVERLAP') == '1':\n    os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')\n    os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')\nWF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)\nWF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)\nWF_POST_HANDOFF_MMAP, WF_POST_KEEP_FETCHER = (0, 1)"
+        "consumer": "from pathlib import Path\nif os.environ.get('STUDIO_WF_OVERLAP') == '1':\n    os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')\n    os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')\n# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.\n# This mirror therefore offers no retired value, and a caller asks for the relay it can get.\nWF_MODE_MMAP = 0"
       }
     ]
   },
@@ -42760,14 +42760,14 @@
     ],
     "doc": "LLAMA_WF_DS_USE_COPY_STREAM: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:11"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:15"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:11",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:15",
         "unset": "'1'",
         "read": "os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')",
-        "consumer": "if os.environ.get('STUDIO_WF_OVERLAP') == '1':\n    os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')\n    os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')\nWF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)\nWF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)\nWF_POST_HANDOFF_MMAP, WF_POST_KEEP_FETCHER = (0, 1)\n"
+        "consumer": "if os.environ.get('STUDIO_WF_OVERLAP') == '1':\n    os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')\n    os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')\n# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.\n# This mirror therefore offers no retired value, and a caller asks for the relay it can get.\nWF_MODE_MMAP = 0\nWF_MODE_DIRECT_IO = 1"
       }
     ]
   },
@@ -43379,11 +43379,11 @@
     ],
     "doc": "LLAMA_WF_RECORD_COMPUTE_DONE: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:258"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:297"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:258",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:297",
         "unset": "_rc_default",
         "read": "os.environ.get('LLAMA_WF_RECORD_COMPUTE_DONE', _rc_default)",
         "consumer": "            else:\n                _rc_default = '1' if os.environ.get('STUDIO_WF_OVERLAP') == '1' else '0'\n                self._record_compute_done = os.environ.get('LLAMA_WF_RECORD_COMPUTE_DONE', _rc_default) == '1' and has_sym\n        if self._record_compute_done:\n            self.lib.wf_cuda_record_compute_done(self.ctx, il)\n        self.lib.wf_release_layer(self.ctx, il)\n"
@@ -50917,14 +50917,14 @@
     ],
     "doc": "Built weight-fetcher library used by streaming media.",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:27"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:42"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:27",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:42",
         "unset": "''",
         "read": "os.environ.get('STUDIO_WF_DLL', '')",
-        "consumer": "class wf_weight_span(C.Structure):\n    _fields_ = [('tensor_name', C.c_char_p), ('file_offset', C.c_uint64), ('nbytes', C.c_size_t), ('alloc_size', C.c_size_t), ('mmap_addr', C.c_void_p), ('file_idx', C.c_int), ('is_expert', C.c_bool), ('expert_idx', C.c_int), ('alloc_offset', C.c_size_t)]\n_DEFAULT_DLL = os.environ.get('STUDIO_WF_DLL', '')\n\ndef load_wf(dll_path: str=_DEFAULT_DLL):\n    dll_path = str(dll_path)\n    search = [os.path.dirname(dll_path)]"
+        "consumer": "class wf_weight_span(C.Structure):\n    _fields_ = [('tensor_name', C.c_char_p), ('file_offset', C.c_uint64), ('nbytes', C.c_size_t), ('alloc_size', C.c_size_t), ('mmap_addr', C.c_void_p), ('file_idx', C.c_int), ('is_expert', C.c_bool), ('expert_idx', C.c_int), ('alloc_offset', C.c_size_t)]\n_DEFAULT_DLL = os.environ.get('STUDIO_WF_DLL', '')\n\n# What the transport cannot run without. The optional ones (reverse pass, MoE gating, stats,\n# compute-done records) are probed with hasattr below and by the callers.\nREQUIRED_WF_SYMBOLS = ('wf_create', 'wf_destroy', 'wf_register_layer', 'wf_set_layer_major_mode',"
       }
     ],
     "defaults_by_scope": {
@@ -50947,18 +50947,18 @@
     ],
     "doc": "STUDIO_WF_OVERLAP: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:9",
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:257"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:13",
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:296"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:9",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:13",
         "unset": "None",
         "read": "os.environ.get('STUDIO_WF_OVERLAP')",
-        "consumer": "import os\nfrom pathlib import Path\nif os.environ.get('STUDIO_WF_OVERLAP') == '1':\n    os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')\n    os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')\nWF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)\nWF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)"
+        "consumer": "import os\nfrom pathlib import Path\nif os.environ.get('STUDIO_WF_OVERLAP') == '1':\n    os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')\n    os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')\n# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.\n# This mirror therefore offers no retired value, and a caller asks for the relay it can get."
       },
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:257",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:296",
         "unset": "None",
         "read": "os.environ.get('STUDIO_WF_OVERLAP')",
         "consumer": "                self._record_compute_done = bool(self._rc_override) and has_sym\n            else:\n                _rc_default = '1' if os.environ.get('STUDIO_WF_OVERLAP') == '1' else '0'\n                self._record_compute_done = os.environ.get('LLAMA_WF_RECORD_COMPUTE_DONE', _rc_default) == '1' and has_sym\n        if self._record_compute_done:\n            self.lib.wf_cuda_record_compute_done(self.ctx, il)\n        self.lib.wf_release_layer(self.ctx, il)"
@@ -51619,11 +51619,11 @@
     ],
     "doc": "WF_PASS_BOUNDARY: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:196"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:235"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:196",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:235",
         "unset": "'cycle'",
         "read": "os.environ.get('WF_PASS_BOUNDARY', 'cycle')",
         "consumer": "                s.alloc_offset = ao\n            lib.wf_register_layer(self.ctx, il, arr, len(sl), total)\n        self._boundary = os.environ.get('WF_PASS_BOUNDARY', 'cycle').strip().lower()\n        if self._boundary not in ('cycle', 'inline'):\n            raise ValueError(f\"WF_PASS_BOUNDARY must be 'cycle' or 'inline', got {self._boundary!r}\")\n        self._layer_major = self._boundary == 'cycle'\n        lib.wf_set_layer_major_mode(self.ctx, self._layer_major)"
@@ -51642,11 +51642,11 @@
     ],
     "doc": "WF_TRACE: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:168"
+      "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:207"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:168",
+        "source": "vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:207",
         "unset": "'0'",
         "read": "os.environ.get('WF_TRACE', '0')",
         "consumer": "        p.post_mode = WF_POST_KEEP_FETCHER\n        p.n_layers = self.n\n        p.trace = os.environ.get('WF_TRACE', '0').strip().lower() in ('1', 'true', 'yes', 'on')\n        self.ctx = lib.wf_create(C.byref(p))\n        if not self.ctx:\n            raise RuntimeError('wf_create failed')\n        self.mode = lib.wf_get_effective_mode(self.ctx)"
@@ -51781,7 +51781,7 @@
         "source": "vendor/engines/cosmos_windows/weight_streaming/zimage_backend.py:234",
         "unset": "None",
         "read": "_os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE')",
-        "consumer": "        n_glob_resident += 1\n    streamer = DirectStorageStreamer(idx, component='', n_gpu_buffers=n_gpu_buffers, device=device)\n    if getattr(streamer, 'mode', None) != 3 and _os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE') != '1':\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"Z-Image streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Refusing to run this production path without real NVMe->GPU streaming. Set ZIMAGE_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.\")"
+        "consumer": "        n_glob_resident += 1\n    streamer = DirectStorageStreamer(idx, component='', n_gpu_buffers=n_gpu_buffers, device=device)\n    if not is_streaming_mode(getattr(streamer, 'mode', None)) and _os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE') != '1':\n        try:\n            streamer.close()\n        finally:\n            raise RuntimeError(f\"Z-Image streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Refusing to run this production path without real NVMe->GPU streaming. Set ZIMAGE_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.\")"
       }
     ]
   },

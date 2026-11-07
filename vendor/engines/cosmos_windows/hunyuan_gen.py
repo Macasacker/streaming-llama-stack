@@ -758,6 +758,7 @@ def main() -> int:
     except Exception as e:
         print(f'[hunyuan] memeff-attention enable skipped: {e}', flush=True)
     from cosmos_windows.weight_streaming.hunyuan_backend import build_streamed_hunyuan
+    from cosmos_windows.weight_streaming.ds_backend import is_streaming_mode
     print(f'[hunyuan] loading streamed model from {a.model_dir} (157GB on disk, ~15.6GB resident)...', flush=True)
     t0 = time.time()
     import threading
@@ -773,14 +774,14 @@ def main() -> int:
     _loaded.set()
     model = built[0] if isinstance(built, tuple) else built
     streamer = built[1] if isinstance(built, tuple) and len(built) > 1 else None
-    if not os.environ.get('HY_ALLOW_NON_STREAMING') and streamer is not None and (getattr(streamer, 'mode', None) != 3):
-        print(f"[hunyuan] ABORT: streamer mode={getattr(streamer, 'mode', '?')} is NOT DirectStorage(3) — a non-streaming load would prestage the 80B in RAM on a 32 GB box. Fix DirectStorage init (COM apartment / dstorage*.dll) and retry. (override with HY_ALLOW_NON_STREAMING=1)", flush=True)
+    if not os.environ.get('HY_ALLOW_NON_STREAMING') and streamer is not None and (not is_streaming_mode(getattr(streamer, 'mode', None))):
+        print(f"[hunyuan] ABORT: streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) — a non-streaming load would prestage the 80B in RAM on a 32 GB box. Fix the fetcher library (it must export the wf_* API) and retry. (override with HY_ALLOW_NON_STREAMING=1)", flush=True)
         try:
             streamer.close()
         except Exception:
             pass
         return 3
-    print(f"[hunyuan] streaming confirmed: DirectStorage mode={getattr(streamer, 'mode', 'n/a')} (NVMe->GPU, weights never staged in RAM).", flush=True)
+    print(f"[hunyuan] streaming confirmed: relay mode={getattr(streamer, 'mode', 'n/a')} (NVMe->GPU, weights never staged in RAM).", flush=True)
     model.eval()
     if hasattr(model, 'load_tokenizer'):
         try:

@@ -41,25 +41,29 @@ class VideoHttpTests(unittest.TestCase):
         finally:
             server.shutdown();server.server_close();thread.join(2)
 
-    def test_ready_marker_cannot_hide_changed_or_unverified_tools(self):
-        if os.name != 'nt':
-            self.skipTest('the setup-owned FFmpeg marker is the Windows arm; the PATH arm is checked below')
-        root=Path(tempfile.mkdtemp());tools=media_tools.directory(root);tools.mkdir(parents=True)
-        for name in ('ffmpeg','ffprobe'):(tools/(name+'.exe')).write_bytes(b'fixture')
-        (tools.parent/'installed.json').write_text(json.dumps(dict(archive_sha256=media_tools.SHA256,files={})))
-        self.assertFalse(media_tools.install(root,check=True)['ready'])
-
-    def test_the_posix_arm_reports_path_tools_and_never_a_windows_marker(self):
-        # A marker written by a Windows install must not make a Linux run ready, and
-        # must not make it unready either: on this platform the tools are PATH's.
-        root=Path(tempfile.mkdtemp());tools=media_tools.directory(root);tools.mkdir(parents=True)
-        (tools.parent/'installed.json').write_text(json.dumps(dict(archive_sha256=media_tools.SHA256,files={})))
+    def test_video_tools_are_ready_only_when_they_start(self):
         with patch('shutil.which',return_value=None):
-            self.assertFalse(media_tools.install(root,check=True)['ready'])
-        with patch('shutil.which',side_effect=lambda name:'/usr/bin/'+name):
-            result=media_tools.install(root,check=True)
+            self.assertFalse(media_tools.readiness()['ready'])
+        with patch('shutil.which',side_effect=lambda name:'/usr/bin/'+name),patch('subprocess.run',return_value=SimpleNamespace(returncode=0,stdout='ffmpeg version fixture\n')):
+            result=media_tools.readiness()
         self.assertTrue(result['ready'])
         self.assertEqual(set(result['tools']),{'ffmpeg','ffprobe'})
+        self.assertEqual(result['tools']['ffmpeg']['version'],'ffmpeg version fixture')
+        self.assertEqual([],result['missing'])
+
+    def test_a_tool_on_path_that_exits_nonzero_is_not_ready(self):
+        # The retired Windows arm could hide a changed binary behind its marker; the Linux
+        # equivalent trap is a name on PATH that fails when the media worker runs it.
+        with patch('shutil.which',side_effect=lambda name:'/usr/bin/'+name),patch('subprocess.run',return_value=SimpleNamespace(returncode=1,stdout='broken install')):
+            result=media_tools.readiness()
+        self.assertFalse(result['ready'])
+        self.assertEqual(sorted(result['missing']),['ffmpeg','ffprobe'])
+
+    def test_a_tool_that_cannot_be_executed_reports_why(self):
+        with patch('shutil.which',side_effect=lambda name:'/usr/bin/'+name),patch('subprocess.run',side_effect=OSError('No such file or directory')):
+            result=media_tools.readiness()
+        self.assertFalse(result['ready'])
+        self.assertIn('OSError',result['tools']['ffmpeg']['reason'])
 
 
 class H3AdapterTests(unittest.TestCase):

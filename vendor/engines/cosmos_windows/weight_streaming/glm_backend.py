@@ -101,7 +101,7 @@ def build_streamed_glm_transformer(model_dir: str | Path, *, device: str='cuda',
     import torch
     from accelerate.utils import set_module_tensor_to_device
     from .backends import PortableBackend
-    from .ds_backend import DirectStorageStreamer
+    from .ds_backend import DirectStorageStreamer, is_streaming_mode
     from .safetensors_index import build_index
     if dtype is None:
         dtype = torch.float16
@@ -153,11 +153,11 @@ def build_streamed_glm_transformer(model_dir: str | Path, *, device: str='cuda',
         n_glob += 1
     cuda = str(device).startswith('cuda')
     streamer = DirectStorageStreamer(_GlmBlockIndex(idx), component='', n_gpu_buffers=n_gpu_buffers, device=device) if cuda else _PortableGlmStreamer(idx, device)
-    if cuda and getattr(streamer, 'mode', None) != 3 and (not (allow_non_directstorage or _os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE') == '1')):
+    if cuda and not is_streaming_mode(getattr(streamer, 'mode', None)) and (not (allow_non_directstorage or _os.environ.get('GLM_ALLOW_NON_DIRECTSTORAGE') == '1')):
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"GLM streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Set GLM_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"GLM streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Set GLM_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
 
     def _resolve(path: str) -> str:
         parent, _, leaf = path.rpartition('.')

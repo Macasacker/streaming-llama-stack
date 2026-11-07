@@ -206,7 +206,7 @@ def build_streamed_zimage_transformer(transformer_file: str, config_dir: str | P
     import torch
     from accelerate.utils import set_module_tensor_to_device
     from .backends import PortableBackend
-    from .ds_backend import DirectStorageStreamer
+    from .ds_backend import DirectStorageStreamer, is_streaming_mode
     dtype = dtype or torch.bfloat16
     _guard_ram('Z-Image streamed transformer load', min_free_gb=10.0)
     config_root = _require_path(config_dir, 'config_dir', file=False)
@@ -231,11 +231,11 @@ def build_streamed_zimage_transformer(transformer_file: str, config_dir: str | P
         set_module_tensor_to_device(model, ref.name, device, value=value, dtype=dtype if value.is_floating_point() else None)
         n_glob_resident += 1
     streamer = DirectStorageStreamer(idx, component='', n_gpu_buffers=n_gpu_buffers, device=device)
-    if getattr(streamer, 'mode', None) != 3 and _os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and _os.environ.get('ZIMAGE_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"Z-Image streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Refusing to run this production path without real NVMe->GPU streaming. Set ZIMAGE_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"Z-Image streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Refusing to run this production path without real NVMe->GPU streaming. Set ZIMAGE_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
 
     def _resolve(path: str) -> str:
         parent, _, leaf = path.rpartition('.')

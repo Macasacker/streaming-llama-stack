@@ -30,7 +30,7 @@ def build_streamed_acestep_transformer(model_dir: str, *, device: str='cuda', dt
     import torch
     from accelerate.utils import set_module_tensor_to_device
     from .backends import PortableBackend
-    from .ds_backend import DirectStorageStreamer
+    from .ds_backend import DirectStorageStreamer, is_streaming_mode
     from .loader import StreamingWeightLoader
     from .safetensors_index import build_index
     dtype = dtype or torch.bfloat16
@@ -58,11 +58,11 @@ def build_streamed_acestep_transformer(model_dir: str, *, device: str='cuda', dt
         set_module_tensor_to_device(model, path, device, value=value, dtype=dtype if value.is_floating_point() else None)
         n_globals += 1
     streamer = DirectStorageStreamer(idx, component='transformer', n_gpu_buffers=n_gpu_buffers, device=device)
-    if getattr(streamer, 'mode', None) != 3 and os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and os.environ.get('ACESTEP_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"ACE-Step streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3). Refusing to count this as native streaming. Set ACESTEP_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"ACE-Step streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). Refusing to count this as native streaming. Set ACESTEP_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
     layer_paths = {il: [StreamingWeightLoader._param_path(r) for r in refs if StreamingWeightLoader._param_path(r) in sd_keys] for il, refs in layer_refs.items()}
 
     def make_bind(il: int):

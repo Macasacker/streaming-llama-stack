@@ -441,6 +441,7 @@ def directstorage_available(dll_path: Optional[str]=None) -> bool:
 def build_layer_ring_streamer(plan: Magi2LayerRingPlan, *, device: str='cuda', transport: str='auto', emit=None, allow_fallback: bool=True, n_gpu_buffers: int=1, dll_path: Optional[str]=None, source: Optional[object]=None, require_env: str='MAGI2_REQUIRE_DIRECTSTORAGE', **pinned_kwargs):
     import os
     import sys
+    from cosmos_windows.weight_streaming.ds_backend import is_streaming_mode
     is_windows = sys.platform == 'win32'
     if transport == 'pinned':
         if emit is not None:
@@ -448,26 +449,26 @@ def build_layer_ring_streamer(plan: Magi2LayerRingPlan, *, device: str='cuda', t
         return Magi2LayerRingStreamer(plan, device=device, source=source, **pinned_kwargs)
     if not is_windows:
         if transport == 'directstorage':
-            raise RuntimeError("transport='directstorage' is Windows-only (DirectStorage); use 'auto'/'pinned' — the bounded-pinned ring is the designated portable tier on macOS/Linux.")
+            raise RuntimeError("transport='directstorage' is Windows-only (DirectStorage); use 'auto'/'pinned' — the bounded-pinned ring is the designated portable tier on Linux.")
         if emit is not None:
-            emit.emit('transport_selected', transport='pinned', level='info', reason='portable (no DirectStorage on this platform)', message='layer-ring transport = bounded-pinned portable tier (macOS/Metal / Linux, 256MB fixed host, RSS-guarded)')
+            emit.emit('transport_selected', transport='pinned', level='info', reason='portable (no DirectStorage on this platform)', message='layer-ring transport = bounded-pinned portable tier (Linux, 256MB fixed host, RSS-guarded)')
         return Magi2LayerRingStreamer(plan, device=device, source=source, **pinned_kwargs)
     env_strict = os.environ.get(require_env, '').strip() in ('1', 'true', 'yes', 'on')
     strict = transport == 'directstorage' or env_strict
     reason = None
     try:
         ring = Magi2DirectStorageRing(plan, device=device, n_gpu_buffers=n_gpu_buffers, dll_path=dll_path)
-        if getattr(ring, 'mode', None) == 3:
+        if is_streaming_mode(getattr(ring, 'mode', None)):
             if emit is not None:
-                emit.emit('transport_selected', transport='directstorage', mode=3, level='info', message='layer-ring transport = TRUE DirectStorage NVMe->GPU DMA (zero pageable host RAM in the weight path)')
+                emit.emit('transport_selected', transport='directstorage', mode=getattr(ring, 'mode', None), level='info', message='layer-ring transport = relay NVMe->GPU DMA (zero pageable host RAM in the weight path)')
             return ring
-        reason = f"DirectStorage did not engage (effective mode={getattr(ring, 'mode', '?')})"
+        reason = f"the relay did not engage (effective mode={getattr(ring, 'mode', '?')})"
         ring.close()
     except Exception as exc:
         reason = f'{type(exc).__name__}: {exc}'
     if strict or not allow_fallback:
         raise RuntimeError(f"DirectStorage transport required but unavailable: {reason}. (Set {require_env}=0 / transport='auto' to allow the bounded-pinned fallback.)")
-    msg = f'DirectStorage unavailable on Windows -> bounded-pinned host staging ({reason})'
+    msg = f'fetcher relay unavailable -> bounded-pinned host staging ({reason})'
     if emit is not None:
         emit.fallback('layer-ring transport', msg)
     else:

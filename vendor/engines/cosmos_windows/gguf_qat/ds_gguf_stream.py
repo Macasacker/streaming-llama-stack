@@ -7,7 +7,7 @@ import sys
 from typing import Dict, List, Optional
 if '' not in sys.path:
     sys.path.insert(0, '')
-from cosmos_windows.weight_streaming.ds_backend import load_wf, wf_params, wf_weight_span, WF_MODE_DSTORAGE, WF_MOE_FETCH_ALL, WF_POST_KEEP_FETCHER, _DEFAULT_DLL, _aln, _ALIGN
+from cosmos_windows.weight_streaming.ds_backend import load_wf, wf_params, wf_weight_span, WF_MODE_DIRECT_IO, WF_MOE_FETCH_ALL, WF_POST_KEEP_FETCHER, _DEFAULT_DLL, _aln, _ALIGN
 
 def _layer_index(name: str) -> Optional[int]:
     if name.startswith('blk.'):
@@ -79,7 +79,7 @@ class GGUFDirectStorageStreamer:
         p.n_sublayers = 1
         p.gpu_backend = None
         p.cuda_device = None
-        p.mode = WF_MODE_DSTORAGE
+        p.mode = WF_MODE_DIRECT_IO
         p.moe_mode = WF_MOE_FETCH_ALL
         p.post_mode = WF_POST_KEEP_FETCHER
         p.n_layers = self.n

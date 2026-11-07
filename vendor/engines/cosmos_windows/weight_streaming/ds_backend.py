@@ -1,7 +1,11 @@
 # Derived from private fork c5ee9ec9dd47786287e576e78fbb42e5f4c4eac3: cosmos_windows/weight_streaming/ds_backend.py
 # Machine fallback paths cleared; no model data included.
-# wf_params matches this stack's engines/streaming-llama src/llama-weight-fetcher.h (same fork): the six
-# strict-profile fields are appended in header order; ctypes zero-fills them, which the header defines as legacy.
+# wf_params is a field-for-field mirror of this stack's engines/streaming-llama
+# src/llama-weight-fetcher.h, in header order. The three fields the Windows relay carried
+# (`ds_submit_threads`, `ds_gpu_ring_slots`, `ds_zero_padding_only`) went with that relay, and a
+# mirror that keeps them shifts every later field: the fetcher would read an integer where it
+# expects the GPU backend pointer. `tests/test_media_fetcher_abi.py` compares all three
+# declarations below against the header, so the mirror cannot drift again silently.
 from __future__ import annotations
 import ctypes as C
 import os
@@ -9,12 +13,23 @@ from pathlib import Path
 if os.environ.get('STUDIO_WF_OVERLAP') == '1':
     os.environ.setdefault('LLAMA_WF_ASYNC_DRAIN', '1')
     os.environ.setdefault('LLAMA_WF_DS_USE_COPY_STREAM', '1')
-WF_MODE_MMAP, WF_MODE_DIRECT_IO, WF_MODE_GDS, WF_MODE_DSTORAGE, WF_MODE_AUTO = (0, 1, 2, 3, 4)
+# The header retires mode 3 (Microsoft DirectStorage): a caller asking for it gets DIRECT_IO.
+# This mirror therefore offers no retired value, and a caller asks for the relay it can get.
+WF_MODE_MMAP = 0
+WF_MODE_DIRECT_IO = 1
+WF_MODE_GDS = 2
+WF_MODE_AUTO = 4
+# AUTO resolves to GDS or DIRECT_IO and never to MMAP, so the effective mode is what these two
+# cover: weights move NVMe -> staged host tier -> device, never through an unbounded mapping.
+STREAMING_MODES = (WF_MODE_DIRECT_IO, WF_MODE_GDS)
 WF_MOE_FETCH_ALL, WF_MOE_FETCH_ACTIVE = (0, 1)
 WF_POST_HANDOFF_MMAP, WF_POST_KEEP_FETCHER = (0, 1)
 
+def is_streaming_mode(mode) -> bool:
+    return mode in STREAMING_MODES
+
 class wf_params(C.Structure):
-    _fields_ = [('model_path', C.c_char_p), ('split_paths', C.POINTER(C.c_char_p)), ('n_split_files', C.c_int), ('io_block_size', C.c_size_t), ('io_queue_depth', C.c_int), ('io_threads', C.c_int), ('io_direct', C.c_bool), ('prefetch_depth', C.c_int), ('n_gpu_buffers', C.c_int), ('n_ram_buffers', C.c_int), ('max_layer_bytes', C.c_size_t), ('ds_staging_limit_bytes', C.c_size_t), ('ds_async_drain', C.c_bool), ('ds_submit_threads', C.c_uint32), ('n_sublayers', C.c_int), ('gpu_backend', C.c_void_p), ('cuda_device', C.c_void_p), ('mode', C.c_int), ('moe_mode', C.c_int), ('post_mode', C.c_int), ('n_layers', C.c_int), ('trace', C.c_bool), ('ds_gpu_ring_slots', C.c_uint32), ('ds_zero_padding_only', C.c_bool), ('ds_compute_direct', C.c_bool)]
+    _fields_ = [('model_path', C.c_char_p), ('split_paths', C.POINTER(C.c_char_p)), ('n_split_files', C.c_int), ('io_block_size', C.c_size_t), ('io_queue_depth', C.c_int), ('io_threads', C.c_int), ('io_direct', C.c_bool), ('prefetch_depth', C.c_int), ('n_gpu_buffers', C.c_int), ('n_ram_buffers', C.c_int), ('max_layer_bytes', C.c_size_t), ('ds_staging_limit_bytes', C.c_size_t), ('ds_async_drain', C.c_bool), ('n_sublayers', C.c_int), ('gpu_backend', C.c_void_p), ('cuda_device', C.c_void_p), ('mode', C.c_int), ('moe_mode', C.c_int), ('post_mode', C.c_int), ('n_layers', C.c_int), ('trace', C.c_bool), ('ds_compute_direct', C.c_bool)]
 
 class wf_stats(C.Structure):
     _fields_ = [('nvme_read_bw_gbps', C.c_float), ('ram_to_gpu_bw_gbps', C.c_float), ('end_to_end_bw_gbps', C.c_float), ('total_nvme_read_ms', C.c_float), ('total_staging_ms', C.c_float), ('total_h2d_ms', C.c_float), ('total_stall_ms', C.c_float), ('total_compute_ms', C.c_float), ('bytes_read_nvme', C.c_size_t), ('bytes_uploaded_gpu', C.c_size_t), ('layers_fetched', C.c_int), ('stall_count', C.c_int), ('io_ops', C.c_int), ('experts_skipped', C.c_int), ('expert_bytes_saved', C.c_size_t), ('cache_hits', C.c_uint64), ('cache_vram_hits', C.c_uint64), ('cache_ram_hits', C.c_uint64), ('cache_misses', C.c_uint64), ('cache_bytes_saved', C.c_size_t), ('expert_prefetch_predicted', C.c_uint64), ('expert_prefetch_hits', C.c_uint64), ('expert_prefetch_misses', C.c_uint64), ('expert_prefetch_wasted_bytes', C.c_size_t), ('gds_active', C.c_bool), ('effective_mode', C.c_int)]
@@ -26,32 +41,54 @@ class wf_weight_span(C.Structure):
     _fields_ = [('tensor_name', C.c_char_p), ('file_offset', C.c_uint64), ('nbytes', C.c_size_t), ('alloc_size', C.c_size_t), ('mmap_addr', C.c_void_p), ('file_idx', C.c_int), ('is_expert', C.c_bool), ('expert_idx', C.c_int), ('alloc_offset', C.c_size_t)]
 _DEFAULT_DLL = os.environ.get('STUDIO_WF_DLL', '')
 
+# What the transport cannot run without. The optional ones (reverse pass, MoE gating, stats,
+# compute-done records) are probed with hasattr below and by the callers.
+REQUIRED_WF_SYMBOLS = ('wf_create', 'wf_destroy', 'wf_register_layer', 'wf_set_layer_major_mode',
+                       'wf_start', 'wf_wait_layer_gpu', 'wf_release_layer', 'wf_get_span_gpu_offset',
+                       'wf_cuda_wait_upload', 'wf_get_effective_mode', 'wf_get_n_gpu_bufs',
+                       'wf_get_gpu_buf_capacity', 'wf_set_gpu_buf_ptr', 'wf_end_pass', 'wf_stop',
+                       'wf_request_layer', 'wf_gds_available', 'wf_cuda_get_vram_info')
+
 def load_wf(dll_path: str=_DEFAULT_DLL):
     dll_path = str(dll_path)
-    search = [os.path.dirname(dll_path)]
-    cuda_path = os.environ.get('CUDA_PATH') or ''
-    search.append(os.path.join(cuda_path, 'bin'))
-    search.append(os.path.join(cuda_path, 'bin', 'x64'))
-    for sub in ('', 'bin'):
-        p = os.path.join(os.path.dirname(os.path.dirname(dll_path)), sub)
-        search.append(p)
-    for d in search:
-        if hasattr(os, 'add_dll_directory') and os.path.isdir(d):
-            try:
-                os.add_dll_directory(d)
-            except Exception:
-                pass
-    try:
-        C.windll.ole32.CoInitializeEx(None, 0)
-    except Exception:
-        pass
-    bindir = os.path.dirname(dll_path)
-    for ds in ('dstoragecore.dll', 'dstorage.dll'):
+    if not dll_path:
+        raise ValueError('no weight-fetcher library is configured; set STUDIO_WF_DLL or the stack weight_fetcher setting')
+    if os.name == 'nt':
+        # Windows resolves the fetcher's own DLL dependencies from the directories beside it,
+        # and the retired DirectStorage runtime was preloaded so its COM apartment existed first.
+        search = [os.path.dirname(dll_path)]
+        cuda_path = os.environ.get('CUDA_PATH') or ''
+        search.append(os.path.join(cuda_path, 'bin'))
+        search.append(os.path.join(cuda_path, 'bin', 'x64'))
+        for sub in ('', 'bin'):
+            p = os.path.join(os.path.dirname(os.path.dirname(dll_path)), sub)
+            search.append(p)
+        for d in search:
+            if hasattr(os, 'add_dll_directory') and os.path.isdir(d):
+                try:
+                    os.add_dll_directory(d)
+                except Exception:
+                    pass
         try:
-            C.CDLL(os.path.join(bindir, ds))
-        except OSError:
+            C.windll.ole32.CoInitializeEx(None, 0)
+        except Exception:
             pass
+        bindir = os.path.dirname(dll_path)
+        for ds in ('dstoragecore.dll', 'dstorage.dll'):
+            try:
+                C.CDLL(os.path.join(bindir, ds))
+            except OSError:
+                pass
     lib = C.CDLL(dll_path)
+    missing = [name for name in REQUIRED_WF_SYMBOLS if not hasattr(lib, name)]
+    if missing:
+        raise RuntimeError(
+            f'{dll_path} does not export the weight-fetcher API this transport binds '
+            f'(missing {", ".join(missing[:4])} of {len(missing)}). No build of this fork exports it: '
+            'the producer links the fetcher statically, and the shared library carries only a link '
+            'anchor because the CUDA backend objects are compiled without -fPIC. The portable tiers '
+            'in weight_streaming/ are the Linux weight paths; this one needs a fetcher library built '
+            'to export wf_* (docs/linux-port-plan.md, chunk 6.1).')
     lib.wf_gds_available.restype = C.c_bool
     lib.wf_gds_available.argtypes = []
     lib.wf_cuda_get_vram_info.restype = C.c_bool
@@ -91,11 +128,11 @@ def _aln(x):
     return (x + _ALIGN - 1) // _ALIGN * _ALIGN
 
 def enforce_ds_mode(streamer, label: str, env_prefix: str) -> None:
-    if getattr(streamer, 'mode', None) != 3 and os.environ.get(f'{env_prefix}_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and os.environ.get(f'{env_prefix}_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"{label} streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3) — R1 requires the optimised NVMe->GPU path. Set {env_prefix}_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
+            raise RuntimeError(f"{label} streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) — R1 requires the bounded NVMe->GPU path, not an unbounded mapping. Set {env_prefix}_ALLOW_NON_DIRECTSTORAGE=1 only for diagnostics.")
 
 class DirectStorageStreamer:
 
@@ -161,7 +198,9 @@ class DirectStorageStreamer:
         p.n_sublayers = 1
         p.gpu_backend = None
         p.cuda_device = None
-        p.mode = WF_MODE_DSTORAGE
+        # DIRECT_IO, not AUTO: AUTO may resolve to GDS, which registers the fetcher's own
+        # allocations at create time, before the caller replaces the bank pointers below.
+        p.mode = WF_MODE_DIRECT_IO
         p.moe_mode = moe_mode
         p.post_mode = WF_POST_KEEP_FETCHER
         p.n_layers = self.n

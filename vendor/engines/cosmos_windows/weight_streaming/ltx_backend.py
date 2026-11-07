@@ -540,8 +540,9 @@ def streamed_ltx_generate(model_file: str, prompt: str, components_repo: str='',
     if transformer is None or streamer is None:
         preflight_vram(device, need_mib=8192, label='LTX streamed 22B transformer + denoise')
         transformer, streamer = build_streamed_ltx(model_file, device=device, n_gpu_buffers=n_gpu_buffers, dtype=dtype, config_dir=Path(components_repo) / 'transformer')
-        if getattr(streamer, 'mode', None) != 3:
-            raise RuntimeError(f"streamed_ltx_generate: streamer mode={getattr(streamer, 'mode', '?')} != DirectStorage(3). A non-streaming load would prestage ~46 GB in RAM on a 32 GB box. Fix DirectStorage init and retry.")
+        from .ds_backend import is_streaming_mode
+        if not is_streaming_mode(getattr(streamer, 'mode', None)):
+            raise RuntimeError(f"streamed_ltx_generate: streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). A non-streaming load would prestage ~46 GB in RAM on a 32 GB box.")
     transformer.eval()
     if loras:
         from cosmos_windows.gen_with_lora import apply_lora_stack
@@ -898,8 +899,9 @@ def streamed_ltx_generate_legacy_pipeline(model_file: str, prompt: str, componen
         num_inference_steps = 2
     if transformer is None or streamer is None:
         transformer, streamer = build_streamed_ltx(model_file, device=device, n_gpu_buffers=n_gpu_buffers, dtype=dtype, config_dir=Path(components_repo) / 'transformer')
-        if getattr(streamer, 'mode', None) != 3:
-            raise RuntimeError(f"streamed_ltx_generate: streamer mode={getattr(streamer, 'mode', '?')} != DirectStorage(3). A non-streaming load would prestage ~46 GB in RAM on a 32 GB box. Fix DirectStorage init and retry.")
+        from .ds_backend import is_streaming_mode
+        if not is_streaming_mode(getattr(streamer, 'mode', None)):
+            raise RuntimeError(f"streamed_ltx_generate: streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage). A non-streaming load would prestage ~46 GB in RAM on a 32 GB box.")
     transformer.eval()
     if components is None:
         pipe = LTX2Pipeline.from_pretrained(components_repo, transformer=transformer, torch_dtype=dtype)

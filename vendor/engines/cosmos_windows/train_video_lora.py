@@ -188,8 +188,9 @@ def _ltx_pipeline(model, device, dtype, support_files, streamed, save_dir, load_
     try:
         if streamed:
             transformer, streamer = backend.build_streamed_backward_ltx(model, device=device, n_gpu_buffers=1, config_dir=support_files.get('transformer_config') or Path(components) / 'transformer')
-            if getattr(streamer, 'mode', None) != 3:
-                raise ValueError('CUDA LTX training requires actual DirectStorage mode 3')
+            from cosmos_windows.weight_streaming.ds_backend import is_streaming_mode
+            if not is_streaming_mode(getattr(streamer, 'mode', None)):
+                raise ValueError('CUDA LTX training requires the async relay (Direct I/O or GPUDirect Storage)')
         else:
             transformer, _ = backend._load_meta_ltx(model, config_dir=support_files.get('transformer_config') or Path(components) / 'transformer')
             transformer = backend._load_ltx23_mapped_module(transformer, [model], backend._remap_key, device=device, dtype=dtype, label='training transformer')
@@ -451,8 +452,9 @@ def _raw_wan_pipeline(model, device, dtype, support_files, save_dir, streamed=Fa
             if support_files.get('transformer_config'):
                 raise ValueError('CUDA streamed Wan training uses the standard 14B T2V configuration; custom configurations require resident training')
             transformer, streamer = backend.build_streamed_backward_wan(model, device=device, n_gpu_buffers=1)
-            if getattr(streamer, 'mode', None) != 3:
-                raise ValueError('CUDA Wan training requires actual DirectStorage mode 3')
+            from cosmos_windows.weight_streaming.ds_backend import is_streaming_mode
+            if not is_streaming_mode(getattr(streamer, 'mode', None)):
+                raise ValueError('CUDA Wan training requires the async relay (Direct I/O or GPUDirect Storage)')
         else:
             config = support_files.get('transformer_config')
             if config:

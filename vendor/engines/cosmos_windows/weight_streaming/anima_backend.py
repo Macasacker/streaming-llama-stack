@@ -214,16 +214,16 @@ class _AnimaBlockIndex:
 def _attach_ds_anima_blocks(transformer, transformer_file, dtype, device, source_prefix, n_gpu_buffers=3):
     import os as _os
     from accelerate.utils import set_module_tensor_to_device
-    from .ds_backend import DirectStorageStreamer
+    from .ds_backend import DirectStorageStreamer, is_streaming_mode
     from .safetensors_index import build_index
     expected = set(transformer.state_dict().keys())
     idx = build_index(transformer_file)
     streamer = DirectStorageStreamer(_AnimaBlockIndex(idx, source_prefix, expected), component='', n_gpu_buffers=n_gpu_buffers, device=device)
-    if getattr(streamer, 'mode', None) != 3 and _os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE') != '1':
+    if not is_streaming_mode(getattr(streamer, 'mode', None)) and _os.environ.get('ANIMA_ALLOW_NON_DIRECTSTORAGE') != '1':
         try:
             streamer.close()
         finally:
-            raise RuntimeError(f"Anima streamer mode={getattr(streamer, 'mode', '?')} is not DirectStorage(3) — R1 requires the optimised NVMe->GPU path. Set ANIMA_ALLOW_NON_DIRECTSTORAGE=1 for diagnostics.")
+            raise RuntimeError(f"Anima streamer mode={getattr(streamer, 'mode', '?')} is not the async relay (Direct I/O or GPUDirect Storage) — R1 requires the bounded NVMe->GPU path. Set ANIMA_ALLOW_NON_DIRECTSTORAGE=1 for diagnostics.")
     if streamer.n != len(transformer.transformer_blocks):
         streamer.close()
         raise RuntimeError(f'Anima DS block count {streamer.n} != {len(transformer.transformer_blocks)} transformer_blocks (Cosmos2->diffusers block grouping mismatch)')
