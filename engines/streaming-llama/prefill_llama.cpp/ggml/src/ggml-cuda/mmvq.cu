@@ -64,13 +64,7 @@ enum mmvq_parameter_table_id {
 };
 
 static constexpr __device__ mmvq_parameter_table_id get_device_table_id() {
-#if defined(RDNA2) || defined(RDNA3) || defined(RDNA4)
-    return MMVQ_PARAMETERS_RDNA2;
-#elif defined(GCN) || defined(CDNA)
-    return MMVQ_PARAMETERS_GCN;
-#else
     return MMVQ_PARAMETERS_GENERIC;
-#endif
 }
 
 static __host__ mmvq_parameter_table_id get_device_table_id(int cc) {

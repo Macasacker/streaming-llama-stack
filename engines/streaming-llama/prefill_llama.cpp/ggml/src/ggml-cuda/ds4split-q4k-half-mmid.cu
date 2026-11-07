@@ -72,18 +72,7 @@ static __global__ void mul_mat_q4k_half_ids(
         const int sample_ratio, const int stride_sample_x, const int stride_sample_y, const int stride_sample_dst,
         const uint3 sis1_fd, const uint3 nch_fd) {
 // TODO: handle this in a consistent and simpler way after AMD MFMA support has been added
-#if defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE) || defined(AMD_MFMA_AVAILABLE)
-#if defined(AMD_WMMA_AVAILABLE)
-    if constexpr (!(std::is_same_v<T, half2> || std::is_same_v<T, nv_bfloat162>) || rows_per_block != MMF_ROWS_PER_BLOCK) {NO_DEVICE_CODE;} else {
-    typedef tile<16, 8,  T,     get_input_data_layout()> tile_A;
-    typedef tile<16, 8,  T,     get_input_data_layout()> tile_B;
-    typedef tile<16, 16, float, DATA_LAYOUT_J_MAJOR>     tile_C;
-#elif defined(AMD_MFMA_AVAILABLE)
-    if constexpr (rows_per_block != MMF_ROWS_PER_BLOCK_CDNA) {NO_DEVICE_CODE;} else {
-    typedef tile<16, 8,  T,     DATA_LAYOUT_I_MAJOR> tile_A;
-    typedef tile<16, 8,  T,     DATA_LAYOUT_I_MAJOR> tile_B;
-    typedef tile<16, 16, float, DATA_LAYOUT_J_MAJOR> tile_C;
-#else
+#if defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
 #ifdef VOLTA_MMA_AVAILABLE
     if constexpr (!std::is_same_v<T, half2> || rows_per_block != MMF_ROWS_PER_BLOCK) {NO_DEVICE_CODE;} else {
     typedef tile<32, 4, T,     DATA_LAYOUT_I_MAJOR>          tile_A;
@@ -95,7 +84,6 @@ static __global__ void mul_mat_q4k_half_ids(
     typedef tile<8,  8, T>     tile_B;
     typedef tile<16, 8, float> tile_C;
 #endif // VOLTA_MMA_AVAILABLE
-#endif // defined(AMD_WMMA_AVAILABLE)
     if constexpr (!tile_A::supported() || !tile_B::supported() || !tile_C::supported()) {
         NO_DEVICE_CODE;
         return;
@@ -340,7 +328,7 @@ static __global__ void mul_mat_q4k_half_ids(
         channel_ratio, stride_channel_x, stride_channel_y, stride_channel_dst,
         sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, sis1_fd, nch_fd);
     NO_DEVICE_CODE;
-#endif // defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE) || defined(AMD_MFMA_AVAILABLE)
+#endif // defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
 }
 
 } // namespace ds4split_q4k_half_impl

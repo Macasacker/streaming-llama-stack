@@ -17,40 +17,53 @@ sys.path.insert(0, "scripts/port")
 from collapse_conditionals import Evaluator, parse  # noqa: E402
 
 
+def split_comment(expr):
+    """A trailing `// ...` is not part of a condition - the preprocessor ignores it - so a branch
+    whose guard reads `#elif defined(X) // explanation` is still decidable. The comment is kept
+    when that branch becomes the guard."""
+    head, _, tail = expr.partition("//")
+    return head.strip(), ("// " + tail.strip()) if tail.strip() else ""
+
+
+def verdict(ev, branch):
+    cond, _ = split_comment(branch["expr"])
+    return ev.decide(cond)[0]
+
+
 def plan(ev, scope, node, drops, rewrites, log):
     branches = node["branches"]
     if branches:
         first = branches[0]
         # Same gate as the collapse: a node is only work for this sweep if its first condition
         # names a macro in scope. `#if defined(_MSC_VER) / #else` is another chunk's business.
-        if any(name in first["expr"] for name in scope):
-            verdict, _ = ev.decide(first["expr"])
+        cond0, _ = split_comment(first["expr"])
+        if any(name in cond0 for name in scope):
+            v0 = ev.decide(cond0)[0]
         else:
-            verdict = None
-        if verdict == "DEAD":
+            v0 = None
+        if v0 == "DEAD":
             live_at = None
             for idx, b in enumerate(branches[1:], 1):
                 if b["kind"] == "else":
                     live_at = idx
                     break
-                v2, _ = ev.decide(b["expr"])
-                if v2 == "DEAD":
+                if verdict(ev, b) == "DEAD":
                     continue
                 live_at = idx
                 break
             if live_at is not None:
                 target = branches[live_at]
                 drops.update(range(node["line"], target["dir"]))
+                cond, comment = split_comment(target["expr"])
                 if target["kind"] == "else":
                     drops.add(target["dir"])
                     drops.add(node["end"])
                 else:
-                    rewrites[target["dir"]] = "#if " + target["expr"].strip()
+                    rewrites[target["dir"]] = ("#if " + cond + ((" " + comment) if comment else "")).rstrip()
                 log.append((node["line"], target["dir"], target["kind"],
-                            target["expr"].strip()))
+                            cond + ((" " + comment) if comment else "")))
                 for b in branches[live_at + 1:]:
-                    v2, _ = ev.decide(b["expr"])
-                    if v2 == "DEAD":
+                    if verdict(ev, b) == "DEAD":
                         drops.update(range(b["dir"], b["bend"] + 1))
                         log.append((node["line"], b["dir"], "drop-dead-later",
                                     b["expr"].strip()))

@@ -181,8 +181,6 @@ static constexpr __device__ fattn_mma_config ggml_cuda_fattn_mma_get_config(cons
     return ggml_cuda_fattn_mma_get_config_turing(DKQ, DV, ncols);
 #elif defined(VOLTA_MMA_AVAILABLE)
     return ggml_cuda_fattn_mma_get_config_volta(DKQ, DV, ncols);
-#elif defined(AMD_WMMA_AVAILABLE)
-    return ggml_cuda_fattn_mma_get_config_rdna(DKQ, DV, ncols);
 #else
     GGML_UNUSED_VARS(DKQ, DV, ncols);
     return fattn_mma_config(32, 1, 0, 0, 0, 0, 0, false);
@@ -254,11 +252,7 @@ static constexpr __device__ bool ggml_cuda_fattn_mma_get_Q_in_reg(const int DKQ,
 }
 
 static constexpr __device__ int get_cols_per_thread() {
-#if defined(AMD_WMMA_AVAILABLE)
-    return 1; // RDNA has a single column.
-#else
     return 2; // This is specifically KQ columns, Volta only has a single VKQ column.
-#endif // defined(AMD_WMMA_AVAILABLE)
 }
 
 static __host__ int get_cols_per_warp(const int cc) {
@@ -538,7 +532,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
         const int jt,
         const int kb0,
         const int k_VKQ_sup) {
-#if defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4))
+#if defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
     constexpr int  ncols           = ncols1 * ncols2;
     constexpr int  cols_per_warp   = T_B_KQ::I;
     constexpr int  cols_per_thread = get_cols_per_thread();
@@ -565,8 +559,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
     const int k_VKQ_0 = kb0 * nbatch_fa;
 #if defined(TURING_MMA_AVAILABLE)
     T_C_KQ KQ_C[nbatch_fa/(np*(cols_per_warp == 8 ? T_C_KQ::I : T_C_KQ::J))];
-#elif defined(AMD_WMMA_AVAILABLE)
-    T_C_KQ KQ_C[nbatch_fa/(np*T_C_KQ::J)];
 #else // Volta
     T_C_KQ KQ_C[nbatch_fa/(np*T_C_KQ::J)];
 #endif // defined(TURING_MMA_AVAILABLE)
@@ -644,13 +636,8 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
                         mma(KQ_C[i_KQ_00/(np*T_A_KQ::I)], K_A, Q_B[k_KQ_0/T_A_KQ::J]);
                     } else {
                         // Wide version of KQ_C is column-major
-#if defined(AMD_WMMA_AVAILABLE)
-                        // RDNA matrix C is column-major.
-                        mma(KQ_C[i_KQ_00/(np*T_A_KQ::I)], K_A, Q_B[k_KQ_0/T_A_KQ::J]);
-#else
                         // swap A and B for CUDA.
                         mma(KQ_C[i_KQ_00/(np*T_A_KQ::I)], Q_B[k_KQ_0/T_A_KQ::J], K_A);
-#endif // defined(AMD_WMMA_AVAILABLE)
                     }
                 }
             }
@@ -670,13 +657,8 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
                         mma(KQ_C[i_KQ_00/(np*T_A_KQ::I)], K_A, Q_B[0]);
                     } else {
                         // Wide version of KQ_C is column-major
-#if defined(AMD_WMMA_AVAILABLE)
-                        // RDNA matrix C is column-major.
-                        mma(KQ_C[i_KQ_00/(np*T_A_KQ::I)], K_A, Q_B[0]);
-#else
                         // swap A and B for CUDA.
                         mma(KQ_C[i_KQ_00/(np*T_A_KQ::I)], Q_B[0], K_A);
-#endif // defined(AMD_WMMA_AVAILABLE)
                     }
                 }
             }
@@ -761,12 +743,8 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
 #pragma unroll
             for (int l = 0; l < T_C_KQ::ne; ++l) {
                 if (!oob_check || k0 + (threadIdx.y % np)*T_C_KQ::I + T_C_KQ::get_i(l) < k_VKQ_sup) {
-#if defined(AMD_WMMA_AVAILABLE)
-                    constexpr int KQ_idx = 0;
-#else
                     // Turing + Volta:
                     const int KQ_idx = l % 2;
-#endif // defined(AMD_WMMA_AVAILABLE)
                     KQ_max_new[KQ_idx] = fmaxf(KQ_max_new[KQ_idx], KQ_C[k0/(np*T_C_KQ::I)].x[l] + FATTN_KQ_MAX_OFFSET);
                 }
             }
@@ -787,12 +765,8 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
 #pragma unroll
             for (int l = 0; l < T_C_KQ::ne; ++l) {
                 if (!oob_check || k0 + (threadIdx.y % np)*T_C_KQ::I + T_C_KQ::get_i(l) < k_VKQ_sup) {
-#if defined(AMD_WMMA_AVAILABLE)
-                    constexpr int KQ_idx = 0;
-#else
                     // Turing + Volta:
                     const int KQ_idx = l % 2;
-#endif // defined(AMD_WMMA_AVAILABLE)
                     KQ_C[k0/(np*T_C_KQ::I)].x[l] = expf(KQ_C[k0/(np*T_C_KQ::I)].x[l] - KQ_max_new[KQ_idx]);
                     KQ_rowsum_add[KQ_idx] += KQ_C[k0/(np*T_C_KQ::I)].x[l];
                 } else {
@@ -874,12 +848,8 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
 #pragma unroll
             for (int l = 0; l < T_C_KQ::ne; ++l) {
                 if (!oob_check || k0 + (threadIdx.y % np)*T_C_KQ::J + T_C_KQ::get_j(l) < k_VKQ_sup) {
-#if defined(AMD_WMMA_AVAILABLE)
-                    constexpr int KQ_idx = 0;
-#else
                     // Turing + Volta:
                     const int KQ_idx = (l/2) % 2;
-#endif // defined(AMD_WMMA_AVAILABLE)
                     KQ_max_new[KQ_idx] = fmaxf(KQ_max_new[KQ_idx], KQ_C[(k0/(np*T_C_KQ::J))].x[l] + FATTN_KQ_MAX_OFFSET);
                 }
             }
@@ -891,10 +861,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
             // Values per KQ column are spread across 4 threads:
             constexpr int offset_first = 2;
             constexpr int offset_last  = 1;
-#elif defined(AMD_WMMA_AVAILABLE)
-            // Values per KQ column are spread across 2 threads:
-            constexpr int offset_first = 16;
-            constexpr int offset_last  = 16;
 #else // Volta
             // Values per KQ column are spread across 2 threads:
             constexpr int offset_first = 2;
@@ -912,12 +878,8 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
 #pragma unroll
             for (int l = 0; l < T_C_KQ::ne; ++l) {
                 if (!oob_check || k0 + (threadIdx.y % np)*T_C_KQ::J + T_C_KQ::get_j(l) < k_VKQ_sup) {
-#if defined(AMD_WMMA_AVAILABLE)
-                    constexpr int KQ_idx = 0;
-#else
                     // Turing + Volta:
                     const int KQ_idx = (l/2) % 2;
-#endif // defined(AMD_WMMA_AVAILABLE)
                     KQ_C[(k0/(np*T_C_KQ::J))].x[l] = expf(KQ_C[(k0/(np*T_C_KQ::J))].x[l] - KQ_max_new[KQ_idx]);
                     KQ_rowsum_add[KQ_idx] += KQ_C[(k0/(np*T_C_KQ::J))].x[l];
                 } else {
@@ -983,16 +945,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
                 }
             }
         }
-#elif defined(AMD_WMMA_AVAILABLE)
-        const half2 KQ_max_scale_h2 = make_half2(
-            KQ_max_scale[0], KQ_max_scale[0]);
-#pragma unroll
-        for (int i = 0; i < (DV/2)/T_C_VKQ::J; ++i) {
-#pragma unroll
-            for (int l = 0; l < T_C_VKQ::ne; ++l) {
-                VKQ_C[i].x[l] *= KQ_max_scale_h2;
-            }
-        }
 #else // Volta
         const half2 KQ_max_scale_h2 = make_half2(
             KQ_max_scale[(threadIdx.x / 2) % 2], KQ_max_scale[(threadIdx.x / 2) % 2]);
@@ -1038,10 +990,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
     }
 
 
-#if defined(AMD_WMMA_AVAILABLE) && !defined(LDMATRIX_TRANS_AVAILABLE)
-    T_A_VKQ A_identity;
-    make_identity_mat(A_identity);
-#endif // defined(AMD_WMMA_AVAILABLE) && !defined(LDMATRIX_TRANS_AVAILABLE)
 
     // Calculate VKQ tile, need to use logical rather than physical elements for i0 due to transposition of V:
 #pragma unroll
@@ -1088,7 +1036,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
         }
         const half2 * tile_V_i = !V_is_K_view || i0_stop > 2*nbatch_K2 ? tile_V : tile_V + i0_start/2;
 
-#if defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+#if defined(TURING_MMA_AVAILABLE)
         constexpr int i0_stride = cols_per_warp == 8 ? T_C_VKQ::I : 2*T_C_VKQ::J;
 #pragma unroll
         for (int i_VKQ_0 = i0_start; i_VKQ_0 < i0_stop; i_VKQ_0 += i0_stride) {
@@ -1111,10 +1059,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
                     mma(VKQ_C[i_VKQ_0/i0_stride], A, B[k00/(np*T_A_VKQ::J)]);
                 } else {
                     // Wide version of VKQ_C is column-major.
-#if defined(AMD_WMMA_AVAILABLE)
-                    // RDNA matrix C is column-major.
-                    mma(VKQ_C[i_VKQ_0/i0_stride], A, B[k00/(np*T_A_VKQ::J)]);
-#else
                     // swap A and B for CUDA.
                     mma(VKQ_C[i_VKQ_0/i0_stride], B[k00/(np*T_A_VKQ::J)], A);
                     if constexpr (use_f32_acc) {
@@ -1140,7 +1084,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
                             : "r"(Axi[0]), "r"(Axi[1]), "r"(Axi[2]), "r"(Axi[3]),
                               "r"(Bxi[1]), "r"(Bxi[3]));
                     }
-#endif // defined(AMD_WMMA_AVAILABLE)
                 }
             }
         }
@@ -1159,7 +1102,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
                 mma(VKQ_C[i_VKQ_0/i0_stride], B[k00/(np*T_A_VKQ::I)], A);
             }
         }
-#endif // defined(TURING_MMA_AVAILABLE) || defined(AMD_WMMA_AVAILABLE)
+#endif // defined(TURING_MMA_AVAILABLE)
 
         if constexpr (nstages <= 1) {
             __syncthreads(); // Only needed if tile_K == tile_V.
@@ -1172,7 +1115,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_iter(
         tile_Q, tile_K, tile_V, tile_mask,
         Q_B, VKQ_C, KQ_max, KQ_rowsum, kb0);
     NO_DEVICE_CODE;
-#endif // defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4))
+#endif // defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
 }
 
 #if defined(TURING_MMA_AVAILABLE)
@@ -1191,15 +1134,6 @@ template<> struct mma_tile_sizes<8> {
     using T_A_VKQ = tile<16,  8, half2>; // row-major
     using T_B_VKQ = tile< 8,  8, half2>; // column-major
     using T_C_VKQ = tile<16,  4, half2>; // row-major
-};
-#elif defined(AMD_WMMA_AVAILABLE)
-template<int ncols> struct mma_tile_sizes {
-    using T_A_KQ  = tile<16,  8, half2>; // row-major
-    using T_B_KQ  = tile<16,  8, half2>; // column-major
-    using T_C_KQ  = tile<16, 16, float>; // column-major
-    using T_A_VKQ = tile<16,  8, half2>; // row-major
-    using T_B_VKQ = tile<16,  8, half2>; // column-major
-    using T_C_VKQ = tile<16,  8, half2>; // column-major
 };
 #else // Volta
 template<int ncols> struct mma_tile_sizes {
@@ -1244,7 +1178,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
     // flash_attn_ext_f16_iter, which computes the causal mask INLINE from positions at the
     // two KQ mask-add sites (replacing the materialized tile_mask read). Gated entirely by
     // direct_causal so the default production path (direct_causal==false) is byte-untouched.
-#if defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4))
+#if defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
     //In this kernel Q, K, V are matrices while i, j, k are matrix indices.
 
     constexpr int ncols = ncols1 * ncols2;
@@ -1286,8 +1220,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
     T_B_KQ    Q_B[(Q_in_reg ? DKQ/(2*T_B_KQ::J) : 1)];
 #if defined(TURING_MMA_AVAILABLE)
     T_C_VKQ VKQ_C[cols_per_warp == 8 ? DV/T_C_VKQ::I : DV/(2*T_C_VKQ::J)];
-#elif defined(AMD_WMMA_AVAILABLE)
-    T_C_VKQ VKQ_C[                                     DV/(2*T_C_VKQ::J)];
 #else // Volta
     T_C_VKQ VKQ_C[                                     DV/(2*T_C_VKQ::J)];
 #endif // defined(TURING_MMA_AVAILABLE)
@@ -1537,10 +1469,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
         // The partial sums are spread across 8/4 threads.
         constexpr int offset_first = cols_per_warp == 8 ? 16 : 2;
         constexpr int offset_last  = cols_per_warp == 8 ?  4 : 1;
-#elif defined(AMD_WMMA_AVAILABLE)
-        // The partial sums are spread across 2 threads.
-        constexpr int offset_first = 16;
-        constexpr int offset_last  = 16;
 #else // Volta
         // The partial sums are spread across 2 threads.
         constexpr int offset_first = 2;
@@ -1624,15 +1552,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
 #endif
             }
         }
-#elif defined(AMD_WMMA_AVAILABLE)
-        const half2 KQ_max_scale_h2 = make_half2(KQ_max_scale[0], KQ_max_scale[0]);
-#pragma unroll
-        for (int i = 0; i < (DV/2)/T_C_VKQ::J; ++i) {
-#pragma unroll
-            for (int l = 0; l < T_C_VKQ::ne; ++l) {
-                VKQ_C[i].x[l] *= KQ_max_scale_h2;
-            }
-        }
 #else // Volta
         const int col = (threadIdx.x / 2) % 2;
         const half2 KQ_max_scale_h2 = make_half2(KQ_max_scale[col], KQ_max_scale[col]);
@@ -1684,10 +1603,6 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
         const int jc_cwm = threadIdx.y*cols_per_warp + T_C_VKQ::get_i(threadIdx.x % 4);
         const float2 KQ_cmr = make_float2(KQ_max[threadIdx.x % cols_per_thread], KQ_rowsum[threadIdx.x % cols_per_thread]);
         const bool thread_should_write = threadIdx.x % 4 < cols_per_thread;
-#elif defined(AMD_WMMA_AVAILABLE)
-        const int jc_cwm = threadIdx.y*cols_per_warp + T_C_VKQ::get_i(0);
-        const float2 KQ_cmr = make_float2(KQ_max[0], KQ_rowsum[0]);
-        const bool thread_should_write = threadIdx.x / 16 < cols_per_thread;
 #else // Volta
         const int jc_cwm = threadIdx.y*cols_per_warp + T_C_KQ::get_i(threadIdx.x & 2);
         const float2 KQ_cmr = make_float2(KQ_max[(threadIdx.x & 2) / 2], KQ_rowsum[(threadIdx.x & 2) / 2]);
@@ -1935,7 +1850,7 @@ static __device__ __forceinline__ void flash_attn_ext_f16_process_tile(
         stride_Q1, stride_Q2, stride_K, stride_V, stride_mask,
         jt, kb0_start, kb0_stop);
     NO_DEVICE_CODE;
-#endif // defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4))
+#endif // defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE)
 }
 
 template<int DKQ, int DV, int ncols1, int ncols2, bool use_logit_softcap, bool V_is_K_view, bool direct_causal_env = false>
@@ -1963,7 +1878,7 @@ static __global__ void flash_attn_ext_f16(
                             const int32_t ne31, const int32_t ne32, const int32_t ne33,
                             const int32_t nb31, const int32_t nb32, const int64_t nb33,
                             const int32_t n_past_causal) {
-#if defined(FLASH_ATTN_AVAILABLE) && (defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4)))
+#if defined(FLASH_ATTN_AVAILABLE) && (defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE))
 
     // Skip unused kernel variants for faster compilation:
     if (use_logit_softcap && !(DKQ == 128 || DKQ == 256)) {
@@ -1984,12 +1899,6 @@ static __global__ void flash_attn_ext_f16(
     }
 #endif // __CUDA_ARCH__ == GGML_CUDA_CC_TURING
 
-#if defined(AMD_WMMA_AVAILABLE)
-    if (ncols1*ncols2 > 32 || ncols1*ncols2 < 16 || DKQ > 128 || ncols2 == 1) {
-        NO_DEVICE_CODE;
-        return;
-    }
-#endif // defined(AMD_WMMA_AVAILABLE)
 
     constexpr int ncols     = ncols1 * ncols2;
     constexpr int nbatch_fa = ggml_cuda_fattn_mma_get_nbatch_fa(DKQ, DV, ncols);
@@ -2124,7 +2033,7 @@ static __global__ void flash_attn_ext_f16(
               ne31, ne32, ne33,
               nb31, nb32, nb33);
     NO_DEVICE_CODE;
-#endif // defined(FLASH_ATTN_AVAILABLE) && (defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4)))
+#endif // defined(FLASH_ATTN_AVAILABLE) && (defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE))
 }
 
 template <int DKQ, int DV, int ncols1, int ncols2>
@@ -2282,7 +2191,7 @@ static __global__ void flash_attn_ext_f16_sparse(
                             const int32_t nb21, const int32_t nb22, const int64_t nb23,
                             const int32_t ne31, const int32_t ne32, const int32_t ne33,
                             const int32_t nb31, const int32_t nb32, const int64_t nb33) {
-#if defined(FLASH_ATTN_AVAILABLE) && (defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE) || (defined(AMD_WMMA_AVAILABLE) && defined(RDNA4)))
+#if defined(FLASH_ATTN_AVAILABLE) && (defined(VOLTA_MMA_AVAILABLE) || defined(TURING_MMA_AVAILABLE))
 
     // Skip unused kernel variants for faster compilation:
     if (use_logit_softcap && !(DKQ == 128 || DKQ == 256)) {
@@ -2303,12 +2212,6 @@ static __global__ void flash_attn_ext_f16_sparse(
     }
 #endif // __CUDA_ARCH__ == GGML_CUDA_CC_TURING
 
-#if defined(AMD_WMMA_AVAILABLE)
-    if (ncols1*ncols2 > 32 || ncols1*ncols2 < 16 || DKQ > 128 || ncols2 == 1) {
-        NO_DEVICE_CODE;
-        return;
-    }
-#endif // defined(AMD_WMMA_AVAILABLE)
 
     constexpr int ncols     = ncols1 * ncols2;
     constexpr int nbatch_fa = ggml_cuda_fattn_mma_get_nbatch_fa(DKQ, DV, ncols);
