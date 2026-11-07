@@ -2,7 +2,6 @@
 # Machine fallback paths cleared; no model data included.
 from __future__ import annotations
 import argparse
-import base64
 import json
 import math
 import os
@@ -10,12 +9,10 @@ import shlex
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 MODELS_ROOT = os.environ.get('COSMOS_MODELS_ROOT', '')
-MODELS = {'nano': dict(dir='Cosmos3-Nano', label='Cosmos3-Nano (16B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='model', reasoner='mac'), 'super': dict(dir='Cosmos3-Super', label='Cosmos3-Super (64B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='sequential', reasoner='mac', note='64B -> offload=sequential, or /stream for DirectStorage weight-streaming (fast on 32GB).'), 'super-t2i': dict(dir='Cosmos3-Super-Text2Image', label='Cosmos3-Super-Text2Image (high-fidelity T2I)', modalities=['t2i', 'i2i'], offload='sequential', reasoner=None), 'super-i2v': dict(dir='Cosmos3-Super-Image2Video', label='Cosmos3-Super-Image2Video', modalities=['i2v', 'v2v'], offload='sequential', reasoner=None), 'droid': dict(dir='Cosmos3-Nano-Policy-DROID', label='Cosmos3-Nano-Policy-DROID (robot action policy)', modalities=['policy'], offload='model', reasoner=None, note='DROID platform: language instruction + visual observation -> robot action trajectory.')}
+MODELS = {'nano': dict(dir='Cosmos3-Nano', label='Cosmos3-Nano (16B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='model', reasoner='local'), 'super': dict(dir='Cosmos3-Super', label='Cosmos3-Super (64B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='sequential', reasoner='local', note='64B -> offload=sequential, or /stream for streamed weights.'), 'super-t2i': dict(dir='Cosmos3-Super-Text2Image', label='Cosmos3-Super-Text2Image (high-fidelity T2I)', modalities=['t2i', 'i2i'], offload='sequential', reasoner=None), 'super-i2v': dict(dir='Cosmos3-Super-Image2Video', label='Cosmos3-Super-Image2Video', modalities=['i2v', 'v2v'], offload='sequential', reasoner=None), 'droid': dict(dir='Cosmos3-Nano-Policy-DROID', label='Cosmos3-Nano-Policy-DROID (robot action policy)', modalities=['policy'], offload='model', reasoner=None, note='DROID platform: language instruction + visual observation -> robot action trajectory.')}
 SAMPLING = {'t2i': dict(guidance=4.0, flow_shift=3.0, steps=50), 'i2i': dict(guidance=4.0, flow_shift=3.0, steps=40), 't2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'i2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'v2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'av': dict(guidance=6.0, flow_shift=10.0, steps=35)}
 _SAMPLERS = {'unipc': 'UniPCMultistepScheduler', 'dpm2m': 'DPMSolverMultistepScheduler', 'dpmpp2m': 'DPMSolverMultistepScheduler', 'dpm2m_sde': 'DPMSolverMultistepScheduler', 'dpm_single': 'DPMSolverSinglestepScheduler', 'deis': 'DEISMultistepScheduler', 'euler': 'EulerDiscreteScheduler', 'euler_a': 'EulerAncestralDiscreteScheduler', 'heun': 'HeunDiscreteScheduler', 'kdpm2': 'KDPM2DiscreteScheduler', 'kdpm2_a': 'KDPM2AncestralDiscreteScheduler', 'lms': 'LMSDiscreteScheduler'}
 _SIGMAS = {'flow': 'use_flow_sigmas', 'karras': 'use_karras_sigmas', 'exponential': 'use_exponential_sigmas', 'beta': 'use_beta_sigmas', 'normal': None, 'simple': None}
@@ -29,8 +26,8 @@ except Exception:
     configure_diffusers_flow_scheduler = None
     is_res4lyf_sampler = lambda _name: False
     is_res4lyf_sigma = lambda _name: False
-DEFAULTS = {'reasoner_host': '<mac-ip>', 'reasoner_port': 9200, 'temperature': 0.0, 'top_p': 0.95, 'max_new_tokens': 512, 'system': '', 'model': '', 'steps': 35, 'guidance': 6.0, 'height': 720, 'width': 1280, 'num_frames': 1, 'fps': 24, 'flow_shift': 10.0, 'negative': '', 'seed': 42, 'offload': 'model', 'gpu_index': '1', 'weight_stream': True, 'weight_backend': 'directstorage', 'prefetch': True, 'sampler': 'unipc', 'sigmas': 'karras', 'v_pred': False, 'clip_skip': 0, 'cfg_batch': False, 'enable_sound': False, 'memeff_attn': True, 'vae_tile': 'auto', 'mode': 'reason', 'loop_render': 't2i', 'out': '', 'auto_prefill': 'on', 'prefill_min_tokens': 1500, 'prefill_max_tokens': 64000, 'remote_host': '<mac-ip>', 'remote_port': 9100, 'mac_user': 'private', 'mac_key': str(Path.home() / '.ssh' / 'mac_ed'), 'mac_python': '/tmp/cosmos3_mps_venv/bin/python', 'mac_model': ''}
-_INT = {'reasoner_port', 'max_new_tokens', 'steps', 'height', 'width', 'num_frames', 'fps', 'seed', 'remote_port', 'prefill_min_tokens', 'prefill_max_tokens'}
+DEFAULTS = {'temperature': 0.0, 'top_p': 0.95, 'max_new_tokens': 512, 'system': '', 'model': '', 'steps': 35, 'guidance': 6.0, 'height': 720, 'width': 1280, 'num_frames': 1, 'fps': 24, 'flow_shift': 10.0, 'negative': '', 'seed': 42, 'offload': 'model', 'gpu_index': '1', 'weight_stream': True, 'weight_backend': 'directstorage', 'prefetch': True, 'sampler': 'unipc', 'sigmas': 'karras', 'v_pred': False, 'clip_skip': 0, 'cfg_batch': False, 'enable_sound': False, 'memeff_attn': True, 'vae_tile': 'auto', 'mode': 'reason', 'out': ''}
+_INT = {'max_new_tokens', 'steps', 'height', 'width', 'num_frames', 'fps', 'seed'}
 _FLOAT = {'temperature', 'top_p', 'guidance', 'flow_shift'}
 _BOOL = {'weight_stream', 'prefetch', 'cfg_batch', 'memeff_attn', 'enable_sound'}
 
@@ -204,16 +201,28 @@ class Cli:
             self.set(k, str(v).lower() if isinstance(v, bool) else str(v))
         print('  (tune individual knobs with /set; quality = /set steps + /set res, separate from these)')
 
-    def _reason_request(self, prompt, image_path=None, system=None, max_new=None):
-        body = {'prompt': prompt, 'temperature': self.st['temperature'], 'top_p': self.st['top_p'], 'max_new_tokens': int(max_new or self.st['max_new_tokens'])}
-        if system or self.st['system']:
-            body['system'] = system or self.st['system']
+    def _reason_local(self, mode, prompt, image_path=None):
+        # Reasoning runs on this machine's GPU through reasoner_prefill_stream. The Mac
+        # reasoner server this CLI used to POST to went with macOS, so there is no remote
+        # endpoint to fall back to and no KV to ship anywhere.
+        cmd = [sys.executable, '-m', 'cosmos_windows.reasoner_prefill_stream', '--mode', mode,
+               '--device', 'cuda', '--model', self.st['model'], '--gpu-index', self.st['gpu_index'],
+               '--prompt', prompt, '--max-new-tokens', str(self.st['max_new_tokens']),
+               '--temperature', str(self.st['temperature']), '--top-p', str(self.st['top_p'])]
+        if self.st['system']:
+            cmd += ['--system', self.st['system']]
         if image_path:
-            body['image_b64'] = base64.b64encode(Path(image_path).read_bytes()).decode()
-        url = f"{self.st['reasoner_host']}:{self.st['reasoner_port']}/reason"
-        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(req, timeout=600) as r:
-            return json.loads(r.read())
+            cmd += ['--image', image_path]
+        r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True)
+        answer = None
+        for line in r.stdout.splitlines():
+            if line.startswith('ANSWER_JSON'):
+                answer = json.loads(line[len('ANSWER_JSON'):].strip())
+        if not answer:
+            print(f'  reason failed ({mode}, rc={r.returncode}):\n', (r.stdout or '')[-600:], (r.stderr or '')[-600:])
+            return None
+        print(f"\n--- reasoner ({mode}, {answer['prefill_tokens']} tok, {answer['seconds']}s) ---\n{answer['answer']}\n")
+        return answer['answer']
 
     def reason(self, prompt, image_path=None):
         if not prompt:
@@ -222,75 +231,18 @@ class Cli:
         if image_path and (not Path(image_path).exists()):
             print(f'  image not found: {image_path!r} (check the path/quoting)')
             return None
-        try:
-            res = self._reason_request(prompt, image_path)
-        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:
-            print(f'  reasoner unreachable ({type(e).__name__}: {e}). Try /sync to (re)start the Mac server.')
-            return None
-        except Exception as e:
-            print(f'  reason failed ({type(e).__name__}: {e})')
-            return None
-        if 'error' in res:
-            print(f"  reasoner error: {res['error']}")
-            return None
-        print(f"\n--- reasoner ({res['seconds']}s, {res['gen_tokens']} tok) ---\n{res['answer']}\n")
-        return res['answer']
+        return self._reason_local('local', prompt, image_path)
 
     def preason(self, prompt):
-        mode = None
+        mode = 'local'
         if prompt and prompt.split()[0] in ('--local', '--quant'):
             tok = prompt.split()[0]
             mode = tok[2:]
             prompt = prompt[len(tok):].strip()
         if not prompt:
-            print('  usage: /preason [--local|--quant] PROMPT   (no flag = RTX prefill -> Mac decode)')
+            print('  usage: /preason [--local|--quant] PROMPT')
             return None
-        if mode:
-            cmd = [sys.executable, '-m', 'cosmos_windows.reasoner_prefill_stream', '--mode', mode, '--device', 'cuda', '--model', self.st['model'], '--gpu-index', self.st['gpu_index'], '--prompt', prompt, '--max-new-tokens', str(self.st['max_new_tokens'])]
-            print(f'  [preason --{mode}] prefill+decode on the RTX (single machine, no Mac)...')
-            r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True)
-            ans = None
-            for line in r.stdout.splitlines():
-                if line.startswith('ANSWER_JSON'):
-                    ans = json.loads(line[len('ANSWER_JSON'):].strip())
-            if ans:
-                print(f"\n--- reasoner (RTX {mode}, {ans['prefill_tokens']} tok, {ans['seconds']}s) ---\n{ans['answer']}\n")
-                return ans['answer']
-            print('  local reason failed:\n', (r.stdout or '')[-600:], (r.stderr or '')[-600:])
-            return None
-        out = Path(self.st['out']) / 'cli_prefill'
-        out.parent.mkdir(parents=True, exist_ok=True)
-        cmd = [sys.executable, '-m', 'cosmos_windows.reasoner_prefill_stream', '--mode', 'export', '--device', 'cuda', '--model', self.st['model'], '--gpu-index', self.st['gpu_index'], '--prompt', prompt, '--out', str(out)]
-        print('  [preason] 1/2 prefilling on the RTX (CUDA)...')
-        if subprocess.run(cmd, cwd=str(REPO)).returncode != 0:
-            print('  RTX prefill failed.')
-            return None
-        meta = json.loads(Path(str(out) + '.json').read_text())
-        kv_bytes = Path(str(out) + '.safetensors').read_bytes()
-        url = f"{self.st['reasoner_host']}:{self.st['reasoner_port']}/decode_kv"
-        print(f'  [preason] 2/2 shipping {len(kv_bytes) // 1000000} MB KV -> Mac decode...')
-        try:
-            req = urllib.request.Request(url, data=kv_bytes, headers={'Content-Type': 'application/octet-stream', 'X-Prompt-Len': str(meta['prompt_len']), 'X-Next-Id': str(meta['next_id']), 'X-Max-New-Tokens': str(self.st['max_new_tokens'])})
-            with urllib.request.urlopen(req, timeout=900) as r:
-                res = json.loads(r.read())
-        except Exception as e:
-            print(f'  Mac decode unreachable ({type(e).__name__}). /sync to (re)start the Mac server.')
-            return None
-        if 'error' in res:
-            print(f"  decode error: {res['error']}")
-            return None
-        print(f"\n--- reasoner (RTX prefill {res['prefill_tokens']} tok -> Mac decode, {res['seconds']}s) ---\n{res['answer']}\n")
-        return res['answer']
-
-    def health(self):
-        url = f"{self.st['reasoner_host']}:{self.st['reasoner_port']}/health"
-        try:
-            with urllib.request.urlopen(url, timeout=10) as r:
-                print('  Mac reasoner:', r.read().decode())
-                return True
-        except Exception as e:
-            print(f'  Mac reasoner down ({type(e).__name__}). /sync to start it.')
-            return False
+        return self._reason_local(mode, prompt)
 
     def _transformer_bytes(self):
         tdir = Path(self.st['model']) / 'transformer'
@@ -796,49 +748,6 @@ class Cli:
         print(f"  [stream] DirectStorage weight-streamed video ({self.st['model']}) -> {out}")
         subprocess.run(cmd)
 
-    def loop(self, goal):
-        if not goal:
-            print('  usage: /loop GOAL')
-            return
-        sys_prompt = "You are a generation planner for a video/image diffusion model. Turn the user's goal into a single vivid, concrete visual prompt (one paragraph, no preamble, describe subject, scene, lighting, motion). Output ONLY the prompt."
-        print('  [loop] 1/2 reasoning the render plan on the Mac...')
-        plan = self.reason(goal, None) if False else None
-        try:
-            res = self._reason_request(goal, system=sys_prompt, max_new=220)
-            plan = res.get('answer')
-        except Exception as e:
-            print(f'  reasoner unreachable ({type(e).__name__}); /sync first.')
-            return
-        if not plan:
-            print('  no plan produced.')
-            return
-        print(f"  [loop] plan: {plan}\n  [loop] 2/2 rendering on the RTX ({self.st['loop_render']})...")
-        self.generate(self.st['loop_render'], plan)
-
-    def _ssh(self, *cmd):
-        return ['ssh', '-i', self.st['mac_key'], '-o', 'IdentitiesOnly=yes', '-o', 'ConnectTimeout=10', f"{self.st['mac_user']}@{self.st['reasoner_host']}", *cmd]
-
-    def sync(self):
-        print('  [sync] shipping reasoner server to the Mac + (re)starting it...')
-        scp = ['scp', '-i', self.st['mac_key'], '-o', 'IdentitiesOnly=yes', str(REPO / 'cosmos_windows' / 'mac_reasoner_server.py'), f"{self.st['mac_user']}@{self.st['reasoner_host']}:/tmp/mac_reasoner_server.py"]
-        subprocess.run(scp)
-        start = f"pkill -f mac_reasoner_server.py 2>/dev/null; sleep 1; cd /tmp; nohup {self.st['mac_python']} -u /tmp/mac_reasoner_server.py --model {self.st['mac_model']} --port {self.st['reasoner_port']} > /tmp/mac_reasoner_server.log 2>&1 & echo started $!"
-        subprocess.run(self._ssh(start))
-        print('  [sync] waiting for the reasoner to load...')
-        for _ in range(40):
-            time.sleep(3)
-            if self.health():
-                print('  [sync] ready.')
-                return
-        print('  [sync] timed out waiting for health; check /tmp/mac_reasoner_server.log on the Mac.')
-
-    def remote(self, modality, prompt):
-        sys.path.insert(0, str(REPO))
-        from cosmos_windows.omni_connector_sender import send_generation_request
-        nf = self.st['num_frames'] if modality != 't2v' else max(self.st['num_frames'], 17)
-        print(f"  [remote] TBP1 -> {self.st['remote_host']}:{self.st['remote_port']} ({modality})")
-        send_generation_request(self.st['remote_host'], self.st['remote_port'], prompt=prompt, height=self.st['height'], width=self.st['width'], num_frames=nf, num_inference_steps=self.st['steps'], seed=self.st['seed'])
-
     def do(self, line):
         line = line.strip()
         if not line:
@@ -882,10 +791,6 @@ class Cli:
             self.stream(raw)
         elif cmd == 'upscale' and rest:
             self.upscale(rest)
-        elif cmd == 'health':
-            self.health()
-        elif cmd == 'sync':
-            self.sync()
         elif cmd in ('reason', 'ask', 'r'):
             img = None
             toks = []
@@ -937,33 +842,18 @@ class Cli:
                 self.continue_video(' '.join(toks), total_frames=total, chunk_frames=chunk, overlap=ov, image_path=img)
         elif cmd == 'action':
             self.action(rest[0] if rest else None, ' '.join(rest[1:]))
-        elif cmd == 'loop':
-            self.loop(raw)
-        elif cmd == 'remote' and len(rest) >= 2:
-            self.remote(rest[0], ' '.join(rest[1:]))
         else:
             self._run_mode(line)
         return True
 
-    @staticmethod
-    def _est_tokens(text):
-        return int(len(text) / 3.5) + 24
-
     def _run_mode(self, text):
         m = self.st['mode']
         if m in ('reason', 'ask'):
-            est = self._est_tokens(text)
-            if self.st['auto_prefill'] == 'on' and self.st['prefill_min_tokens'] <= est <= self.st['prefill_max_tokens']:
-                print(f'  (~{est} tok -> RTX prefill path; /set auto_prefill off to force Mac-only)')
-                self.preason(text)
-            else:
-                self.reason(text)
+            self.reason(text)
         elif m in ('t2i', 't2v', 'av'):
             self.generate(m, text)
-        elif m == 'loop':
-            self.loop(text)
         else:
-            print(f'  (mode {m!r}: type a /command, or /set mode reason|t2i|t2v|av|loop)')
+            print(f'  (mode {m!r}: type a /command, or /set mode reason|t2i|t2v|av)')
 
 def main():
     ap = argparse.ArgumentParser(description='Cosmos3 unified CLI', add_help=True)
@@ -974,8 +864,8 @@ def main():
     if args.command:
         cli.do(' '.join(args.command))
         return
-    print('Cosmos3 CLI — /help for commands, /quit to exit. reasoner->Mac, diffusion->RTX.')
-    print(f"  reasoner @ {st['reasoner_host']}:{st['reasoner_port']}  |  mode={st['mode']}  |  out={st['out']}")
+    print('Cosmos3 CLI — /help for commands, /quit to exit. reasoner and diffusion both run on this machine.')
+    print(f"  mode={st['mode']}  |  gpu={st['gpu_index']}  |  out={st['out']}")
     while True:
         try:
             line = input('cosmos> ')

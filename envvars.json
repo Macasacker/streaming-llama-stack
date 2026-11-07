@@ -538,15 +538,15 @@
     ],
     "doc": "COSMOS_MODELS_ROOT: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/cosmos_cli.py:17",
+      "vendor/engines/cosmos_windows/cosmos_cli.py:14",
       "vendor/studio/studio/adapter.py:639"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:17",
+        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:14",
         "unset": "''",
         "read": "os.environ.get('COSMOS_MODELS_ROOT', '')",
-        "consumer": "from pathlib import Path\nREPO = Path(__file__).resolve().parent.parent\nMODELS_ROOT = os.environ.get('COSMOS_MODELS_ROOT', '')\nMODELS = {'nano': dict(dir='Cosmos3-Nano', label='Cosmos3-Nano (16B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='model', reasoner='mac'), 'super': dict(dir='Cosmos3-Super', label='Cosmos3-Super (64B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='sequential', reasoner='mac', note='64B -> offload=sequential, or /stream for DirectStorage weight-streaming (fast on 32GB).'), 'super-t2i': dict(dir='Cosmos3-Super-Text2Image', label='Cosmos3-Super-Text2Image (high-fidelity T2I)', modalities=['t2i', 'i2i'], offload='sequential', reasoner=None), 'super-i2v': dict(dir='Cosmos3-Super-Image2Video', label='Cosmos3-Super-Image2Video', modalities=['i2v', 'v2v'], offload='sequential', reasoner=None), 'droid': dict(dir='Cosmos3-Nano-Policy-DROID', label='Cosmos3-Nano-Policy-DROID (robot action policy)', modalities=['policy'], offload='model', reasoner=None, note='DROID platform: language instruction + visual observation -> robot action trajectory.')}\nSAMPLING = {'t2i': dict(guidance=4.0, flow_shift=3.0, steps=50), 'i2i': dict(guidance=4.0, flow_shift=3.0, steps=40), 't2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'i2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'v2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'av': dict(guidance=6.0, flow_shift=10.0, steps=35)}\n_SAMPLERS = {'unipc': 'UniPCMultistepScheduler', 'dpm2m': 'DPMSolverMultistepScheduler', 'dpmpp2m': 'DPMSolverMultistepScheduler', 'dpm2m_sde': 'DPMSolverMultistepScheduler', 'dpm_single': 'DPMSolverSinglestepScheduler', 'deis': 'DEISMultistepScheduler', 'euler': 'EulerDiscreteScheduler', 'euler_a': 'EulerAncestralDiscreteScheduler', 'heun': 'HeunDiscreteScheduler', 'kdpm2': 'KDPM2DiscreteScheduler', 'kdpm2_a': 'KDPM2AncestralDiscreteScheduler', 'lms': 'LMSDiscreteScheduler'}\n_SIGMAS = {'flow': 'use_flow_sigmas', 'karras': 'use_karras_sigmas', 'exponential': 'use_exponential_sigmas', 'beta': 'use_beta_sigmas', 'normal': None, 'simple': None}"
+        "consumer": "from pathlib import Path\nREPO = Path(__file__).resolve().parent.parent\nMODELS_ROOT = os.environ.get('COSMOS_MODELS_ROOT', '')\nMODELS = {'nano': dict(dir='Cosmos3-Nano', label='Cosmos3-Nano (16B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='model', reasoner='local'), 'super': dict(dir='Cosmos3-Super', label='Cosmos3-Super (64B omni)', modalities=['reason', 't2i', 'i2i', 't2v', 'i2v', 'v2v', 'av', 'action'], offload='sequential', reasoner='local', note='64B -> offload=sequential, or /stream for streamed weights.'), 'super-t2i': dict(dir='Cosmos3-Super-Text2Image', label='Cosmos3-Super-Text2Image (high-fidelity T2I)', modalities=['t2i', 'i2i'], offload='sequential', reasoner=None), 'super-i2v': dict(dir='Cosmos3-Super-Image2Video', label='Cosmos3-Super-Image2Video', modalities=['i2v', 'v2v'], offload='sequential', reasoner=None), 'droid': dict(dir='Cosmos3-Nano-Policy-DROID', label='Cosmos3-Nano-Policy-DROID (robot action policy)', modalities=['policy'], offload='model', reasoner=None, note='DROID platform: language instruction + visual observation -> robot action trajectory.')}\nSAMPLING = {'t2i': dict(guidance=4.0, flow_shift=3.0, steps=50), 'i2i': dict(guidance=4.0, flow_shift=3.0, steps=40), 't2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'i2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'v2v': dict(guidance=6.0, flow_shift=10.0, steps=35), 'av': dict(guidance=6.0, flow_shift=10.0, steps=35)}\n_SAMPLERS = {'unipc': 'UniPCMultistepScheduler', 'dpm2m': 'DPMSolverMultistepScheduler', 'dpmpp2m': 'DPMSolverMultistepScheduler', 'dpm2m_sde': 'DPMSolverMultistepScheduler', 'dpm_single': 'DPMSolverSinglestepScheduler', 'deis': 'DEISMultistepScheduler', 'euler': 'EulerDiscreteScheduler', 'euler_a': 'EulerAncestralDiscreteScheduler', 'heun': 'HeunDiscreteScheduler', 'kdpm2': 'KDPM2DiscreteScheduler', 'kdpm2_a': 'KDPM2AncestralDiscreteScheduler', 'lms': 'LMSDiscreteScheduler'}\n_SIGMAS = {'flow': 'use_flow_sigmas', 'karras': 'use_karras_sigmas', 'exponential': 'use_exponential_sigmas', 'beta': 'use_beta_sigmas', 'normal': None, 'simple': None}"
       },
       {
         "source": "vendor/studio/studio/adapter.py:639",
@@ -568,12 +568,11 @@
     ],
     "doc": "CUDA_DEVICE_ORDER: qualified preset/runtime setting; override for a different memory or arithmetic plan",
     "reads": [
-      "vendor/engines/cosmos_windows/cosmos_cli.py:381",
+      "vendor/engines/cosmos_windows/cosmos_cli.py:333",
       "vendor/engines/cosmos_windows/generate.py:25",
       "vendor/engines/cosmos_windows/hunyuan_gen.py:747",
       "vendor/engines/cosmos_windows/ideogram_gen.py:213",
       "vendor/engines/cosmos_windows/ltx_gen.py:31",
-      "vendor/engines/cosmos_windows/omni_connector_rx_server.py:7",
       "vendor/engines/cosmos_windows/pid_upscale.py:54",
       "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:362",
       "vendor/engines/cosmos_windows/streaming_engine.py:32",
@@ -589,7 +588,7 @@
     },
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:381",
+        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:333",
         "unset": "'PCI_BUS_ID'",
         "read": "os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')",
         "consumer": "            return self._pipe\n        sound_kw = {} if need_sound else {'sound_tokenizer': None}\n        os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\n        os.environ.setdefault('CUDA_VISIBLE_DEVICES', self.st['gpu_index'])\n        sys.path.insert(0, str(REPO))\n        import torch\n        from diffusers import Cosmos3OmniPipeline"
@@ -617,12 +616,6 @@
         "unset": "'PCI_BUS_ID'",
         "read": "os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')",
         "consumer": "    ap.add_argument('--decode-audio', action='store_true')\n    a = ap.parse_args()\n    os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\n    os.environ.setdefault('CUDA_VISIBLE_DEVICES', str(a.gpu))\n    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n    from cosmos_windows import mem_guard\n    mem_guard.preflight(min_free_gb=8.0, label='LTX 2.3 (22B) streamed gen')"
-      },
-      {
-        "source": "vendor/engines/cosmos_windows/omni_connector_rx_server.py:7",
-        "unset": "'PCI_BUS_ID'",
-        "read": "os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')",
-        "consumer": "import os\nfrom pathlib import Path\nos.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\nos.environ.setdefault('CUDA_VISIBLE_DEVICES', os.environ.get('STUDIO_GPU_INDEX', '0'))\nfrom cosmos_windows.omni_connector_receiver import OmniConnectorReceiver, decode_generation_request, generate_from_request\n\nclass DiffusersCudaImagePipeline:"
       },
       {
         "source": "vendor/engines/cosmos_windows/pid_upscale.py:54",
@@ -736,12 +729,11 @@
     "doc": "Explicit selected GPU UUID, never an inherited GPU selection.",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/producer-platform.inc:319",
-      "vendor/engines/cosmos_windows/cosmos_cli.py:382",
+      "vendor/engines/cosmos_windows/cosmos_cli.py:334",
       "vendor/engines/cosmos_windows/generate.py:26",
       "vendor/engines/cosmos_windows/hunyuan_gen.py:748",
       "vendor/engines/cosmos_windows/ideogram_gen.py:214",
       "vendor/engines/cosmos_windows/ltx_gen.py:32",
-      "vendor/engines/cosmos_windows/omni_connector_rx_server.py:8",
       "vendor/engines/cosmos_windows/pid_upscale.py:55",
       "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:363",
       "vendor/engines/cosmos_windows/streaming_engine.py:33",
@@ -760,7 +752,7 @@
         "consumer": "    static auto info=reinterpret_cast<info_t>(library_symbol(nvml,\"nvmlDeviceGetMemoryInfo\"));\n    static const int ready=init?init():-1;\n    const char*uuid=std::getenv(\"CUDA_VISIBLE_DEVICES\");\n    if(ready!=0||!by_uuid||!info||!uuid||std::strncmp(uuid,\"GPU-\",4))return false;\n    void*device=nullptr;memory m{};\n    if(by_uuid(uuid,&device)!=0||info(device,&m)!=0)return false;\n    free_bytes=m.free;total_bytes=m.total;return true;"
       },
       {
-        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:382",
+        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:334",
         "unset": "self.st['gpu_index']",
         "read": "os.environ.setdefault('CUDA_VISIBLE_DEVICES', self.st['gpu_index'])",
         "consumer": "        sound_kw = {} if need_sound else {'sound_tokenizer': None}\n        os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\n        os.environ.setdefault('CUDA_VISIBLE_DEVICES', self.st['gpu_index'])\n        sys.path.insert(0, str(REPO))\n        import torch\n        from diffusers import Cosmos3OmniPipeline\n        from diffusers.schedulers.scheduling_unipc_multistep import UniPCMultistepScheduler"
@@ -788,12 +780,6 @@
         "unset": "str(a.gpu)",
         "read": "os.environ.setdefault('CUDA_VISIBLE_DEVICES', str(a.gpu))",
         "consumer": "    a = ap.parse_args()\n    os.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\n    os.environ.setdefault('CUDA_VISIBLE_DEVICES', str(a.gpu))\n    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n    from cosmos_windows import mem_guard\n    mem_guard.preflight(min_free_gb=8.0, label='LTX 2.3 (22B) streamed gen')\n    proc_cap = max(28.0, min(mem_guard.total_gb() - 4.0, 64.0))"
-      },
-      {
-        "source": "vendor/engines/cosmos_windows/omni_connector_rx_server.py:8",
-        "unset": "os.environ.get('STUDIO_GPU_INDEX', '0')",
-        "read": "os.environ.setdefault('CUDA_VISIBLE_DEVICES', os.environ.get('STUDIO_GPU_INDEX', '0'))",
-        "consumer": "from pathlib import Path\nos.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\nos.environ.setdefault('CUDA_VISIBLE_DEVICES', os.environ.get('STUDIO_GPU_INDEX', '0'))\nfrom cosmos_windows.omni_connector_receiver import OmniConnectorReceiver, decode_generation_request, generate_from_request\n\nclass DiffusersCudaImagePipeline:\n"
       },
       {
         "source": "vendor/engines/cosmos_windows/pid_upscale.py:55",
@@ -45581,12 +45567,12 @@
     ],
     "doc": "PID_VENV_PYTHON: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/cosmos_cli.py:366",
+      "vendor/engines/cosmos_windows/cosmos_cli.py:318",
       "vendor/studio/studio/adapter.py:624"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:366",
+        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:318",
         "unset": "''",
         "read": "os.environ.get('PID_VENV_PYTHON', '')",
         "consumer": "        out = kv.get('out', os.path.splitext(img)[0] + '_upscaled.png')\n        self.free()\n        pidpy = os.environ.get('PID_VENV_PYTHON', '')\n        if not os.path.isfile(pidpy):\n            print(f'  [upscale] PiD venv python not found: {pidpy} (set PID_VENV_PYTHON)')\n            return\n        cmd = [pidpy, '-m', 'cosmos_windows.pid_upscale', '--image', img, '--out', out, '--scale', str(scale), '--backbone', backbone, '--gpu', str(self.st.get('gpu_index', '1'))]"
@@ -45722,16 +45708,9 @@
     ],
     "doc": "PYTORCH_ENABLE_MPS_FALLBACK: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/mac_reasoner_server.py:22",
       "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:365"
     ],
     "code_defaults": [
-      {
-        "source": "vendor/engines/cosmos_windows/mac_reasoner_server.py:22",
-        "unset": "'1'",
-        "read": "os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')",
-        "consumer": "    _DEV = device\n    os.environ.setdefault('TORCHDYNAMO_DISABLE', '1')\n    os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')\n    import torch\n    import transformers_cosmos3\n    from transformers_cosmos3 import Cosmos3ForConditionalGeneration, Cosmos3OmniConfig\n    from transformers import AutoProcessor"
-      },
       {
         "source": "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:365",
         "unset": "'1'",
@@ -46258,11 +46237,11 @@
     ],
     "doc": "STUDIO_ALLOW_ATTENTION_FALLBACK: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/cosmos_cli.py:510"
+      "vendor/engines/cosmos_windows/cosmos_cli.py:462"
     ],
     "code_defaults": [
       {
-        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:510",
+        "source": "vendor/engines/cosmos_windows/cosmos_cli.py:462",
         "unset": "''",
         "read": "os.environ.get('STUDIO_ALLOW_ATTENTION_FALLBACK', '')",
         "consumer": "        if self.st.get('memeff_attn', True):\n            from .attention_memeff import enable_memeff_attention\n            allow_attention_fallback = os.environ.get('STUDIO_ALLOW_ATTENTION_FALLBACK', '').strip().lower()\n            enable_memeff_attention(allow_math_fallback=allow_attention_fallback in {'1', 'true', 'yes', 'on'})\n        self._apply_vae_tiling(pipe, modality)\n        from .cfg_batch import enable_cfg_batch, disable_cfg_batch\n        if self.st.get('cfg_batch') and guidance != 1.0:"
@@ -47656,7 +47635,6 @@
       "vendor/engines/cosmos_windows/hunyuan_gen.py:694",
       "vendor/engines/cosmos_windows/ideogram_gen.py:211",
       "vendor/engines/cosmos_windows/ltx_gen.py:22",
-      "vendor/engines/cosmos_windows/omni_connector_rx_server.py:8",
       "vendor/engines/cosmos_windows/pid_upscale.py:50",
       "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:355",
       "vendor/engines/cosmos_windows/run_native_action.py:55",
@@ -47692,12 +47670,6 @@
         "unset": "'0'",
         "read": "os.environ.get('STUDIO_GPU_INDEX', '0')",
         "consumer": "    ap.add_argument('--fps', type=int, default=24)\n    ap.add_argument('--seed', type=int, default=42)\n    ap.add_argument('--gpu', default=os.environ.get('STUDIO_GPU_INDEX', '0'))\n    ap.add_argument('--guidance', type=float, default=4.0)\n    ap.add_argument('--audio-guidance', type=float, default=4.0)\n    ap.add_argument('--negative', default='worst quality, blurry, jittery, distorted, watermark, text')\n    ap.add_argument('--sampler', default=None, help='Diffusers/RES4LYF sampler name, e.g. res_2s')"
-      },
-      {
-        "source": "vendor/engines/cosmos_windows/omni_connector_rx_server.py:8",
-        "unset": "'0'",
-        "read": "os.environ.get('STUDIO_GPU_INDEX', '0')",
-        "consumer": "from pathlib import Path\nos.environ.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')\nos.environ.setdefault('CUDA_VISIBLE_DEVICES', os.environ.get('STUDIO_GPU_INDEX', '0'))\nfrom cosmos_windows.omni_connector_receiver import OmniConnectorReceiver, decode_generation_request, generate_from_request\n\nclass DiffusersCudaImagePipeline:\n"
       },
       {
         "source": "vendor/engines/cosmos_windows/pid_upscale.py:50",
@@ -51178,17 +51150,10 @@
     ],
     "doc": "TORCHDYNAMO_DISABLE: advanced engine setting; built-in default retained",
     "reads": [
-      "vendor/engines/cosmos_windows/mac_reasoner_server.py:21",
       "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:364",
       "vendor/engines/cosmos_windows/validate_reasoner.py:31"
     ],
     "code_defaults": [
-      {
-        "source": "vendor/engines/cosmos_windows/mac_reasoner_server.py:21",
-        "unset": "'1'",
-        "read": "os.environ.setdefault('TORCHDYNAMO_DISABLE', '1')",
-        "consumer": "    global _MODEL, _PROC, _DEV\n    _DEV = device\n    os.environ.setdefault('TORCHDYNAMO_DISABLE', '1')\n    os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')\n    import torch\n    import transformers_cosmos3\n    from transformers_cosmos3 import Cosmos3ForConditionalGeneration, Cosmos3OmniConfig"
-      },
       {
         "source": "vendor/engines/cosmos_windows/reasoner_prefill_stream.py:364",
         "unset": "'1'",
