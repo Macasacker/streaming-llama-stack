@@ -258,9 +258,24 @@ python3 scripts/port/preprocess_equiv.py --cc g++ --include build/41 \
 python3 scripts/port/warning_profile.py --list llama-context.cpp,llama.cpp,ggml-cpu.cpp,ggml.c,arg.cpp \
     build/wt-base .   # 36 -> 34 occurrences, 19 distinct both sides: only the two deleted Metal
                       # branches' own -Wcast-qual went, and no new kind appeared
+# llama-context.cpp needs the build's own -D and -I list, plus -x c++ (.cpp alone is not
+# enough for g++ here) and /opt/cuda/include once GGML_USE_CUDA is defined; without those the
+# before side dies on ggml-cpp.h or cuda_runtime.h and proves nothing.
+git show HEAD:$llama/src/llama-context.cpp > build/s71/llama-context.before.cpp
+python3 scripts/port/preprocess_equiv.py --cc g++ --extra \
+    "-x c++ -DGGML_USE_CUDA -DGGML_USE_CPU -DWF_STATIC -DNDEBUG -I/opt/cuda/include \
+     -I$llama/vendor -I$llama/src -I$llama/ggml/src -I$llama/include -I$llama/ggml/include" \
+    build/s71/llama-context.before.cpp $llama/src/llama-context.cpp
+# 274807 live lines both sides, 0 differing positions: on a CUDA build the split-graph refusal
+# line is inside #ifndef GGML_USE_CUDA, so a reword there cannot reach the compiled text. Drop
+# -DGGML_USE_CUDA and the same command reports exactly the one intended message line.
 python3 scripts/port/metal_word_census.py --strict engines/streaming-llama/prefill_llama.cpp
-# IDENTIFIER 0, STRING 0; the 56 COMMENT lines are the Mac peer's measurement history, which
-# chunk 7.1 owns. --strict passes because it classifies by position, which a grep cannot do.
+# IDENTIFIER 1, STRING 3, COMMENT 51 lines as of chunk 7.1c. --strict fails, and correctly so:
+# the census used to keep reading a line comment as open after the newline, so any identifier on
+# a later line was filed as COMMENT and IDENTIFIER 0 was not evidence. The one identifier is
+# USE_METAL_GUEST_SUPPORTS_OP in ggml/src/ggml-virtgpu/ggml-remoting.h, a backend tree no cmake
+# option builds any more - chunk 4.2's to delete. The 51 comment lines and 3 printed strings are
+# the Mac peer's measurement history, which chunk 7.1 still owes.
 ```
 
 ### The producer's platform layer, with no test target to run

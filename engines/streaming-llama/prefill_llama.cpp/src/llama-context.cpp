@@ -24716,7 +24716,7 @@ struct llama_split_graph * llama_split_graph_create(
         enum llama_split_graph_mode  mode) {
     if (!ctx) return nullptr;
 #ifndef GGML_USE_CUDA
-    LLAMA_LOG_WARN("llama_split_graph_create: no supported backend (need CUDA or Metal)\n");
+    LLAMA_LOG_WARN("llama_split_graph_create: no supported backend (this fork builds CUDA)\n");
     GGML_UNUSED(mode);
     return nullptr;
 #else

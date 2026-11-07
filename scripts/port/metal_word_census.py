@@ -11,6 +11,11 @@ not by a word-boundary regex. `_` is a word character, so `grep -n '\bMETAL_'`
 cannot see `DS4_GLM_METAL_FOO` or `DS4_METAL_PROFILE_X` - the two classes chunks
 2.2b, 2.2d and 2.2e each missed in turn. Position is the only honest test:
 
+A `//` comment ends at its newline; a `/* */` comment and a string literal carry
+their state across lines. Chunk 7.1c fixed the first of those: the scanner used to
+stay in line-comment state after the newline, which filed every later identifier as
+a comment and made an `IDENTIFIER 0` answer mean nothing.
+
   IDENTIFIER       in code position, so the compiler sees it. Must be 0.
   ENV_NAME         inside a name that envvars.json documents (kept on purpose:
                    renaming a knob breaks existing recipes).
@@ -49,6 +54,8 @@ def scan(text):
         c = text[i]
         if c == "\n":
             n += 1
+            if state == "line":
+                state = "code"   # a line comment ends at the newline
             i += 1
             continue
         if state == "code":
