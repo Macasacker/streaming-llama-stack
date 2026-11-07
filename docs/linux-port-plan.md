@@ -400,7 +400,8 @@ Gate: cmake configures and builds with no backend options other than CUDA.
     Behaviour changes, none of them reachable on this build: a CPU-only llama no longer offers
     `--rpc`, and `llama_split_graph_create`'s refusal line reads "no supported backend (this fork
     builds CUDA)" where it named Metal; both are in the CUDA-gated producer path only under
-    `#ifndef GGML_USE_CUDA`.
+    `#ifndef GGML_USE_CUDA`. The second of those did not actually happen in this chunk - the line
+    still printed "need CUDA or Metal" until chunk 7.1c reworded it.
     Gate: cmake configures with no backend option other than CUDA and CPU in both flag sets -
     `build.sh`'s (CUTLASS, `-DGGML_CUDA_DSV41_SPLIT_F32=ON`, sm_120a) and the plain one - and
     both build 489 and 210 targets with exit 0 and no new warning kind
@@ -438,9 +439,17 @@ Gate: cmake configures and builds with no backend options other than CUDA.
       `wait_token_complete`) is live and unchanged.
     - `SPLIT_DECODE_EVENT_SYNC` is now an inert knob: its branch and the default branch both
       call `ggml_backend_synchronize`, and the read is kept so the row stays documented.
-    - 61 `metal` mentions remain in the llama tree across 56 lines, all of them in comment
-      position - the Mac peer's measurement history. `scripts/port/metal_word_census.py --strict` passes because it
-      classifies by position; the comment sweep is chunk 7.1's, as it was for the engine.
+    - 61 `metal` mentions remained in the llama tree across 56 lines, all of them reported as
+      comment position by `scripts/port/metal_word_census.py --strict`. That report was not sound:
+      the census kept line-comment state open past its newline, so an identifier on a later line
+      was filed as a comment and `IDENTIFIER 0` proved nothing. Chunk 7.1c fixed the scanner, and
+      the same command now reads IDENTIFIER 1, STRING 4, COMMENT 51 lines, with `--strict` failing.
+      The identifier is `USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/ggml-remoting.h`,
+      one of nine backend directories this chunk's list never named and never deleted -
+      `ggml-blas`, `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`
+      and `ggml-zendnn` beside it, 68 tracked files and about 1.5 MB, none of them compiled on this
+      build. Their deletion is chunk 4.2; the comment and message sweep is chunk 7.1e's, as it was
+      for the engine.
     - `common/arg.cpp`'s `--device` parsing and `llama_supports_rpc()` still name "RPC" at
       runtime; both are inert because no RPC registry exists, and neither is in the producer path.
 
@@ -497,17 +506,24 @@ and the repo size drops from about 150 MB.
 
 ## Phase 7: docs, examples, presets, tests
 
-- `docs/`: 5,925 Apple/Metal references. Delete `MACDECODE*.md`, `docs/macdecode-r*`,
-  `macdecode-measurements.json`, `docs/MEDIA_SETUP_VERIFICATION.md` Mac sections,
-  `docs/SUPPORTED_MODELS.md` Mac decode rows, `docs/TWO_MACHINE.md` unless pairing stays.
-  Keep measurement history labelled as inherited from the Windows and macOS builds.
-- `examples/`: delete `examples/dual-machine/*/mac-big-memory.sh`, the Mac halves of the paired
-  presets, `examples/engine_environment/mac-*.json`, `examples/macdecode-r3`,
-  `examples/dual-machine/dsv41-ultra-cone/proof/mac-*.json`.
-- `presets/dsv41-mac.json` delete.
-- `tests/`: 75 Apple/Metal references, plus `engines/ds4-mac/tests/*` and `engines/ds4-win/tests/*`
-  disappearing with the engines. Port what remains to Linux gates.
-- Regenerate `docs/VARIABLES.md` after the scope rename.
+- `docs/`: done in 7.1a. `MACDECODE*.md`, `docs/macdecode-r*`, `macdecode-measurements.json`,
+  `docs/TWO_MACHINE.md`, `docs/YOCO_PAIRED_*` and the Mac build receipt are deleted;
+  `docs/MEDIA_SETUP_VERIFICATION.md` and `docs/SUPPORTED_MODELS.md` lost their Mac halves;
+  `docs/BACKEND_SETUP.md` and `docs/BACKEND_SOURCE_AUDIT.md` were rewritten for the two Linux
+  engines. Measurement history that stays is labelled as inherited from the Windows and macOS
+  builds.
+- `examples/`: done. `examples/dual-machine` and the paired presets went in 1.10c, which also
+  took `mac-big-memory.sh`, `examples/macdecode-r3` and the `dsv41-ultra-cone/proof` receipts;
+  `examples/engine_environment/mac-*.json` went in 7.1a, and `examples/WALKTHROUGH.md` and
+  `examples/single-machine/README.md` now use the Linux launchers.
+- `presets/dsv41-mac.json`: deleted in 1.10c.
+- `tests/`: the Mac test sources are gone (7.1a) and the suite names this phase owned pass
+  (7.1b). What is still Windows-shaped is two test sources with no build rule,
+  `tests/dsv41_producer_abort.cpp` and `tests/studio_generation.cpp`, which need POSIX ports
+  rather than deletion, and `vendor/engines/cosmos_windows` behind the media tests (chunk 6.1).
+- `docs/VARIABLES.md`: still owed. The scope rename is done, but the inventory cannot see a
+  wrapper read (chunk 7.1d), so regenerating it now would only re-render the same understated
+  table.
 
 ## Phase 8: qualification
 
@@ -516,7 +532,9 @@ Nothing measured transfers. Re-run against the hash-pinned fixtures and write ne
 1. 262K exact-cone single engine, three runs, prompt clock and decode rates.
 2. 200K real-text fixture, password recall, logits SHA-256.
 3. Engram extent reads against the `pread` baseline, so the io_uring gain is isolated.
-4. Paired run only if two-machine mode stays, KL within mean 0.1 and max 0.5 nats.
+4. Paired run: dropped. Two-machine mode was deleted with macOS (decision 1, chunk 1.10c), so
+   there is no second machine to compare KL against; the cross-machine limits in the inherited
+   receipts are history.
 5. Update `docs/PERFORMANCE.md` and the README tables only from these receipts.
 
 ### Chunk backlog, in the order worth doing
@@ -1217,8 +1235,26 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     model by the selftest's `open_decode_library()` check: all 8 required and all 10 optional
     `ds4x_*` exports bind. A live session against weights is still unrun.
 
-4.1 ggml backend prune: keep CUDA + CPU; delete Vulkan, SYCL, Hexagon, KleidiAI, RPC, AMX, Metal
-    in `ggml-bench`, and the corresponding options in `ggml/CMakeLists.txt`.
+4.1 ggml backend prune: done (`0c9d01d`), see the Phase 4 entry above for what it deleted and
+    what it proved.
+
+4.2 The nine ggml backends Phase 4's list never named. Pending. `ggml/src/ggml-blas`,
+    `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`,
+    `ggml-zendnn` and `ggml-virtgpu` are still in the tree - 68 tracked files, about 1.5 MB -
+    and none is built: `ggml_add_backend()` is still called for each, but the cmake option behind
+    each defaults OFF and `build.sh` passes only `-DGGML_CUDA=ON`, so
+    `ggml-backend-reg.cpp`'s registration blocks sit inside `#ifdef GGML_USE_*` guards this build
+    never defines. Their environment rows survived chunk 4.1's drop because
+    `envvars.py:inventory()` scans `engines/` whether or not the tree is compiled: 8
+    `GGML_CANN_*`, 3 `GGML_OPENCL_*` and one `GGML_REMOTING_*` row are documented reads in code
+    nobody builds. Deleting them is the same work as 4.1 - collapse the conditionals the compiler
+    already resolved, drop the options and the `ggml_add_backend()` calls, run
+    `drop_rows.py` with a whole-tree reader scan per name - and it removes the last code-position
+    Metal mention in the llama tree, `USE_METAL_GUEST_SUPPORTS_OP` in
+    `ggml-virtgpu/ggml-remoting.h`, which is why `metal_word_census --strict` fails there today.
+    Gate: `metal_word_census --strict engines/streaming-llama/prefill_llama.cpp` reports 0
+    identifiers, both cmake flag sets configure and build with exit 0, `warning_profile.py`
+    loses occurrences and gains no kind, and `envdocs --check` reports the dropped count.
 
 5.1 Python orchestrator. Done in four commits: `270d7a9` (memory_counters reads
     /proc/meminfo, /proc/vmstat and /proc/swaps), `65e54bd` (journal.advisory_lock, the
@@ -1363,11 +1399,81 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     without privileges, so a resident admission on Linux is a claim about the tree this stack
     created, never about the host.
 
-6.1 Vendor and engine bloat: `vendor/mac-mlx`, `engines/mlx-receiver`, `engines/mlx-serve`,
-    `engines/mference`, the MLX lock files, `patches/mlx-core-ring-listeners.*`.
+6.1 Vendor and engine bloat. Partly landed. `vendor/mac-mlx`, `engines/mlx-receiver`,
+    `engines/mlx-serve`, `engines/mference` and the MLX lock files went in 1.10a and 1.10c;
+    `patches/mlx-core-ring-listeners.*` and `scripts/setup-mlx.py` (whose `slstack.mlx_setup`
+    import was already dead) went in 7.1a. What is left is
+    `vendor/engines/cosmos_windows`: Windows-shaped media workers that the media tests import,
+    and `slstack/media_tools.py`, which downloads a pinned Windows FFmpeg archive and on
+    non-nt only reports the system `ffmpeg`/`ffprobe` on PATH. Port media to Linux or delete it;
+    the README already calls it experimental.
 
-7.1 Docs, examples, presets, tests: delete the Mac/paired halves, regenerate `docs/VARIABLES.md`,
-    relabel inherited Windows/macOS measurements.
+7.1 Docs, examples, presets, tests. Three commits landed; two pieces remain.
+
+7.1a Done (`5b941ff`): the Mac and paired doc surface is deleted - six `MACDECODE` rounds, four
+    `macdecode-r*` receipt directories, `macdecode-measurements.json`, `TWO_MACHINE.md`,
+    `YOCO_PAIRED_*`, the October 27 Mac build receipt, `examples/engine_environment/mac-*.json`,
+    `scripts/setup-mlx.py`, `patches/mlx-core-ring-listeners.*` and ten test sources whose
+    includes named `engines/ds4-mac`; 86 tracked files, 67,638 lines. `README.md` describes one
+    Linux machine, and `BACKEND_SETUP.md`, `BACKEND_SOURCE_AUDIT.md`, `SUPPORTED_MODELS.md`,
+    `CONE_STATE.md`, `WALKTHROUGH.md` and `examples/single-machine/README.md` were rewritten to
+    what this box actually runs (two backends, `build.sh`, the `.sh` launchers, and the fact that
+    the `-ultra-yoco` filenames are approximate keep 140 rather than exact cone). 26 measurement
+    docs gain an inherited-history label under their heading, which is what the phase asked for
+    instead of deleting the Windows and macOS numbers; `PERFORMANCE.md` loses the Mac decode
+    columns and its paired section and keeps the RTX prefill history.
+    Gate: no tracked markdown links a file that does not exist, no tracked file names a deleted
+    path, `release_check` 0 findings.
+
+7.1b Done (`9a822c8`): the four suite names this phase owned pass. `test_streamed_recipe_argv`
+    calls `vendor()` before importing `studio` and hands the trainer the same PYTHONPATH the
+    launcher does; `test_dsv41_recipe` passes that PYTHONPATH to its child; `test_h3_video_delivery`
+    keeps the Windows marker case skipped here and adds the POSIX arm, where readiness is what
+    PATH reports and a Windows marker neither creates nor breaks it; `test_shared_prefill_profile`
+    drops its `slstack.mac` half and says native export where it said paired. `scripts/export_ds4_sampling.py`
+    read `engines/ds4-win/ds4.c`, which is gone: repointed at `engines/ds4`,
+    regenerating `studio-sampling.c` moves only the recorded source SHA and leaves all nine
+    exported sampler functions byte-identical. `scripts/build_combo_runtime.py`'s preset name
+    loses `ds4-win` and its empty `mac={}` block.
+    Gate: the full suite reads 672 passed, 3 failed, 38 skipped, the three being the two process
+    tests that flip between runs plus `test_yoco` (chunk 8.1's), against the baseline's 668/7/37;
+    `release_check` 0 findings; `envdocs --check` still 2,162 names.
+
+7.1c Done (`050e0b1`): `scripts/port/metal_word_census.py` kept reading a `//` comment as open
+    after its newline, so every identifier on a later line was filed as COMMENT and an
+    `IDENTIFIER 0` answer proved nothing. The engine's numbers are unchanged by the fix, so
+    chunk 2.2e's gate stands; the llama tree moves to IDENTIFIER 1, STRING 4, COMMENT 51 lines,
+    and `--strict` now fails there. `llama_split_graph_create`'s refusal line still printed
+    "need CUDA or Metal" although chunk 4.1's message, this plan and the handoff all claimed it
+    had been reworded: it is reworded now, with `preprocess_equiv` showing 0 differing positions
+    on the CUDA build (the line is inside `#ifndef GGML_USE_CUDA`) and exactly one on a CPU-only
+    preprocessing. `docs/linux-port-commands.md` carries the corrected recipe and numbers.
+
+7.1d The env inventory cannot see a wrapper read, so `docs/VARIABLES.md` understates the engine.
+    Pending, and it is the largest remaining piece of this phase. `envvars.py:inventory()` matches
+    literal `getenv("NAME")`; a read through a wrapper such as `glm_graph_env_present(
+    "DS4_ROCM_X", "DS4_METAL_X")`, `gpu_graph_tp_env_flag("NAME", dflt)`,
+    `cuda_stream_tier_bound_env("NAME")` or `ds41_env_flag(name)` is invisible, and the census
+    counts 123 `DS4_*METAL*`/`ENV_NAME_CITED` names in that class today. Fix the inventory (a
+    second pass: functions whose body calls `getenv` on a parameter, then the string literals at
+    their call sites, joining continuation lines), then add a row per name by hand before
+    `--refresh-defaults`, then regenerate. Renaming the names is not the fix - 2.2b kept them for
+    recipe compatibility. The same chunk must decide what `engines/mlx-serve/` read references
+    mean now that the gitlink is gone: `envvars.py:validate_table()` and `envdocs.py` still
+    exempt references under that path, and `envvars.json` holds 28 of them, so those rows are
+    documented reads in a tree this checkout does not contain.
+    Gate: `envdocs --check` passes with the new rows, the name set only grows, and
+    `metal_word_census` reports `ENV_NAME_CITED 0`.
+
+7.1e The Mac peer's text in the llama tree. Pending: 51 comment lines across 20 files and 3
+    printed strings (`ds4split-expert-projection.cuh`, `ds4split-projection-fixture.cuh`,
+    `tools/decode-receiver/main.cpp`), plus `decode-receiver`'s 13 comment lines and its printed
+    `LLAMA_PD_CACHE_CAPTURE` warning that describes the deleted Mac backend. Use
+    `scripts/port/comment_code_diff.py` and `string_text_replace.py`, check `__LINE__` first, and
+    keep provenance comments that say what was deleted rather than pretending it exists.
+    Gate: `metal_word_census --strict` reports 0 identifiers and the comment count drops to the
+    provenance lines, `comment_code_diff.py` reports 0 changed code lines for a comment-only
+    sweep, and the warning profile loses no kind.
 
 8.1 Qualification. Needs a qualified GGUF on disk: 262K exact-cone runs, 200K real-text fixture
     with password recall and logits SHA-256, Engram extent reads against the pread baseline, then
@@ -1453,23 +1559,28 @@ grep -rn "__APPLE__\|TARGET_OS\|Metal\|mlx\|MLX\|darwin\|Darwin" engines slstack
 python3 -B scripts/release_check.py
 ```
 
-Counts, re-counted after chunk 5.1 with the commands above plus `-I` (skip binary files - the
+Counts, re-counted after chunk 7.1c with the commands above plus `-I` (skip binary files - the
 built engine binaries and `*.o` under `engines/ds4` match these patterns and are not source) and
-`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__`: 488 Windows references and
-920 Apple/MLX ones repo-wide. The earlier figures in this file (504, 532 and 491) were counted
-differently - some without `-I` - so they are not comparable; re-run the command rather than
-trusting any number here. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
+`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__`: 443 Windows references and
+691 Apple/MLX ones repo-wide, down from the 488 and 920 this file quoted after chunk 5.1 because
+7.1a deleted the Mac docs, receipts and test sources. Earlier figures in this file (504, 532 and
+491) were counted differently - some without `-I` - so they are not comparable; re-run the command
+rather than trusting any number here. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
 `scripts/port`'s own sweep `--tokens` list does not count, the gate in
-`docs/linux-port-commands.md` reports 8 lines after chunk 5.3 and only two of them are code:
-`combo_ram.py` and `working_set.py` each call `ctypes.WinDLL('kernel32')` in the Windows arm of
-a module that now runs on both platforms. The other six are provenance - five rows of
-`slstack/producer_runner.py`'s mapping table, which names the retired API it replaces, and one
-line of `working_set.py`'s docstring naming the Win32 binding that arm keeps.
+`docs/linux-port-commands.md` reports 5 lines after chunk 7.1b: the two `ctypes.WinDLL('kernel32')`
+calls in the Windows arms of `combo_ram.py` and `working_set.py`, which run on both platforms, and
+three provenance lines (`slstack/producer_runner.py`'s mapping table and `working_set.py`'s
+docstring) naming the retired API those arms replace.
 `media_tools.py`'s Windows FFmpeg download is not in that
-number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside `engines/ds4` the code-identifier gate
-(`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
-matches are the 213 distinct `DS4_METAL_*` environment names (404 occurrences) kept on purpose plus
-the 26 provenance comments chunk 2.2e kept on purpose; no printed message names Metal.
+number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside
+`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 195 lines, ENV_NAME_CITED 123
+lines and COMMENT 26 lines: the documented `DS4_METAL_*` names are kept on purpose, the 123 cited
+ones are the wrapper reads chunk 7.1d owes the inventory, and the 26 comment lines are the
+provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 1,
+STRING 4 and COMMENT 51 lines and `--strict` fails, because `USE_METAL_GUEST_SUPPORTS_OP` lives in
+`ggml/src/ggml-virtgpu/` - one of nine backend directories (also blas, cann, hip, musa, opencl,
+webgpu, zdnn, zendnn) that no cmake option builds and chunk 4.2 has to delete. Re-count before
+trusting any of these numbers.
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in
@@ -1489,26 +1600,19 @@ ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 in chunk 1.10b.
 
 Python suite: `timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B
--m pytest tests/ -q` reports **670 passed, 5 failed, 37 skipped** after chunk 5.3 (20 new
-resident-admission and checkpoint checks, 3 names un-skipped from the two Windows-only
-classes; one of those is the post-resume cleanup contract, which only runs now that the runner
-is Linux). Full runs of this tree have read 5, 6 and 7 failures - three of the names are
-process tests that move. Set
+-m pytest tests/ -q` reports **672 passed, 3 failed, 38 skipped** after chunk 7.1b. Set
 `STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or 21
 process tests raise `KeyError: STUDIO_RUNTIME_ROOT`, and chunk 5.3's floor-honour check needs a
-disk-backed fixture directory too; without it the same tree reads 639 passed, 35 failed, 38
-skipped, which is why counts alone mislead. Two process tests vary run to run
+disk-backed fixture directory too; without it the same tree reads a much worse line, which is why
+counts alone mislead. Two process tests vary run to run
 (`test_real_owned_child_stops_on_kit11_hold`,
-`test_disconnect_inside_reasoning_then_next_turn_appends_only`), so compare the set of names,
-not the count. The five stable survivors are Linux gaps, not Mac leftovers: the missing
-`cosmos_windows` vendor module (`test_streamed_recipe_argv`, `test_dsv41_recipe`), its video
-gate (`test_h3_video_delivery`, whose fixture is `.exe`-shaped), `test_shared_prefill_profile`
-(needs the deleted `slstack.mac`), and `test_yoco` (`producer_prefill_sweep_tokens` is `auto`
-in the preset the test reads, not the 49152 it asserts). Chunks 7.1 and 8.1 own them.
-Chunk 5.1 fixed four names: `test_journal_recovery_flags` (a fixture path outside the repo),
-`test_single_liveness` (`io_counters().other_bytes` does not exist on Linux),
-`test_shared_guard_adapter` (the vendored StopIteration, and a Windows-only page-scan
-assertion), and `test_combo_guard`'s whole 21-test class, which had been skipped on this box.
+`test_persistent_window_denial_still_stops_owned_job`), so compare the set of names, not the
+number. The one stable failure is `test_yoco`, whose preset reads `producer_prefill_sweep_tokens`
+as `auto` rather than the 49,152 it asserts - chunk 8.1's. Chunk 7.1b removed the four names Phase
+7 owned: `test_dsv41_recipe` and `test_streamed_recipe_argv` (they needed the vendored paths on
+`sys.path` the launcher hands a child), `test_h3_video_delivery`'s Windows marker case (now
+skipped here, with a POSIX arm added, which is why the skip line moved 37 to 38) and
+`test_shared_prefill_profile`'s `slstack.mac` import.
 
 `python3 -B -m slstack.envdocs --check` reports 2,162 documented variables. Chunk 5.1 moved no
 row and dropped no name; chunk 4.1 is the first chunk that did, because deleting a backend deletes

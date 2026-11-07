@@ -17,40 +17,60 @@ records - the open decisions, the box's constraints, the verification method, an
 
 ## What the next session is for
 
-Phase 3's producer CLI, its weight fetcher, its native weight provider, its Engram row loader, its
-carry store and its locked RAM tier are now Linux: the provider holds a POSIX lease on the verified
-model file, builds the bounded relay, acquires stages in alternating banks, writes named file
-extents into a compute bank, admits its RAM expert tier from `/proc`, loads a prompt's Engram rows
-through io_uring queues, and the carry tier locks as much of its RAM as the kernel allows. Nothing
-in the streamed prefill path refuses on Linux any more. What it still needs is a qualified GGUF.
-Chunk 5.1 - the Python orchestrator's platform half - is finished, in four commits, so `slstack/`
-has no `msvcrt` and no `CREATE_SUSPENDED` left and the guardian caps its tree in the kernel rather
-than polling it; chunk 5.2 (`5fb07f7`) is the producer runner, so a ULTRA or mode1 producer can be
-launched here and has been, without a model; chunk 5.3 is resident admission and the locked
-checkpoint, so `combo_producer`, `combo_native` and `native_broker` reach `after_resume` on Linux
-and the checkpoint tier allocates, locks what the kernel allows, and is attachable by name from a
-second process. Phase 5 is complete. Chunk 4.1 is landed too, so Phase 4 is: `ggml` builds CUDA and
-CPU only, and the Vulkan, SYCL, Hexagon, RPC, AMX, KleidiAI and Metal trees, options and reads are
-gone. In the order worth doing next:
+**Phase 5 is closed, and Phase 7 has landed its first three commits.** Phase 3's producer CLI, its weight
+fetcher, its native weight provider, its Engram row loader, its carry store and its locked RAM
+tier are Linux; the orchestrator (`slstack/`) has no `msvcrt` and no `CREATE_SUSPENDED`, the
+guardian caps its tree in the kernel, ULTRA and mode1 producers launch here, and resident
+admission plus the locked checkpoint reach `after_resume`. Chunk 4.1 landed, so ggml builds CUDA
+and CPU only - but Phase 4 is *not* closed: nine backend directories that its list never named
+are still in the tree, unbuilt (item 1 below). Nothing in the streamed prefill path refuses on
+Linux any more; what it still needs is a qualified GGUF, which this box does not have. Chunk 7.1a
+deleted the Mac and paired docs, examples and Mac test sources and rewrote the front page for one
+Linux machine, 7.1b fixed the four suite names Phase 7 owned plus two scripts that still named
+`engines/ds4-win`, and 7.1c fixed the census gate the remaining text sweep needs and made the
+rewording chunk 4.1 had claimed but never did.
 
-1. **Chunk 7.1 - docs, presets, tests**: the Mac/paired halves, `docs/VARIABLES.md` regeneration
-   (which also owes the 123 wrapper-read names below), the inherited Windows/macOS measurement
-   labels - including the 56 `metal` mentions chunk 4.1 left in the llama tree's comments -
-   and the four suite names it owns.
-2. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start without
-   a download or a quantize run in the accepted type set (see "Constraints on this box" 2).
+1. **Chunk 4.2 - the nine ggml backends Phase 4's list never named.** `ggml/src/ggml-blas`,
+   `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`,
+   `ggml-zendnn` and `ggml-virtgpu` are still in the tree: 68 tracked files, about 1.5 MB,
+   none of them built. Chunk 7.1c's census fix is what exposed it - `--strict` over the llama
+   tree now fails on one code identifier, `USE_METAL_GUEST_SUPPORTS_OP` in
+   `ggml-virtgpu/ggml-remoting.h`. The work is 4.1's work again: delete the trees, their
+   `ggml_add_backend()` calls and their cmake options, collapse the conditionals the compiler
+   already resolved in the surviving sources, and drop the env rows whose only readers are in
+   those trees (8 `GGML_CANN_*`, 3 `GGML_OPENCL_*`, one `GGML_REMOTING_*` - they survived 4.1
+   because `inventory()` scans `engines/` whether or not a tree is compiled).
+2. **Chunk 7.1d - the env inventory and `docs/VARIABLES.md`.** `envvars.py:inventory()` sees
+   only literal `getenv("NAME")`, so a read through a wrapper such as
+   `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` is invisible; the census counts 123
+   such names in `engines/ds4` today (`ENV_NAME_CITED 123`). Fix the inventory, add a row per
+   name by hand before `--refresh-defaults`, then regenerate. Do not rename the names - 2.2b
+   kept them for recipe compatibility. The same chunk decides what the 28 `engines/mlx-serve/`
+   read references in `envvars.json` mean now that the gitlink is gone, since
+   `envvars.validate_table()` and `envdocs.py` still exempt that prefix.
+3. **Chunk 7.1e - the Mac peer's text in the llama tree**: 51 comment lines across 20 files
+   and 3 printed strings, plus `tools/decode-receiver`'s 13 comment lines and its printed
+   `LLAMA_PD_CACHE_CAPTURE` warning. `comment_code_diff.py`, `string_text_replace.py`, a
+   `__LINE__` check first, and `metal_word_census --strict` as the gate.
+4. **Chunk 6.1's remainder** - `vendor/engines/cosmos_windows` (the media workers the media
+   tests import) and `slstack/media_tools.py`'s pinned Windows FFmpeg archive: port media to
+   Linux or delete it.
+5. **Chunk 8.1 - qualification**, blocked on a qualified GGUF: nothing in Phase 8 can start
+   without a download or a quantize run in the accepted type set (see "Constraints on this
+   box" 2). Its name set includes `test_yoco`, the suite's one stable failure.
 
 What is left of Phase 3's Win32 is `mtmd`, `server` and `decode-receiver`, none of which the
 streamed prefill needs. Chunk 4.1 changed nothing about `tools/decode-receiver`'s code - it is the
 Mac peer's receiver, its target is `OFF` by default, and it never called the split-graph API; what
 it carries is 13 comment lines and one printed `LLAMA_PD_CACHE_CAPTURE` warning that describe the
-deleted Mac backend, which is chunk 7.1's text sweep. Three findings from 2.2e that belong to those chunks and
+deleted Mac backend, which is chunk 7.1e's text sweep. Three findings from 2.2e that belong to those chunks and
 to no chunk yet: 35 declarations in the engine's GPU headers are dead - declared by the deleted
 Mac backend, defined nowhere, called nowhere (the scan is in this file's method section, and the
 three that named Metal were deleted in 2.2e's comment half); 123 `DS4_METAL_*` environment names
 are read but not documented, because their only reader is a wrapper such as
 `glm_graph_env_present("DS4_ROCM_X", "DS4_METAL_X")` and `envvars.py:inventory()` only sees
-literal `getenv("NAME")` calls, so `docs/VARIABLES.md` understates the engine's knobs; and names
+literal `getenv("NAME")` calls, so `docs/VARIABLES.md` understates the engine's knobs (chunk 7.1d
+now owns this, with the `engines/mlx-serve/` exemption beside it); and names
 handed to a folded-to-false stub, such as `DS4_METAL_DISABLE_M5_QKV_PAIR_QUAD_FUSE`, are never read
 at all. Do not "fix" the wrapper reads by renaming the names - 2.2b kept them for recipe
 compatibility - fix the inventory. Four findings from 5.1 in the same category: `lease.py`'s
@@ -58,8 +78,9 @@ CPU-reservation recognition matches hold lines by their *wording*, including the
 a Linux CPU hold worded differently preempts the engine - settle the wording with the owner of the
 other agent rather than widening the regex; `scripts/perfexp_pair.py` hashes
 `<producer>/ds4-decode.dll` and writes `decode_dll_sha256`, which 8.1 regenerates; `media_tools.py`
-downloads a pinned Windows FFmpeg zip and `test_h3_video_delivery`'s fixture is `.exe`-shaped
-(Phase 6/7.1); and `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp` still
+downloads a pinned Windows FFmpeg zip (chunk 6.1's), while its Linux arm reports the system
+`ffmpeg`/`ffprobe` and 7.1b's test asserts that arm; and
+`engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp` still
 declares `bool gpu_bufs_via_dstorage = false` and branches on it - a folded-to-false constant with
 no chunk of its own. Three from 5.2 in the same category: neither the engine's `require_local_volume`
 nor `slstack/producer_runner.py`'s copy of that refusal list contains NFS4's magic (`0x6e626470`),
@@ -101,30 +122,32 @@ maps chunk numbers to commits. As of this session: `3bc184a` + `0265129` (3.1a),
 `1325655` (3.1e), `3afcd91` + `1e4cf01` (3.1f), `2f79178` (3.1g), `187f2fa` + `09b6158` (the
 model-file claim and the Blackwell plan), `d7eae91` (3.1h), `b6c6d9c` (2.2e 1/4), `f551a8d`
 (2.2e 2/4), `a12383b` (2.2e 3/4), `76053fc` (2.2e 4/4), `270d7a9` (5.1a), `65e54bd` (5.1b),
-`c17d6a6` (5.1c), `63c8dc1` (5.1d), `5fb07f7` (5.2), `1279063` (5.3), plus the plan/handoff
-commits. `git status -sb` shows no `[ahead N]` after pushing; check it rather than assuming.
+`c17d6a6` (5.1c), `63c8dc1` (5.1d), `5fb07f7` (5.2), `1279063` (5.3), `0c9d01d` (4.1),
+`5b941ff` (7.1a), `9a822c8` (7.1b), `050e0b1` (7.1c), plus the plan/handoff commits. The branch
+was two commits ahead of `origin/linux-only` when this session opened and is pushed now, so
+`git status -sb` shows no `[ahead N]`; check it rather than assuming.
 
 The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyError` for it (the
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **670 passed, 5 failed, 37 skipped** - runs of it have read 5, 6 and 7
-failures, since three names are process tests that move. Without it, 639 passed, 35 failed, 38
-skipped - chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
+this tree reads **672 passed, 3 failed, 38 skipped** - runs of it have read 3 and 7 failures,
+since the two process tests named below move. Without it, the same tree reads a much worse line -
+chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
 Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
 count - the process tests flip and the skip set changes when a platform gate starts running.
 Chunk 5.1 un-skipped `tests/test_combo_guard.py`, which was `skipUnless(os.name=='nt')`: 21 guardian
 tests that had never run on Linux now do, which is why the skip count fell from 62 to 41. Chunk 5.2
 added 22 runner checks and one shared-lock check and un-skipped nothing, so the skip line was still
 41. Chunk 5.3 added 20 checks and un-skipped three names - among them the post-resume ownership
-contract, which only runs now that the runner is Linux - so the line is 37 and the passing count
-moved from the 648 this session measured at `c4ddbf8`. Five names fail in every run: the ones
-7.1 and 8.1 own (listed below). Three more appear and disappear -
-`test_combo_guard::test_persistent_window_denial_still_stops_owned_job`,
-`test_hold_yield::test_real_owned_child_stops_on_kit11_hold` and
-`test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only` - so four
-full runs of this session's tree read 6 or 7 failures against the same five. All three fail in a
-worktree of the commit before chunk 5.2 as well; they are the box, not the tree.
+contract, which only runs now that the runner is Linux - so the line was 37. Chunk 7.1b fixed the
+four names Phase 7 owned and added the POSIX FFmpeg-arm check, which skips the Windows marker case
+here, so the line is 38 and one number moved up. The one stable failure is `test_yoco`, whose
+preset reads `producer_prefill_sweep_tokens` as `auto` rather than the 49,152 it asserts - chunk
+8.1's. Two names appear and disappear between runs,
+`test_combo_guard::test_persistent_window_denial_still_stops_owned_job` and
+`test_hold_yield::test_real_owned_child_stops_on_kit11_hold`; both fail in a worktree of the
+commit before chunk 5.2 as well, so they are the box, not the tree.
 
 Working tree is clean apart from scratch under `build/` and `runtime/`; `build/wt-base` is a
 worktree now checked out at `c4ddbf8` (the commit before chunk 5.3), so move it wherever a
@@ -132,22 +155,26 @@ comparison needs a baseline - `git -C build/wt-base checkout <sha>` - or remove 
 `git worktree remove build/wt-base`. `engines/ds4` holds `ds4` and `ds4-decode.so` built from the
 pushed tree (CUDA_ARCH=sm_120), so `./ds4 --help` and the unknown-option gate can run without a
 rebuild; `ds4-server`, `ds4-bench`, `ds4-eval` and `ds4-agent` are still from the previous session.
-Chunks 5.1, 5.2 and 5.3 touched no engine source, so nothing they link changed - but rebuild before
-trusting a gate that runs one of them.
+Chunks 5.1, 5.2 and 5.3 touched no engine source. Chunk 7.1c touched one: `llama-context.cpp`'s
+`llama_split_graph_create` refusal line, which sits inside `#ifndef GGML_USE_CUDA` and so cannot
+reach a CUDA build's compiled text (`preprocess_equiv` shows 0 differing positions with
+`-DGGML_USE_CUDA`). It also regenerated `tools/dsv41-prefill/studio-sampling.c`, whose only change
+is the recorded source SHA line, and `build/llama/bin/llama-dsv41-prefill` was rebuilt after it and
+passes `--help` and `--check-native-profiles`. Rebuild before trusting a gate that runs an engine
+binary.
 `python3 -B scripts/release_check.py`
 reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPath` is empty and
 `.git/hooks` holds only the samples, so the check has to be run by hand before committing. Do not
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
-`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **670 passed, 5 failed, 37 skipped**, and all
-five are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing
-`cosmos_windows` module), `test_h3_video_delivery` (that module, plus a `.exe`-shaped fixture),
-`test_shared_prefill_profile` (needs `slstack.mac`, which this checkout does not publish), and
-`test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the 49152 it asserts).
-The three process tests named above appear in some runs and not others, which is why the
-failure line moves. Chunk 7.1 owns the missing-module and
-Mac-profile names, 8.1 the recipe default. Chunk 5.1 fixed four names that used to be in this list
+`STUDIO_RUNTIME_ROOT` set (see the paragraph above): **672 passed, 3 failed, 38 skipped**. The one
+stable failure is `test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the
+49152 it asserts), which chunk 8.1 owns; the other two are the process tests that move. Chunk 7.1b
+removed the four names this phase owned, including the two that had been attributed to a missing
+`cosmos_windows` module - their real cause was that the suite's own command does not put
+`vendor/studio` and `vendor/engines` on `sys.path`, which is what `slstack.native_broker.vendor()`
+and the launcher's `library_pythonpath` do. Chunk 5.1 fixed four names that used to be in this list
 and un-skipped 21 more; chunk 5.3 un-skipped three more and fixed none. Check a suspected
 regression by running the same file in a worktree at the baseline
 (`git -C build/wt-base checkout <sha>`) rather than by reading a count. Process tests flip
@@ -396,7 +423,56 @@ dead declarations deleted, no environment name added or dropped) are in its four
 in the plan; its gate is `python3 scripts/port/metal_word_census.py --strict`, not a grep, because
 `\bMETAL_` cannot see an identifier with a prefix before it.
 
-This session's (chunk 4.1, one commit):
+This session's (chunks 7.1a, 7.1b and 7.1c, one commit each):
+
+- **The Mac and paired docs surface is deleted, and the front page describes one Linux
+  machine.** 86 tracked files, 67,638 lines: the six `MACDECODE` rounds, the four
+  `macdecode-r*` receipt directories, `macdecode-measurements.json`, `TWO_MACHINE.md`,
+  `YOCO_PAIRED_QUALIFICATION.md`, `YOCO_PAIRED_CPU.json`, the October 27 Mac build receipt,
+  `examples/engine_environment/mac-*.json`, `scripts/setup-mlx.py`,
+  `patches/mlx-core-ring-listeners.*` and ten test sources whose `#include`s named
+  `engines/ds4-mac`. `README.md` no longer offers Mac decode, a paired route, `slstack mac`,
+  the Mac FP4 file, the "Optional Mac" requirement or the four MLX-decoded model families;
+  its inherited numbers now say plainly that the Linux fork has re-measured none of them. Two
+  consequences worth knowing: the DSpark drafter row survives because `ds4` on Linux has
+  DSpark, and the converter's `--expert-layout ggml-mxfp4` option is documented as something
+  nothing here loads. `BACKEND_SETUP.md`, `BACKEND_SOURCE_AUDIT.md`, `SUPPORTED_MODELS.md`,
+  `CONE_STATE.md`, `WALKTHROUGH.md` and `examples/single-machine/README.md` were rewritten
+  against what the code actually does now: two backends (`ds4`, `llama-server`), `build.sh`,
+  the `.sh` launchers, the refusal `check.py` and `router.py` raise for a `general` config,
+  and the fact that `start-dsv41-single-*-ultra-yoco.sh` is approximate keep 140 while the
+  plain launchers are exact cone - the old text claimed the opposite. `docs/CONE_STATE.md`
+  keeps the state-version contract, which `slstack/yoco.py` and `slstack/native_broker.py`
+  still enforce, and says outright that the paired proof receipts are gone, so those numbers
+  are recorded nowhere. 26 measurement docs gained an inherited-history label under their
+  heading instead of being deleted; `PERFORMANCE.md` lost its paired section, its MiMo Mac
+  dial table, its Mac decode column and its two-machine memory row.
+- **The four suite names Phase 7 owned pass, and two scripts stopped naming `engines/ds4-win`.**
+  No production behaviour changed. `test_streamed_recipe_argv` calls `vendor()` before its
+  `studio` import and hands the trainer the PYTHONPATH the launcher hands it; `test_dsv41_recipe`
+  passes the same to its child; `test_h3_video_delivery`'s FFmpeg marker case is the Windows arm
+  and is skipped here, with a new POSIX case asserting that readiness is what PATH reports and
+  that a Windows `installed.json` marker neither creates nor breaks it; `test_shared_prefill_profile`
+  lost its `slstack.mac` half and calls the export path by its current name.
+  `scripts/export_ds4_sampling.py` read `engines/ds4-win/ds4.c` and died on `FileNotFoundError`;
+  repointed at `engines/ds4`, regenerating `tools/dsv41-prefill/studio-sampling.c` moves only the
+  recorded source SHA, with all nine exported sampler functions byte-identical, which is the proof
+  the engine rename never moved the sampler. `scripts/build_combo_runtime.py`'s staged preset lost
+  `ds4-win` in its name and its empty `mac={}` block.
+- **The Metal census could not see a code identifier after a line comment, and the llama tree's
+  answer moved.** `scripts/port/metal_word_census.py` left line-comment state open past the
+  newline, so identifiers on later lines were filed as COMMENT and `IDENTIFIER 0` proved nothing.
+  The engine's numbers are unchanged (so chunk 2.2e's gate stands); over the llama tree it now
+  reports IDENTIFIER 1, STRING 4, COMMENT 51 lines and `--strict` fails. The identifier is
+  `USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/ggml-remoting.h`, and that tree - plus
+  blas, cann, hip, musa, opencl, webgpu, zdnn and zendnn, 68 files and about 1.5 MB in total - is
+  chunk 4.2: none is built, and their env rows survive only because `inventory()` scans unbuilt
+  code. `llama_split_graph_create`'s refusal line still printed "need CUDA or Metal" even though
+  chunk 4.1's message and this file both claimed it had been reworded; it is reworded now, with
+  `preprocess_equiv` proving the CUDA build's live text is unchanged and a CPU-only preprocessing
+  showing exactly the one intended message line.
+
+Before that (chunk 4.1, one commit):
 
 - **`ggml` builds CUDA and CPU only.** Six backend trees and their public headers are deleted
   (`ggml-vulkan`, `ggml-sycl`, `ggml-hexagon`, `ggml-rpc`, `ggml-cpu/amx`,
@@ -412,7 +488,8 @@ This session's (chunk 4.1, one commit):
   branch and the default branch both call `ggml_backend_synchronize`, so the knob changes nothing
   while the read keeps the row honest.
 - **A CPU-only llama no longer offers `--rpc`** (`common/arg.cpp` lost `add_rpc_devices` and the
-  option), and `llama_split_graph_create`'s no-backend warning reads "this fork builds CUDA".
+  option), and `llama_split_graph_create`'s no-backend warning was to read "this fork builds
+  CUDA" - it did not; chunk 7.1c reworded it.
   Both were already unreachable here: `llama_supports_rpc()` asks the registry for "RPC", which
   no longer exists, and the warning sits in `#ifndef GGML_USE_CUDA`.
 - **The Mac peer's split-graph API is now eleven stubs with no caller in this fork**
@@ -426,7 +503,7 @@ This session's (chunk 4.1, one commit):
 - `ggml_cpu_has_amx_tile/_bf16/_fp16` stay (they are `--version`'s CPU feature flags, not a
   backend); `ggml_cpu_has_amx_int8` is gone because its only reader was the deleted AMX buft.
 
-Previous session's (chunk 5.3, one commit):
+Before that (chunk 5.3, one commit):
 
 - **Resident admission runs on Linux.** `working_set.protect_working_set` is one function now -
   `combo_ram`'s verbatim copy is gone, and `combo_native`/`combo_producer` import the surviving
@@ -455,7 +532,7 @@ Previous session's (chunk 5.3, one commit):
   exception is written in `combo_ram.py`'s docstring and in `producer_runner.py`'s refusal list
   comment instead of narrowing the rule.
 
-The session before that (chunk 5.2, one commit):
+Before that (chunk 5.2, one commit):
 
 - **A ULTRA or mode1 producer can be launched on Linux.** `slstack/producer_runner.py` is the
   counterpart of the vendored Windows runner with the same `_Native`/`_Job` surface, and
@@ -558,6 +635,37 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
 
 ## Gotchas
 
+- **A gate that reports zero is only evidence if you have seen it report non-zero.**
+  `scripts/port/metal_word_census.py` classified a mention by character state, but its scanner
+  never left line-comment state at a newline, so every identifier on a line after a `//` comment
+  was filed as COMMENT and `--strict` passed on a tree that still had `USE_METAL_GUEST_SUPPORTS_OP`
+  compiled. Chunk 7.1c fixed it. Four lines of probe text are the cheapest way to check a
+  classifier: note that the census's `source_files()` skips any path with a `build` component, so
+  the probe has to live outside `build/`, and `--list` is what prints the per-file breakdown.
+- **`envvars.py:inventory()` scans `engines/` whether or not cmake builds it.** That is why nine
+  unbuilt ggml backend trees still hold environment rows (8 `GGML_CANN_*`, 3 `GGML_OPENCL_*`, one
+  `GGML_REMOTING_*`), and why deleting a backend, not disabling it, is what drops its rows.
+- **A suite command that does not put the vendor trees on `sys.path` is a fact about the tests.**
+  The documented run is `PYTHONPATH=.:tests`, so `import studio` and `import cosmos_windows` fail
+  unless a test calls `slstack.native_broker.vendor()` first, and a *subprocess* running a vendored
+  module by path needs the PYTHONPATH the launcher composes (`envvars`' `library_pythonpath`). No
+  `tests/conftest.py` was added on purpose: the repo's established pattern is `vendor()`, and
+  hiding the failure would also hide the production requirement.
+- **`preprocess_equiv` on a llama TU needs the build's own flags**, taken from
+  `build/llama/compile_commands.json`: `-x c++`, the five `-I` directories, and `/opt/cuda/include`
+  while `-DGGML_USE_CUDA` is defined. Without them the before side dies on `ggml-cpp.h` or
+  `cuda_runtime.h` and reports nothing. Dropping `-DGGML_USE_CUDA` is how you prove a change inside
+  `#ifndef GGML_USE_CUDA` reaches only a CPU-only build.
+- **Commit messages are claims, and this repo's own docs repeated a false one for a session.**
+  Chunk 4.1's message said `llama_split_graph_create`'s refusal line had been reworded; it had not,
+  and both the plan and this file copied that. Check quoted text against the working tree before
+  recording it, the same way you check code.
+- **A doc-insertion script must preserve a UTF-8 BOM.** `docs/EXPERIMENT_E7.md`, `_E10.md`,
+  `_E17.md` and `_E18.md` begin with one, so a check like `line.startswith('# ')` fails on them and
+  a naive rewrite silently drops the BOM.
+- **`media_tools.install()` has no marker on non-nt.** It returns readiness from `shutil.which`
+  and ignores `installed.json` entirely, so a test that wants to prove "a stale marker cannot hide
+  changed tools" is a Windows-arm test; patch `shutil.which` both ways to gate the Linux arm.
 - The producer builds the fetcher **twice**: `tools/dsv41-prefill` compiles its own copy of
   `src/llama-weight-fetcher.cpp` into the CLI, and `src/` compiles it into `libllama.a`. A manually
   linked selftest uses `build/llama/src/CMakeFiles/llama.dir/llama-weight-fetcher.cpp.o`, which
