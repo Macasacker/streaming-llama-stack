@@ -77,10 +77,10 @@ timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'tes
 # process tests flip, and un-skipping a platform's tests moves the skip total.
 mkdir -p runtime
 timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q
-# 669 passed, 6 failed, 37 skipped. The five stable ones are the missing cosmos_windows module
+# 670 passed, 5 failed, 37 skipped. The five stable ones are the missing cosmos_windows module
 # (2), its video gate, the deleted slstack.mac profile, and test_yoco's preset default; the rest
-# of the line depends on which process tests flipped this run - runs of this tree showed 6 and 7
-# failures an hour apart. One of those names appears in some runs and not others, alone or in a
+# of the line depends on which process tests flipped this run - runs of this tree showed 5, 6 and
+# 7 failures. One of those names appears in some runs and not others, alone or in a
 # full run -
 # test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only - and it
 # fails in a worktree of the commit before chunk 5.2 too, so it is the box, not the tree.
@@ -489,10 +489,15 @@ the same session.
 rm -rf build/smoke/out && mkdir -p build/smoke/out
 ./build/cuda-headroom-probe || echo "no context: this gate aborts inside ggml CUDA init"
 timeout 300 python3 -B docs/evidence/producer-launch-gate.py
+# DS4COMBO_RESIDENT_FLOOR_INERT {... "scope": ".../slstack-resident-gate-<pid>-<nonce>",
+#   "applied": true, "floor_bytes": 1073741824, "ceiling_bytes": 4294967296, "honored": false,
+#   "blocked_by": ".../app.slice" ...}
+# resident admission: {...same row...}          (out/resident-admission.json holds it)
 # producer refused: ... reason=Selected GPU free bytes do not exceed the explicit reserve
 # owned_cleanup={... "owned_job_empty": true, "owned_process_signaled": true,
 #                  "exit_code": 1, "forced_kill": false, "owned_pid_gone": true}
 # launchers still blocked: 0 []
+# scope after retirement: {... "remaining_members": [], "removed": true}
 ```
 
 `launchers still blocked: 0` is the orphan rule: a child that never got its admission byte

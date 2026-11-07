@@ -1265,7 +1265,11 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     against this chunk's own 648/7/41 baseline, and every failing name in both runs is one of the
     five this plan's Phase 7 and Phase 8 own or one of the three process tests that flip between
     runs.
-    `combo_ultra_parity.py`'s shared-RAM handoff still needs a qualified GGUF, so it is unrun.
+    `docs/evidence/producer-launch-gate.py` now rides chunk 5.2's launch with chunk 5.3's
+    admission: the job is moved into a scope the gate created, `protect_working_set` floors it,
+    and the run still ends at the reserve refusal with the ownership certificate clean and the
+    scope removed. `combo_ultra_parity.py`'s shared-RAM handoff still needs a qualified GGUF, so
+    it is unrun.
     Findings this chunk produced: `mlock` past `RLIMIT_MEMLOCK` answers ENOMEM (12) on this
     kernel, not the EAGAIN the man page leads with; and a whole-user floor chain is not reachable
     without privileges, so a resident admission on Linux is a claim about the tree this stack
@@ -1397,11 +1401,11 @@ ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 in chunk 1.10b.
 
 Python suite: `timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B
--m pytest tests/ -q` reports **669 passed, 6 failed, 37 skipped** after chunk 5.3 (20 new
+-m pytest tests/ -q` reports **670 passed, 5 failed, 37 skipped** after chunk 5.3 (20 new
 resident-admission and checkpoint checks, 3 names un-skipped from the two Windows-only
 classes; one of those is the post-resume cleanup contract, which only runs now that the runner
-is Linux). A second full run of the same tree an hour earlier read 669 passed, 7 failed, 38
-skipped: three of the failures are process tests that move. Set
+is Linux). Full runs of this tree have read 5, 6 and 7 failures - three of the names are
+process tests that move. Set
 `STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or 21
 process tests raise `KeyError: STUDIO_RUNTIME_ROOT`, and chunk 5.3's floor-honour check needs a
 disk-backed fixture directory too; without it the same tree reads 639 passed, 35 failed, 38

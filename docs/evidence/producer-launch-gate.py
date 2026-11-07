@@ -4,7 +4,9 @@ No model. The throwaway GGUF, receipt and four LE32 tokens take the CLI through 
 half, so this proves the launch chain rather than inference: the child is contained before
 it execs, admission releases it, the three transport pipes carry it, its stderr drains into
 the diagnostic buffer, its exit code is read, and the retirement certificate says the owned
-tree is empty. Expected outcome on this box while another process holds the GPU: the abort
+tree is empty. Chunk 5.3's resident admission rides the same launch: the job is moved into a
+scope this gate created, `protect_working_set` floors it, and the receipt is written beside
+the producer's own output. Expected outcome on this box while another process holds the GPU: the abort
 line `Selected GPU free bytes do not exceed the explicit reserve`, exit code 1, and
 `launchers still blocked: 0`.
 
@@ -59,16 +61,31 @@ argv = [str(binary), '--model', str(model), '--copy-receipt', str(receipt), '--t
 env = dict(os.environ)   # CUDA_VISIBLE_DEVICES stays as the controller has it
 
 native = _Native()
+
+# Chunk 5.3's half of this gate: the resident admission the combo paths run after resume.
+# The job is moved into a scope of ours first, which is what the guardian does for a real
+# session, so the floor lands on a scope this stack created rather than being reported as
+# inherited from a foreign one.
+from slstack.cgroup_scope import open_scope
+from slstack.working_set import protect_working_set
 print('runner memory=%d GiB commit=%d/%d GiB' % (native.memory() >> 30, native.commit()[0] >> 30, native.commit()[1] >> 30))
 from contextlib import ExitStack
 with ExitStack() as leases:
     leases.enter_context(native.directory(directory))
     for held in (binary, model, receipt, tokens):
         leases.enter_context(native.read_lease(held))
+    scope = open_scope(4 << 30, hint='resident-gate')
+    def admitted(job):
+        (scope.path / 'cgroup.procs').write_text(str(job.pid))
+        job.scope = str(scope.path)
+        row = protect_working_set(job, 1 << 30, 512 << 20, 4 << 30,
+                                  receipt=out / 'resident-admission.json')
+        print('resident admission: %s' % json.dumps(row['resident'], separators=(',', ':')))
+        return row
     try:
         producer = Producer(session, argv, env, directory, host_bytes=1 << 30,
                             physical_floor=512 << 20, operation_seconds=120, idle_seconds=120,
-                            native=native, native_mode=1, model_sha256=digest)
+                            native=native, native_mode=1, model_sha256=digest, after_resume=admitted)
         print('UNEXPECTED: producer reached readiness')
     except BaseException as failure:
         print('producer refused: %s' % str(failure)[-700:])
@@ -82,3 +99,4 @@ still = [p.name for p in Path('/proc').iterdir()
          if p.name.isdigit() and p.name != str(os.getpid())
          and b'producer_launch.py' in (p / 'cmdline').read_bytes()]
 print('launchers still blocked: %d %s' % (len(still), still))
+print('scope after retirement: %s' % json.dumps(scope.close(), separators=(',', ':')))

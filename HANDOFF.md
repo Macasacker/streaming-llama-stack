@@ -106,7 +106,8 @@ The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyE
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **669 passed, 6 failed, 37 skipped**; without it, 639 passed, 35 failed, 38
+this tree reads **670 passed, 5 failed, 37 skipped** - runs of it have read 5, 6 and 7
+failures, since three names are process tests that move. Without it, 639 passed, 35 failed, 38
 skipped - chunk 5.3's page-cache-fixture check also needs the root, and skips when it has none.
 Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
 count - the process tests flip and the skip set changes when a platform gate starts running.
@@ -137,14 +138,13 @@ reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPa
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
-`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **669 passed, 6 failed, 37 skipped**, and five
-of the six are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing
+`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **670 passed, 5 failed, 37 skipped**, and all
+five are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing
 `cosmos_windows` module), `test_h3_video_delivery` (that module, plus a `.exe`-shaped fixture),
 `test_shared_prefill_profile` (needs `slstack.mac`, which this checkout does not publish), and
-`test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the 49152 it asserts);
-the other two are the process tests named above. One more,
-`test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only`,
-flips between runs and was passing in the run quoted above. Chunk 7.1 owns the missing-module and
+`test_yoco` (its preset reads `producer_prefill_sweep_tokens` as `auto`, not the 49152 it asserts).
+The three process tests named above appear in some runs and not others, which is why the
+failure line moves. Chunk 7.1 owns the missing-module and
 Mac-profile names, 8.1 the recipe default. Chunk 5.1 fixed four names that used to be in this list
 and un-skipped 21 more; chunk 5.3 un-skipped three more and fixed none. Check a suspected
 regression by running the same file in a worktree at the baseline
@@ -180,8 +180,10 @@ before admission, the never-resumed and closed-child retirements, SIGINT retirem
 fallback with a grandchild, `wait_for_exit` over the job, `/proc` module list, the volume and alias
 refusals, lease sharing, `commit()`/`memory()` from `/proc`, NVML identity and capability) and
 `docs/evidence/producer-launch-gate.py`, which drives the real CLI through the vendored `Producer`
-and is the only gate that exercises the launch chain end to end; it needs the CUDA headroom probe
-to say yes and `build/smoke/out` cleared. Chunk 5.3's are `tests/test_working_set.py` (8 checks
+and is the only gate that exercises the launch chain end to end; since 5.3 it also runs the
+resident admission against that real producer - the job into a scope the gate created, the floor
+written, the receipt written - and still ends at the reserve refusal with the scope removed. It
+needs the CUDA headroom probe to say yes and `build/smoke/out` cleared. Chunk 5.3's are `tests/test_working_set.py` (8 checks
 against real owned CPU children and real scopes: the floor lands where the job inherited it, a
 foreign or missing scope is reported and left alone, the ceiling keeps its reclaim gap, an admission
 below one page refuses, and a failed `after_resume` certifies the owned cleanup on Linux) and
