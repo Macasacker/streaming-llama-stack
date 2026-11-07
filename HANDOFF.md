@@ -31,7 +31,16 @@ four suite names Phase 7 owned plus two scripts that still named `engines/ds4-wi
 the census gate the remaining text sweep needs and made the rewording chunk 4.1 had claimed but
 never did.
 
-1. **Chunk 4.3 - the CUDA backend's AMD and Moore Threads vocabulary.** Chunk 4.2 deleted
+1. **Chunk 4.3 - the dead platform text the two 4.2 commits did not reach.** Two pieces, both
+   keyed on names no build of this fork defines, so both are the same mechanical fold 4.2b did:
+   (a) `engines/ds4/cuda/mmq/` - the engine's vendored copy of the ggml CUDA tier - carries 96
+   directive lines naming `GGML_USE_HIP`/`GGML_USE_MUSA`/`MUSART_*` across 11 files plus its own
+   `vendors/hip.h` (308 lines); its gates are the engine's, not llama's (the four hand-compiled
+   TUs, `make -C engines/ds4 cuda CUDA_ARCH=sm_120`, and the by-hand warning comparison in
+   `docs/linux-port-commands.md`), and `cuda/mmq/VENDOR.md` should say what was pruned from the
+   vendored copy. (b) the CUDA backend's AMD and Moore Threads compute-capability vocabulary,
+   described in the next paragraph.
+   Chunk 4.2 deleted
    `ggml-hip` and `ggml-musa`, which were the only things that ever defined `GGML_USE_HIP` and
    `GGML_USE_MUSA`, and folded every branch keyed on those names. What is left is one layer
    deeper and is not a collapse: `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, the

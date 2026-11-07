@@ -1312,6 +1312,17 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     added or dropped, the suite's failing names are a subset of the baseline worktree's, and
     `release_check` reports 0 findings.
     Findings this chunk produced, for the chunk that owns them:
+    - `engines/ds4/cuda/mmq/` is a vendored copy of the same ggml CUDA tier
+      (`cuda/mmq/VENDOR.md` says so), and it carries the identical HIP and MUSA branches: 96
+      directive lines naming `GGML_USE_HIP`/`GGML_USE_MUSA`/`MUSART_*` across 11 files -
+      `common.cuh`, `ds4_ggml_stubs.cu`, `ds4_mmq_d2r.cu`, `ds4_mmq_d2r.cuh`, `ds4_mmq.h`,
+      `ds4_repack.cu`, `mma.cuh`, `mmq.cuh`, `vecdotq.cuh` and the two `test/` sources - plus its
+      own `vendors/hip.h` (308 lines). The engine's Makefile never defines any of those names, so
+      it is the same fold as this chunk's, with the engine's own gates (the four hand-compiled
+      TUs and the warning comparison in `docs/linux-port-commands.md`) rather than the llama
+      build's. `common.cuh` there even includes a `vendors/musa.h` that does not exist in the
+      engine, which is only visible because the branch naming it is dead. Not done here: this
+      chunk's scope was the llama tree, and the engine's mmq tier is what Phase 2 owns.
     - The CUDA backend's AMD and Moore Threads compute-capability vocabulary is still
       dead-but-present: `GGML_CUDA_CC_IS_CDNA/_RDNA/_MTHREADS`, `AMD_MFMA_AVAILABLE`,
       `AMD_WMMA_AVAILABLE` and the `GGML_CUDA_CC_CDNA*/RDNA*/QY*/PH1` constants. Their guards'
