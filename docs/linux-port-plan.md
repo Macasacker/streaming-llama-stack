@@ -361,16 +361,17 @@ Gate: cmake configures and builds with no backend options other than CUDA.
 Chunk 5.1 landed the platform half of this phase in four commits (`270d7a9`, `65e54bd`,
 `c17d6a6`, `63c8dc1`): the paging counters read `/proc`, one advisory lock replaces the
 four `msvcrt`/`fcntl` pairs, the guardian contains its tree in a cgroup v2 scope, and the
-staged runtime carries Linux binaries. `slstack/` has no `msvcrt`, no `WinDLL` and no
-`CREATE_SUSPENDED` left; what still refuses non-nt is two files and one media installer:
+staged runtime carries Linux binaries. Chunk 5.2 (`5fb07f7`) landed the producer runner, so
+nothing that launches a producer refuses non-nt any more; what still refuses non-nt is two
+files and one media installer:
 
 ```
 combo_ram.py      LockedRam is a named Windows file mapping plus VirtualLock, and
-                  protect_working_set is SetProcessWorkingSetSizeEx on a suspended handle.
-                  Both are reached only through studio.dsv41_windows_runner._Native,
-                  whose constructor refuses non-nt - see chunk 5.2 before touching these.
+                  protect_working_set is SetProcessWorkingSetSizeEx on the owned job.
+                  Its runner is now slstack.producer_runner.default_runner, so both are
+                  reachable on Linux and refuse only inside kernel_api() - chunk 5.3.
 working_set.py    the same protect_working_set, kept as a separate module for the
-                  native_broker path. Same dependency.
+                  native_broker path. Same dependency, same chunk.
 media_tools.py    downloads and unpacks a pinned Windows FFmpeg zip; the non-nt arm only
                   reports the system ffmpeg and ffprobe on PATH. Media setup, Phase 6.
 ```
@@ -1161,27 +1162,58 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
       therefore refuses an over-budget allocation before the 50 ms RSS poll can report
       one, and the receipt's reason is derived from the scope's OOM counters.
 
-5.2 Producer runner on Linux. `vendor/studio/studio/dsv41_windows_runner._Native`
-    refuses non-nt in its constructor and is imported unconditionally by `combo_producer`,
-    `combo_native`, `combo_session` and `native_broker`, so no ULTRA producer can be
-    launched here at all. It is a port, not a fold: suspended `CreateProcessW` plus Job
-    admission, `CreateFileW` leases with no-share modes and volume checks
-    (`QueryDosDeviceW`, alternate-data-stream refusals), module enumeration, and the
-    Ctrl-Break cooperative request. Linux counterparts: `Popen(preexec_fn=scope.pre_exec)`
-    from `slstack/cgroup_scope.py`, `fcntl` leases, `/proc/<pid>/maps` for the module list,
-    SIGINT (already `shutdown.request_interrupt`). Chunk 5.1's scope and lock are the
-    pieces it should reuse rather than re-implement.
-    Gate: a producer launch that reaches readiness. Blocked on a qualified GGUF for
-    anything beyond reaching the refusal that names the model.
+5.2 Producer runner on Linux. Done in `5fb07f7`. `slstack/producer_runner.py` is the
+    counterpart of `vendor/studio/studio/dsv41_windows_runner.py` with the same
+    `_Native`/`_Job` surface, and `default_runner()` chooses between the two, so the four
+    combo call sites and the vendored `Producer` no longer name a platform.
+    Suspension is `slstack/producer_launch.py`: a child that takes its own process group,
+    reports its pid, and execs the engine only when the controller writes one byte, so no
+    engine instruction runs before containment is confirmed - what
+    `CreateProcessW(CREATE_SUSPENDED)` + `AssignProcessToJobObject` + `ResumeThread` gave.
+    Its `PR_SET_PDEATHSIG` retires a child that was never admitted, and `execv` clears that
+    setting, which is why `release_kill_on_close()` records the release rather than making
+    one. Ctrl-Break is SIGINT to the group, `TerminateJobObject(137)` is SIGKILL to it, and
+    `ActiveProcesses` is the group's live members, so a force-killed producer's receipt
+    reports exit `-9` where Windows recorded the 137 it passed in. Containment is the cgroup
+    the controller already sits in, not a new sibling scope: the retired job was created with
+    `CREATE_BREAKAWAY_FROM_JOB` and carried no memory limit, and moving the producer out
+    would have taken it out of the guardian's ceiling, so `job.scope` only records what the
+    tree inherited. Leases reuse chunk 5.1's lock - `journal.advisory_lock(shared=True)` is
+    `FILE_SHARE_READ`'s counterpart - and `_Native._open` applies the provider's own statfs
+    magic refusal list, with `O_NOFOLLOW`, `realpath` equality and `st_dev`/`st_ino` in place
+    of `QueryDosDeviceW`, `GetFinalPathNameByHandleW` and `FileIdInfo`. The lock is advisory:
+    what a share mode refused against a non-cooperating opener is not reproduced here, the
+    identity rechecks are. `launch_environment()` puts the producer's library directories in
+    `LD_LIBRARY_PATH` as well as PATH, because the Linux loader is what reads them.
+    Gate: `tests/test_producer_runner.py` (22 checks, no model and no GPU allocation) and
+    `docs/evidence/producer-launch-gate.py`, which runs the real CLI through the vendored
+    `Producer` with the no-model argv and reaches "Selected GPU free bytes do not exceed the
+    explicit reserve" with `owned_job_empty`, `owned_process_signaled` and `owned_pid_gone`
+    true and no launcher left blocked. Readiness needs a qualified GGUF, and the engine's
+    own `--gpu-reserve-bytes` floor is 1 GiB, so on a busier box this gate aborts inside
+    ggml CUDA init instead - read it against the headroom probe. The cooperative SIGINT path
+    is proven against CPU fixtures, not against the engine, which exits before a retirement
+    window can open.
+    Findings this chunk produced, none of them its own to fix: neither the engine's nor this
+    runner's volume list refuses NFS4's magic (`0x6e626470`), only `NFS_SUPER_MAGIC`, so an
+    NFS4 mount is accepted on both sides; `combo_native`'s model-drive refusal keys on a
+    Windows drive letter and so no-ops here; and `working_set`/`combo_ram` reach for
+    `job.pi.process`, which this runner does not expose - chunk 5.3 reads `job.scope` and
+    `job.pid` instead.
 
 5.3 Resident admission and the locked checkpoint. `working_set.protect_working_set` and
-    `combo_ram.protect_working_set` set a hard minimum working set on a suspended handle;
-    the Linux counterpart is `memory.min` on the child's scope (page-multiple writes -
-    chunk 3.1h learned that the kernel rounds and splits VMAs). `combo_ram.LockedRam` is
-    a named `CreateFileMappingW` + `VirtualLock` shared section, which becomes
-    `shm_open`/`mmap` + best-effort `mlock` with the 3.1h `CARRY_RAM_LOCK_PARTIAL` rule,
-    and its child-side `OpenFileMappingW` becomes the same name under `/dev/shm`.
-    Blocked on 5.2, whose suspended-handle object is the argument both functions take.
+    `combo_ram.protect_working_set` set a hard minimum working set on the owned job; the
+    Linux counterpart is `memory.min` on the scope the job inherited (`job.scope`), written
+    in page multiples - chunk 3.1h learned that the kernel rounds and splits VMAs. Neither
+    module may need a handle at all, since chunk 5.2's `_Job` exposes `pid` and `scope`
+    only. `memory.min` on an *inherited* scope raises the floor of the guardian's own tree
+    too, which the Windows working set did not: decide whether the producer needs a scope of
+    its own, and whether the guardian can delegate `memory` to it, before writing one.
+    `combo_ram.LockedRam` is a named `CreateFileMappingW` + `VirtualLock` shared section,
+    which becomes `shm_open`/`mmap` + best-effort `mlock` with the 3.1h
+    `CARRY_RAM_LOCK_PARTIAL` rule, and its child-side `OpenFileMappingW` becomes the same
+    name under `/dev/shm` - which chunk 5.2's volume rule refuses as RAM-backed, so either
+    the checkpoint moves off tmpfs or that rule is scoped to producer paths.
     Gate: `tests/test_working_set.py` and `tests/test_combo_ram.py` stop skipping and the
     shared-RAM child handoff in `combo_ultra_parity.py` runs.
 
@@ -1268,12 +1300,16 @@ python3 -B scripts/release_check.py
 
 Counts, re-counted after chunk 5.1 with the commands above plus `-I` (skip binary files - the
 built engine binaries and `*.o` under `engines/ds4` match these patterns and are not source) and
-`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__`: 491 Windows references and
-920 Apple/MLX ones repo-wide. The earlier figures in this file (504 and 1,109) were counted
-without `-I`, so they are not comparable; re-run the command rather than trusting any number
-here. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so `scripts/port`'s own sweep
-`--tokens` list does not count, the Python that still names Win32 is 3 hits: `combo_ram.py` and
-`working_set.py` (chunks 5.2 and 5.3). `media_tools.py`'s Windows FFmpeg download is not in that
+`--exclude-dir=build --exclude-dir=.git --exclude-dir=__pycache__`: 488 Windows references and
+920 Apple/MLX ones repo-wide. The earlier figures in this file (504, 532 and 491) were counted
+differently - some without `-I` - so they are not comparable; re-run the command rather than
+trusting any number here. Inside `slstack/` and `scripts/`, with `--exclude-dir=port` so
+`scripts/port`'s own sweep `--tokens` list does not count, the gate in
+`docs/linux-port-commands.md` reports 8 lines after chunk 5.2 and only two of them are code:
+`combo_ram.py` and `working_set.py` each call `ctypes.WinDLL('kernel32')` (chunk 5.3). The other
+six are provenance - five rows of `slstack/producer_runner.py`'s mapping table, which names the
+retired API it replaces, and one line of `working_set.py`'s module docstring.
+`media_tools.py`'s Windows FFmpeg download is not in that
 number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside `engines/ds4` the code-identifier gate
 (`\bmetal_\|\bMETAL_`) returns 0, `DS4_BACKEND_METAL` returns 0, and the remaining 270 Apple/Metal
 matches are the 213 distinct `DS4_METAL_*` environment names (404 occurrences) kept on purpose plus
@@ -1297,10 +1333,11 @@ ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 in chunk 1.10b.
 
 Python suite: `timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B
--m pytest tests/ -q` reports **625 passed, 5 failed, 41 skipped** after chunk 5.1. Set
-`STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or five
-process tests raise `KeyError: STUDIO_RUNTIME_ROOT`; without it the same tree reads 593 passed,
-7 failed, 62 skipped, which is why counts alone mislead. Two process tests vary run to run
+-m pytest tests/ -q` reports **648 passed, 5 failed, 41 skipped** after chunk 5.2 (22 runner
+checks and one shared-lock check added; no name un-skipped). Set
+`STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or 21
+process tests raise `KeyError: STUDIO_RUNTIME_ROOT`; without it the same tree reads 624 passed,
+29 failed, 41 skipped, which is why counts alone mislead. Two process tests vary run to run
 (`test_real_owned_child_stops_on_kit11_hold`,
 `test_disconnect_inside_reasoning_then_next_turn_appends_only`), so compare the set of names,
 not the count. The five stable survivors are Linux gaps, not Mac leftovers: the missing
