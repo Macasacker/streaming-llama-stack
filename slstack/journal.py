@@ -2,6 +2,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
+import errno
 import hashlib
 import json
 import os
@@ -29,6 +30,12 @@ def advisory_lock(stream, *, blocking=False, shared=False):
     try:
         fcntl.flock(stream.fileno(), mode)
     except OSError as error:
+        # A refused attempt is the only thing that means contention. An interrupted blocked
+        # wait, a closed descriptor or a filesystem that cannot lock is a different failure,
+        # and lease.gpu_lease must not report it as an admission already in progress.
+        # https://man7.org/linux/man-pages/man2/flock.2.html
+        if error.errno != errno.EWOULDBLOCK:
+            raise
         raise LockUnavailable(f'{label} is held by another process') from error
     try:
         yield

@@ -1179,8 +1179,11 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `CREATE_BREAKAWAY_FROM_JOB` and carried no memory limit, and moving the producer out
     would have taken it out of the guardian's ceiling, so `job.scope` only records what the
     tree inherited. Leases reuse chunk 5.1's lock - `journal.advisory_lock(shared=True)` is
-    `FILE_SHARE_READ`'s counterpart - and `_Native._open` applies the provider's own statfs
-    magic refusal list, with `O_NOFOLLOW`, `realpath` equality and `st_dev`/`st_ino` in place
+    `FILE_SHARE_READ`'s counterpart, and `advisory_lock` now reports `LockUnavailable` only for an
+    attempt the kernel refused (`EWOULDBLOCK`), because `lease.gpu_lease` turns that class into
+    `AdmissionRefused` and an unrelated `OSError` - an interrupted wait, a closed descriptor - must
+    not surface as an admission already in progress - and `_Native._open` applies the provider's own
+    statfs magic refusal list, with `O_NOFOLLOW`, `realpath` equality and `st_dev`/`st_ino` in place
     of `QueryDosDeviceW`, `GetFinalPathNameByHandleW` and `FileIdInfo`. The lock is advisory:
     what a share mode refused against a non-cooperating opener is not reproduced here, the
     identity rechecks are. `launch_environment()` puts the producer's library directories in
@@ -1333,7 +1336,7 @@ ggml backends Phase 4 deletes. Re-count before trusting any of these numbers.
 in chunk 1.10b.
 
 Python suite: `timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B
--m pytest tests/ -q` reports **648 passed, 5 failed, 41 skipped** after chunk 5.2 (22 runner
+-m pytest tests/ -q` reports **649 passed, 5 failed, 41 skipped** after chunk 5.2 (22 runner
 checks and one shared-lock check added; no name un-skipped). Set
 `STUDIO_RUNTIME_ROOT` (the repo's gitignored `runtime/` works: `mkdir -p runtime`) or 21
 process tests raise `KeyError: STUDIO_RUNTIME_ROOT`; without it the same tree reads 624 passed,

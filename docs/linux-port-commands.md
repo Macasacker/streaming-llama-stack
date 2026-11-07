@@ -77,7 +77,7 @@ timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'tes
 # process tests flip, and un-skipping a platform's tests moves the skip total.
 mkdir -p runtime
 timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q
-# 648 passed, 5 failed, 41 skipped. The five are the missing cosmos_windows module (2), its
+# 649 passed, 5 failed, 41 skipped. The five are the missing cosmos_windows module (2), its
 # video gate, the deleted slstack.mac profile, and test_yoco's preset default. A sixth name
 # appears in some runs and not others, alone or in a full run -
 # test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only - and it
@@ -86,7 +86,7 @@ timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -
 # Chunk 5.1's kernel containment, and chunk 5.2's runner and shared lease: no GPU, no model.
 timeout 300 env PYTHONPATH=.:tests python3 -B -m pytest \
   tests/test_cgroup_scope.py tests/test_advisory_lock.py tests/test_producer_runner.py -q
-# 35 passed. The cgroup one creates real subgroups under the user's app.slice and lets the
+# 37 passed. The cgroup one creates real subgroups under the user's app.slice and lets the
 # kernel SIGKILL an oversized child, so it needs the memory controller delegated there - it
 # skips with the reason printed if it is not. The runner one launches real children through
 # slstack/producer_launch.py and reads their /proc identity; it writes its fixtures under

@@ -103,7 +103,7 @@ The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyE
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
 `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q`). With it,
-this tree reads **648 passed, 5 failed, 41 skipped**; without it, 624 passed, 29 failed, 41 skipped.
+this tree reads **649 passed, 5 failed, 41 skipped**; without it, 624 passed, 29 failed, 41 skipped.
 Compare failing *names* across runs, and compare them in a baseline worktree rather than reading a
 count - the process tests flip and the skip set changes when a platform gate starts running.
 Chunk 5.1 un-skipped `tests/test_combo_guard.py`, which was `skipUnless(os.name=='nt')`: 21 guardian
@@ -127,7 +127,7 @@ reports 0 findings, and **no hook runs it here**: `git config --get core.hooksPa
 wire `.githooks` up on this box without changing the git identity - `release_check.py --identities`
 requires `Front Eagle <fronteagle739@users.noreply.github.com>`, which the fork's history carries,
 while this checkout's config is `Mac` and every port commit is `Mac`-authored. Python suite, with
-`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **648 passed, 5 failed, 41 skipped**, and the
+`STUDIO_RUNTIME_ROOT` set (see the paragraph below): **649 passed, 5 failed, 41 skipped**, and the
 five are `test_dsv41_recipe` and `test_streamed_recipe_argv` (the missing `cosmos_windows` module),
 `test_h3_video_delivery` (that module, plus a `.exe`-shaped fixture),
 `test_shared_prefill_profile` (needs `slstack.mac`, which this checkout does not publish), and
@@ -157,7 +157,8 @@ session, and the two carry recipes until this one.
 Chunk 5.1's Linux gates are ordinary pytest files rather than hand-compiled programs:
 `tests/test_cgroup_scope.py` (8 checks, the kernel refusing an oversized tree, a grandchild's
 refusal taking the group, the survivor and stale-launcher rules) and
-`tests/test_advisory_lock.py` (5 checks after 5.2 added the shared arm, one lock across two
+`tests/test_advisory_lock.py` (7 checks after 5.2 added the shared arm and the interrupted-wait
+rule, one lock across two
 processes, contended, blocking and shared) both run in the suite and need no GPU, no model and no
 `STUDIO_RUNTIME_ROOT`. Chunk 5.2's are `tests/test_producer_runner.py` (22 checks: nothing runs
 before admission, the never-resumed and closed-child retirements, SIGINT retirement, the force
@@ -715,6 +716,17 @@ Chunk 5.1 (four commits), whose receipt changes are still worth knowing:
   the reserve, and that is the deepest no-model outcome reachable here; lowering the flag below
   1 GiB reaches a different refusal ("requires ... explicit GPU reserve>=1GiB") instead of going
   deeper.
+- **`LockUnavailable` means "refused", not "failed".** `journal.advisory_lock` maps only
+  `EWOULDBLOCK` to it, because `lease.gpu_lease` converts that class into `AdmissionRefused`, which
+  the guardian's `gpu_wait_seconds` loop retries; any other `OSError` propagates instead of
+  reporting an admission already in progress. Chunk 5.2 found this while chasing a load-dependent
+  failure of `test_a_blocking_wait_ends_when_the_holder_leaves`, whose real cause was the test's own
+  holder: the polling probe could win the lock first, and the holder died on the refusal, so the
+  wait never saw the contention it was waiting for. The holder now retries.
+- **A freshly resumed child's module list races its exec.** `/proc/<pid>/maps` gains the
+  interpreter's mappings a moment after the admission byte lands, so an observation of
+  `job.modules()` polls rather than asserting once. The retired Windows runner had the same race
+  with `K32EnumProcessModulesEx`.
 
 ## Suggested skills
 

@@ -182,8 +182,13 @@ class OwnedChildTests(unittest.TestCase):
 
     def test_modules_are_the_mapped_paths(self):
         job = self.launch(SCRIPT)
+        interpreter = Path(sys.executable).resolve()
+        deadline = time.monotonic() + 5
         paths = job.modules()
-        self.assertIn(Path(sys.executable).resolve(), paths)
+        while interpreter not in paths and time.monotonic() < deadline:
+            time.sleep(.05)      # the observation races the exec, as the module list always does
+            paths = job.modules()
+        self.assertIn(interpreter, paths)
         self.assertTrue(any(path.name.startswith('lib') for path in paths))
 
     def test_launch_validation_refuses_before_any_child_exists(self):
