@@ -77,14 +77,19 @@ timeout 600 env PYTHONPATH=.:tests python3 -m unittest discover -s tests -p 'tes
 # process tests flip, and un-skipping a platform's tests moves the skip total.
 mkdir -p runtime
 timeout 900 env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest tests/ -q
-# 625 passed, 5 failed, 41 skipped. The five are the missing cosmos_windows module (2), its
-# video gate, the deleted slstack.mac profile, and test_yoco's preset default.
+# 646 passed, 5 failed, 41 skipped. The five are the missing cosmos_windows module (2), its
+# video gate, the deleted slstack.mac profile, and test_yoco's preset default. One more name,
+# test_combo_single_stop::test_disconnect_inside_reasoning_then_next_turn_appends_only, fails
+# in a full run and passes alone - it does in a baseline worktree too, so it is the box.
 
-# The guardian's kernel containment and the admission lock: no GPU, no model.
-timeout 300 env PYTHONPATH=.:tests python3 -B -m pytest tests/test_cgroup_scope.py tests/test_advisory_lock.py -q
-# 12 passed. The cgroup one creates real subgroups under the user's app.slice and lets the
+# Chunk 5.1's kernel containment, and chunk 5.2's runner and shared lease: no GPU, no model.
+timeout 300 env PYTHONPATH=.:tests python3 -B -m pytest \
+  tests/test_cgroup_scope.py tests/test_advisory_lock.py tests/test_producer_runner.py -q
+# 34 passed. The cgroup one creates real subgroups under the user's app.slice and lets the
 # kernel SIGKILL an oversized child, so it needs the memory controller delegated there - it
-# skips with the reason printed if it is not.
+# skips with the reason printed if it is not. The runner one launches real children through
+# slstack/producer_launch.py and reads their /proc identity; it writes its fixtures under
+# runtime/ because the runner refuses a RAM-backed volume, which /tmp is here.
 
 # The check gate the plan's Phase 5 names. Runs here; model/vram rows fail for box reasons.
 timeout 120 ./bin/slstack --config config.example.json check
@@ -106,13 +111,16 @@ grep -rn "_WIN32\|windows\.h\|Win32\|DStorage\|IoRing" engines/ds4 \
   --include=*.cu --include=*.cuh --include=*.inc
 # 3 hits, all vendored: engines/ds4/external/nlohmann/json.hpp (2) and the linenoise.c comment
 
-# The orchestrator has no Win32 bindings left either, except the two files chunk 5.2/5.3 own
+# The orchestrator has no Win32 bindings left either, except the two files chunk 5.3 owns
 # and the media installer. Note -I (the built engine binaries and *.o match these patterns) and
 # --exclude-dir=port, because scripts/port's own sweep token list is not platform code.
 grep -rn -I "_WIN32\|windows\.h\|Win32\|msvcrt\|WinDLL\|JobObject\|psapi\|kernel32\|add_dll_directory" \
   slstack scripts --include=*.py --exclude-dir=__pycache__ --exclude-dir=port
-# 3 hits: combo_ram.py and working_set.py (chunks 5.2 and 5.3). media_tools.py's Windows
-# FFmpeg download does not match this pattern - it keys on os.name and .exe names.
+# 8 lines, and only two of them are code: combo_ram.py and working_set.py (chunk 5.3) each call
+# ctypes.WinDLL('kernel32'). The other six are provenance - five rows of the mapping table in
+# slstack/producer_runner.py's docstring, which names the retired API it replaces, and one line
+# in working_set.py's module docstring. media_tools.py's Windows FFmpeg download does not match
+# this pattern - it keys on os.name and .exe names.
 
 # No Metal-named identifier or backend left in the engine. The word-boundary greps below are cheap
 # but NOT sufficient: `_` is a word character, so \bMETAL_ cannot see DS4_METAL_FOO (an environment
@@ -440,7 +448,34 @@ sha=$(sha256sum build/llama/bin/llama-dsv41-prefill | cut -d" " -f1)
 # exit 1: "Selected GPU free bytes do not exceed the explicit reserve".
 # out/payload.bin stays 0 bytes and out/receipt.json.pending-<pid>-<ticks> holds the failed
 # receipt, whose payload_actual_identity is that file's st_dev, st_ino and st_mtime.
+# Clear build/smoke/out first: the CLI opens its payload exclusive-new, so a leftover file
+# from an earlier run makes it refuse with "Cannot open exclusive-new output or read-only
+# physical input" before it ever reaches the GPU admission.
 ```
+
+### Launching that producer through the controller (chunk 5.2)
+
+`docs/evidence/producer-launch-gate.py` runs the same argv through the vendored
+`studio.dsv41_session_process.Producer`, so it gates the launch chain rather than the CLI:
+the child is contained before it execs, admission releases it, the three transport pipes
+carry it, stderr drains into the diagnostic buffer, the exit code is read, and the
+retirement certificate says the owned tree is empty. Read the CUDA headroom probe above in
+the same session.
+
+```bash
+rm -rf build/smoke/out && mkdir -p build/smoke/out
+./build/cuda-headroom-probe || echo "no context: this gate aborts inside ggml CUDA init"
+timeout 300 python3 -B docs/evidence/producer-launch-gate.py
+# producer refused: ... reason=Selected GPU free bytes do not exceed the explicit reserve
+# owned_cleanup={... "owned_job_empty": true, "owned_process_signaled": true,
+#                  "exit_code": 1, "forced_kill": false, "owned_pid_gone": true}
+# launchers still blocked: 0 []
+```
+
+`launchers still blocked: 0` is the orphan rule: a child that never got its admission byte
+leaves with 125 when its controller's write end goes away, so nothing survives the run. Readiness itself is still unreachable here - the engine then asks for a qualified GGUF,
+and `--gpu-reserve-bytes` has a 1 GiB floor, so a box with less free VRAM than that stops at
+the reserve refusal.
 
 ## Gates that fail today, and why
 

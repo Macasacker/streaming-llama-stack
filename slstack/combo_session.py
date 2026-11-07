@@ -57,8 +57,8 @@ def render_body(body):
 class ComboSession:
     def __init__(self,cfg,*,device=None,qualification_route=None):
         vendor()
-        from studio.dsv41_windows_runner import _Native
-        self.cfg=deepcopy(cfg);self.device=device or _Native()
+        from .producer_runner import default_runner
+        self.cfg=deepcopy(cfg);self.device=default_runner(device)
         self.session=secrets.token_hex(16);self.epoch=secrets.randbits(63) or 1
         self.generation=0;self.state=None;self.contract=None;self.payload=None
         self.journal=None;self.anchor=None;self.current=None;self.poison=None

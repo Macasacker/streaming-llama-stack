@@ -16,16 +16,20 @@ class LockUnavailable(OSError):
 
 
 @contextmanager
-def advisory_lock(stream, *, blocking=False):
-    """One exclusive advisory lock on an open file, held for the duration of the block.
+def advisory_lock(stream, *, blocking=False, shared=False):
+    """One advisory lock on an open file, held for the duration of the block.
 
+    `shared` is the reader's half of the same rule: read leases of one file coexist, as
+    `FILE_SHARE_READ` allowed, and an exclusive holder still refuses them.
     https://man7.org/linux/man-pages/man2/flock.2.html
     A contended non-blocking attempt raises LockUnavailable rather than waiting.
     """
+    mode = (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | (0 if blocking else fcntl.LOCK_NB)
+    label = stream.name if isinstance(getattr(stream, 'name', None), str) else f'descriptor {stream.fileno()}'
     try:
-        fcntl.flock(stream.fileno(), fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(stream.fileno(), mode)
     except OSError as error:
-        raise LockUnavailable(f'{stream.name} is held by another process') from error
+        raise LockUnavailable(f'{label} is held by another process') from error
     try:
         yield
     finally:

@@ -52,9 +52,9 @@ def qualification_identity(prior=None):
 
 def main(config_path,output,resume_full=None):
     cfg=json.loads(Path(config_path).read_text());vendor()
-    from studio.dsv41_windows_runner import _Native
+    from slstack.producer_runner import default_runner
     os.environ['CUDA_VISIBLE_DEVICES']=cfg['gpu_uuid'];os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-    device=_Native();baseline=device.gpu(0,cfg['gpu_uuid'])
+    device=default_runner();baseline=device.gpu(0,cfg['gpu_uuid'])
     prior=json.loads(Path(resume_full).read_text()) if resume_full else None
     session,epoch=qualification_identity(prior);cancel=threading.Event()
     childcfg=dict(cfg,host_budget_gib=cfg['native_host_budget_gib'],aggregate_host_budget_gib=cfg['host_budget_gib'])

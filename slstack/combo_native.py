@@ -154,7 +154,7 @@ class Native:
         combo_abort.check('native launch')
         vendor()
         from studio.dsv41_session_process import Producer
-        from studio.dsv41_windows_runner import _Native
+        from .producer_runner import default_runner, launch_environment
         self.cfg=deepcopy(cfg);self.session=session;self.epoch=epoch;self.sequence=sequence
         self.control_lock=threading.Lock();self.process=None;self.closed=False
         self.creation_attempted=False
@@ -210,8 +210,7 @@ class Native:
         parts=cfg.get('ds_read_parts',8)
         if type(parts) is not int or not 1<=parts<=64:raise ValueError('Explicit native split reads must be in1..64')
         env['DS4_DS_READ_PARTS']=str(parts)
-        libraries=[str(path(p)) for p in cfg.get('producer_library_directories',[])]
-        env['PATH']=os.pathsep.join([str(binary.parent),*libraries,env.get('PATH','')])
+        env=launch_environment(env,binary.parent,cfg.get('producer_library_directories',[]))
         directory=Path(cfg['runtime_root'])/('native-'+secrets.token_hex(8));directory.mkdir(parents=True,exist_ok=False)
         self.directory=directory;self.launch_started=time.monotonic()
         self.live_log=LiveLog(self,directory/'stderr.log')
@@ -242,7 +241,7 @@ class Native:
                         owner_epoch=epoch,next_sequence=self.sequence)
 
         try:
-            native=runner or _Native()
+            native=default_runner(runner)
             receipt=model_receipt(cfg)
             self.leases.enter_context(native.directory(directory))
             for file in (binary,path(cfg['model']),receipt):self.leases.enter_context(native.read_lease(file))

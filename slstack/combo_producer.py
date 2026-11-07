@@ -424,7 +424,7 @@ class ComboProducer:
         runtime_floor=runtime_min_free_gib(cfg)
         vendor()
         from studio.dsv41_session_process import Producer
-        from studio.dsv41_windows_runner import _Native
+        from .producer_runner import default_runner, launch_environment
         self.session=session;self.epoch=epoch;self.process=None;self.closed=False;self.leases=ExitStack()
         self.loading_process=None
         if on_start:on_start(self)
@@ -436,7 +436,7 @@ class ComboProducer:
         binary=path(cfg['llama_producer'])
         if sha256(binary)!=cfg['producer_sha256']:raise ValueError('ULTRA binary pin differs')
         self.directory=Path(cfg['runtime_root'])/('ultra-'+secrets.token_hex(8));self.directory.mkdir()
-        native=runner or _Native();receipt=model_receipt(cfg)
+        native=default_runner(runner);receipt=model_receipt(cfg)
         self.model_sha256=model_digest(cfg,receipt)
         tier=cfg.get('producer_profile','ultra')
         if tier not in ('accurate','fast','ultra'):raise ValueError('Combo producer profile must be accurate, fast or ultra (original weights; no HYPER)')
@@ -488,7 +488,7 @@ class ComboProducer:
             env['LLAMADECODE_DS4_SPREAD']=str(path(cfg['cache_affinity_spread_file']))   # B5 calibration (native's file)
         self.cancel_path=self.directory/'decode.cancel'   # LLAMADECODE decode cancel (see cancel_decode)
         env['LLAMADECODE_DECODE_CANCEL_FILE']=str(self.cancel_path)
-        env['PATH']=os.pathsep.join([str(binary.parent),*[str(path(p)) for p in cfg.get('producer_library_directories',[])],env.get('PATH','')])
+        env=launch_environment(env,binary.parent,cfg.get('producer_library_directories',[]))
         self.started=time.monotonic()
         try:
             self.leases.enter_context(native.directory(self.directory))

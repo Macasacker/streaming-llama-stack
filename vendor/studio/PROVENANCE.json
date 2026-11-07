@@ -85,6 +85,10 @@
     {
       "path": "job_paging.py",
       "purpose": "Linux paging observer: an owned member can exit between the identity check and the /proc/<pid>/status read, and a status with no VmSwap line charges no swap. The read now yields zero for that member instead of raising StopIteration, which the guard monitor previously reported as the job's stop reason. Windows and Darwin observation unchanged."
+    },
+    {
+      "path": "dsv41_session_process.py",
+      "purpose": "Linux producer launch: the default runner is slstack.producer_runner.default_runner, which returns this module's Windows runner on nt and the POSIX runner elsewhere, so a mode1 or mode3 Producer can be constructed on Linux at all. The suspended-handle admission hook, transport, liveness rule and hash checks are unchanged."
     }
   ],
   "modules": [

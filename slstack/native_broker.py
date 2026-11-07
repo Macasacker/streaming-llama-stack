@@ -126,7 +126,7 @@ class OwnedProducer:
         from studio.dsv41_session_contract import CONTEXT, require
         from studio.dsv41_session_process import Producer
         from .native_profiles import profile
-        from studio.dsv41_windows_runner import _Native
+        from .producer_runner import default_runner, launch_environment
         self.cfg, self.request, self.cancel = cfg, {k:v for k,v in request.items() if k!='vision'}, cancel
         self.stack = ExitStack()
         self.producer = None
@@ -158,7 +158,7 @@ class OwnedProducer:
                     return True
                 return False
 
-            native = _Native()
+            native = default_runner()
             directory = Path(cfg['runtime_root']) / 'native-sessions' / request['session']
             directory.mkdir(parents=True, exist_ok=False)
             self.directory = directory
@@ -221,8 +221,7 @@ class OwnedProducer:
             argv = [str(binary), *[str(v) for item in args.items() for v in item]]
             env = environment(cfg, 'rtx-producer')
             if not env.get('LLAMADECODE_ABORT_FILE'):env['LLAMADECODE_ABORT_FILE']=str(directory/'guard.abort')
-            libraries = [str(path(p)) for p in cfg.get('producer_library_directories', [])]
-            env['PATH'] = os.pathsep.join([str(binary.parent), *libraries, env.get('PATH', '')])
+            env = launch_environment(env, binary.parent, cfg.get('producer_library_directories', []))
             from .combo_producer import stall_seconds   # local: combo_producer imports this module
             # DS4COMBO2 liveness: no fixed lease_minutes cap; the Producer's no-progress window
             # (stall_seconds) ends a stalled session, and idle_seconds still retires an idle one.

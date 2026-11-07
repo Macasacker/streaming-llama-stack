@@ -10,9 +10,9 @@ from slstack.journal import atomic_json
 
 def main(config_path,output):
     cfg=json.loads(Path(config_path).read_text());vendor()
-    from studio.dsv41_windows_runner import _Native
+    from slstack.producer_runner import default_runner
     os.environ['CUDA_VISIBLE_DEVICES']=cfg['gpu_uuid'];os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-    device=_Native();baseline=device.gpu(0,cfg['gpu_uuid']);owner=None
+    device=default_runner();baseline=device.gpu(0,cfg['gpu_uuid']);owner=None
     proof=dict(status='RUNNING',native_sha256=cfg['native_sha256'],provider_schema=cfg['provider_schema'],requests=[])
     try:
         owner=Native(dict(cfg,host_budget_gib=cfg['native_host_budget_gib'],aggregate_host_budget_gib=cfg['host_budget_gib']),secrets.token_hex(16),secrets.randbits(63) or 1,1,lambda:False,runner=device)

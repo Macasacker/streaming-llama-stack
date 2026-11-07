@@ -24,6 +24,14 @@ HOLDER = ('import sys, time\n'
           'stream = open(sys.argv[1], "r+")\n'
           'with advisory_lock(stream):\n'
           '    time.sleep(float(sys.argv[2]))')
+SHARED_PROBE = ('import sys\n'
+                'from slstack.journal import advisory_lock, LockUnavailable\n'
+                'stream = open(sys.argv[1], "r+")\n'
+                'try:\n'
+                '    with advisory_lock(stream, shared=True):\n'
+                '        print("SHARED")\n'
+                'except LockUnavailable:\n'
+                '    print("CONTENDED")')
 
 
 def run(code, *args):
@@ -62,6 +70,16 @@ class AdvisoryLockTests(unittest.TestCase):
             self.assertLess(waited, 10)
         finally:
             holder.wait(timeout=10)
+
+    def test_shared_holders_coexist_and_refuse_an_exclusive_holder(self):
+        """The reader's half of the rule chunk 5.2's read lease needs: many readers, no writer."""
+        with self.ledger.open('r+') as stream, advisory_lock(stream, shared=True):
+            self.assertEqual(run(SHARED_PROBE, str(self.ledger)).stdout.strip(), 'SHARED')
+            with self.assertRaises(LockUnavailable):
+                with self.ledger.open('r+') as writer, advisory_lock(writer):
+                    pass
+        with self.ledger.open('r+') as stream, advisory_lock(stream):
+            self.assertEqual(run(SHARED_PROBE, str(self.ledger)).stdout.strip(), 'CONTENDED')
 
     def test_a_contended_admission_is_refused_not_crashed(self):
         cfg = dict(hold_file=str(self.ledger), runtime_root=str(self.folder), task='DS4STACK',

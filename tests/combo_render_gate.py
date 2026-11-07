@@ -48,12 +48,12 @@ def main():
     cfg = json.loads(Path(args.cfg).read_text())
     cases = args.case or DEFAULT_CASES + [str(ROOT / 'tests/fixtures/render_gate_cases.json')]
     vendor()
-    from studio.dsv41_windows_runner import _Native
+    from slstack.producer_runner import default_runner
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg['gpu_uuid'];os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
     os.environ.setdefault('LLAMADECODE_ABORT_FILE', str(Path(args.out).with_suffix('.abort')))
     tokenizer = ds4_render.Tokenizer.from_gguf(cfg['model'])
     result = dict(cfg=args.cfg, native_sha256=cfg.get('native_sha256'), cases=[], started=time.time())
-    device = _Native();baseline = device.gpu(0, cfg['gpu_uuid']);owner = None
+    device = default_runner();baseline = device.gpu(0, cfg['gpu_uuid']);owner = None
     try:
         childcfg = dict(cfg, host_budget_gib=cfg['native_host_budget_gib'], aggregate_host_budget_gib=cfg['host_budget_gib'])
         owner = Native(childcfg, secrets.token_hex(16), secrets.randbits(63) or 1, 1, lambda: False)

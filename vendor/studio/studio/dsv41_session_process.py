@@ -82,8 +82,8 @@ class Producer:
         require(0 < operation_seconds <= 3600 and 0 < idle_seconds <= 3600, 'Bounded session deadlines required')
         require(psutil.virtual_memory().available >= host_bytes + physical_floor, 'Persistent producer host admission refused')
         if native is None:
-            from studio.dsv41_windows_runner import _Native
-            native = _Native()
+            from slstack.producer_runner import default_runner
+            native = default_runner()
         self.session, self.native = (session, native)
         self.host_bytes, self.floor = (host_bytes, physical_floor)
         # Admission and runtime floors are independent. The runtime available-RAM stop defaults to
