@@ -17,11 +17,7 @@ using namespace ggml_cuda_mma;
 static __forceinline__ int64_t mmf_get_max_block_size(int cc) { return GGML_CUDA_CC_IS_CDNA(cc) ? 512 : 256; }
 static __forceinline__ int mmf_get_padding(int cc) { return GGML_CUDA_CC_IS_CDNA(cc) ? 2 : 4; }
 static constexpr __device__ int mmf_get_padding() {
-#if defined(AMD_MFMA_AVAILABLE)
-    return 2;
-#else
     return 4;
-#endif
 }
 // Pure bounds and logical layout for the explicit Q4_K/half-RHS MMID family.
 #include <cstdint>

@@ -70,17 +70,7 @@ enum mmvq_parameter_table_id {
 };
 
 static constexpr __device__ mmvq_parameter_table_id get_device_table_id() {
-#if defined(RDNA4)
-    return MMVQ_PARAMETERS_RDNA4;
-#elif defined(RDNA3_0)
-    return MMVQ_PARAMETERS_RDNA3_0;
-#elif defined(RDNA2) || defined(RDNA3_5)
-    return MMVQ_PARAMETERS_RDNA2;
-#elif defined(GCN) || defined(CDNA)
-    return MMVQ_PARAMETERS_GCN;
-#else
     return MMVQ_PARAMETERS_GENERIC;
-#endif
 }
 
 static __host__ mmvq_parameter_table_id get_device_table_id(int cc) {
@@ -274,17 +264,7 @@ int get_mmvq_mmid_max_batch(ggml_type type, int cc) {
 // Device constexpr: returns the max batch size for the current arch+type at compile time.
 template <ggml_type type>
 static constexpr __device__ int get_mmvq_mmid_max_batch_for_device() {
-#if defined(RDNA4)
-    return get_mmvq_mmid_max_batch_rdna4(type);
-#elif defined(RDNA3)
-    return get_mmvq_mmid_max_batch_rdna3(type);
-#elif defined(RDNA2) || defined(RDNA1)
-    return get_mmvq_mmid_max_batch_rdna1_rdna2(type);
-#elif defined(CDNA)
-    return get_mmvq_mmid_max_batch_cdna(type);
-#elif defined(GCN)
-    return get_mmvq_mmid_max_batch_gcn(type);
-#elif defined(__CUDA_ARCH__) && (__CUDA_ARCH__ == GGML_CUDA_CC_VOLTA || __CUDA_ARCH__ >= GGML_CUDA_CC_ADA_LOVELACE)
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ == GGML_CUDA_CC_VOLTA || __CUDA_ARCH__ >= GGML_CUDA_CC_ADA_LOVELACE)
     return MMVQ_MAX_BATCH_SIZE;
 #elif defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= GGML_CUDA_CC_TURING
     return get_mmvq_mmid_max_batch_turing_plus(type);

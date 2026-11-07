@@ -22205,7 +22205,7 @@
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:604",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/common.cuh:1165",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:6216",
-      "engines/ds4/cuda/mmq/common.cuh:1115"
+      "engines/ds4/cuda/mmq/common.cuh:1111"
     ],
     "defaults_by_scope": {
       "rtx-llama": "1"
@@ -22254,7 +22254,7 @@
         "consumer": "    // use ggml_backend_cuda_graphs_disable_push/pop for scoped runtime control.\n    static const bool cuda_graphs_disabled = [] {\n        const char *value=std::getenv(\"GGML_CUDA_DISABLE_GRAPHS\");\n        return value && std::strcmp(value,\"0\")!=0;\n    }();\n    if (cuda_graphs_disabled || cuda_graphs_forced_disabled) {\n        use_cuda_graph = false;"
       },
       {
-        "source": "engines/ds4/cuda/mmq/common.cuh:1115",
+        "source": "engines/ds4/cuda/mmq/common.cuh:1111",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static const bool disable_cuda_graphs_due_to_env = (getenv(\"GGML_CUDA_DISABLE_GRAPHS\") != nullptr);",
         "consumer": "\n    bool is_enabled() const {\n        static const bool disable_cuda_graphs_due_to_env = (getenv(\"GGML_CUDA_DISABLE_GRAPHS\") != nullptr);\n        return !(disable_due_to_gpu_arch || disable_cuda_graphs_due_to_env);\n    }\n#endif\n};"
