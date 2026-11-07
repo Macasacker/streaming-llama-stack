@@ -463,8 +463,8 @@ Gate: cmake configures and builds with no backend options other than CUDA.
       one of nine backend directories this chunk's list never named and never deleted -
       `ggml-blas`, `ggml-cann`, `ggml-hip`, `ggml-musa`, `ggml-opencl`, `ggml-webgpu`, `ggml-zdnn`
       and `ggml-zendnn` beside it, 68 tracked files and about 1.5 MB, none of them compiled on this
-      build. Their deletion landed as chunk 4.2; the comment and message sweep is chunk 7.1e's, as
-      it was for the engine.
+      build. Their deletion landed as chunk 4.2; the comment and message sweep landed as chunk
+      7.1e, as it was for the engine.
     - `common/arg.cpp`'s `--device` parsing and `llama_supports_rpc()` still name "RPC" at
       runtime; both are inert because no RPC registry exists, and neither is in the producer path.
 
@@ -1337,11 +1337,11 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
       pass - so no branch keyed on it is decidable by that rule. Pruning it is a chunk of its own,
       not a collapse. `mma.cuh`'s `#endif // defined(GGML_USE_HIP)` comment never matched its
       guard, upstream.
-    - Ten retired-backend mentions remain in the llama tree, all in comment position
+    - Ten retired-backend mentions remained in the llama tree, all in comment position
       (`src/llama-context.cpp` x2, `src/llama-prefill-stream.cpp`, `common/common.h` x2,
       `ggml/src/ggml-cpu/simd-mappings.h`, `ggml/src/ggml-backend.cpp`,
       `ggml/include/ggml-backend.h`, `ggml/src/ggml-cuda/mma.cuh`, `common.cuh`'s Moore Threads
-      heading): chunk 7.1e's text sweep.
+      heading): chunk 7.1e's text sweep took them.
     - The "plain flag set" in `docs/linux-port-commands.md` cannot configure as written: this fork
       has no `tests/`, no `examples/CMakeLists.txt` and no `pocs/`, so it needs
       `-DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF` and
@@ -1517,7 +1517,8 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
       those are still in `cuda/mmq/`. What remains of the AMD vocabulary in both trees is comment
       text naming architectures the retained `GGML_CUDA_CC_*` constants still describe: 30 lines in
       `engines/ds4` and 22 in `engines/streaming-llama/prefill_llama.cpp/ggml/src`, which is 7.1e's
-      text sweep only insofar as that text is wrong rather than explanatory.
+      text sweep only insofar as that text is wrong rather than explanatory - 7.1e read them and
+      kept them: they explain the kept selection code.
     - Environment: one row re-anchored in the engine half (`GGML_CUDA_DISABLE_GRAPHS`,
       `common.cuh:1115 -> 1111`) and eleven rows / fourteen reads in the llama half (all in
       `fattn-mma-f16.cuh`). 2,143 documented variables stand through both halves and no name was
@@ -1684,7 +1685,7 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     non-nt only reports the system `ffmpeg`/`ffprobe` on PATH. Port media to Linux or delete it;
     the README already calls it experimental.
 
-7.1 Docs, examples, presets, tests. Three commits landed; two pieces remain.
+7.1 Docs, examples, presets, tests. Five commits landed; the phase is closed.
 
 7.1a Done (`5b941ff`): the Mac and paired doc surface is deleted - six `MACDECODE` rounds, four
     `macdecode-r*` receipt directories, `macdecode-measurements.json`, `TWO_MACHINE.md`,
@@ -1765,7 +1766,7 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `ENV_NAME_CITED` 118 to **7**, not 0 - the seven are cited and never read: six are arguments of
     `gpu_graph_ported_m5_decode_feature_enabled()`, a stub that returns false and `(void)`-discards
     both, and one is the `DS4_METAL_DISABLE_*_FUSION` wildcard in a comment above it. Chunk 7.1e
-    owns them. `tests/test_env_inventory.py` (12 checks) proves the three passes on synthetic
+    took them to 0 by deleting the stub's parameters and rewording that comment. `tests/test_env_inventory.py` (12 checks) proves the three passes on synthetic
     source - including that the old line-bound rule found the *discarded* alias and not the live
     name - and asserts the tree facts this entry claims. Suite: **685 passed, 1 failed, 38
     skipped**; the one failure is still `test_yoco`, and `test_environment_contract`'s
@@ -1775,25 +1776,65 @@ Each chunk is sized to fit one working session and ends with a gate. Tick them i
     `env`) - listed by `unresolved_wrapper_reads()`; all three name knobs the table already
     documents from their engine reads.
 
-7.1e The Mac peer's text in the llama tree. Pending: 51 comment lines across 20 files and 3
-    printed strings (`ds4split-expert-projection.cuh`, `ds4split-projection-fixture.cuh`,
-    `tools/decode-receiver/main.cpp`), plus `decode-receiver`'s 13 comment lines and its printed
-    `LLAMA_PD_CACHE_CAPTURE` warning that describes the deleted Mac backend. Chunk 7.1d left two
-    more items on this list. `metal_word_census` reports `ENV_NAME_CITED 7`, and all seven are
-    cited but never read: `gpu_graph_ported_m5_decode_feature_enabled()` at `ds4.c:24461` returns
-    false and `(void)`-discards both of its parameters, so the six `DS4_METAL_*_FUSE` literals at
-    its three call sites are dead arguments of a dead branch, and the seventh is the
-    `DS4_METAL_DISABLE_*_FUSION` wildcard in the comment at `ds4.c:22660` that describes them.
-    Deleting the stub's parameters (and rewording that comment) is what takes the count to 0;
-    documenting them is not, because nothing reads them. And `scripts/release_check.py:161` still
-    skips `engines/mlx-serve/` in the working-tree scan although 1.10a deleted the gitlink - the
-    pinned-OID branches at 191 and 242 must stay, because `scan_history()` walks historical trees
-    that really do contain it.
-    Use `scripts/port/comment_code_diff.py` and `string_text_replace.py`, check `__LINE__` first,
-    and keep provenance comments that say what was deleted rather than pretending it exists.
-    Gate: `metal_word_census --strict` reports 0 identifiers and `ENV_NAME_CITED 0`, and the
-    comment count drops to the provenance lines, `comment_code_diff.py` reports 0 changed code
-    lines for a comment-only sweep, and the warning profile loses no kind.
+7.1e The Mac peer's text in the llama tree. Done, one commit. The 51 comment lines and 3 printed
+    strings the census counted, the ten retired-backend mentions 4.2 left in comment position, and
+    what 4.3c left there are reworded or deleted; what survives is provenance - comments that say
+    the *retired* Mac peer ran the arithmetic they describe, none that a deleted backend still
+    routes compute. The present-tense Metal rewrites (`routes compute to Metal`, `Only enable on
+    Metal (Mac)`, `for the CPU and Metal backend`, `including Metal`, the mega-launch header naming
+    the `metal_hidden_buf` field chunk 4.1 deleted) became CUDA/CPU text or past tense; the
+    measurement-history comments (`GGML_CUDA_CC_*` notes, the E3-filter narrative, the rope-table
+    blob provenance, the `ds4_metal.m` and `metal/dense.metal` arithmetic sources) stayed as
+    provenance with the retirement named. `common.cuh`'s Moore Threads heading and the 22
+    `ggml/src` lines naming CDNA/RDMA/HIP/ROCm were read and kept: they explain the host-side `cc`
+    selection this port keeps on purpose, which is what the plan predicted. `mma.cuh`'s `#endif`
+    comment now quotes the guard it closes (`__CUDA_ARCH__ == GGML_CUDA_CC_VOLTA` - upstream's
+    `defined(GGML_USE_HIP)` never matched it), and `fattn-new-mma.cu`'s line comparing
+    `GGML_USE_HIPBLAS` with `GGML_USE_HIP` is gone; neither macro exists here. The BLAS/AMX example
+    clauses (`common/common.h` x2, `llama-context.cpp` x2, `ggml-backend.cpp`, `ggml-backend.h`)
+    and the Vulkan/OpenCL/SYCL backend list went with their backends.
+    The three printed strings - the two `ds4split` half-proof diagnostics and the
+    `LLAMA_PD_CACHE_CAPTURE` warning - are reworded from the committed map
+    `docs/evidence/messages-7.1e.json` (`string_text_replace.py`, applied and re-checkable);
+    the warning's quoted `consumer` moved that row's evidence with it, which is why the table is
+    regenerated in the same commit.
+    `tools/decode-receiver` got a wider pass than the census can see: fifteen present-tense "Mac"
+    comment lines describing the daemon's own role now say "receiver" (this binary IS the receiver, and it
+    runs here), while dated measurements and quoted historical text keep their era's names. Its
+    printed warning now says the capture "belonged to the retired Mac receiver".
+    The engine's `gpu_graph_ported_m5_decode_feature_enabled()` lost its two `(void)`-discarded
+    parameters and its three call sites the six `DS4_METAL_*_FUSE` literals - dead arguments of a
+    constant-false gate; the wildcard comment at `ds4.c:22660` now names `gpu_graph_env_flag()`
+    instead of a name family the table does not carry. That takes `ENV_NAME_CITED` to 0 with no
+    row added or dropped. A second stale claim in comment position went: `ds4.c:19531` said the
+    dumps run "unless `DS4_METAL_GRAPH_DUMP_PREFIX` or `DS4_ROCM_GRAPH_DUMP_PREFIX` is set", and
+    the ROCM spelling is a discarded wrapper argument whose row 7.1d deleted - it now cites only
+    the name that is read.
+    `scripts/release_check.py`'s working-tree scan no longer skips `engines/mlx-serve/` (1.10a
+    deleted the gitlink); the pinned-OID branches in `scan_index()` and `scan_history()` stay,
+    because `scan_history()` walks trees that really contain it.
+    Gates: `metal_word_census --strict` reads IDENTIFIER 0 and ENV_NAME_CITED 0 over both trees,
+    STRING 0 everywhere, and the COMMENT bucket is provenance only - 25 lines in `engines/ds4`
+    (unchanged) and 37 in the llama tree (from 51). `comment_code_diff.py` against a worktree of
+    HEAD reports 0 changed code lines for every comment-only file; the changed lines are exactly
+    the three reworded strings (1 line each) and the stub's signature and three call sites
+    (14 removed, 4 added). `__LINE__` appears in no edited file, so no reported line moved.
+    The three compilations of `ds4.c` (`ds4.o`, `ds4_ext.o`, `ds4_cpu.o`) warning-match the
+    baseline: 23, 11 and 5 occurrences, 20, 8 and 3 kinds, none added or lost. The five engine
+    binaries and `ds4-decode.so` relinked with the folded `ds4.o`: `./ds4 --help`, `./ds4 --metal`
+    (unknown option), `make test-batch-io` and `make test-decode-library` (19 entry points) pass.
+    `scripts/export_ds4_sampling.py` regenerated `tools/dsv41-prefill/studio-sampling.c` - only the
+    recorded source SHA moved, all nine exported functions byte-identical - and
+    `build/llama/bin/llama-dsv41-prefill` rebuilt and passes `--help` and `--check-native-profiles`
+    (the headroom probe said yes at 392 MiB this session). `tools/decode-receiver/main.cpp` has no
+    build rule (`LLAMA_BUILD_DECODE_RECEIVER` is OFF) and was compiled by hand with the CLI's
+    flags; `docs/linux-port-commands.md` carries the recipe. `envdocs --check` reports 2,186
+    documented variables with the name set unchanged; 606 rows had their `path:line` re-anchored
+    and `code_defaults` regenerated after the line moves. Suite: **685 passed, 2 failed,
+    38 skipped** - `test_yoco` unchanged, and `test_disconnect_inside_reasoning_then_next_turn_appends_only`
+    moved again: it failed in the full run and in two alone-runs, and it also flips in a worktree
+    of the untouched HEAD (three alone-runs there read pass, pass, fail), so it is the box. `release_check.py`
+    reports 0 findings.
 
 8.1 Qualification. Needs a qualified GGUF on disk: 262K exact-cone runs, 200K real-text fixture
     with password recall and logits SHA-256, Engram extent reads against the pread baseline, then
@@ -1904,16 +1945,14 @@ three provenance lines (`slstack/producer_runner.py`'s mapping table and `workin
 docstring) naming the retired API those arms replace.
 `media_tools.py`'s Windows FFmpeg download is not in that
 number - it keys on `os.name` and `.exe` names rather than on those tokens (Phase 6). Inside
-`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 306 lines, ENV_NAME_CITED 7
-lines and COMMENT 25 lines: the documented `DS4_METAL_*` names are kept on purpose, the 7 cited
-ones are dead arguments of a folded-to-false stub plus one wildcard in a comment (chunk 7.1e -
-7.1d took the count from 118 by documenting the wrapper reads that really are knobs), and the 25
-comment lines are the provenance chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0,
-STRING 3 and COMMENT 51 lines and `--strict` passes, since chunk 4.2 deleted the tree holding the
-one code-position mention (`USE_METAL_GUEST_SUPPORTS_OP` in `ggml/src/ggml-virtgpu/`). The 51
-comment lines and 3 printed strings are the Mac peer's measurement history and the ten
-retired-backend mentions 4.2 left behind - chunk 7.1e's. Re-count before trusting any of these
-numbers.
+`engines/ds4` `metal_word_census.py` reports IDENTIFIER 0, ENV_NAME 306 lines, ENV_NAME_CITED 0
+lines and COMMENT 25 lines after chunk 7.1e: the documented `DS4_METAL_*` names are kept on
+purpose, the 7 cited ones 7.1d left were dead arguments of a folded-to-false stub plus a wildcard
+in a comment, deleted with the stub's parameters, and the 25 comment lines are the provenance
+chunk 2.2e kept on purpose. Over the llama tree the same gate reports IDENTIFIER 0, STRING 0 and
+COMMENT 37 lines, down from the STRING 3 and COMMENT 51 lines the Mac peer's text left; those are
+chunk 7.1e's rewording, and the survivors all name the retirement. Re-count before trusting any of
+these numbers.
 Windows in `engines/ds4`: 3 hits, all vendored (`external/nlohmann/json.hpp` x2, the `linenoise.c`
 comment). Windows in `engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill`, in
 `src/llama-weight-fetcher.{cpp,h}`, in `src/llama-dsv41-weights.cpp` and in
