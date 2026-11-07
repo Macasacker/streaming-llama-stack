@@ -1693,23 +1693,6 @@ struct llama_split_layer_params {
     // For layers that do KV-cache updates (both modes read KV, only ATTN_ONLY writes).
     int32_t token_pos;                   // Position in KV sequence.
     int32_t seq_id;                      // Sequence id (default 0).
-
-    // Phase 3 Option B (Mac Metal): shared-buffer I/O mode. When set, the
-    // external_input and external_attn_out pointers above must be bases of
-    // pre-allocated Metal shared MTLBuffers (not host scratch). The
-    // corresponding ggml_backend_buffer_t handles must be supplied so the
-    // per-layer wrap tensors bind to the correct Metal backend buffer. The
-    // graph's output tensor (res->t_embd) is copied GPU-side (ggml_cpy)
-    // into metal_output_buf (also a shared MTLBuffer base); no host
-    // tensor_get is performed. Caller drains ordering via output_ready
-    // event encoded after graph_compute on the same Metal queue.
-    //
-    // Ignored when metal_shared_io == false. On non-Metal backends ignored.
-    bool              metal_shared_io;
-    void *            metal_input_backend_buf;      // ggml_backend_buffer_t for external_input
-    void *            metal_attn_out_backend_buf;   // ggml_backend_buffer_t for external_attn_out
-    void *            metal_output_buf;             // base ptr of shared output buffer (fp32, [n_embd])
-    void *            metal_output_backend_buf;     // ggml_backend_buffer_t owning metal_output_buf
 };
 
 // Write the layer's output ([n_embd] fp32) to out_buf. Caller owns the buffer.
@@ -1719,14 +1702,17 @@ LLAMA_API int32_t llama_build_compute_split_layer(
         float * out_buf);
 
 // Phase 3 Mac single-graph: submit a layer's compute without blocking for
-// completion. Encodes an event_record after the graph_compute cmd_buf so
-// the host can wait later via llama_wait_split_layer_async. out_buf is
-// remembered on the context; the actual memcpy happens in
-// llama_wait_split_layer_async. Only one layer submit can be in-flight
-// at a time per context.
+// completion. That was the Mac peer's deferred read - it recorded a GPU
+// event after the layer's compute and did the copy later, in
+// llama_wait_split_layer_async, remembering out_buf on the context with
+// one layer in flight at a time per context.
 //
-// Returns 0 on success. Requires SPLIT_DECODE_EVENT_SYNC=1 env gate
-// (for safety; current only supported on Metal backend).
+// No backend this fork builds can record that event, so
+// llama_submit_split_layer_async runs the layer synchronously and returns
+// 0 with the output already in out_buf, and llama_wait_split_layer_async
+// reports -99. The SPLIT_DECODE_EVENT_SYNC gate is read but changes
+// nothing. Callers get correct results either way; there is simply no
+// deferred path to overlap with the network peer.
 LLAMA_API int32_t llama_submit_split_layer_async(
         struct llama_context * ctx,
         const struct llama_split_layer_params * params,
@@ -1822,7 +1808,7 @@ LLAMA_API int32_t llama_embed_token(
 // events to advance the compute stream layer-by-layer.
 //
 // Expected impact: cuts per-layer framework overhead from ~1 ms to ~10 us
-// on both Windows CUDA and Mac Metal, closing the 2-3x gap to the Phase 0
+// on Windows CUDA and the deleted Mac peer, closing the 2-3x gap to the Phase 0
 // split-decode ceiling. See docs/split_decode_event_graph_plan.md.
 //
 
@@ -1834,7 +1820,8 @@ enum llama_split_graph_mode {
 struct llama_split_graph;
 
 // Create a persistent per-layer split graph cache. Pre-captures + instantiates
-// one CUDA graph (or Metal command buffer template) per layer at init, plus
+// one CUDA graph (the Mac peer used a command buffer template; that backend is
+// deleted) per layer at init, plus
 // all needed events and staging buffers. Call this ONCE per server at startup.
 //
 // Returns NULL on failure (e.g. model arch doesn't support split graphs, OOM).
@@ -1913,22 +1900,12 @@ LLAMA_API int32_t llama_split_graph_capture_layer(
         int32_t                    il);
 
 // Phase 3 Option B — single-dispatch submit with per-layer event gates
-// and shared-MTLBuffer I/O. Encodes:
-//   1. encodeWaitForEvent(g->metal_input_ready[il])
-//   2. graph_compute for layer il with external_attn_out bound to
-//      g->metal_attn_out_buf[il] and output written via ggml_cpy into
-//      g->metal_hidden_buf[il+1] (all on the Metal queue, no CPU sync)
-//   3. encodeSignalEvent(g->metal_output_ready[il])
-// Returns immediately; does NOT wait for GPU completion. Callers drive
-// progress by signaling input_ready[il] from the network RX thread when
-// attn_out[il] arrives, and host-waiting on output_ready[il] from the
-// TX thread to detect when metal_hidden_buf[il+1] is safe to read.
+// and shared-buffer I/O. This was the Mac peer's per-layer submit; it
+// needs the deleted Metal backend's encodeWaitForEvent/encodeSignalEvent
+// queue hooks, so it now always reports -99. The CUDA peer uses
+// llama_split_graph_launch instead.
 //
-// Requires g created with LLAMA_SPLIT_GRAPH_FFN_ALL_LAYERS on a Metal
-// context. Only FFN_ONLY mode is supported (attn-side single-dispatch
-// for CUDA uses llama_split_graph_launch instead).
-//
-// Returns 0 on success, -99 if no Metal backend, -2 on invalid args.
+// Returns -99 on every backend this fork builds, -2 on invalid args.
 LLAMA_API int32_t llama_split_graph_submit_layer_gated(
         struct llama_split_graph * g,
         int32_t                    il,
@@ -1936,47 +1913,38 @@ LLAMA_API int32_t llama_split_graph_submit_layer_gated(
         int32_t                    seq_id);
 
 // Path A Phase E (2026-04-20) — mega-graph single-dispatch launch.
-// Builds ONE cgraph for all n_layer FFN_ONLY subgraphs and computes it
-// via the gated ggml-metal API (per-layer encodeWaitForEvent/SignalEvent
-// on the Metal queue). Caller must call llama_split_graph_create with
-// LLAMA_SPLIT_GRAPH_FFN_ALL_LAYERS first; per-layer shared MTLBuffers +
-// MTLSharedEvents are allocated there.
+// Built ONE cgraph for all n_layer FFN_ONLY subgraphs and computed it
+// through the deleted Metal backend's gated queue API. It now always
+// reports -99; the CUDA path is llama_split_graph_launch.
 //
-// Before this call:
-//   - hidden_buf[0] must hold the initial embedding (seeded by caller
-//     or by llama_embed_token)
-//   - RX thread should be standing by to signal input_ready[il] events
-//     as attn_out[il] arrives from the RTX peer (writes to attn_out_buf[il])
-//   - TX thread should be waiting on output_ready[il] events to read
-//     hidden_buf[il+1] per-layer for forwarding to RTX
+// Requires g created with LLAMA_SPLIT_GRAPH_FFN_ALL_LAYERS first. The
+// caller's threads were expected to be standing by to signal the
+// per-layer input_ready events as attn_out[il] arrived from the RTX peer
+// and to wait on output_ready[il] to read hidden_buf[il+1]; the call
+// returned only once the final layer's output_ready was synchronized
+// host-side, so hidden_buf[n_layer] held the vector for
+// apply_output_head.
 //
-// This function returns when the final layer's output_ready has been
-// synchronized host-side, i.e. hidden_buf[n_layer] contains the final
-// vector ready for apply_output_head.
-//
-// Requires Metal backend (Mac). Returns -99 on non-Metal, 0 on success.
+// Returns -99 on every backend this fork builds.
 LLAMA_API int32_t llama_split_graph_launch_mega(
         struct llama_split_graph * g,
         int32_t                    token_pos,
         int32_t                    seq_id);
 
-// Phase 3 Option B accessors — ffn-server RX/TX threads use these to
-// signal/wait events and read/write the per-layer shared MTLBuffers
-// without needing direct access to the Metal backend handle.
+// Phase 3 Option B accessors — the Mac peer's RX/TX threads used these
+// to signal/wait events and read/write the per-layer shared buffers
+// without needing direct access to that backend's handle. They are
+// no-ops now, and the buffer accessors return NULL.
 
-// Host-side signal of input_ready[il]. Called by RX thread after
-// memcpying received attn_out[il] bytes into the shared buffer
-// returned by llama_split_graph_attn_out_buf(g, il). Unblocks the
-// matching encodeWaitForEvent on the Metal queue, so GPU proceeds with
-// layer il's compute.
+// Host-side signal of input_ready[il]. Was called by the Mac peer's RX
+// thread after copying received attn_out[il] bytes into the shared buffer
+// returned by llama_split_graph_attn_out_buf(g, il).
 LLAMA_API void llama_split_graph_signal_input_ready_host(
         struct llama_split_graph * g,
         int32_t                    il);
 
-// Host-side wait for output_ready[il]. Called by TX thread before
-// reading from the shared hidden buffer at index il+1. Spins on the
-// MTLSharedEvent's signaledValue (no syscall) until the GPU-queue
-// encodeSignalEvent fires after layer il's compute + blit completes.
+// Host-side wait for output_ready[il]. Was called by the Mac peer's TX
+// thread before reading from the shared hidden buffer at index il+1.
 LLAMA_API void llama_split_graph_wait_output_ready_host(
         struct llama_split_graph * g,
         int32_t                    il);
@@ -1997,9 +1965,8 @@ LLAMA_API void llama_split_graph_wait_output_ready_host_value(
         int32_t                    il,
         uint64_t                   target);
 
-// Shared-MTLBuffer base pointers. Returned pointers are stable for
-// the lifetime of g; layout is fp32 [n_embd]. NULL if Metal unavailable
-// or index out of range.
+// Shared-buffer base pointers, for the Mac peer whose backend is deleted.
+// Both accessors return NULL in every build of this fork.
 //   attn_out_buf[il]  — input; RX thread memcpy's attn_out[il] here.
 //   hidden_buf[0]     — pre-graph embedding (caller seeds per token).
 //   hidden_buf[il+1]  — output of layer il (read by TX thread).
@@ -2012,10 +1979,11 @@ LLAMA_API void * llama_split_graph_hidden_buf(
         struct llama_split_graph * g,
         int32_t                    il);
 
-// Force a full Metal backend synchronize — blocks until all pending GPU work
-// (including the last mega-dispatch cmd_buf) has completed.  Used by the
-// SPLIT_DECODE_MHB_TRACE probe to distinguish a CPU-GPU race from a GPU
-// correctness bug: if mhb values change after this call, it is a race;
+// Force a full synchronize on the Mac peer's backend — blocks until all
+// pending GPU work (including the last mega-dispatch command buffer) has
+// completed. That backend is deleted, so this is a no-op. It existed to
+// let the SPLIT_DECODE_MHB_TRACE probe distinguish a CPU-GPU race from a
+// GPU correctness bug: if mhb values change after this call, it is a race;
 // if they are unchanged (still zero), the GPU wrote zeros.
 LLAMA_API void llama_split_graph_synchronize(struct llama_split_graph * g);
 

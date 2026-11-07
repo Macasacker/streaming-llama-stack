@@ -148,3 +148,36 @@ Without `--apply` it prints each pair's hit count and every literal still matchi
 `envvars.json`, so regenerate the table in the same commit. Verify with `metal_word_census.py`
 (STRING should reach 0) and with `comment_code_diff.py`, which then reports exactly the reworded
 string lines and nothing else.
+
+## drop_rows.py
+
+Deletes the env rows a backend prune orphaned. A row whose only reads were `getenv` sites inside
+the deleted tree is documentation of a variable nothing reads, and `envdocs --check` calls it
+stale, so the row goes with the code. The name list is a JSON array, and the tool reports against
+`slstack.envvars.inventory()` - the same scan the gate uses - rather than against its own grep:
+
+    python3 scripts/port/drop_rows.py --names build/dropped-names-41.json
+    python3 scripts/port/drop_rows.py --names build/dropped-names-41.json --apply
+
+Two things it cannot see, both checked by hand before applying. `inventory()` scans `engines/` and
+`vendor/` only, so a name read in `slstack/` looks orphaned here and is not - a launcher-owned row
+must be grepped in `slstack/` separately. And a name *naming* a deleted backend is not necessarily
+owned by it: `GGML_CUDA_SYCL_GRAPHS`, `GGML_CUDA_SYCL_DISABLE_GRAPHS` and `GGML_NO_SYCL_COMPILLER`
+name SYCL but are read in `ggml-cuda/`, while the `GGML_CUDA_GRAPHS` they sit beside stays live.
+`--keep` refuses the whole batch if any listed name is still read somewhere in the scanned tree.
+
+## reanchor_env_reads.py
+
+`envvars.json` anchors every read to `path:line`, so editing a source file above a read breaks
+`envdocs --check` even when the read itself is untouched - one reworded comment in
+`llama-context.cpp` moved seven rows. This recomputes the live reads with `inventory()` and maps
+each recorded reference onto the live read in the same file by order, so only genuinely moved
+reads are rewritten:
+
+    python3 scripts/port/reanchor_env_reads.py            # report
+    python3 scripts/port/reanchor_env_reads.py --apply    # rewrite
+
+A file whose read *count* changed is reported and left alone rather than guessed at: that means
+reads were added or removed, which is a table decision (`drop_rows.py`, or a new row), not a line
+fix. Run it before `slstack.envdocs --refresh-defaults`, since the evidence entries carry the same
+`path:line`.

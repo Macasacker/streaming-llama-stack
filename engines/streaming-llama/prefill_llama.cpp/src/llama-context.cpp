@@ -1,9 +1,6 @@
 #include "llama-context.h"
 
 #include "ggml-impl.h"  // for ggml_cgraph internals
-#ifdef GGML_USE_METAL
-#include "ggml-metal.h"
-#endif
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #include <cuda_runtime.h>
@@ -8273,7 +8270,7 @@ ggml_status llama_context::graph_compute_per_layer(ggml_cgraph *     gf,
         set_n_threads_fn.second(set_n_threads_fn.first, n_threads);
     }
 
-    // Get the GPU backend (first non-CPU backend, typically Metal)
+    // Get the GPU backend (first non-CPU backend — CUDA in this fork)
     ggml_backend_t gpu_backend = nullptr;
     for (const auto & backend : backends) {
         if (backend.get() != backend_cpu) {
@@ -24712,127 +24709,12 @@ struct llama_split_graph {
     cudaStream_t                    tx_stream = nullptr;
 #endif
 
-#ifdef GGML_USE_METAL
-    // Phase 3 Mac mirror of the CUDA event-graph. Uses MTLSharedEvent
-    // (exposed via ggml-metal.h Phase 3 public API) to signal per-layer
-    // RX readiness and per-layer TX completion.
-    //
-    // Layer subgraphs are encoded into a single MTLCommandBuffer, with
-    // encodeWaitForEvent(input_ready[il]) at each layer's input boundary
-    // and encodeSignalEvent(output_ready[il]) at each layer's output.
-    // commit() submits the whole token's worth of work as one queue
-    // operation; RX thread calls event_signal_host to unblock the GPU at
-    // each layer boundary as attn_out arrives from the RTX peer.
-    std::vector<ggml_metal_event_t> metal_input_ready;   // length n_layer
-    std::vector<ggml_metal_event_t> metal_output_ready;  // length n_layer
-
-    // Option B: per-layer shared MTLBuffers. Apple silicon's unified
-    // memory lets the network RX thread memcpy directly into
-    // metal_attn_out_buf[il] from the socket, then signal input_ready[il];
-    // the GPU encodes a layer whose external_attn_out input points at this
-    // same memory. Likewise metal_hidden_buf[il+1] is a shared buffer the
-    // layer's FFN writes into, and the TX thread reads and sends over the
-    // socket after event_wait_host(output_ready[il]).
-    //
-    // metal_hidden_buf has n_layer+1 entries: hidden_buf[0] is the input
-    // embedding (seeded by CPU each token), hidden_buf[il+1] is layer il's
-    // output (== layer il+1's input). hidden_buf[n_layer] is the final
-    // post-layer vector consumed by apply_output_head on Mac.
-    //
-    // Buffers are bf16-sized (n_embd * sizeof(uint16_t)) to match the
-    // cross-machine wire format. The graph's ggml tensors cast fp32 ↔ bf16
-    // at the in/out boundary (same as the current per-call path).
-    std::vector<ggml_backend_buffer_t> metal_attn_out_backend_buf;  // length n_layer
-    std::vector<ggml_backend_buffer_t> metal_hidden_backend_buf;    // length n_layer+1
-    std::vector<void *>                metal_attn_out_buf;          // base ptrs (cached)
-    std::vector<void *>                metal_hidden_buf;
-
-    // Legacy placeholder fields — retained for compilation; kept empty
-    // after the buffer rework above. Remove once no caller references.
-    std::vector<void *>             metal_host_in;
-    std::vector<void *>             metal_host_out;
-#endif
 };
 
 struct llama_split_graph * llama_split_graph_create(
         struct llama_context *       ctx,
         enum llama_split_graph_mode  mode) {
     if (!ctx) return nullptr;
-#if defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA)
-    // Phase 3 Mac-side: allocate per-layer MTLSharedEvents + shared
-    // staging buffers. Capture/launch still stubbed — this only lays
-    // the resource foundation. See docs/split_decode_phase3_metal_design.md.
-    {
-        const llama_model * model = llama_get_model(ctx);
-        const int32_t n_layer = llama_model_n_layer(model);
-        const int32_t n_embd  = llama_model_n_embd(model);
-        if (n_layer <= 0 || n_embd <= 0) {
-            LLAMA_LOG_ERROR("llama_split_graph_create: bad hparams n_layer=%d n_embd=%d\n",
-                            n_layer, n_embd);
-            return nullptr;
-        }
-        ggml_backend_t metal_backend = ctx->get_metal_backend();
-        if (!metal_backend) {
-            LLAMA_LOG_WARN("llama_split_graph_create: no Metal backend found — skip\n");
-            return nullptr;
-        }
-        auto g = std::make_unique<llama_split_graph>();
-        g->ctx = ctx;
-        g->mode = mode;
-        g->n_layer = n_layer;
-        g->n_embd = n_embd;
-        g->payload_bytes = (size_t)n_embd * sizeof(uint16_t);
-        g->metal_input_ready.resize(n_layer, nullptr);
-        g->metal_output_ready.resize(n_layer, nullptr);
-        g->metal_host_in.resize(n_layer, nullptr);
-        g->metal_host_out.resize(n_layer, nullptr);
-        for (int il = 0; il < n_layer; ++il) {
-            g->metal_input_ready[il]  = ggml_backend_metal_event_init(metal_backend);
-            g->metal_output_ready[il] = ggml_backend_metal_event_init(metal_backend);
-            if (!g->metal_input_ready[il] || !g->metal_output_ready[il]) {
-                LLAMA_LOG_ERROR("llama_split_graph_create: metal_event_init layer %d failed\n", il);
-                llama_split_graph_free(g.release());
-                return nullptr;
-            }
-        }
-
-        // Option B: per-layer shared MTLBuffers. Sized at FP32 (matches
-        // graph-internal format so ggml_cpy can blit directly). The
-        // network RX/TX threads do bf16↔fp32 conversion at the wire
-        // boundary. Apple silicon unified memory → ggml_backend_buffer_get_base
-        // returns a CPU-writable pointer.
-        const size_t shared_bytes = (size_t)n_embd * sizeof(float);  // fp32 for graph I/O
-        ggml_backend_buffer_type_t buft = ggml_backend_get_default_buffer_type(metal_backend);
-        g->metal_attn_out_backend_buf.assign(n_layer, nullptr);
-        g->metal_hidden_backend_buf.assign(n_layer + 1, nullptr);
-        g->metal_attn_out_buf.assign(n_layer, nullptr);
-        g->metal_hidden_buf.assign(n_layer + 1, nullptr);
-        for (int il = 0; il < n_layer; ++il) {
-            g->metal_attn_out_backend_buf[il] = ggml_backend_buft_alloc_buffer(buft, shared_bytes);
-            if (!g->metal_attn_out_backend_buf[il]) {
-                LLAMA_LOG_ERROR("llama_split_graph_create: attn_out buft_alloc layer %d failed\n", il);
-                llama_split_graph_free(g.release());
-                return nullptr;
-            }
-            g->metal_attn_out_buf[il] = ggml_backend_buffer_get_base(g->metal_attn_out_backend_buf[il]);
-        }
-        for (int il = 0; il <= n_layer; ++il) {
-            g->metal_hidden_backend_buf[il] = ggml_backend_buft_alloc_buffer(buft, shared_bytes);
-            if (!g->metal_hidden_backend_buf[il]) {
-                LLAMA_LOG_ERROR("llama_split_graph_create: hidden buft_alloc idx %d failed\n", il);
-                llama_split_graph_free(g.release());
-                return nullptr;
-            }
-            g->metal_hidden_buf[il] = ggml_backend_buffer_get_base(g->metal_hidden_backend_buf[il]);
-        }
-        const size_t total_bytes = shared_bytes * (size_t)(2 * n_layer + 1);
-        LLAMA_LOG_INFO("llama_split_graph_create (Metal): allocated %d MTLSharedEvents pairs + "
-                       "%d attn_out + %d hidden shared buffers (%zu KB total). "
-                       "Capture + launch not yet wired — see Phase 3 Option B plan.\n",
-                       2*n_layer, n_layer, n_layer+1, total_bytes / 1024);
-        return g.release();
-    }
-#endif
 #ifndef GGML_USE_CUDA
     LLAMA_LOG_WARN("llama_split_graph_create: no supported backend (need CUDA or Metal)\n");
     GGML_UNUSED(mode);
@@ -25183,17 +25065,6 @@ ggml_backend_t llama_context::get_cuda_backend() const {
     return nullptr;
 }
 
-ggml_backend_t llama_context::get_metal_backend() const {
-    for (const auto & b : backends) {
-#ifdef GGML_USE_METAL
-        if (ggml_backend_is_metal(b.get())) return b.get();
-#else
-        GGML_UNUSED(b);
-#endif
-    }
-    return nullptr;
-}
-
 int32_t llama_split_graph_capture_layer(
         struct llama_split_graph * g,
         int32_t                    il) {
@@ -25506,26 +25377,24 @@ int32_t llama_split_graph_capture_layer(
 #endif
 }
 
-// Phase 3 Option B (Mac Metal): event-gated single-dispatch submit.
+// Phase 3 Option B — the Mac peer's event-gated single-dispatch submit, kept
+// as a stub now that its backend is deleted. The note describes what it used
+// to encode per layer, which is still the ordering the RTX side assumes:
 //
-// Encodes onto the Metal queue:
-//   1. event_submit_wait(input_ready[il])   — GPU stalls until RX thread
-//      signals (meaning attn_out[il] has been memcpy'd into
-//      metal_attn_out_buf[il]).
-//   2. graph_compute(FFN_ONLY, il) with:
-//        external_input    = metal_hidden_buf[il]         (previous layer out)
-//        external_attn_out = metal_attn_out_buf[il]       (RX-thread target)
-//        metal_output_buf  = metal_hidden_buf[il+1]       (blit target)
-//      The graph's output tensor is blit'd onto the Metal queue into
-//      metal_hidden_buf[il+1] before the queue advances.
-//   3. event_record(output_ready[il])       — signals TX thread that
-//      metal_hidden_buf[il+1] is safe to read.
+//   1. GPU-side wait on input_ready[il] — the layer stalled until the RX
+//      thread had copied attn_out[il] into that layer's shared input buffer.
+//   2. graph_compute(FFN_ONLY, il) with external_input bound to the previous
+//      layer's output buffer and external_attn_out to the RX-thread target,
+//      and the graph's output blit into the next layer's input buffer on the
+//      same queue before it advanced.
+//   3. signal output_ready[il], which told the TX thread that buffer was safe
+//      to read.
 //
-// All three are enqueued and returned; caller does not block. For a
-// full token, caller submits layers 0..n_layer-1 in order and the Metal
-// queue executes them serially, stalling at each input_ready event until
-// the network RX thread signals it. The network TX thread reads outputs
-// as each output_ready fires.
+// All three were enqueued and returned without blocking the caller. For a
+// full token the peer submitted layers 0..n_layer-1 in order and the queue
+// ran them serially, stalling at each input boundary until the network RX
+// thread signalled it, while the network TX thread read outputs as each
+// completion fired.
 int32_t llama_split_graph_submit_layer_gated(
         struct llama_split_graph * g,
         int32_t                    il,
@@ -25533,55 +25402,8 @@ int32_t llama_split_graph_submit_layer_gated(
         int32_t                    seq_id) {
     if (!g) return -2;
     if (il < 0 || il >= g->n_layer) return -2;
-#ifdef GGML_USE_METAL
-    if (!g->ctx) return -3;
-    ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-    if (!metal_backend) return -99;
-    if (g->metal_input_ready.empty() || g->metal_output_ready.empty()) return -4;
-    if (g->metal_attn_out_backend_buf.empty() || g->metal_hidden_backend_buf.empty()) return -5;
-
-    // 1. GPU-queue wait on input_ready[il]. This does NOT bump the
-    //    event's expected value — the wait targets the CURRENT expected
-    //    value. The RX thread bumps via event_signal_host when attn_out
-    //    for this layer has been memcpy'd into the shared buffer.
-    ggml_backend_metal_event_submit_wait(metal_backend, g->metal_input_ready[il]);
-
-    // 2. Encode + submit the layer's compute.
-    llama_split_layer_params p = {};
-    p.layer_id   = il;
-    p.mode       = LLAMA_SPLIT_LAYER_FFN_ONLY;
-    p.token_pos  = token_pos;
-    p.seq_id     = seq_id;
-    // Inputs: previous layer's output (fp32 in shared buffer).
-    p.external_input = (const float *)g->metal_hidden_buf[il];
-    p.external_attn_out = (const float *)g->metal_attn_out_buf[il];
-    // Shared-buffer bindings:
-    p.metal_shared_io             = true;
-    p.metal_input_backend_buf     = (void *)g->metal_hidden_backend_buf[il];
-    p.metal_attn_out_backend_buf  = (void *)g->metal_attn_out_backend_buf[il];
-    p.metal_output_buf            = g->metal_hidden_buf[il + 1];
-    p.metal_output_backend_buf    = (void *)g->metal_hidden_backend_buf[il + 1];
-
-    // No out_buf: metal_shared_io + metal_output_buf drives a GPU-queue
-    // blit to the shared output buffer; no host-side tensor_get.
-    float dummy_out = 0.0f;
-    int32_t rc = g->ctx->build_compute_split_layer(&p, &dummy_out, /*defer_read=*/false);
-    if (rc != 0) {
-        LLAMA_LOG_ERROR("%s: build_compute_split_layer rc=%d for layer %d\n", __func__, rc, il);
-        return -6;
-    }
-
-    // 3. GPU-queue signal on output_ready[il]. The signal cmd_buf runs
-    //    AFTER the blit cmd_buf (same queue, FIFO order), so when this
-    //    event fires, metal_hidden_buf[il+1] contains the finalized
-    //    output of layer il.
-    ggml_backend_metal_event_record(metal_backend, g->metal_output_ready[il]);
-
-    return 0;
-#else
     (void)il; (void)token_pos; (void)seq_id;
     return -99;
-#endif
 }
 
 // Path A Phase E (2026-04-20) — public wrapper for mega-graph single-dispatch.
@@ -25590,97 +25412,44 @@ int32_t llama_split_graph_launch_mega(
         int32_t                    token_pos,
         int32_t                    seq_id) {
     if (!g) return -2;
-#ifdef GGML_USE_METAL
-    if (!g->ctx) return -3;
-    return g->ctx->build_compute_split_mega(g, token_pos, seq_id);
-#else
     (void)token_pos; (void)seq_id;
     return -99;
-#endif
 }
 
 void llama_split_graph_signal_input_ready_host(struct llama_split_graph * g, int32_t il) {
     if (!g || il < 0) return;
-#ifdef GGML_USE_METAL
-    if ((size_t)il >= g->metal_input_ready.size()) return;
-    if (!g->ctx) return;
-    ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-    if (!metal_backend) return;
-    ggml_backend_metal_event_signal_host(metal_backend, g->metal_input_ready[il]);
-#else
     (void)il;
-#endif
 }
 
 void llama_split_graph_wait_output_ready_host(struct llama_split_graph * g, int32_t il) {
     if (!g || il < 0) return;
-#ifdef GGML_USE_METAL
-    if ((size_t)il >= g->metal_output_ready.size()) return;
-    if (!g->ctx) return;
-    ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-    if (!metal_backend) return;
-    ggml_backend_metal_event_wait_host(metal_backend, g->metal_output_ready[il]);
-#else
     (void)il;
-#endif
 }
 
 void llama_split_graph_signal_input_ready_host_value(struct llama_split_graph * g, int32_t il, uint64_t target) {
     if (!g || il < 0) return;
-#ifdef GGML_USE_METAL
-    if ((size_t)il >= g->metal_input_ready.size()) return;
-    if (!g->ctx) return;
-    ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-    if (!metal_backend) return;
-    ggml_backend_metal_event_signal_host_value(metal_backend, g->metal_input_ready[il], target);
-#else
     (void)il; (void)target;
-#endif
 }
 
 void llama_split_graph_wait_output_ready_host_value(struct llama_split_graph * g, int32_t il, uint64_t target) {
     if (!g || il < 0) return;
-#ifdef GGML_USE_METAL
-    if ((size_t)il >= g->metal_output_ready.size()) return;
-    if (!g->ctx) return;
-    ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-    if (!metal_backend) return;
-    ggml_backend_metal_event_wait_host_value(metal_backend, g->metal_output_ready[il], target);
-#else
     (void)il; (void)target;
-#endif
 }
 
 void * llama_split_graph_attn_out_buf(struct llama_split_graph * g, int32_t il) {
     if (!g || il < 0) return nullptr;
-#ifdef GGML_USE_METAL
-    if ((size_t)il >= g->metal_attn_out_buf.size()) return nullptr;
-    return g->metal_attn_out_buf[il];
-#else
     (void)il;
     return nullptr;
-#endif
 }
 
 void * llama_split_graph_hidden_buf(struct llama_split_graph * g, int32_t il) {
     if (!g || il < 0) return nullptr;
-#ifdef GGML_USE_METAL
-    if ((size_t)il >= g->metal_hidden_buf.size()) return nullptr;
-    return g->metal_hidden_buf[il];
-#else
     (void)il;
     return nullptr;
-#endif
 }
 
 void llama_split_graph_synchronize(struct llama_split_graph * g) {
     if (!g || !g->ctx) return;
-#ifdef GGML_USE_METAL
-    ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-    if (metal_backend) {
-        ggml_backend_synchronize(metal_backend);
-    }
-#endif
 }
 
 void llama_split_graph_free(struct llama_split_graph * g) {
@@ -25697,20 +25466,6 @@ void llama_split_graph_free(struct llama_split_graph * g) {
     if (g->compute_stream) cudaStreamDestroy(g->compute_stream);
     if (g->rx_stream)      cudaStreamDestroy(g->rx_stream);
     if (g->tx_stream)      cudaStreamDestroy(g->tx_stream);
-#endif
-#ifdef GGML_USE_METAL
-    // Phase 3 Mac cleanup: free MTLSharedEvents + per-layer shared
-    // MTLBuffers. The buffer vectors may be empty (events-only mode) in
-    // which case the loops are no-ops.
-    if (g->ctx) {
-        ggml_backend_t metal_backend = g->ctx->get_metal_backend();
-        if (metal_backend) {
-            for (auto ev : g->metal_input_ready)  if (ev) ggml_backend_metal_event_free(metal_backend, ev);
-            for (auto ev : g->metal_output_ready) if (ev) ggml_backend_metal_event_free(metal_backend, ev);
-        }
-    }
-    for (auto b : g->metal_attn_out_backend_buf) if (b) ggml_backend_buffer_free(b);
-    for (auto b : g->metal_hidden_backend_buf)   if (b) ggml_backend_buffer_free(b);
 #endif
     delete g;
 }
@@ -25747,7 +25502,8 @@ int32_t llama_context::embed_token(
 
     // Fast path: for deepseek2/GLM_DSA the full-graph path runs only build_inp_embd
     // which is a bare ggml_get_rows(tok_embd, token_id). The surrounding graph
-    // dispatch costs ~16 ms/token on Metal (sched_reset + build_graph + alloc +
+    // dispatch costs ~16 ms/token on the Mac peer this fork no longer builds
+    // (sched_reset + build_graph + alloc +
     // graph_compute + 2x blocking synchronize) for an op that is really a
     // 6.5 KB DMA + a local dequantize. Short-circuit when the embedding truly is a
     // bare lookup: no LoRA adapter, no n_embd_inp != n_embd padding, and a type
@@ -26320,25 +26076,7 @@ int32_t llama_build_compute_split_layer(
 }
 
 int32_t llama_context::wait_split_layer_async() {
-#ifdef GGML_USE_METAL
-    if (!async_in_flight) return -3;
-    ggml_backend_t metal_backend = get_metal_backend();
-    if (!metal_backend || !split_sync_event) {
-        async_in_flight = false;
-        return -4;
-    }
-    ggml_backend_metal_event_wait_host(metal_backend, (ggml_metal_event_t)split_sync_event);
-    if (async_pending_t_embd && async_pending_out_buf && async_pending_out_bytes) {
-        ggml_backend_tensor_get(async_pending_t_embd, async_pending_out_buf, 0, async_pending_out_bytes);
-    }
-    async_pending_out_buf = nullptr;
-    async_pending_t_embd = nullptr;
-    async_pending_out_bytes = 0;
-    async_in_flight = false;
-    return 0;
-#else
     return -99;
-#endif
 }
 
 int32_t llama_submit_split_layer_async(
@@ -26589,14 +26327,7 @@ int32_t llama_context::build_compute_split_layer(
         // tensor directly at it — no H2D copy needed (and the normal
         // tensor_set path below would fail mid-capture anyway because it
         // issues cudaMemcpyHostToDevice, treating the device pointer as host).
-        if (params->metal_shared_io && params->metal_input_backend_buf) {
-            // Phase 3 Option B: external_input is already on shared Metal
-            // memory (RX thread wrote directly). Bind the in_tensor to the
-            // shared backend buffer so the Metal dispatch uses the correct
-            // MTLBuffer; no tensor_set needed.
-            in_tensor->data = (void *)params->external_input;
-            in_tensor->buffer = (ggml_backend_buffer_t)params->metal_input_backend_buf;
-        } else if (split_capture_stream != nullptr) {
+        if (split_capture_stream != nullptr) {
             in_tensor->data = (void *)params->external_input;
             in_tensor->buffer = split_in_buf;  // dummy, not read from
         } else {
@@ -26608,13 +26339,7 @@ int32_t llama_context::build_compute_split_layer(
     if (params->external_attn_out) {
         attn_tensor = ggml_new_tensor_2d(wrap_ctx, GGML_TYPE_F32, n_embd, 1);
         ggml_set_name(attn_tensor, "split_external_attn_out");
-        if (params->metal_shared_io && params->metal_attn_out_backend_buf) {
-            // Phase 3 Option B: external_attn_out is already on shared Metal
-            // memory (the RX thread's target for this layer). Bind directly
-            // to that backend buffer; no tensor_set needed.
-            attn_tensor->data = (void *)params->external_attn_out;
-            attn_tensor->buffer = (ggml_backend_buffer_t)params->metal_attn_out_backend_buf;
-        } else if (split_capture_stream != nullptr) {
+        if (split_capture_stream != nullptr) {
             attn_tensor->data = (void *)params->external_attn_out;
             attn_tensor->buffer = split_attn_buf;
         } else {
@@ -26689,7 +26414,7 @@ int32_t llama_context::build_compute_split_layer(
     // sched state is in "allocated" mode from the previous call, and
     // alloc_graph asserts !is_alloc at entry). The OPTIMIZATION from
     // graph_cache is skipping model.build_graph — which is where the
-    // ~380us of Metal encoding work happens.
+    // ~380us of encoding work happened on the deleted Mac backend.
     res->reset();
     ggml_backend_sched_reset(sched.get());
     ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
@@ -26850,25 +26575,6 @@ int32_t llama_context::build_compute_split_layer(
     }
 #endif
 
-    // Xcode Metal capture: set GGML_METAL_CAPTURE_PERCALL=1 to capture only
-    // the per-call path at token 0, layer 0 (use different env var from mega
-    // so we can capture each separately). Note: capture goes to
-    // /tmp/perf-metal.gputrace — move/rename per bench between runs.
-#ifdef GGML_USE_METAL
-    if (std::getenv("GGML_METAL_CAPTURE_PERCALL") != nullptr && params->layer_id == 0) {
-        static std::atomic<int> pc_capture_count{0};
-        if (pc_capture_count.fetch_add(1) == 0) {
-            ggml_backend_t metal_backend_pc = nullptr;
-            for (auto & b : backends) {
-                if (b.get() != backend_cpu) { metal_backend_pc = b.get(); break; }
-            }
-            if (metal_backend_pc) {
-                LLAMA_LOG_INFO("%s: GGML_METAL_CAPTURE_PERCALL=1 — triggering per-call Xcode capture (layer 0 token 0)\n", __func__);
-                ggml_backend_metal_capture_next_compute(metal_backend_pc);
-            }
-        }
-    }
-#endif
     ggml_status status = graph_compute(gf, /*batched=*/true);
     SPLIT_CAP_TRACE("post graph_compute");
     if (status != GGML_STATUS_SUCCESS) {
@@ -26890,13 +26596,14 @@ int32_t llama_context::build_compute_split_layer(
     // active and we're just building the graph for later replay, not actually
     // using the output. Skip sync (and the tensor_get below) so nothing lands
     // inside the captured graph that would mess up replay.
-    // Phase 3 Mac: event-based per-layer sync (replaces full-queue
-    // synchronize with ~45ms/token savings). Gated by
-    // SPLIT_DECODE_EVENT_SYNC=1. See docs/split_decode_phase3_metal_design.md.
+    // The Mac peer replaced the full-queue synchronize with per-layer event
+    // sync (~45ms/token saved), gated by SPLIT_DECODE_EVENT_SYNC=1. Its
+    // backend is deleted, so that branch now does the same plain synchronize
+    // as the default path; the knob is read for recipe compatibility.
     //
     // Diagnostic only: SPLIT_DECODE_SKIP_SYNC_PER_LAYER skips sync entirely.
-    // Correctness breaks on Mac shared-memory reads but proves the upper
-    // bound of sync overhead (~45ms/token).
+    // Correctness breaks on the peer's shared-memory reads but proves the
+    // upper bound of sync overhead (~45ms/token).
     static const bool skip_sync_per_layer = [](){
         const char * v = std::getenv("SPLIT_DECODE_SKIP_SYNC_PER_LAYER");
         return v != nullptr && v[0] != '\0' && v[0] != '0';
@@ -26908,32 +26615,10 @@ int32_t llama_context::build_compute_split_layer(
 
     if (split_capture_stream != nullptr) {
         // capture path skips sync
-#ifdef GGML_USE_METAL
-    } else if (params->metal_shared_io) {
-        // Phase 3 Option B: caller manages GPU sync via per-layer
-        // output_ready event encoded on the Metal queue AFTER the blit
-        // below. No CPU-GPU barrier here — the whole point of Option B.
-#endif
     } else if (skip_sync_per_layer) {
         // diagnostic: no sync (correctness broken)
     } else if (event_sync_per_layer && gpu_backend) {
-#ifdef GGML_USE_METAL
-        // Event-based sync: submit a cmd_buf that signals after graph
-        // completes, then host-wait on the event. Lower overhead than
-        // ggml_backend_synchronize (which blocks in kernel mode).
-        if (!split_sync_event) {
-            split_sync_event = ggml_backend_metal_event_init(gpu_backend);
-        }
-        if (split_sync_event) {
-            ggml_backend_metal_event_record(gpu_backend, (ggml_metal_event_t)split_sync_event);
-            ggml_backend_metal_event_wait_host(gpu_backend, (ggml_metal_event_t)split_sync_event);
-        } else {
-            // Fallback to full sync if event creation failed.
-            ggml_backend_synchronize(gpu_backend);
-        }
-#else
         ggml_backend_synchronize(gpu_backend);
-#endif
     } else if (gpu_backend) {
         ggml_backend_synchronize(gpu_backend);
     }
@@ -26955,28 +26640,9 @@ int32_t llama_context::build_compute_split_layer(
     // build_compute_split_layer call — otherwise sched_reset will
     // invalidate the t_embd pointer we saved.
     if (defer_read) {
-#ifdef GGML_USE_METAL
-        ggml_backend_t metal_backend = get_metal_backend();
-        if (metal_backend) {
-            if (!split_sync_event) {
-                split_sync_event = ggml_backend_metal_event_init(metal_backend);
-            }
-            if (split_sync_event) {
-                ggml_backend_metal_event_record(metal_backend, (ggml_metal_event_t)split_sync_event);
-                async_pending_out_buf  = out_buf;
-                async_pending_t_embd   = res->t_embd;
-                async_pending_out_bytes = out_bytes;
-                async_in_flight        = true;
-                // wrap_ctx and batch aren't needed for the later tensor_get —
-                // shared-memory buffer is ctx-owned (split_in_buf etc). Free now.
-                ggml_free(wrap_ctx);
-                llama_batch_free(batch);
-                return 0;
-            }
-        }
-#endif
-        // Non-Metal or event-init failed: fall through to synchronous path
-        // for correctness.
+        // The Mac peer recorded a GPU event here and returned before the
+        // read. Every backend this fork builds falls through to the
+        // synchronous path, which is the correct behaviour.
     }
     LLAMA_LOG_INFO("%s: layer=%d mode=%d t_embd name='%s' nbytes=%zu (requested %zu) type=%d\n",
                    __func__, params->layer_id, (int)params->mode,
@@ -26987,33 +26653,6 @@ int32_t llama_context::build_compute_split_layer(
     // we're capturing the graph for later replay and don't actually need the
     // output here. The caller will get the output from device_out[il] after
     // replay via llama_split_graph_get_output.
-#ifdef GGML_USE_METAL
-    if (params->metal_shared_io && params->metal_output_buf && params->metal_output_backend_buf) {
-        // Phase 3 Option B: enqueue a GPU-queue blit from res->t_embd
-        // into the caller-owned shared output buffer. This preserves the
-        // layer's output in a stable location before the compute buffer
-        // gets reused by the next layer. Runs AFTER graph_compute on the
-        // Metal queue; the subsequent event_record(output_ready[il])
-        // signals TX thread when this blit has completed.
-        ggml_tensor out_target = {};
-        out_target.type = res->t_embd->type;
-        for (int d = 0; d < GGML_MAX_DIMS; ++d) {
-            out_target.ne[d] = res->t_embd->ne[d];
-            out_target.nb[d] = res->t_embd->nb[d];
-        }
-        out_target.data   = params->metal_output_buf;
-        out_target.buffer = (ggml_backend_buffer_t)params->metal_output_backend_buf;
-        ggml_backend_t metal_b = get_metal_backend();
-        if (!metal_b || !ggml_backend_metal_cpy_tensor_async(metal_b, res->t_embd, &out_target)) {
-            LLAMA_LOG_ERROR("%s: metal_cpy_tensor_async failed for layer %d\n",
-                            __func__, params->layer_id);
-            ggml_free(wrap_ctx);
-            llama_batch_free(batch);
-            return -35;
-        }
-        // No host-side tensor_get; output lands in metal_output_buf via the blit.
-    } else
-#endif
     if (split_capture_stream == nullptr) {
         ggml_backend_tensor_get(res->t_embd, out_buf, 0, out_bytes);
     } else if (split_capture_output_device && split_capture_output_bytes >= out_bytes) {
@@ -27109,636 +26748,16 @@ int32_t llama_context::build_compute_split_layer(
 
 // ─── llama_context::build_compute_split_mega ───────────────────────────────
 //
-// Path A Phase D (2026-04-20). Builds ONE cgraph for all n_layer FFN_ONLY
-// subgraphs via the per-layer external tensor arrays. Submits ONE scheduler
-// compute. Per-layer outputs land in sg->metal_hidden_buf[il+1] via cpy nodes
-// emitted in the graph builder.
-//
-// THIS ITERATION: no per-layer event gates in the cmd_buf stream. Caller must
-// ensure all attn_out_buf[il] entries are populated before this is called,
-// OR accept that the GPU may read stale data mid-flight. True pipelining
-// requires Phase D.2 (ggml-metal API to inject events at cgraph node
-// boundaries). This iteration validates graph-builder correctness.
-//
-// Requires Metal backend + shared per-layer buffers on sg.
+// Path A Phase D (2026-04-20) — the Mac peer's mega-graph single dispatch.
+// It built ONE cgraph for all n_layer FFN_ONLY subgraphs via the per-layer
+// external tensor arrays and submitted a single scheduler compute, with each
+// layer's output landing in the peer's next-layer buffer through cpy nodes
+// emitted by the graph builder. That backend is deleted, so this is a stub;
+// the CUDA peer dispatches through build_compute_split_layer per layer.
 int32_t llama_context::build_compute_split_mega(
         struct llama_split_graph * sg,
         int32_t token_pos,
         int32_t seq_id) {
-#ifndef GGML_USE_METAL
     (void)sg; (void)token_pos; (void)seq_id;
     return -99;
-#else
-    if (!sg) return -2;
-    if (!memory) {
-        LLAMA_LOG_ERROR("%s: context has no memory\n", __func__);
-        return -6;
-    }
-    if (sg->n_layer <= 0 || sg->n_embd <= 0) return -3;
-    if ((int)sg->metal_attn_out_backend_buf.size() != sg->n_layer) return -4;
-    if ((int)sg->metal_hidden_backend_buf.size()   != sg->n_layer + 1) return -4;
-
-    const auto & vocab    = model.vocab;
-    const auto & hparams  = model.hparams;
-    const int64_t n_embd  = hparams.n_embd_inp();
-    const uint32_t n_seq_max = cparams.kv_unified ? LLAMA_MAX_SEQ : cparams.n_seq_max;
-    const int32_t n_layer = sg->n_layer;
-
-    if ((int64_t)sg->n_embd != n_embd) {
-        LLAMA_LOG_ERROR("%s: sg n_embd=%d != model n_embd=%lld\n",
-                        __func__, sg->n_embd, (long long)n_embd);
-        return -5;
-    }
-
-    // ─── Step 1: single-token batch + balloc (same as build_compute_split_layer) ──
-    llama_batch batch = llama_batch_init(1, 0, 1);
-    batch.n_tokens = 1;
-    llama_token tok = llama_vocab_bos(&vocab);
-    if (tok < 0) tok = 0;
-    batch.token[0]    = tok;
-    batch.pos[0]      = token_pos;
-    batch.n_seq_id[0] = 1;
-    batch.seq_id[0][0]= seq_id;
-    batch.logits[0]   = 1;
-
-    if (memory && token_pos >= 0) {
-        memory->seq_rm(seq_id, token_pos, token_pos + 1);
-    }
-
-    const bool output_all_split = cparams.embeddings;
-    if (!balloc->init(batch, vocab, memory.get(), (int32_t)n_embd, n_seq_max,
-                      output_all_split, /*allow_pos_overlap=*/true)) {
-        LLAMA_LOG_ERROR("%s: balloc->init failed\n", __func__);
-        llama_batch_free(batch);
-        return -10;
-    }
-
-    sched_reserve();
-    memory_update(false);
-
-    llama_memory_context_ptr mctx = memory->init_batch(*balloc, cparams.n_ubatch, output_all_split);
-    if (!mctx) {
-        LLAMA_LOG_ERROR("%s: memory->init_batch failed\n", __func__);
-        llama_batch_free(batch);
-        return -11;
-    }
-    if (mctx->get_status() != LLAMA_MEMORY_STATUS_SUCCESS) {
-        LLAMA_LOG_ERROR("%s: mctx status=%d\n", __func__, (int)mctx->get_status());
-        llama_batch_free(batch);
-        return -12;
-    }
-
-    const int32_t n_outputs_all = (int32_t)balloc->get_n_outputs();
-    if (output_reserve(n_outputs_all) < (uint32_t)n_outputs_all) {
-        LLAMA_LOG_ERROR("%s: output_reserve(%d) failed\n", __func__, n_outputs_all);
-        llama_batch_free(batch);
-        return -20;
-    }
-
-    const auto & ubatch = mctx->get_ubatch();
-    {
-        int32_t n_out = 0;
-        if (ubatch.output) {
-            for (uint32_t i = 0; i < ubatch.n_tokens; ++i) {
-                n_out += (int32_t)(ubatch.output[i] != 0);
-            }
-        }
-        if (n_out == 0) n_out = 1;
-        this->n_outputs = n_out;
-    }
-
-    // ─── Step 2: create per-layer wrap tensors for shared MTLBuffers ────────
-    // One ggml_tensor per: attn_out[il] × n_layer, hidden_in[il] × n_layer,
-    // hidden_out[il] × n_layer. All share the same shape (n_embd, 1) fp32.
-    // The tensors' data points at the shared MTLBuffer base; buffer binds to
-    // the corresponding ggml_backend_buffer_t so ggml-metal resolves the
-    // underlying MTLBuffer via ggml_metal_get_buffer_id.
-    const int n_wrap = n_layer * 3 + 8;  // slack for safety
-    ggml_init_params wrap_params = {
-        (size_t)n_wrap * ggml_tensor_overhead(),
-        nullptr,
-        /*no_alloc=*/true
-    };
-    ggml_context * wrap_ctx = ggml_init(wrap_params);
-    if (!wrap_ctx) {
-        LLAMA_LOG_ERROR("%s: ggml_init(wrap_ctx) failed\n", __func__);
-        llama_batch_free(batch);
-        return -13;
-    }
-
-    std::vector<ggml_tensor *> attn_wraps(n_layer, nullptr);
-    std::vector<ggml_tensor *> in_wraps  (n_layer, nullptr);
-    std::vector<ggml_tensor *> out_wraps (n_layer, nullptr);
-
-    for (int il = 0; il < n_layer; ++il) {
-        ggml_tensor * a = ggml_new_tensor_2d(wrap_ctx, GGML_TYPE_F32, n_embd, 1);
-        char name[64]; snprintf(name, sizeof(name), "mega_attn_%d", il);
-        ggml_set_name(a, name);
-        a->data   = sg->metal_attn_out_buf[il];
-        a->buffer = sg->metal_attn_out_backend_buf[il];
-        attn_wraps[il] = a;
-
-        ggml_tensor * i = ggml_new_tensor_2d(wrap_ctx, GGML_TYPE_F32, n_embd, 1);
-        snprintf(name, sizeof(name), "mega_in_%d", il);
-        ggml_set_name(i, name);
-        i->data   = sg->metal_hidden_buf[il];
-        i->buffer = sg->metal_hidden_backend_buf[il];
-        in_wraps[il] = i;
-
-        ggml_tensor * o = ggml_new_tensor_2d(wrap_ctx, GGML_TYPE_F32, n_embd, 1);
-        snprintf(name, sizeof(name), "mega_out_%d", il);
-        ggml_set_name(o, name);
-        o->data   = sg->metal_hidden_buf[il + 1];
-        o->buffer = sg->metal_hidden_backend_buf[il + 1];
-        out_wraps[il] = o;
-    }
-
-    if (!mctx->apply()) {
-        LLAMA_LOG_ERROR("%s: mctx->apply() failed\n", __func__);
-        ggml_free(wrap_ctx);
-        llama_batch_free(batch);
-        return -19;
-    }
-
-    // ─── Step 3: build the mega-cgraph via model.build_graph ────────────────
-    llm_graph_result * res = gf_res_prev.get();
-    res->reset();
-    ggml_backend_sched_reset(sched.get());
-    ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
-
-    auto mega_gparams = graph_params(res, ubatch, mctx.get(), LLM_GRAPH_TYPE_DECODER);
-    mega_gparams.layer_start = 0;
-    mega_gparams.layer_end   = n_layer;
-    mega_gparams.external_input                  = in_wraps[0];  // layer 0 input = hidden_buf[0]
-    mega_gparams.external_attn_out_per_layer     = attn_wraps.data();
-    mega_gparams.external_input_per_layer        = in_wraps.data();
-    mega_gparams.external_output_per_layer       = out_wraps.data();
-
-    struct ggml_cgraph * gf = model.build_graph(mega_gparams);
-    if (!gf) {
-        LLAMA_LOG_ERROR("%s: mega build_graph failed\n", __func__);
-        ggml_free(wrap_ctx);
-        llama_batch_free(batch);
-        return -15;
-    }
-
-    // Route nodes to GPU backend where supported (same as split_layer path).
-    ggml_backend_t gpu_backend = nullptr;
-    for (const auto & b : backends) {
-        if (b.get() != backend_cpu) { gpu_backend = b.get(); break; }
-    }
-    if (gpu_backend) {
-        for (int i = 0; i < gf->n_nodes; ++i) {
-            auto * node = gf->nodes[i];
-            if (node->op == GGML_OP_SET_ROWS) continue;
-            bool force = (node->op == GGML_OP_VIEW || node->op == GGML_OP_RESHAPE ||
-                          node->op == GGML_OP_TRANSPOSE || node->op == GGML_OP_PERMUTE ||
-                          node->op == GGML_OP_NONE || node->op == GGML_OP_PAD);
-            if (ggml_backend_supports_op(gpu_backend, node) || force) {
-                ggml_backend_sched_set_tensor_backend(sched.get(), node, gpu_backend);
-            }
-        }
-    }
-    for (int ni = 0; ni < gf->n_nodes; ni++) {
-        auto * t = gf->nodes[ni];
-        for (int si = 0; si < GGML_MAX_SRC && t && t->src[si]; si++) {
-            auto * s = t->src[si];
-            if (s && !s->buffer && s->view_src && s->view_src->buffer) {
-                s->buffer = s->view_src->buffer;
-            }
-        }
-    }
-    for (int ni = 0; ni < gf->n_leafs; ni++) {
-        auto * s = gf->leafs[ni];
-        if (s && !s->buffer && s->view_src && s->view_src->buffer) {
-            s->buffer = s->view_src->buffer;
-        }
-    }
-
-    if (!ggml_backend_sched_alloc_graph(sched.get(), gf)) {
-        LLAMA_LOG_ERROR("%s: mega alloc_graph failed\n", __func__);
-        ggml_free(wrap_ctx);
-        llama_batch_free(batch);
-        return -16;
-    }
-
-    res->set_inputs(&ubatch);
-
-    // Path A Phase D.2 — if the split_graph has per-layer events AND the
-    // caller enabled MEGA_DISPATCH, use the gated graph_compute that
-    // injects encodeWaitForEvent / encodeSignalEvent between layer
-    // boundaries. This gives the network RX thread the gate to drive
-    // mid-mega-graph layer advancement.
-    //
-    // Identify layer boundaries by scanning the cgraph for nodes with
-    // the "l_out_external_pl-<il>" name emitted in Phase C (the cpy
-    // that writes layer il's output to metal_hidden_buf[il+1]).
-    static const bool mega_dispatch_gated = [](){
-        const char * v = std::getenv("SPLIT_DECODE_MEGA_DISPATCH");
-        return v != nullptr && v[0] != '\0' && v[0] != '0';
-    }();
-
-    bool use_gated = mega_dispatch_gated &&
-                     !sg->metal_input_ready.empty() &&
-                     !sg->metal_output_ready.empty();
-
-    if (use_gated) {
-        // Scan for per-layer boundaries.
-        std::vector<int> layer_end_idx(n_layer, -1);
-        for (int i = 0; i < gf->n_nodes; ++i) {
-            const char * name = gf->nodes[i]->name;
-            if (!name) continue;
-            // Expected names: "l_out_external_pl-0", ..., "l_out_external_pl-77"
-            const char * prefix = "l_out_external_pl-";
-            size_t plen = std::strlen(prefix);
-            if (std::strncmp(name, prefix, plen) == 0) {
-                int il = std::atoi(name + plen);
-                if (il >= 0 && il < n_layer) {
-                    layer_end_idx[il] = i;  // inclusive index of the cpy node
-                }
-            }
-        }
-
-        // Validate ACTUAL present layer range. GLM-5.1 has 79 total layers
-        // but the graph builder skips the trailing nextn-predict layer
-        // (deepseek2.cpp effective_n_layers), so only 78 markers exist.
-        // Count markers from index 0 up — the first missing one bounds
-        // the segment range. Previously we required ALL n_layer markers
-        // and fell back to non-gated (which doesn't honor the event-gated
-        // inter-layer protocol) when the last nextn layer was absent.
-        int n_active_layers = 0;
-        for (int il = 0; il < n_layer; ++il) {
-            if (layer_end_idx[il] < 0) break;
-            n_active_layers = il + 1;
-        }
-        const bool all_found = (n_active_layers > 0);
-
-        if (!all_found) {
-            LLAMA_LOG_WARN("%s: gated mega-dispatch requested but NO layer "
-                           "boundaries found in cgraph (n_nodes=%d) — falling back\n",
-                           __func__, gf->n_nodes);
-            use_gated = false;
-        } else if (n_active_layers < n_layer) {
-            LLAMA_LOG_INFO("%s: gated mega-dispatch: %d active layers (of %d total; "
-                           "last %d layers skipped by graph builder, e.g. nextn-predict)\n",
-                           __func__, n_active_layers, n_layer, n_layer - n_active_layers);
-        }
-        if (all_found) {
-            // Build segments: [prev_end+1 .. end_il+1) per active layer.
-            //
-            // 2026-04-20 race fix: use token_pos-derived explicit targets
-            // for wait/signal. Both the GPU encoder and the host signaler
-            // (RX thread for input_ready; build_compute_split_mega's own
-            // post-sync for output_ready) must agree on the target. Since
-            // token_pos increases strictly monotonically across decode
-            // calls and is known to both sides, it's a perfect target source.
-            // Encoding with +1 to avoid target=0 (which MTLSharedEvent
-            // treats as the initial unsignaled state, causing wait to
-            // pass trivially).
-            const uint64_t target_for_this_token = (uint64_t)token_pos + 1;
-            std::vector<struct ggml_metal_gated_segment> segments(n_active_layers);
-            int prev_end = -1;
-            for (int il = 0; il < n_active_layers; ++il) {
-                segments[il].start_idx     = prev_end + 1;
-                // 2026-04-20: for the FINAL active layer, extend end_idx to
-                // the end of the graph. ggml_backend_sched_alloc_graph may
-                // reorder nodes such that the `l_out_external_pl-<il>` cpy
-                // for the last layer appears AFTER the bounded index
-                // layer_end_idx[il] (it can be appended to the tail of the
-                // graph by later ggml_build_forward_expand calls on new
-                // tensors introduced by the post-loop final-norm/lm_head
-                // path in deepseek2.cpp). Missing this cpy is exactly what
-                // we saw in diagnostics — metal_hidden_buf[78] = zeros with
-                // all other layers bit-identical to per-call. Including all
-                // trailing nodes in the last segment is safe since any
-                // post-loop norm/lm_head nodes the scheduler places here
-                // are idempotent w.r.t. our output buffer.
-                if (il == n_active_layers - 1) {
-                    segments[il].end_idx = gf->n_nodes;
-                } else {
-                    segments[il].end_idx = layer_end_idx[il] + 1;
-                }
-                segments[il].wait_event    = sg->metal_input_ready[il];
-                segments[il].signal_event  = sg->metal_output_ready[il];
-                segments[il].wait_target   = target_for_this_token;
-                segments[il].signal_target = target_for_this_token;
-                segments[il].fill_buf      = nullptr;  // default: no fill
-                segments[il].fill_offs     = 0;
-                segments[il].fill_len      = 0;
-                prev_end = layer_end_idx[il];
-            }
-
-            // ── Iter-9 inp_out_ids fill fix (superseded by iter-10) ─────────
-            // Iter-9: gallocr aliases intermediate float tensors to the
-            // inp_out_ids compute-buffer slot (offset 0). Filling that slot
-            // with int32=0 before GET_ROWS runs ensured the correct row index.
-            // Iter-10: the root fix (skip get_rows for external per-layer
-            // tensors in mega mode) eliminates the GET_ROWS nodes entirely
-            // from the last segment, making this fill a no-op. The code
-            // below is retained for safety in case get_rows is ever re-
-            // introduced, but will log at DEBUG level when GET_ROWS is absent.
-            {
-                ggml_tensor * inp_out_ids_cpy = nullptr;
-                for (int ni = gf->n_nodes - 1; ni >= 0; --ni) {
-                    ggml_tensor * nd = gf->nodes[ni];
-                    if (!nd || nd->op != GGML_OP_GET_ROWS) continue;
-                    if (!nd->src[0] || !nd->src[1]) continue;
-                    const char * src0_name = nd->src[0]->name;
-                    if (!src0_name) continue;
-                    char want_attn[64]; snprintf(want_attn, sizeof(want_attn), "attn_out_external_pl-%d", n_active_layers-1);
-                    char want_attn2[64]; snprintf(want_attn2, sizeof(want_attn2), "mega_attn_%d", n_active_layers-1);
-                    char want_in[64]; snprintf(want_in, sizeof(want_in), "mega_in_%d", n_active_layers-1);
-                    if (strstr(src0_name, want_attn) || strstr(src0_name, want_attn2) ||
-                        strstr(src0_name, want_in)) {
-                        inp_out_ids_cpy = nd->src[1];
-                        break;
-                    }
-                }
-#ifdef GGML_USE_METAL
-                if (inp_out_ids_cpy && inp_out_ids_cpy->buffer && n_active_layers > 0) {
-                    size_t fill_offs = 0;
-                    void * mtl_buf = ggml_backend_metal_tensor_get_mtl_buf(inp_out_ids_cpy, &fill_offs);
-                    if (mtl_buf) {
-                        int last_seg = n_active_layers - 1;
-                        segments[last_seg].fill_buf  = mtl_buf;
-                        segments[last_seg].fill_offs = fill_offs;
-                        segments[last_seg].fill_len  = sizeof(int32_t) * (size_t)inp_out_ids_cpy->ne[0];
-                        LLAMA_LOG_INFO("%s: iter-9/10 inp_out_ids fill: seg=%d buf=%p offs=%zu len=%zu\n",
-                            __func__, last_seg, mtl_buf, fill_offs,
-                            segments[last_seg].fill_len);
-                    }
-                }
-                // Note: inp_out_ids_cpy == nullptr is EXPECTED after iter-10
-                // (no GET_ROWS on external tensors in mega mode). Not a warning.
-#endif
-            }
-            // ── End iter-9/10 fill fix ───────────────────────────────────────
-
-            ggml_backend_t metal_backend = sg->ctx ? sg->ctx->get_metal_backend() : nullptr;
-            if (!metal_backend) {
-                LLAMA_LOG_ERROR("%s: gated mega-dispatch requires Metal backend\n", __func__);
-                ggml_free(wrap_ctx);
-                llama_batch_free(batch);
-                return -18;
-            }
-
-            // Xcode Metal capture: set GGML_METAL_CAPTURE=1 to record the
-            // next graph_compute to /tmp/perf-metal.gputrace. MTL_CAPTURE_ENABLED=1
-            // must also be set in the environment at process launch (required
-            // by Apple for capture destinations).
-#ifdef GGML_USE_METAL
-            {
-                const char * mcap = std::getenv("GGML_METAL_CAPTURE");
-                if (mcap != nullptr && mcap[0] != '\0' && mcap[0] != '0') {
-                    static std::atomic<int> capture_count{0};
-                    if (capture_count.fetch_add(1) == 0) {
-                        LLAMA_LOG_INFO("%s: GGML_METAL_CAPTURE=1 — triggering Xcode capture (mega token 0)\n", __func__);
-                        ggml_backend_metal_capture_next_compute(metal_backend);
-                    }
-                }
-            }
-#endif
-
-            bool ok = ggml_backend_metal_graph_compute_gated(
-                metal_backend, gf, n_active_layers, segments.data());
-            if (!ok) {
-                LLAMA_LOG_ERROR("%s: ggml_backend_metal_graph_compute_gated failed\n", __func__);
-                ggml_free(wrap_ctx);
-                llama_batch_free(batch);
-                return -17;
-            }
-
-            // 2026-04-20 — workaround for the layer-77 cpy-zero bug.
-            // Layers 0-76 write metal_hidden_buf[il+1] via their in-graph
-            // cpy nodes (emitted by deepseek2.cpp's external_output_per_layer
-            // path). Diagnostics show these cpy's produce the correct bytes
-            // for every layer EXCEPT the last one: layer 77's cpy writes
-            // zeros instead of the real l_out, making metal_hidden_buf[78]
-            // all-zeros and downstream output_head garbage. All theories
-            // about graph-scheduler interaction with the post-loop final-
-            // norm/lm_head nodes or the last-layer get_rows have been
-            // ruled out (separate bisections). The per-call path works
-            // because it uses `ggml_backend_metal_cpy_tensor_async` as a
-            // separate blit cmd_buf AFTER graph_compute. We mirror that
-            // here: find the `l_out-77` node (the actual last-layer output,
-            // source of the in-graph cpy) and blit it to metal_hidden_buf[n_layer].
-            // This runs on the same Metal queue as gated compute's last
-            // cmd_buf, so same-queue ordering guarantees it runs AFTER
-            // layer 77's compute finishes.
-            {
-                ggml_tensor * last_out_node = nullptr;
-                char want[64];
-                snprintf(want, sizeof(want), "l_out-%d", n_active_layers - 1);
-                for (int i = gf->n_nodes - 1; i >= 0; --i) {
-                    const char * nm = gf->nodes[i]->name;
-                    if (nm && std::strcmp(nm, want) == 0) {
-                        last_out_node = gf->nodes[i];
-                        break;
-                    }
-                }
-                if (last_out_node != nullptr) {
-                    ggml_tensor out_target = {};
-                    out_target.type = last_out_node->type;
-                    for (int d = 0; d < GGML_MAX_DIMS; ++d) {
-                        out_target.ne[d] = last_out_node->ne[d];
-                        out_target.nb[d] = last_out_node->nb[d];
-                    }
-                    out_target.data   = sg->metal_hidden_buf[n_active_layers];
-                    out_target.buffer = (ggml_backend_buffer_t)sg->metal_hidden_backend_buf[n_active_layers];
-                    if (!ggml_backend_metal_cpy_tensor_async(metal_backend, last_out_node, &out_target)) {
-                        LLAMA_LOG_WARN("%s: post-compute blit for last-layer output FAILED — "
-                                       "metal_hidden_buf[%d] may be stale\n", __func__, n_active_layers);
-                    }
-                } else {
-                    LLAMA_LOG_WARN("%s: could not find l_out-%d node for post-compute blit\n",
-                                   __func__, n_active_layers - 1);
-                }
-            }
-
-            // Sync to ensure all layer signal events have fired AND the post-
-            // compute blit has completed before returning. (Caller's TX
-            // thread would ordinarily wait on per-layer output_ready events;
-            // this final sync ensures metal_hidden_buf[n_layer] contains
-            // the last layer's output for apply_output_head.)
-            ggml_backend_synchronize(metal_backend);
-
-            // ── Iteration-8 raw-address probe ────────────────────────────
-            // Scan ALL nodes for the unnamed CONT and GET_ROWS nodes around
-            // layer-77 and dump their data pointers and first-3-floats.
-            // Also dump attn_out_external_pl-77 and mega_in_77 (external).
-            {
-                const char * ffn_probe_env2 = std::getenv("SPLIT_DECODE_FFN_PROBE_LAYER");
-                if (ffn_probe_env2 && ffn_probe_env2[0] != '\0' && ffn_probe_env2[0] != '0') {
-                    auto dump3 = [](const char * label, const void * ptr, const ggml_tensor * t) {
-                        if (!ptr) { fprintf(stderr, "[RAW_PROBE] %s: ptr=NULL\n", label); return; }
-                        float v[3] = {};
-                        if (t->type == GGML_TYPE_F32) {
-                            std::memcpy(v, ptr, 3*sizeof(float));
-                        } else if (t->type == GGML_TYPE_F16) {
-                            const uint16_t * u = (const uint16_t*)ptr;
-                            for (int k=0;k<3;k++) v[k] = ggml_fp16_to_fp32(u[k]);
-                        } else if (t->type == GGML_TYPE_BF16) {
-                            const uint16_t * u = (const uint16_t*)ptr;
-                            for (int k=0;k<3;k++) { uint32_t b=(uint32_t)u[k]<<16; std::memcpy(&v[k],&b,4); }
-                        }
-                        fprintf(stderr, "[RAW_PROBE] %-40s data=%p v=[%g %g %g] type=%d\n",
-                            label, ptr, (double)v[0], (double)v[1], (double)v[2], (int)t->type);
-                    };
-                    // scan nodes
-                    for (int ni = 0; ni < gf->n_nodes; ++ni) {
-                        ggml_tensor * tn = gf->nodes[ni];
-                        if (!tn) continue;
-                        const char * nm = tn->name;
-                        bool is_cont   = (tn->op == GGML_OP_CONT);
-                        bool is_gr77   = (tn->op == GGML_OP_GET_ROWS && tn->src[0] &&
-                                         (strstr(tn->src[0]->name, "attn_out_external_pl-77") || strstr(tn->src[0]->name, "mega_in_77") ||
-                                          strstr(tn->src[0]->name, "mega_attn_77")));
-                        bool is_inp77  = (nm && strcmp(nm, "ffn_inp-77") == 0);
-                        if (is_cont && tn->src[0] && tn->src[0]->src[0] &&
-                            (strstr(tn->src[0]->src[0]->name, "attn_out_external_pl-77") || strstr(tn->src[0]->src[0]->name, "mega_in_77") || strstr(tn->src[0]->src[0]->name, "mega_attn_77"))) {
-                            char lbl[64]; snprintf(lbl, 64, "CONT(gr_src=%s)", tn->src[0]->src[0]->name);
-                            dump3(lbl, tn->data, tn);
-                        }
-                        if (is_gr77) {
-                            char lbl[64]; snprintf(lbl,64,"GET_ROWS(src=%s)",tn->src[0]->name); dump3(lbl,tn->data,tn);
-                            // Also dump the src1 (inp_out_ids) as I32 — the KEY question:
-                            // what index value does Metal GPU actually read?
-                            if (tn->src[1] && tn->src[1]->data) {
-                                const int32_t * idx_ptr = (const int32_t*)tn->src[1]->data;
-                                fprintf(stderr, "[RAW_PROBE] GET_ROWS src1(inp_out_ids) data=%p val[0]=%d (I32) src0.ne=[%lld,%lld]\n",
-                                    tn->src[1]->data, (int)idx_ptr[0],
-                                    (long long)tn->src[0]->ne[0], (long long)tn->src[0]->ne[1]);
-                            }
-                        }
-                        if (is_inp77) dump3("ffn_inp-77", tn->data, tn);
-                    }
-                    // scan leafs (external tensors like attn_out_external_pl-77, mega_in_77)
-                    for (int li = 0; li < gf->n_leafs; ++li) {
-                        ggml_tensor * tn = gf->leafs[li];
-                        if (!tn) continue;
-                        const char * nm = tn->name;
-                        if (nm && (strstr(nm, "attn_out_external_pl-77") || strstr(nm, "mega_in_77") || strstr(nm, "mega_attn_77") || strcmp(nm, "leaf_911") == 0)) {
-                            char lbl[64]; snprintf(lbl, 64, "LEAF(%s)", nm);
-                            dump3(lbl, tn->data, tn);
-                        }
-                    }
-                    fflush(stderr);
-                }
-            }
-            // ── End raw-address probe ─────────────────────────────────────
-
-            // ── Iteration-6 FFN-chain probe ───────────────────────────────
-            // Gate on SPLIT_DECODE_FFN_PROBE_LAYER=<il>. After the Metal
-            // sync, scan gf->nodes for the six named tensors in layer-77's
-            // FFN chain and dump the first 3 floats from each. Apple Silicon
-            // is unified memory so tensor->data is CPU-readable immediately
-            // after ggml_backend_synchronize. If tensor->data is null (non-
-            // unified path) we fall back to ggml_backend_tensor_get.
-            {
-                const char * ffn_probe_env = std::getenv("SPLIT_DECODE_FFN_PROBE_LAYER");
-                if (ffn_probe_env && ffn_probe_env[0] != '\0' && ffn_probe_env[0] != '0') {
-                    int probe_il = std::atoi(ffn_probe_env);
-                    // Also probe layer probe_il-1 as a sanity reference (should be non-zero)
-                    int probe_ils[2] = { probe_il - 1, probe_il };
-                    int n_probe_ils = (probe_il > 0) ? 2 : 1;
-                    // Names to probe: ffn_inp-<il>, ffn_norm-<il>,
-                    // ffn_moe_out-<il>, ffn_shexp-<il>, ffn_out-<il>, l_out-<il>
-                    const char * targets[] = {
-                        "ffn_inp", "ffn_norm", "ffn_moe_out",
-                        "ffn_shexp", "ffn_out", "l_out"
-                    };
-                    const int n_targets = 6;
-                    for (int pi = 0; pi < n_probe_ils; ++pi) {
-                    int cur_probe_il = probe_ils[pi];
-                    for (int ti = 0; ti < n_targets; ++ti) {
-                        char want[64];
-                        snprintf(want, sizeof(want), "%s-%d", targets[ti], cur_probe_il);
-                        for (int ni = 0; ni < gf->n_nodes; ++ni) {
-                            const char * nm = gf->nodes[ni]->name;
-                            if (nm && std::strcmp(nm, want) == 0) {
-                                ggml_tensor * tn = gf->nodes[ni];
-                                float v_direct[3] = {0.0f, 0.0f, 0.0f};
-                                float v_get[3]    = {0.0f, 0.0f, 0.0f};
-                                // Path A: direct memcpy from data pointer
-                                if (tn->data != nullptr) {
-                                    if (tn->type == GGML_TYPE_F32) {
-                                        std::memcpy(v_direct, tn->data, sizeof(v_direct));
-                                    } else if (tn->type == GGML_TYPE_BF16) {
-                                        uint16_t raw[3];
-                                        std::memcpy(raw, tn->data, sizeof(raw));
-                                        for (int k = 0; k < 3; ++k) {
-                                            uint32_t bits = (uint32_t)raw[k] << 16;
-                                            std::memcpy(&v_direct[k], &bits, 4);
-                                        }
-                                    } else if (tn->type == GGML_TYPE_F16) {
-                                        uint16_t raw[3];
-                                        std::memcpy(raw, tn->data, sizeof(raw));
-                                        for (int k = 0; k < 3; ++k)
-                                            v_direct[k] = ggml_fp16_to_fp32(raw[k]);
-                                    }
-                                }
-                                // Path B: ggml_backend_tensor_get (goes through Metal backend)
-                                if (tn->buffer != nullptr) {
-                                    if (tn->type == GGML_TYPE_F32) {
-                                        ggml_backend_tensor_get(tn, v_get, 0, sizeof(v_get));
-                                    } else if (tn->type == GGML_TYPE_BF16) {
-                                        uint16_t raw[3] = {};
-                                        ggml_backend_tensor_get(tn, raw, 0, sizeof(raw));
-                                        for (int k = 0; k < 3; ++k) {
-                                            uint32_t bits = (uint32_t)raw[k] << 16;
-                                            std::memcpy(&v_get[k], &bits, 4);
-                                        }
-                                    } else if (tn->type == GGML_TYPE_F16) {
-                                        uint16_t raw[3] = {};
-                                        ggml_backend_tensor_get(tn, raw, 0, sizeof(raw));
-                                        for (int k = 0; k < 3; ++k)
-                                            v_get[k] = ggml_fp16_to_fp32(raw[k]);
-                                    }
-                                }
-                                fprintf(stderr,
-                                    "[FFN_PROBE] name=%s type=%d data=%p buf=%p"
-                                    " direct=[%g %g %g] get=[%g %g %g]\n",
-                                    want, (int)tn->type,
-                                    tn->data,
-                                    (void*)(tn->buffer ? (void*)tn->buffer : nullptr),
-                                    (double)v_direct[0], (double)v_direct[1], (double)v_direct[2],
-                                    (double)v_get[0], (double)v_get[1], (double)v_get[2]);
-                                break;
-                            }
-                        }
-                    } // ti loop
-                    } // pi loop
-                }
-            }
-            // ── End FFN-chain probe ───────────────────────────────────────
-
-            ggml_free(wrap_ctx);
-            llama_batch_free(batch);
-            LLAMA_LOG_INFO("%s: mega-graph GATED dispatch complete: %d segments, %d nodes\n",
-                           __func__, n_active_layers, gf->n_nodes);
-            return 0;
-        }
-    }
-
-    // Default path: normal (non-gated) graph_compute. Caller must have
-    // pre-populated all attn_out buffers or accept partial-pipeline
-    // semantics. Used for single-machine correctness testing.
-    ggml_status status = graph_compute(gf, /*batched=*/true);
-    if (status != GGML_STATUS_SUCCESS) {
-        LLAMA_LOG_ERROR("%s: mega graph_compute status=%d\n", __func__, (int)status);
-        ggml_free(wrap_ctx);
-        llama_batch_free(batch);
-        return -17;
-    }
-
-    if (gpu_backend) {
-        ggml_backend_synchronize(gpu_backend);
-    }
-
-    ggml_free(wrap_ctx);
-    llama_batch_free(batch);
-    LLAMA_LOG_INFO("%s: mega-graph computed %d layers (nodes=%d)\n",
-                   __func__, n_layer, gf->n_nodes);
-    return 0;
-#endif
 }

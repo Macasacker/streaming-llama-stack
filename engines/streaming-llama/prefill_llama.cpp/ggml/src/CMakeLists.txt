@@ -76,11 +76,7 @@ if (GGML_CCACHE AND NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAU
             set(GGML_CCACHE_VARIANT sccache)
         endif()
         # TODO: should not be set globally
-        if (GGML_SYCL AND GGML_CCACHE_FOUND AND WIN32)
-            set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "ccache compiler_type=icl")
-        else ()
-            set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${GGML_CCACHE_VARIANT}")
-        endif ()
+        set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${GGML_CCACHE_VARIANT}")
         set(ENV{CCACHE_SLOPPINESS} time_macros)
         message(STATUS "${GGML_CCACHE_VARIANT} found, compilation results will be cached. Disable with GGML_CCACHE=OFF.")
     else()
@@ -312,8 +308,7 @@ function(ggml_add_cpu_backend_variant tag_name)
         foreach (feat NATIVE
                       SSE42
                       AVX AVX2 BMI2 AVX_VNNI FMA F16C
-                      AVX512 AVX512_VBMI AVX512_VNNI AVX512_BF16
-                      AMX_TILE AMX_INT8 AMX_BF16)
+                      AVX512 AVX512_VBMI AVX512_VNNI AVX512_BF16)
             set(GGML_${feat} OFF)
         endforeach()
 
@@ -379,10 +374,6 @@ if (GGML_CPU_ALL_VARIANTS)
             ggml_add_cpu_backend_variant(zen4           SSE42 AVX F16C FMA AVX2 BMI2 AVX512 AVX512_VBMI AVX512_VNNI AVX512_BF16)
         endif()
         ggml_add_cpu_backend_variant(alderlake          SSE42 AVX F16C FMA AVX2 BMI2 AVX_VNNI)
-        if (NOT MSVC)
-            # MSVC doesn't support AMX
-            ggml_add_cpu_backend_variant(sapphirerapids SSE42 AVX F16C FMA AVX2 BMI2 AVX512 AVX512_VBMI AVX512_VNNI AVX512_BF16 AMX_TILE AMX_INT8)
-        endif()
     elseif(GGML_SYSTEM_ARCH STREQUAL "ARM")
         if (CMAKE_SYSTEM_NAME MATCHES "Linux")
             # Many of these features are optional so we build versions with popular
@@ -450,16 +441,11 @@ ggml_add_backend(BLAS)
 ggml_add_backend(CANN)
 ggml_add_backend(CUDA)
 ggml_add_backend(HIP)
-ggml_add_backend(METAL)
 ggml_add_backend(MUSA)
-ggml_add_backend(RPC)
 ggml_add_backend(VirtGPU)
-ggml_add_backend(SYCL)
-ggml_add_backend(Vulkan)
 ggml_add_backend(WebGPU)
 ggml_add_backend(zDNN)
 ggml_add_backend(OpenCL)
-ggml_add_backend(Hexagon)
 ggml_add_backend(ZenDNN)
 
 foreach (target ggml-base ggml)

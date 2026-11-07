@@ -34,17 +34,8 @@
 #include "ggml-cuda.h"
 #endif
 
-#ifdef GGML_USE_METAL
-#include "ggml-metal.h"
-#endif
 
-#ifdef GGML_USE_SYCL
-#include "ggml-sycl.h"
-#endif
 
-#ifdef GGML_USE_VULKAN
-#include "ggml-vulkan.h"
-#endif
 
 #ifdef GGML_USE_WEBGPU
 #include "ggml-webgpu.h"
@@ -58,17 +49,11 @@
 #include "ggml-opencl.h"
 #endif
 
-#ifdef GGML_USE_HEXAGON
-#include "ggml-hexagon.h"
-#endif
 
 #ifdef GGML_USE_BLAS
 #include "ggml-blas.h"
 #endif
 
-#ifdef GGML_USE_RPC
-#include "ggml-rpc.h"
-#endif
 
 #ifdef GGML_USE_VIRTGPU_FRONTEND
 #include "ggml-virtgpu.h"
@@ -112,20 +97,6 @@ struct ggml_backend_registry {
 #ifdef GGML_USE_CUDA
         register_backend(ggml_backend_cuda_reg());
 #endif
-#ifdef GGML_USE_METAL
-        register_backend(ggml_backend_metal_reg());
-#endif
-#ifdef GGML_USE_SYCL
-        register_backend(ggml_backend_sycl_reg());
-#endif
-#ifdef GGML_USE_VULKAN
-    // Add runtime disable check
-    if (getenv("GGML_DISABLE_VULKAN") == nullptr) {
-        register_backend(ggml_backend_vk_reg());
-    } else {
-        GGML_LOG_DEBUG("Vulkan backend disabled by GGML_DISABLE_VULKAN environment variable\n");
-    }
-#endif
 #ifdef GGML_USE_WEBGPU
         register_backend(ggml_backend_webgpu_reg());
 #endif
@@ -142,17 +113,11 @@ struct ggml_backend_registry {
 #ifdef GGML_USE_ZENDNN
         register_backend(ggml_backend_zendnn_reg());
 #endif
-#ifdef GGML_USE_HEXAGON
-        register_backend(ggml_backend_hexagon_reg());
-#endif
 #ifdef GGML_USE_CANN
         register_backend(ggml_backend_cann_reg());
 #endif
 #ifdef GGML_USE_BLAS
         register_backend(ggml_backend_blas_reg());
-#endif
-#ifdef GGML_USE_RPC
-        register_backend(ggml_backend_rpc_reg());
 #endif
 #ifdef GGML_USE_CPU
         register_backend(ggml_backend_cpu_reg());
@@ -548,13 +513,8 @@ void ggml_backend_load_all_from_path(const char * dir_path) {
     ggml_backend_load_best("cann", silent, dir_path);
     ggml_backend_load_best("cuda", silent, dir_path);
     ggml_backend_load_best("hip", silent, dir_path);
-    ggml_backend_load_best("metal", silent, dir_path);
-    ggml_backend_load_best("rpc", silent, dir_path);
-    ggml_backend_load_best("sycl", silent, dir_path);
-    ggml_backend_load_best("vulkan", silent, dir_path);
     ggml_backend_load_best("virtgpu", silent, dir_path);
     ggml_backend_load_best("opencl", silent, dir_path);
-    ggml_backend_load_best("hexagon", silent, dir_path);
     ggml_backend_load_best("musa", silent, dir_path);
     ggml_backend_load_best("cpu", silent, dir_path);
     // check the environment variable GGML_BACKEND_PATH to load an out-of-tree backend

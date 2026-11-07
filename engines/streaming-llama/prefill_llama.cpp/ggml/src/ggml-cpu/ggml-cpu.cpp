@@ -4,7 +4,6 @@
 #include "repack.h"
 #include "traits.h"
 #include "ggml-impl.h"
-#include "amx/amx.h"
 
 #include <cctype>
 #include <string>
@@ -14,9 +13,6 @@
 #    include "hbm.h"
 #endif
 
-#ifdef GGML_USE_CPU_KLEIDIAI
-#    include "kleidiai/kleidiai.h"
-#endif
 
 #ifdef GGML_USE_CPU_RISCV64_SPACEMIT
 #    include "spacemit/ime.h"
@@ -43,11 +39,6 @@ std::vector<ggml_backend_buffer_type_t> & ggml_backend_cpu_get_extra_buffer_type
     static std::vector<ggml_backend_buffer_type_t> bufts = []() {
         std::vector<ggml_backend_buffer_type_t> bufts;
 
-#if defined(__AMX_INT8__) && defined(__AVX512VNNI__)
-        if (ggml_backend_amx_buffer_type()) {
-            bufts.push_back(ggml_backend_amx_buffer_type());
-        }
-#endif
 
 #ifdef GGML_USE_CPU_RISCV64_SPACEMIT
         if (ggml_backend_cpu_riscv64_spacemit_buffer_type()) {
@@ -55,11 +46,6 @@ std::vector<ggml_backend_buffer_type_t> & ggml_backend_cpu_get_extra_buffer_type
         }
 #endif
 
-#ifdef GGML_USE_CPU_KLEIDIAI
-        if (ggml_backend_cpu_kleidiai_buffer_type()) {
-            bufts.push_back(ggml_backend_cpu_kleidiai_buffer_type());
-        }
-#endif
 
 #ifdef GGML_USE_CPU_REPACK
         if (ggml_backend_cpu_repack_buffer_type()) {
@@ -564,9 +550,6 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
         if (ggml_cpu_has_avx512_bf16()) {
             features.push_back({ "AVX512_BF16", "1" });
         }
-        if (ggml_cpu_has_amx_int8()) {
-            features.push_back({ "AMX_INT8", "1" });
-        }
         if (ggml_cpu_has_neon()) {
             features.push_back({ "NEON", "1" });
         }
@@ -619,9 +602,6 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
     #endif
     #ifdef GGML_USE_OPENMP
         features.push_back({ "OPENMP", "1" });
-    #endif
-    #ifdef GGML_USE_CPU_KLEIDIAI
-        features.push_back({ "KLEIDIAI", "1" });
     #endif
     #ifdef GGML_USE_CPU_REPACK
         features.push_back({ "REPACK", "1" });

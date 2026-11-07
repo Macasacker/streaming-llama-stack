@@ -314,10 +314,6 @@ static int ggml_backend_cpu_x86_score() {
     if (!is.AVX512_VNNI()) { return 0; }
     score += 1<<10;
 #endif
-#ifdef GGML_AMX_INT8
-    if (!is.AMX_INT8()) { return 0; }
-    score += 1<<11;
-#endif
 
     return score;
 }

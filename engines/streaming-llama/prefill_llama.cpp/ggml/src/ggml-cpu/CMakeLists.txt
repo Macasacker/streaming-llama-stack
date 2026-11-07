@@ -32,10 +32,6 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
         ggml-cpu/quants.h
         ggml-cpu/traits.cpp
         ggml-cpu/traits.h
-        ggml-cpu/amx/amx.cpp
-        ggml-cpu/amx/amx.h
-        ggml-cpu/amx/mmq.cpp
-        ggml-cpu/amx/mmq.h
         ggml-cpu/ggml-cpu-impl.h
         ggml-cpu/common.h
         ggml-cpu/binary-ops.h
@@ -279,15 +275,6 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
                         list(APPEND ARCH_FLAGS -mavx512bf16)
                     endif()
                 endif()
-                if (GGML_AMX_TILE)
-                    list(APPEND ARCH_DEFINITIONS __AMX_TILE__ GGML_AMX_TILE)
-                endif()
-                if (GGML_AMX_INT8)
-                    list(APPEND ARCH_DEFINITIONS __AMX_INT8__ GGML_AMX_INT8)
-                endif()
-                if (GGML_AMX_BF16)
-                    list(APPEND ARCH_DEFINITIONS __AMX_BF16__ GGML_AMX_BF16)
-                endif()
             elseif (GGML_AVX2)
                 list(APPEND ARCH_FLAGS /arch:AVX2)
                 list(APPEND ARCH_DEFINITIONS GGML_AVX2 GGML_FMA GGML_F16C)
@@ -356,18 +343,6 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
                 if (GGML_AVX512_BF16)
                     list(APPEND ARCH_FLAGS -mavx512bf16)
                     list(APPEND ARCH_DEFINITIONS GGML_AVX512_BF16)
-                endif()
-                if (GGML_AMX_TILE)
-                    list(APPEND ARCH_FLAGS -mamx-tile)
-                    list(APPEND ARCH_DEFINITIONS GGML_AMX_TILE)
-                endif()
-                if (GGML_AMX_INT8)
-                    list(APPEND ARCH_FLAGS -mamx-int8)
-                    list(APPEND ARCH_DEFINITIONS GGML_AMX_INT8)
-                endif()
-                if (GGML_AMX_BF16)
-                    list(APPEND ARCH_FLAGS -mamx-bf16)
-                    list(APPEND ARCH_DEFINITIONS GGML_AMX_BF16)
                 endif()
             endif()
         endif()
@@ -554,125 +529,6 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
         target_compile_definitions(${GGML_CPU_NAME} PRIVATE GGML_USE_CPU_REPACK)
     endif()
 
-    if (GGML_CPU_KLEIDIAI)
-        message(STATUS "Using KleidiAI optimized kernels if applicable")
-
-        # Disable the KleidiAI tests
-        set(KLEIDIAI_BUILD_TESTS  OFF)
-
-        # Fetch KleidiAI sources:
-        include(FetchContent)
-        set(KLEIDIAI_COMMIT_TAG "v1.16.0")
-        set(KLEIDIAI_DOWNLOAD_URL "https://github.com/ARM-software/kleidiai/archive/refs/tags/${KLEIDIAI_COMMIT_TAG}.tar.gz")
-        set(KLEIDIAI_ARCHIVE_MD5  "0a9e9008adb6031f9e8cf70dff4a3321")
-
-        if (POLICY CMP0135)
-            cmake_policy(SET CMP0135 NEW)
-        endif()
-
-        FetchContent_Declare(KleidiAI_Download
-            URL ${KLEIDIAI_DOWNLOAD_URL}
-            DOWNLOAD_EXTRACT_TIMESTAMP NEW
-            URL_HASH MD5=${KLEIDIAI_ARCHIVE_MD5})
-
-        FetchContent_MakeAvailable(KleidiAI_Download)
-        FetchContent_GetProperties(KleidiAI_Download
-            SOURCE_DIR  KLEIDIAI_SRC
-            POPULATED   KLEIDIAI_POPULATED)
-
-        if (NOT KLEIDIAI_POPULATED)
-            message(FATAL_ERROR "KleidiAI source downloaded failed.")
-        endif()
-
-        add_compile_definitions(GGML_USE_CPU_KLEIDIAI)
-
-        # Remove kleidiai target after fetching it
-        if (TARGET kleidiai)
-            set_target_properties(kleidiai PROPERTIES EXCLUDE_FROM_ALL TRUE)
-        endif()
-
-        list(APPEND GGML_CPU_SOURCES
-            ggml-cpu/kleidiai/kleidiai.cpp
-            ggml-cpu/kleidiai/kernels.cpp
-            ggml-cpu/kleidiai/kleidiai.h
-            ggml-cpu/kleidiai/kernels.h
-            )
-
-        # KleidiAI
-        include_directories(
-            ${KLEIDIAI_SRC}/
-            ${KLEIDIAI_SRC}/kai/
-            ${KLEIDIAI_SRC}/kai/ukernels/
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_fp32_bf16p_bf16p/
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/)
-
-        set(ARCH_FLAGS_TEMP "${ARCH_FLAGS}")
-        if (NOT ARCH_FLAGS_TEMP)
-            string(REGEX MATCH "-march=[^ ]+" ARCH_FLAGS_TEMP "${CMAKE_C_FLAGS}")
-        endif()
-        string(FIND "${ARCH_FLAGS_TEMP}" "+dotprod" DOTPROD_ENABLED)
-        string(FIND "${ARCH_FLAGS_TEMP}" "+i8mm" I8MM_ENABLED)
-        string(FIND "${ARCH_FLAGS_TEMP}" "+sme" SME_ENABLED)
-        string(FIND "${ARCH_FLAGS_TEMP}" "+sve" SVE_ENABLED)
-
-        set(PRIVATE_ARCH_FLAGS ${ARCH_FLAGS_TEMP})
-
-        list(APPEND GGML_KLEIDIAI_SOURCES
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qsi8d32p_f32.c
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qsi8d32p4x8sb_f32_neon.c
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_nxk_qsi4c32ps1s0scalef16_qsu4c32s16s0_neon.c
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qsi8d32p_f32_neon.c
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_nxk_qsi4c32pscalef16_qsu4c32s16s0.c
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_quant_pack_qai8dxp_f32.c
-            ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_nxk_qsi8cxp_qsi8cx_neon.c)
-
-        if (NOT DOTPROD_ENABLED MATCHES -1)
-            list(APPEND GGML_KLEIDIAI_SOURCES
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1x8_qsi4c32p4x8_1x4x32_neon_dotprod.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1x4_qsi4c32p4x4_1x4_neon_dotprod.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p4x4_qsi4c32p4x4_16x4_neon_dotprod.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp4x4_qsi8cxp4x4_16x4_neon_dotprod.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp1x4_qsi8cxp4x4_1x4_neon_dotprod.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp1x8_qsi8cxp4x8_1x4_neon_dotprod.c)
-        endif()
-
-        if (NOT I8MM_ENABLED MATCHES -1)
-            list(APPEND GGML_KLEIDIAI_SOURCES
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p4x8_qsi4c32p4x8_16x4_neon_i8mm.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp4x8_qsi8cxp4x8_16x4_neon_i8mm.c)
-        endif()
-
-        if (NOT SME_ENABLED MATCHES -1)
-            list(APPEND GGML_KLEIDIAI_SOURCES
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1vlx4_qsi4c32p4vlx4_1vlx4vl_sme2_mopa.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1x4_qsi4c32p4vlx4_1x4vl_sme2_sdot.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp1vlx4_qsi8cxp4vlx4_1vlx4vl_sme2_mopa.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp1vlx4_qsi8cxp4vlx4_1vlx4vl_sme2_mopa_asm.S
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp1x4_qsi8cxp4vlx4_1x4vl_sme2_dot.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qai8dxp_qsi8cxp/kai_matmul_clamp_f32_qai8dxp1x4_qsi8cxp4vlx4_1x4vl_sme2_dot_asm.S
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_fp32_bf16p_bf16p/kai_matmul_clamp_f32_bf16p2vlx2_bf16p2vlx2_2vlx2vl_sme2_mopa.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_fp32_bf16p_bf16p/kai_matmul_clamp_f32_bf16p2vlx2_bf16p2vlx2_2vlx2vl_sme2_mopa_asm.S
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_lhs_pack_bf16p2vlx2_f32_sme.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/pack/kai_rhs_pack_kxn_bf16p2vlx2b_f32_x32_sme.c
-                ${KLEIDIAI_SRC}/kai/kai_common_sme_asm.S)
-            set(PRIVATE_ARCH_FLAGS "-fno-tree-vectorize;${PRIVATE_ARCH_FLAGS}+sve+sve2")
-        endif()
-
-        if (NOT SVE_ENABLED MATCHES -1)
-            list(APPEND GGML_KLEIDIAI_SOURCES
-                ${KLEIDIAI_SRC}/kai/kai_common_sve_asm.S
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1x8_qsi4c32p8x8_1x8_sve_dotprod_asm.S
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p1x8_qsi4c32p8x8_1x8_sve_dotprod.c
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p4x8_qsi4c32p8x8_16x8_sve_i8mm_asm.S
-                ${KLEIDIAI_SRC}/kai/ukernels/matmul/matmul_clamp_f32_qsi8d32p_qsi4c32p/kai_matmul_clamp_f32_qsi8d32p4x8_qsi4c32p8x8_16x8_sve_i8mm.c)
-        endif()
-
-        set_source_files_properties(${GGML_KLEIDIAI_SOURCES} PROPERTIES COMPILE_OPTIONS "${PRIVATE_ARCH_FLAGS}")
-        list(APPEND GGML_CPU_SOURCES ${GGML_KLEIDIAI_SOURCES})
-    endif()
 
     message(STATUS "Adding CPU backend variant ${GGML_CPU_NAME}: ${ARCH_FLAGS} ${ARCH_DEFINITIONS}")
     target_sources(${GGML_CPU_NAME} PRIVATE ${GGML_CPU_SOURCES})

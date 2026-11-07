@@ -1041,27 +1041,6 @@ static std::vector<ggml_backend_dev_t> parse_device_list(const std::string & val
     return devices;
 }
 
-static void add_rpc_devices(const std::string & servers) {
-    auto rpc_servers = string_split<std::string>(servers, ',');
-    if (rpc_servers.empty()) {
-        throw std::invalid_argument("no RPC servers specified");
-    }
-    ggml_backend_reg_t rpc_reg = ggml_backend_reg_by_name("RPC");
-    if (!rpc_reg) {
-        throw std::invalid_argument("failed to find RPC backend");
-    }
-    typedef ggml_backend_reg_t (*ggml_backend_rpc_add_server_t)(const char * endpoint);
-    ggml_backend_rpc_add_server_t ggml_backend_rpc_add_server_fn =
-        (ggml_backend_rpc_add_server_t) ggml_backend_reg_get_proc_address(rpc_reg, "ggml_backend_rpc_add_server");
-    if (!ggml_backend_rpc_add_server_fn) {
-        throw std::invalid_argument("failed to find RPC add server function");
-    }
-    for (const auto & server : rpc_servers) {
-        auto reg = ggml_backend_rpc_add_server_fn(server.c_str());
-        ggml_backend_register(reg);
-    }
-}
-
 bool common_params_to_map(int argc, char ** argv, llama_example ex, std::map<common_arg, std::string> & out_map) {
     common_params         dummy_params;
     common_params_context ctx_arg = common_params_parser_init(dummy_params, ex, nullptr);
@@ -2706,14 +2685,6 @@ common_params_context common_params_parser_init(common_params & params,
                        [](common_params & params, int value) { params.image_max_tokens = value; })
                 .set_examples(mmproj_examples)
                 .set_env("LLAMA_ARG_IMAGE_MAX_TOKENS"));
-    if (llama_supports_rpc()) {
-        add_opt(common_arg({ "--rpc" }, "SERVERS", "comma separated list of RPC servers (host:port)",
-                           [](common_params & params, const std::string & value) {
-                               add_rpc_devices(value);
-                               GGML_UNUSED(params);
-                           })
-                    .set_env("LLAMA_ARG_RPC"));
-    }
     add_opt(common_arg({ "--mlock" }, "force system to keep model in RAM rather than swapping or compressing",
                        [](common_params & params) { params.use_mlock = true; })
                 .set_env("LLAMA_ARG_MLOCK"));

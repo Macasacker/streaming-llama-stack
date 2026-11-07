@@ -916,10 +916,6 @@ struct llama_context {
     // context's backend list.
     ggml_backend_t get_cuda_backend() const;
 
-    // Metal backend on this context (or nullptr if none). Phase 3 Mac
-    // split_graph mirror needs this analogous to get_cuda_backend.
-    ggml_backend_t get_metal_backend() const;
-
     // Reusable per-call GPU staging buffers for build_compute_split_layer.
     // Allocated once on first use, keyed by buffer type. Both buffers are sized
     // for one token's worth of embeddings (n_embd fp32). Saves 250 us/call of
