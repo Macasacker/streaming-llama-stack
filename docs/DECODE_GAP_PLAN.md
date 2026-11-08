@@ -1,5 +1,12 @@
 # Closing the decode gap: DS4.1-Flash single engine vs Strata + DeepSeek
 
+This engine exists to serve DeepSeek V4.1-Flash, on this hardware, for agentic software
+engineering. That workload is decode-dominated: long generations, tool-call turns, and many turns
+against one growing context. Decode throughput and turn reuse are therefore the product, and
+prefill speed only decides how quickly a turn starts. 1.04 tok/s is not a usable answer for that
+job, so the target of this plan is the Strata + DeepSeek number, not a re-scoped role for the
+stack.
+
 Measured on this box (RTX 5090, 32 GiB VRAM, 93 GiB RAM, NVMe), 2026-11-08.
 
 | | Strata + DeepSeek V4.1-Flash (IST-DAS 2.00 bpw, 129 GB) | This stack (IQ2_XXS-Q2_K imatrix, 365 GB) |
@@ -106,19 +113,64 @@ Cache placement caps out near 10-17 tok/s. The remaining levers change the footp
   315838021632-byte file, so this 365713686528-byte one is refused as wrong-model. Produce one with
   `DS4_CACHE_AFFINITY_CALIBRATE`, then set `cache_affinity_spread_file` (which
   `slstack/combo_producer.py` turns into `LLAMADECODE_DS4_SPREAD`). Until then the probe runs with
-  `quality_speed: 0`.
-- **Speculative decoding.** Not present in this path at all. It is the structural difference between
-  24 tok/s and the ~10-17 tok/s host-cache ceiling, and it is the largest piece of work here; scope
-  it as its own project rather than a tuning step.
+  `quality_speed: 0`. The affinity bias is also what keeps the hot expert set small, so it is part
+  of step 2's hit rate rather than only a quality knob.
 
 Accept for step 4: a measured decode rate for each change in isolation, and the quality difference
 where the change trades accuracy (tail skip, quant).
 
-## Stop condition
+## Step 5 - Decode several tokens per step
 
-If steps 1-3 land and decode still sits below ~4 tok/s, the conclusion is that this file cannot
-serve interactive decode on a 32 GiB card, and the honest configuration is: this stack for long
-262k prefill (where it already beats Strata at ~2000 vs ~1450 tok/s), gyro/Strata for chat decode.
+The per-step bytes are paid once per step, so tokens per step is the only lever that multiplies
+throughput without shrinking the model or the cache. This is the difference between Strata's 24
+tok/s and the ~10-17 tok/s host-cache ceiling, and it is the work that makes the engine usable for
+agentic decoding rather than merely faster.
+
+- Establish what V4.1-Flash offers here: whether the checkpoint carries a draft/MTP head, and
+  whether the decode graph can verify k candidate ids in one step against the existing carry and
+  HC state without re-running the routed FFN per candidate.
+- Verify against the existing state contracts rather than around them: `llama_dsv41_decode_delta`
+  and the owner-digest checkpoints already certify device state, so a draft must extend them and
+  keep the accepted-token count honest in `usage`.
+- Measure acceptance rate and quality against the no-draft path at the same sampling settings, the
+  way Strata reports drafts accepted (e.g. 236 of 287).
+
+Accept: sustained decode ≥ 12 tok/s from cache placement alone (steps 2-4) and ≥ 24 tok/s with a
+verified draft, on a real multi-turn session, with acceptance rate and a quality comparison
+recorded.
+Risk: state correctness. A draft that advances device state the checkpoint cannot describe is worse
+than slow, so the delta and digest contracts gate it, not a throughput number.
+
+## Step 6 - Reuse across agent turns
+
+Strata reuses 81.6 % of prompt tokens on live traffic, and an agent session's second turn is
+mostly the first turn's context. Reuse is worth more than raw tok/s in this workload because it
+removes prefill from every turn after the first.
+
+- Measure it here: the engine already reports `cache_n`/`prompt_n` and tonight's first turn showed
+  `cache_n=0`, which is expected for a cold session. Run a multi-turn session and read `cache_n` on
+  the second turn.
+- The carry store and `DS4_COMBO_RESTORE_MAPPING` / expert-restore file are the mechanism; confirm a
+  second turn takes the append path (`restart_prompt`/append prefill) instead of retiring the
+  producer, and that the resident expert set survives the turn boundary.
+
+Accept: ≥ 70 % of the second turn's prompt tokens reported as reused, and the retired-producer
+path taken only on a real prefix divergence.
+
+## Acceptance
+
+The bar is the measured Strata + DeepSeek number on this box, on agentic traffic, at 262k context:
+
+- sustained decode median ≥ 24 tok/s on generations of ≥ 200 tokens,
+- ≥ 70 % prompt reuse on the second turn of a session,
+- no admission refusal, no budget breach, no paging growth,
+- answers that match the no-bias, no-draft reference within the tolerance the affinity bias is
+  allowed to introduce.
+
+Steps 1-4 are tuning and are worth doing in order. Step 5 is the structural one: without tokens per
+step, cache placement alone cannot reach the bar with a 365 GB file. If steps 1-4 land and steps 5-6
+have not, the honest report is "understood, not accepted": the gap is real, and the fix is draft
+decoding plus reuse, not a narrower role for the engine.
 
 ## What tonight fixed, so the plan is measured on a working pipeline
 
