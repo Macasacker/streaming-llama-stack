@@ -174,6 +174,10 @@ class Producer:
             raise
 
     def _poison(self, exc):
+        # Diagnostic: the first failure seen by the parent, with its call site. Later abort strings
+        # are echoes of the child's exit, so this is the one that names the real cause.
+        import traceback as _traceback
+        print('DSV41_PRODUCER_POISON ' + repr(exc) + '\n' + ''.join(_traceback.format_stack()), flush=True)
         with self.state_lock:
             if self.failure is None:
                 self.failure = str(exc)
@@ -477,6 +481,11 @@ class Producer:
             require(self.receipt.get('owned_job_empty') and self.receipt.get('owned_process_signaled') and self.receipt.get('owned_pid_gone'), 'Previous producer cleanup unconfirmed')
             return self.receipt
         self.closed = True
+        # Diagnostic: which retirement path closes the producer's pipes. The child reads this as
+        # "Session parent input pipe closed", so the caller stack is the only record of why.
+        import traceback as _traceback
+        print('DSV41_PRODUCER_CLOSE first_failure=' + repr(self.failure) + '\n' +
+              ''.join(_traceback.format_stack()), flush=True)
         self.stop_event.set()
         self._stop_job()
         if self.stuck:

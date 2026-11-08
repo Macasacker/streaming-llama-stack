@@ -28,7 +28,12 @@ def read_hold_text(path):
 
 
 def recover_leases(runtime_root, task='DS4STACK'):
-    """Recover legacy kill-on-close guardians; retain cooperative owners for inspection."""
+    """Recover legacy kill-on-close guardians; retain cooperative owners for inspection.
+
+    A cooperative hold is deliberately left unreleased: an interrupted retirement may still
+    leave the producer holding the GPU, and the hold is the evidence an operator reads. The
+    explicit release for a dead cooperative guardian is release_dead_cooperative().
+    """
     root = Path(runtime_root) / 'state' / 'leases'
     if not root.exists():
         return []
@@ -59,6 +64,67 @@ def recover_runtime_leases(runtime_root, task='DS4STACK'):
     root = Path(runtime_root)
     return [identity for location in (root, root / 'single-engine')
             for identity in recover_leases(location, task)]
+
+
+def release_dead_cooperative(runtime_root, task='DS4STACK', *, holders=None):
+    """Operator-initiated release of a cooperative hold whose guardian process is gone.
+
+    recover_leases keeps cooperative holds because an interrupted retirement may still leave
+    the producer holding the GPU. This path is explicit and refuses while the caller's holder
+    probe still reports the card busy, so releasing the ledger can only follow a card that is
+    actually free.
+    """
+    root = Path(runtime_root) / 'state' / 'leases'
+    if not root.exists():
+        return []
+    released = []
+    for file in root.glob('*.json'):
+        row = json.loads(file.read_text())
+        if row.get('task') != task or row.get('released') or row.get('cleanup_uncertain'):
+            continue
+        if not row.get('cooperative_retirement'):
+            continue          # recover_leases owns the kill-on-close guardians
+        try:
+            proc = psutil.Process(row['guardian_pid'])
+            if abs(proc.create_time() - row['guardian_created']) < .01 and proc.is_running():
+                continue      # a live cooperative owner is inspected, not released
+        except psutil.NoSuchProcess:
+            pass
+        if holders is not None and holders():
+            raise AdmissionRefused('Refusing to release a cooperative hold while the GPU is still held')
+        with Path(row['hold_file']).open('a', encoding='utf-8') as stream:
+            stream.write(f'\nRELEASED: {task} {row["id"]}; operator released dead cooperative guardian '
+                         f'{row["guardian_pid"]}; {datetime.now(timezone.utc).isoformat()}\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        atomic_json(file, {**row, 'released': True, 'operator_released': True})
+        released.append(row['id'])
+    return released
+
+
+def release_runtime_cooperative(runtime_root, task='DS4STACK', *, holders=None):
+    """Release dead cooperative holds in this configured owner's two known runtimes."""
+    root = Path(runtime_root)
+    return [identity for location in (root, root / 'single-engine')
+            for identity in release_dead_cooperative(location, task, holders=holders)]
+
+
+def gpu_holders():
+    """Compute processes the driver reports, as evidence that the card is still held.
+
+    A failed query is refused rather than read as an empty card: releasing a hold on the
+    strength of a missing measurement is exactly the guess this ledger exists to avoid.
+    """
+    result = subprocess.run(['nvidia-smi', '--query-compute-apps=pid,used_memory',
+                            '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError('Cannot measure GPU holders: ' + (result.stderr or result.stdout).strip()[:200])
+    rows = []
+    for line in result.stdout.splitlines():
+        parts = [part.strip() for part in line.split(',')]
+        if len(parts) >= 2 and parts[0].isdigit():
+            rows.append(dict(pid=int(parts[0]), used_memory_mib=parts[1]))
+    return rows
 
 
 def active_holds(text):

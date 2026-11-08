@@ -35,6 +35,8 @@ def main():
     for option in ('image', 'video', 'all', 'check'):
         installer.add_argument('--' + option, action='store_true')
     sub.add_parser('mcp')
+    sub.add_parser('release-holds', help='Release this owner\'s cooperative GPU holds whose guardian '
+                   'process is gone, refusing while the card still reports a holder')
     sub.add_parser('serve-internal', help=argparse.SUPPRESS)
     sub.add_parser('broker-internal', help=argparse.SUPPRESS)
     train = sub.add_parser('train_lora')
@@ -134,6 +136,16 @@ def main():
     from .lease import recover_runtime_leases
     for identity in recover_runtime_leases(cfg['runtime_root'], cfg.get('task', 'DS4STACK')):
         print('Released dead GPU guardian hold: ' + identity, file=sys.stderr)
+    if args.command == 'release-holds':
+        from .lease import gpu_holders, release_runtime_cooperative
+        # A release is only safe once the card is idle by the standard the engine itself
+        # admits against: the compositor's few dozen MiB is not an owned hold.
+        idle=float(cfg.get('gpu_idle_max_mib') or 0)
+        blocking=lambda: [row for row in gpu_holders() if float(row['used_memory_mib']) > idle]
+        released = release_runtime_cooperative(cfg['runtime_root'], cfg.get('task', 'DS4STACK'),
+                                               holders=blocking)
+        print(json.dumps(dict(released=released, idle_gate_mib=idle, holders=gpu_holders())))
+        return 0
     reports = Journal(cfg['runtime_root']).recover() if args.command not in ('check', 'start', 'rtx', 'serve-internal') else []
     for report in reports:
         print('Recovered stale journal: ' + json.dumps(report), file=sys.stderr)
