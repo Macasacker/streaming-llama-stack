@@ -173,7 +173,7 @@ class OwnedProducer:
             settings = profile(request['tier'], request.get('techniques'))
             # Use the exact single-engine fold/direct-open/cache configuration.
             # Only the DSpark capture and negotiated export provenance differ.
-            from .combo_producer import prefill_arguments
+            from .combo_producer import prefill_arguments, device_gate_bytes
             from .memory_counters import available_physical_bytes
             prefill_cfg = {**cfg, 'context': CONTEXT, 'producer_profile': request['tier']}
             # Match the single-engine 1M cache preset. Grow only the used rows;
@@ -211,7 +211,7 @@ class OwnedProducer:
             desktop_reserve = max(floor, int(cfg.get('producer_desktop_reserve_gib',.5) * (1 << 30)))
             if native.memory() < host_bytes + desktop_reserve:
                 raise MemoryError('Native producer physical host admission refused')
-            if native.gpu(0, cfg['gpu_uuid']) < int(args['--job-device-bytes']) + int(args['--gpu-reserve-bytes']):
+            if native.gpu(0, cfg['gpu_uuid']) < device_gate_bytes(cfg, args):
                 raise MemoryError('Native producer physical GPU admission refused')
             args.update({'--model': str(path(cfg['model'])), '--copy-receipt': str(receipt),
                          '--tokens-le32': str(tokens), '--build-sha': pin, '--session-id': request['session'],

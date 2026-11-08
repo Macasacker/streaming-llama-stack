@@ -19,7 +19,6 @@
     "--model",
     "{model}",
     "--cuda",
-    "--ssd-streaming",
     "--ctx",
     "262144",
     "--host",

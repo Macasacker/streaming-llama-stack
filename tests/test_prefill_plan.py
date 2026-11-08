@@ -29,6 +29,84 @@ class PrefillPlan(unittest.TestCase):
             with self.assertRaises(ValueError):
                 prefill_arguments(dict(cfg, producer_graph_floor_gib=value), 199952, 14 << 30, export_state=True)
 
+    def test_graph_cap_clamps_only_the_graph_admission(self):
+        # producer_graph_cap_gib exists for machines whose desktop compositor holds VRAM: the
+        # delivered ULTRA component bill needs ~25 GiB of a ~30 GiB free card. The graph admission
+        # is a component of that bill, so clamping it lowers what the producer must fit. The job
+        # ceiling must NOT move: admission is min(job, free - reserve) against the component bill,
+        # so lowering the ceiling only refuses a plan that would otherwise have fitted.
+        from slstack.combo_producer import prefill_arguments, pending_job_bytes, GRAPH_FLOOR_BYTES
+        cfg = dict(context=262144, producer_profile='ultra', yoco_keep=2541)
+        old, _ = prefill_arguments(cfg, 588, 80 << 30)
+        new, _ = prefill_arguments(dict(cfg, producer_graph_cap_gib=5.5), 588, 80 << 30)
+        moved = int(old['--graph-bytes']) - int(new['--graph-bytes'])
+        self.assertGreater(moved, 0)
+        self.assertEqual(new['--job-device-bytes'], old['--job-device-bytes'])
+        self.assertEqual(pending_job_bytes(cfg, old) - pending_job_bytes(cfg, new), moved)
+        self.assertGreaterEqual(int(new['--graph-bytes']), int(5.5 * (1 << 30)))
+        self.assertGreaterEqual(int(new['--graph-bytes']), GRAPH_FLOOR_BYTES)
+        for key in ('--context', '--cache-bytes', '--provider-device-bytes', '--job-host-bytes',
+                    '--hidden-device-bytes', '--pinned-device-bytes'):
+            self.assertEqual(new[key], old[key])
+        # the ceiling still bounds the reduced bill, so the producer admits the same plan
+        self.assertGreater(int(new['--job-device-bytes']), pending_job_bytes(cfg, new))
+        # a cap at or above the delivered graph is a no-op, and a cap under the floor clamps
+        same, _ = prefill_arguments(dict(cfg, producer_graph_cap_gib=9.0), 588, 80 << 30)
+        self.assertEqual(same['--graph-bytes'], old['--graph-bytes'])
+        self.assertEqual(same['--job-device-bytes'], old['--job-device-bytes'])
+        clamped, _ = prefill_arguments(dict(cfg, producer_graph_cap_gib=1.0), 588, 80 << 30)
+        self.assertGreaterEqual(int(clamped['--graph-bytes']), GRAPH_FLOOR_BYTES)
+        for value in (True, 0, -1, float('nan'), float('inf'), '5.5', 0.4, 255):
+            with self.assertRaises(ValueError):
+                prefill_arguments(dict(cfg, producer_graph_cap_gib=value), 588, 80 << 30)
+
+    def test_pending_job_bytes_falls_back_to_the_bill_when_the_ceiling_is_absent(self):
+        # A profile without --job-device-bytes: job_device_bytes() answers with the component bill,
+        # which is what the producer compares its plan against when no ceiling is given.
+        from slstack.combo_producer import job_device_bytes, pending_job_bytes
+        parts = {'--provider-device-bytes': '100', '--cache-bytes': '200', '--graph-bytes': '300',
+                 '--hidden-device-bytes': '40', '--pinned-device-bytes': '8', '--weight-cast-device-bytes': '2'}
+        self.assertEqual(pending_job_bytes({}, parts), 650)
+        self.assertEqual(job_device_bytes({}, parts), 650)
+        self.assertEqual(job_device_bytes({}, dict(parts, **{'--job-device-bytes': '4000'})), 4000)
+
+    def test_host_floors_raise_admission_without_resizing_the_plan(self):
+        # The weight provider charges a host plan (pinned relay staging, one whole compute bank per
+        # slot, plus fetch request metadata) that the fold planner never sees, and the sweep compares
+        # its combined host plan against --job-host-bytes. On a model bigger than the delivered
+        # profile both admissions have to be stated. Raising them must not resize anything: the carry
+        # capacity, the sweeps, the context cache and the device ceiling stay exactly as delivered.
+        from slstack.combo_producer import prefill_arguments
+        cfg = dict(context=262144, producer_profile='ultra', yoco_keep=2541, host_budget_gib=31.5)
+        base, bplan = prefill_arguments(cfg, 100000, 80 << 30)
+        raised, rplan = prefill_arguments(dict(cfg, producer_provider_host_gib=24, producer_job_host_gib=30),
+                                          100000, 80 << 30)
+        self.assertEqual(int(raised['--provider-host-bytes']), 24 * (1 << 30))
+        self.assertEqual(int(raised['--job-host-bytes']), 30 * (1 << 30))
+        self.assertEqual(rplan['host_bytes'], 30 * (1 << 30))
+        self.assertEqual(rplan['job_host_floor_gib'], 30)
+        self.assertGreater(rplan['host_bytes'], bplan['host_bytes'])
+        self.assertGreater(rplan['host_bytes'], int(raised['--provider-host-bytes']))
+        for key in ('--context', '--prefill-chunk-tokens', '--prefill-sweep-tokens', '--prefill-fold-cap-tokens',
+                    '--cache-bytes', '--graph-bytes', '--job-device-bytes', '--carry-host-bytes',
+                    '--engram-prefetch-bytes'):
+            self.assertEqual(raised[key], base[key])
+        self.assertEqual((rplan['capacity'], rplan['carry_delta'], rplan['engram_delta']),
+                         (bplan['capacity'], bplan['carry_delta'], bplan['engram_delta']))
+        # the job floor must actually cover the provider tier it is charged with
+        with self.assertRaises(ValueError):
+            prefill_arguments(dict(cfg, producer_provider_host_gib=20, producer_job_host_gib=10), 588, 80 << 30)
+        # and the guardian's aggregate resident admission has to cover the job floor
+        with self.assertRaises(MemoryError):
+            prefill_arguments(dict(cfg, host_budget_gib=8, producer_job_host_gib=30), 588, 80 << 30)
+        # with neither key the delivered admissions stand, unchanged
+        self.assertEqual(prefill_arguments(dict(cfg), 588, 80 << 30)[0]['--provider-host-bytes'],
+                         prefill_arguments(dict(cfg, producer_provider_host_gib=None), 588, 80 << 30)[0]['--provider-host-bytes'])
+        for value in (True, 0, -1, float('nan'), float('inf'), '24', 0.4, 255):
+            for key in ('producer_job_host_gib', 'producer_provider_host_gib'):
+                with self.assertRaises(ValueError):
+                    prefill_arguments(dict(cfg, **{key: value}), 588, 80 << 30)
+
     def test_single_stream_default_keeps_all_rows_resident(self):
         # OPUS22 round 6 defaults: one 100K sweep with the compact record and an all-rows hidden bank.
         from slstack.combo_producer import prefill_arguments, RESIDENT_ROW_BYTES

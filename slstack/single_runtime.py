@@ -42,6 +42,12 @@ KEPT = ('generation_control_file', 'stack_preferences_file', 'vision_encoder', '
         # to the fold cap; the host max is the ceiling for that largest sweep's bank.
         'producer_prefill_sweep_tokens', 'producer_prefill_fold_cap_tokens', 'producer_host_max_gib', 'producer_chunks_per_pass',
         'producer_carry_registration', 'producer_carry_compact_record', 'producer_hidden_all_rows', 'producer_graph_floor_gib',
+        'producer_graph_cap_gib',   # clamp the graph admission (a component of the device bill) on a smaller free card
+        # The weight provider's host plan (its pinned relay tier is one whole compute bank per slot,
+        # plus fetch request metadata) and the job host admission the sweep's combined host check is
+        # measured against. Neither is modelled by the fold planner, so a machine with a bigger model
+        # than the delivered profile has to state them; host_budget_gib must cover the job host bill.
+        'producer_provider_host_gib', 'producer_job_host_gib',
         'producer_desktop_reserve_gib',   # per-machine desktop RAM reserve kept free by admission (default 0.5 GiB)
         'runtime_min_free_gib',          # runtime available physical RAM floor (default 0.5 GiB; 0 disables it)
         'comfyui_models', 'studio_python')  # envvars.json placeholders the proxy's studio/producer scopes expand

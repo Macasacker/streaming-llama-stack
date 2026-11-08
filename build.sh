@@ -66,6 +66,14 @@ if [ "$target" = llama ] || [ "$target" = all ]; then
         -DGGML_CUDA_DSV41_SPLIT_F32=ON \
         -DGGML_CUDA_CUTLASS_PATH="$cutlass"
     cmake --build "$root/build/llama" --parallel 2 --target llama-server llama-export-lora slstack-weight-fetcher llama-dsv41-prefill
+    # The producer dlopens its decode library from its own directory, and single-engine
+    # serving refuses the request until ds4-decode.so sits beside it (slstack/single_runtime.py
+    # checks producer.parent). The CUDA target builds it under engines/ds4, so stage a copy.
+    if [ -f "$root/engines/ds4/ds4-decode.so" ]; then
+        cp -f "$root/engines/ds4/ds4-decode.so" "$root/build/llama/bin/ds4-decode.so"
+    else
+        echo 'engines/ds4/ds4-decode.so is not built; single-engine serving needs it beside the producer. Run ./build.sh <config> ds4 first.' >&2
+    fi
     echo 'llama-dsv41-prefill runs on Linux: --check-native-profiles passes; a prefill still needs qualified weights and the Linux weight-provider lease (docs/linux-port-plan.md chunk 3.1d).' >&2
 fi
 

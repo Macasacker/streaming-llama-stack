@@ -294,6 +294,98 @@ def resident_all_rows(cfg,arguments,capacity):
     arguments['--hidden-device-bytes']=str(have+moved);arguments['--graph-bytes']=str(int(arguments['--graph-bytes'])-moved)
     return arguments
 
+def pending_job_bytes(cfg, arguments):
+    """The delivered device plan the producer must fit: provider + cache + graph + hidden + pinned
+    + weight-cast. The producer's measured admission is min(--job-device-bytes, free - reserve)
+    against exactly this sum (llama_dsv41_device_admission::admit, charged in the sweep), so the
+    component bill - not the delivered ceiling - is what a smaller machine has to reduce."""
+    return sum(int(arguments[k]) for k in ('--provider-device-bytes','--cache-bytes','--graph-bytes',
+                                           '--hidden-device-bytes','--pinned-device-bytes','--weight-cast-device-bytes')
+               if k in arguments)
+
+def job_device_bytes(cfg, arguments):
+    """--job-device-bytes: the delivered job ceiling. It is the caller's upper bound only, so a
+    graph clamp must not lower it; absent from the profile arguments, the pending bill stands in."""
+    return int(arguments.get('--job-device-bytes', pending_job_bytes(cfg, arguments)))
+
+def gib_key(value, name):
+    """A producer_config GiB admission key: finite, positive, inside a sane range. A quoted number
+    is refused, because a string admission is one the producer cannot read."""
+    if type(value) not in (int,float) or not math.isfinite(value) or not 0.5<=value<=254:
+        raise ValueError('%s must be a finite number between 0.5 and 254 GiB'%name)
+
+def graph_cap(cfg, arguments):
+    """producer_graph_gib: clamp the graph admission below the delivered plan, so a machine whose
+    desktop compositor holds VRAM can admit the plan at all. Only --graph-bytes changes: the job
+    ceiling is an upper bound (admission is min(job, free - reserve) against the component bill),
+    so lowering it cannot make a plan fit and can only refuse one that would have. The cap never
+    falls below producer_graph_floor_gib, and the delivered bill is untouched when the key is
+    absent (the graph allocator still admits its measured peak against whatever cap remains, and
+    fails loudly in the producer if it cannot)."""
+    value=cfg.get('producer_graph_cap_gib')
+    if value is None:return arguments
+    gib_key(value,'producer_graph_cap_gib')
+    floor=cfg.get('producer_graph_floor_gib',GRAPH_FLOOR_BYTES/(1<<30))
+    if type(floor) not in (int,float) or not math.isfinite(floor) or floor<=0:
+        raise ValueError('producer_graph_floor_gib must be finite and positive')
+    cap=max(int(value*(1<<30)),int(floor*(1<<30)))
+    graph=int(arguments['--graph-bytes'])
+    if cap>=graph:return arguments
+    moved=graph-cap
+    if moved>pending_job_bytes(cfg, arguments):
+        raise ValueError('producer_graph_cap_gib exceeds the pending device bill')
+    arguments['--graph-bytes']=str(cap)
+    return arguments
+
+
+def device_gate_bytes(cfg, arguments):
+    """Free VRAM the plan needs before the producer is launched: its combined device bill plus the
+    reserve. --job-device-bytes is only a ceiling - the producer admits min(job, free - reserve)
+    against the bill (llama_dsv41_device_admission::admit) - so charging the ceiling here asks for
+    VRAM the plan never uses, and a graph clamp would have to lower it to pass. The bill is the
+    conservative figure: the producer charges the cache below its admission and the graph at its
+    measured peak, and pays the CUDA context and module load out of the same free."""
+    return pending_job_bytes(cfg, arguments) + int(arguments['--gpu-reserve-bytes'])
+
+def provider_host_floor(cfg, arguments):
+    """producer_provider_host_gib: raise --provider-host-bytes to the host plan the weight provider
+    charges for this model. That plan is not the fetch profile's staging limit: it is the relay's
+    pinned staging tier, one whole compute bank per slot, plus the fetcher's request metadata
+    (src/llama-dsv41-weights.cpp:921-926), which scales with the model's tensor layout and is not
+    modelled by the fold planner. Raising the admission sizes nothing - the provider still refuses
+    loudly if its own plan exceeds it (llama-dsv41-weights.cpp:1055)."""
+    value=cfg.get('producer_provider_host_gib')
+    if value is None:return arguments
+    gib_key(value,'producer_provider_host_gib')
+    arguments['--provider-host-bytes']=str(max(int(arguments['--provider-host-bytes']),int(value*(1<<30))))
+    return arguments
+
+
+def job_host_floor(cfg, arguments, plan):
+    """producer_job_host_gib: raise the job host admission, which is plan['host_bytes'] - the value
+    that reaches --job-host-bytes. The sweep compares its combined host plan (provider plus carry,
+    tile, pair-FFN, owner-digest staging and metadata) against that number
+    (src/llama-dsv41-sweep.cpp:456,497). The fold planner caps the same figure at
+    producer_host_max_gib because the cap sizes the carry bank; raising only the admission leaves
+    capacity, sweeps and the context window exactly as delivered. The guardian's aggregate resident
+    admission (host_budget_gib) must cover it, so a floor above that is refused here, not at launch."""
+    value=cfg.get('producer_job_host_gib')
+    if value is None:return arguments
+    gib_key(value,'producer_job_host_gib')
+    host=max(int(plan['host_bytes']),int(value*(1<<30)))
+    if host<int(arguments['--provider-host-bytes']):
+        raise ValueError('producer_job_host_gib must cover producer_provider_host_gib plus the prefill workspace')
+    budget=cfg.get('host_budget_gib')
+    if budget is not None and host+(1<<29)>float(budget)*(1<<30):
+        raise MemoryError('producer_job_host_gib %.2f GiB needs host_budget_gib of at least %.2f GiB '
+                          '(the admission plus 512 MiB of controller margin)'
+                          %(host/(1<<30),host/(1<<30)+.5))
+    plan['host_bytes']=host
+    plan['job_host_floor_gib']=value
+    arguments['--job-host-bytes']=str(host)
+    return arguments
+
+
 def stall_seconds(cfg):
     """No-progress window for a producer operation. A long operation (a 262K-token prefill, a long
     decode) lives while the producer shows progress; request_timeout_s only bounds silence."""
@@ -338,6 +430,8 @@ def prefill_arguments(cfg, count, available, *, export_state=False, techniques=N
                            producer_prefill_sweep_tokens='auto',
                            producer_prefill_fold_cap_tokens=61440, **compact_default(cfg, arguments)).items():
         selected.setdefault(key, value)
+    if 'producer_graph_cap_gib' in selected and not 0.5<=float(selected['producer_graph_cap_gib'])<=254:
+        raise ValueError('producer_graph_cap_gib must be between 0.5 and 254 GiB')
     plan = whole_prompt_engram(selected, prefill_plan(selected, count, available), count, available)
     arguments['--prefill-chunk-tokens'] = str(plan['capacity'])
     arguments['--job-host-bytes'] = str(plan['host_bytes'])
@@ -408,7 +502,9 @@ def prefill_arguments(cfg, count, available, *, export_state=False, techniques=N
     carry_arguments(cfg, arguments)
     if cfg.get('env_overrides',{}).get('LLAMA_DSV41_DENSE_FP8')=='1':
         arguments['--backend-temporary-reserve-bytes']=str(int(arguments['--backend-temporary-reserve-bytes'])+(576<<20))
-    return arguments, plan
+    arguments=graph_cap(cfg, arguments)
+    provider_host_floor(cfg, arguments)
+    return job_host_floor(cfg, arguments, plan), plan
 
 
 class ComboProducer:
@@ -497,7 +593,7 @@ class ComboProducer:
             if cfg.get('_vision_spans'):
                 self.leases.enter_context(native.read_lease(descriptor))
                 for span in cfg['_vision_spans']:self.leases.enter_context(native.read_lease(Path(span['file'])))
-            if native.gpu(0,cfg['gpu_uuid'])<int(args['--job-device-bytes'])+int(args['--gpu-reserve-bytes']):
+            if native.gpu(0,cfg['gpu_uuid'])<device_gate_bytes(cfg,args):
                 raise MemoryError('ULTRA GPU plan cannot fit; handoff refused')
             self.creation_attempted=True
             owner=self
