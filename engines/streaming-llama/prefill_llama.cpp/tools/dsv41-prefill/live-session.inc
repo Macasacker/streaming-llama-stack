@@ -21,9 +21,11 @@ public:
         require(wire==producer_wire::unarmed()&&producer_wire::is_pipe(input)&&producer_wire::is_pipe(output),
             "Live session requires private inherited pipes");
         // dup() retains the payload end; stdout then points at stderr so producer
-        // diagnostics cannot reach the session's JSON stream.
+        // diagnostics cannot reach the session's JSON stream. POSIX dup2 returns the
+        // descriptor it installed (here 1), not 0 - only the deleted Win32 _dup2
+        // reported success as 0 - so the check is >=0, as the retained dup above is.
         const int retained=dup(output);require(retained>=0,"Cannot retain private session output");wire=retained;
-        require(std::fflush(stdout)==0&&dup2(producer_wire::error_end(),producer_wire::standard_output())==0,
+        require(std::fflush(stdout)==0&&dup2(producer_wire::error_end(),producer_wire::standard_output())>=0,
             "Cannot isolate diagnostic stdout from session payload");
     }
 };
@@ -43,9 +45,13 @@ public:
         while(!last){check();
             // poll reports readability, so a closed parent pipe shows up as an
             // event instead of an infinite wait. The 10 ms cadence is how the
-            // deadline and the cancellation flag stay live between reads.
+            // deadline and the cancellation flag stay live between reads, so a
+            // timeout only means the parent is still composing the next command:
+            // the wait renews. A closed pipe is an event with nothing to read
+            // (POLLHUP/POLLERR), which the read below reports.
             struct pollfd waiter{input,POLLIN,0};
             const int ready=poll(&waiter,1,10);
+            if(ready==0)continue;
             require(ready>0&&waiter.revents!=0,"Session parent input pipe closed");
             const ssize_t got=::read(input,buffer.data(),buffer.size());
             require(got>0,(waiter.revents&(POLLHUP|POLLERR))?"Session parent input pipe closed":"Session pipe read failed");

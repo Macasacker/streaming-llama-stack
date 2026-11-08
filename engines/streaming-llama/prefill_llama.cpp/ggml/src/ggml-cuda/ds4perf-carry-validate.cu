@@ -42,29 +42,37 @@ __global__ void engram_decode_kernel(const uint8_t *raw,uint32_t *output,uint64_
     output[i]=engram_value_bits(row[j],row[256+(j>>5)]);
 }
 __device__ bool nonfinite(float x){return (__float_as_uint(x)&0x7f800000u)==0x7f800000u;}
-__global__ void validate_kernel(ggml_dsv41_validation p,uint32_t *flags,uint64_t maximum){
+__global__ void validate_kernel(ggml_dsv41_validation p,ggml_dsv41_carry_flags *f,uint64_t maximum){
     const uint64_t i=uint64_t(blockIdx.x)*blockDim.x+threadIdx.x;
     if(i>=maximum)return;
     uint32_t bad=0;
-    if(i<p.residual_n&&nonfinite(p.residual[i]))bad|=1;
-    if(i<p.residual_bf16_n&&(p.residual_bf16[i]&0x7f80u)==0x7f80u)bad|=1;
-    if(i<p.pre_n&&nonfinite(p.pre[i]))bad|=2;
-    if(i<p.mean_n&&nonfinite(p.mean[i]))bad|=4;
-    if(i<p.engram_n&&nonfinite(p.engram[i]))bad|=8;
-    if(i<p.selected_n){const int32_t id=p.selected[i];if(id<-1||id>=int32_t(p.compressed_rows))bad|=16;}
-    if(i<p.candidates_n){const int32_t id=p.candidates[i];if(id<0||id>=int32_t((p.compressed_rows+7)/8))bad|=32;}
-    if(bad)atomicOr(flags,bad);
+    // Every offender is counted; the first four are kept with their raw bits, because a refusal
+    // whose values are all the same pattern is a buffer read as the wrong thing, and varied values
+    // are arithmetic. The bitmask alone cannot tell those apart.
+    auto record=[&](uint32_t region,uint32_t bits){bad|=region;
+        const uint32_t slot=atomicAdd(&f->count,1u);
+        if(slot<carry_flags_samples){f->sample[slot].index=i;f->sample[slot].bits=bits;f->sample[slot].region=region;}
+        if(slot==0u)f->region=region;};
+    if(i<p.residual_n&&nonfinite(p.residual[i]))record(1,__float_as_uint(p.residual[i]));
+    if(i<p.residual_bf16_n&&(p.residual_bf16[i]&0x7f80u)==0x7f80u)record(1,uint32_t(p.residual_bf16[i]));
+    if(i<p.residual_f16_n&&(p.residual_f16[i]&0x7c00u)==0x7c00u)record(64,uint32_t(p.residual_f16[i]));
+    if(i<p.pre_n&&nonfinite(p.pre[i]))record(2,__float_as_uint(p.pre[i]));
+    if(i<p.mean_n&&nonfinite(p.mean[i]))record(4,__float_as_uint(p.mean[i]));
+    if(i<p.engram_n&&nonfinite(p.engram[i]))record(8,__float_as_uint(p.engram[i]));
+    if(i<p.selected_n){const int32_t id=p.selected[i];if(id<-1||id>=int32_t(p.compressed_rows))record(16,uint32_t(id));}
+    if(i<p.candidates_n){const int32_t id=p.candidates[i];if(id<0||id>=int32_t((p.compressed_rows+7)/8))record(32,uint32_t(id));}
+    if(bad)atomicOr(&f->bad,bad);
 }
 }
 int ggml_dsv41_cuda_validate(const ggml_dsv41_validation &p,void *device_flags,void *stream){
     constexpr uint64_t limit=uint64_t(5120)*4*4096;
-    const uint64_t maximum=std::max({p.residual_n,p.residual_bf16_n,p.pre_n,p.mean_n,p.engram_n,p.selected_n,p.candidates_n});
+    const uint64_t maximum=std::max({p.residual_n,p.residual_bf16_n,p.residual_f16_n,p.pre_n,p.mean_n,p.engram_n,p.selected_n,p.candidates_n});
     if(!device_flags||!maximum||maximum>limit||p.compressed_rows>1048576||
-       (p.residual_n&&!p.residual)||(p.residual_bf16_n&&!p.residual_bf16)||(p.pre_n&&!p.pre)||(p.mean_n&&!p.mean)||(p.engram_n&&!p.engram)||
+       (p.residual_n&&!p.residual)||(p.residual_bf16_n&&!p.residual_bf16)||(p.residual_f16_n&&!p.residual_f16)||(p.pre_n&&!p.pre)||(p.mean_n&&!p.mean)||(p.engram_n&&!p.engram)||
        (p.selected_n&&!p.selected)||(p.candidates_n&&!p.candidates))return int(cudaErrorInvalidValue);
     const auto s=static_cast<cudaStream_t>(stream);
-    const auto status=cudaMemsetAsync(device_flags,0,4,s);if(status!=cudaSuccess)return int(status);
-    validate_kernel<<<unsigned((maximum+255)/256),256,0,s>>>(p,static_cast<uint32_t*>(device_flags),maximum);
+    const auto status=cudaMemsetAsync(device_flags,0,carry_flags_bytes,s);if(status!=cudaSuccess)return int(status);
+    validate_kernel<<<unsigned((maximum+255)/256),256,0,s>>>(p,static_cast<ggml_dsv41_carry_flags*>(device_flags),maximum);
     return int(cudaGetLastError());
 }
 

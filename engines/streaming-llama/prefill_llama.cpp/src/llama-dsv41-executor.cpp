@@ -39,6 +39,7 @@
 #include <cuda_runtime_api.h>
 #endif
 #include <cstdlib>
+#include <map>
 #include "ggml-ds4-native-half.h"
 #include "ggml-ds4-native-half-stats.h"
 #include "ggml-dsv41-index-cublas.h"
@@ -454,8 +455,30 @@ struct llama_dsv41_tile_executor::pinned_storage {
         ok(cudaMemcpyAsync(engram_raw_device,raw.data(),raw.size(),cudaMemcpyHostToDevice,compute()),"Engram raw upload");
         ok(cudaError_t(ggml_dsv41_cuda_engram_decode(engram_raw_device,static_cast<float*>(out->data),raw.size()/264,compute())),"Engram GPU decode");
     }
-    void validate(const llama_dsv41_validation &p){
-        require(!(p.residual_n&&p.residual_bf16_n),"Validation carries one residual storage");
+    // Same validator, no refusal: a debug probe that answers "which tensor is nonfinite".
+    uint32_t carry_probe(const llama_dsv41_validation &p){
+        ok(static_cast<cudaError_t>(llama_dsv41_cuda_validate(p,flags_device,compute())),"GPU carry validator probe launch failed");
+        ok(cudaMemcpyAsync(flags_host,flags_device,carry_flags_bytes,cudaMemcpyDeviceToHost,compute()),"GPU carry flags probe readback failed");
+        ok(cudaStreamSynchronize(compute()),"GPU carry validation probe did not complete");
+        return *flags_host;
+    }
+    // The residual's storage follows the resident contract: F32, BF16 or F16. The validator
+    // takes raw pointers and element counts, so the count must come from the tensor's own
+    // byte extent. Reading a BF16 buffer as F32 reads twice its extent and poisons the CUDA
+    // context; the illegal access then surfaces at an unrelated later stream sync.
+    uint32_t residual_probe(const ggml_tensor *t){
+        if(!t||!t->data||!ggml_is_contiguous(t))return 0;
+        const uint64_t bytes=ggml_nbytes(t);
+        llama_dsv41_validation p;
+        if(t->type==GGML_TYPE_BF16){p.residual_bf16=static_cast<const uint16_t*>(t->data);p.residual_bf16_n=bytes/sizeof(uint16_t);}
+        else if(t->type==GGML_TYPE_F16){p.residual_f16=static_cast<const uint16_t*>(t->data);p.residual_f16_n=bytes/sizeof(uint16_t);}
+        else if(t->type==GGML_TYPE_F32){p.residual=static_cast<const float*>(t->data);p.residual_n=bytes/sizeof(float);}
+        else return 0;   // a quantized residual has no element-wise pattern to read
+        return carry_probe(p);
+    }
+    void validate(const llama_dsv41_validation &p,const char *stage="carry"){
+        require(!(p.residual_n&&p.residual_bf16_n)&&!(p.residual_n&&p.residual_f16_n)&&
+               !(p.residual_bf16_n&&p.residual_f16_n),"Validation carries one residual storage");
         if(p.residual_n+p.residual_bf16_n>uint64_t(5120)*4*4096){
             const uint64_t residual_total=p.residual_n+p.residual_bf16_n;
             require(residual_total%(5120*4)==0,"Grouped validation residual row geometry changed");
@@ -471,14 +494,36 @@ struct llama_dsv41_tile_executor::pinned_storage {
                 q.mean=part(p.mean,p.mean_n);q.mean_n=count*(p.mean_n/rows);
                 q.engram=part(p.engram,p.engram_n);q.engram_n=count*(p.engram_n/rows);
                 q.selected=part(p.selected,p.selected_n);q.selected_n=count*(p.selected_n/rows);
-                q.candidates=part(p.candidates,p.candidates_n);q.candidates_n=count*(p.candidates_n/rows);validate(q);
+                q.candidates=part(p.candidates,p.candidates_n);q.candidates_n=count*(p.candidates_n/rows);validate(q,stage);
             }
             return;
         }
         const auto before=clock_type::now();
         ok(static_cast<cudaError_t>(llama_dsv41_cuda_validate(p,flags_device,compute())),"GPU carry validator launch failed");
-        ok(cudaMemcpyAsync(flags_host,flags_device,4,cudaMemcpyDeviceToHost,compute()),"GPU carry flags readback failed");
+        ok(cudaMemcpyAsync(flags_host,flags_device,carry_flags_bytes,cudaMemcpyDeviceToHost,compute()),"GPU carry flags readback failed");
         ok(cudaStreamSynchronize(compute()),"GPU carry validation did not complete");
+        // flags is the validator's region bitmask (ggml/src/ggml-cuda/ds4perf-carry-validate.cu):
+        // 1 residual (F32 or BF16), 2 previous pre, 4 DSpark mean, 8 Engram rows, 16 selected ID out
+        // of range, 32 candidate block ID out of range. The refusal below says only that something
+        // was wrong; which region and how far the extents reached is what a run needs to read.
+        if(*flags_host){
+            const auto *d=reinterpret_cast<const ggml_dsv41_carry_flags*>(flags_host);
+            const std::pair<uint32_t,const char*>region[]={{1,"residual"},{2,"pre"},
+                {4,"mean"},{8,"engram"},{16,"selected"},{32,"candidates"},{64,"residual_f16"}};
+            const auto name=[&](uint32_t bit){for(const auto&r:region)if(r.first==bit)return r.second;return "unknown";};
+            std::string regions;for(const auto&r:region)if(*flags_host&r.first){if(!regions.empty())regions+=",";regions+=r.second;}
+            std::string samples;const uint32_t kept=d->count<carry_flags_samples?d->count:carry_flags_samples;
+            for(uint32_t i=0;i<kept;++i){const auto&s=d->sample[i];
+                char row[64];std::snprintf(row,sizeof(row),"%llu:0x%08x:%s",(unsigned long long)s.index,s.bits,name(s.region));
+                if(!samples.empty())samples+=",";samples+=row;}
+            llama_dsv41_layer_log("DS4PERF_CARRY_VALIDATE_REFUSED stage=%s flags=%u regions=%s offenders=%u "
+                "samples=[%s] residual_n=%llu residual_bf16_n=%llu pre_n=%llu mean_n=%llu engram_n=%llu "
+                "selected_n=%llu candidates_n=%llu compressed_rows=%llu\n",stage,*flags_host,regions.c_str(),
+                d->count,samples.c_str(),
+                (unsigned long long)p.residual_n,(unsigned long long)p.residual_bf16_n,(unsigned long long)p.pre_n,
+                (unsigned long long)p.mean_n,(unsigned long long)p.engram_n,(unsigned long long)p.selected_n,
+                (unsigned long long)p.candidates_n,(unsigned long long)p.compressed_rows);
+        }
         require(*flags_host==0,"GPU carry contains nonfinite F32 or out-of-range compact IDs");
         if(std::getenv("DS4PERF_RING_TRACE")&&elapsed(before)>1)llama_dsv41_layer_log("DS4PERF_VALIDATION_API host_ms=%.6f\n",elapsed(before));
     }
@@ -736,7 +781,12 @@ bool llama_dsv41_tile_executor::seed_ram(ggml_tensor *embedding,const std::vecto
         require(ggml_backend_graph_compute_async(backend,graph)==GGML_STATUS_SUCCESS,"Direct seed graph failed");
         llama_dsv41_validation check;check.residual=static_cast<const float*>(compact?rows->data:values.residual->data);
         check.residual_n=uint64_t(5120)*(compact?1:4)*lease.rows;check.pre=static_cast<const float*>(values.pre->data);check.pre_n=uint64_t(4)*lease.rows;
-        pinned->validate(check);pinned->readback_ready();
+        pinned->validate(check,"seed");
+        // The compact record is what every later chunk reads back, and the check above reads the
+        // F32 rows, not the F16 cast that is stored. Validate the stored bytes themselves.
+        if(compact){llama_dsv41_validation stored;stored.residual_f16=static_cast<const uint16_t*>(seed16->data);
+            stored.residual_f16_n=uint64_t(5120)*lease.rows;pinned->validate(stored,"seed_compact_record");}
+        pinned->readback_ready();
         const auto &g=lease.layout();
         if(compact)pinned->queue(false,lease,0,10240,seed16);
         else pinned->queue(false,lease,0,81920,values.residual);
@@ -834,14 +884,14 @@ llama_dsv41_tile_executor::llama_dsv41_tile_executor(ggml_backend_t backend,llam
         }else{pinned_storage::ok(cudaHostRegister(direct->base,size_t(direct->bytes),cudaHostRegisterDefault),"Existing RAM carry bank could not be pinned");pinned->registered=true;}
         pinned_storage::ok(cudaStreamCreateWithFlags(&pinned->copies,cudaStreamNonBlocking),"Pinned carry copy stream creation failed");
         pinned_storage::ok(cudaEventCreateWithFlags(&pinned->ready,cudaEventDisableTiming),"Pinned carry copy fence creation failed");
-        pinned_storage::ok(cudaMalloc(reinterpret_cast<void**>(&pinned->flags_device),8),"GPU carry flag allocation failed");
-        pinned_storage::ok(cudaMallocHost(reinterpret_cast<void**>(&pinned->flags_host),4),"Pinned carry flag host allocation failed");
-        pinned_storage::ok(cudaMemsetAsync(pinned->flags_device,0,8,pinned->compute()),"GPU carry validation warmup initialization failed");
-        llama_dsv41_validation warm;warm.residual=reinterpret_cast<float*>(pinned->flags_device+1);warm.residual_n=1;pinned->validate(warm);
+        pinned_storage::ok(cudaMalloc(reinterpret_cast<void**>(&pinned->flags_device),carry_flags_bytes),"GPU carry flag allocation failed");
+        pinned_storage::ok(cudaMallocHost(reinterpret_cast<void**>(&pinned->flags_host),carry_flags_bytes),"Pinned carry flag host allocation failed");
+        pinned_storage::ok(cudaMemsetAsync(pinned->flags_device,0,carry_flags_bytes,pinned->compute()),"GPU carry validation warmup initialization failed");
+        llama_dsv41_validation warm;warm.residual=reinterpret_cast<float*>(pinned->flags_device+1);warm.residual_n=1;pinned->validate(warm,"warmup");
         pinned_storage::ok(cudaMemGetInfo(&after,&total),"Cannot inspect post-registration GPU memory");
         const uint64_t delta=before>after?before-after:0;require(delta<=direct->admitted_device_bytes,"Pinned bank/validator global device delta exceeds explicit admission");
-        llama_dsv41_layer_log("[dsv41-pinned-carry] bank_bytes=%llu observed_global_device_delta=%llu device_admission=%llu owned_delta_proof=0 direct_page_rows=32 validation_flag_bytes=4 inter_tile_overlap=0\n",
-            (unsigned long long)direct->bytes,(unsigned long long)delta,(unsigned long long)direct->admitted_device_bytes);
+        llama_dsv41_layer_log("[dsv41-pinned-carry] bank_bytes=%llu observed_global_device_delta=%llu device_admission=%llu owned_delta_proof=0 direct_page_rows=32 validation_flag_bytes=%u inter_tile_overlap=0\n",
+            (unsigned long long)direct->bytes,(unsigned long long)delta,(unsigned long long)direct->admitted_device_bytes,carry_flags_bytes);
 #else
         throw std::runtime_error("Direct pinned carry requires a CUDA build");
 #endif
@@ -995,7 +1045,7 @@ bool llama_dsv41_tile_executor::export_hidden_tile(const llama_dsv41_carry_store
         }
         llama_dsv41_validation check;check.residual=static_cast<const float*>(hidden->data);check.residual_n=uint64_t(5120)*4*lease.rows;
         check.pre=static_cast<const float*>(pre->data);check.pre_n=uint64_t(4)*lease.rows;
-        pinned->validate(check);pinned->readback_ready();
+        pinned->validate(check,"hidden");pinned->readback_ready();
         // Compact: the validated F32 cast is exactly the BF16 bank widened, so
         // the record keeps the BF16 bytes (readers widen bit-exactly).
         if(lease.compact_record())pinned->queue(false,lease,0,40960,stored);
@@ -1680,6 +1730,18 @@ bool llama_dsv41_tile_executor::run(const request&in,const llama_dsv41_layer_gra
             }else if(pinned->prefetch_buffer)require(!pinned->prefetch_valid,"Resident input unexpectedly retained a prefetched tile");
 #endif
         }else if(!device_hidden||in.layer==0){upload_input(input.residual,in.residual);upload_input(input.previous_pre,in.previous_pre);}
+#ifdef GGML_USE_CUDA
+        // The compact record is the only hidden the reader graph consumes at layer 0, and nothing
+        // proves it survived the RAM lease -> device copy. Checking it here makes a refusal name the
+        // upload instead of the arithmetic three nodes downstream.
+        if(compact_seed&&in.layer==0&&std::getenv("DS4PERF_NAN_TRACE")!=nullptr){
+            ggml_backend_synchronize(backend);
+            llama_dsv41_validation leaf;leaf.residual_f16=static_cast<const uint16_t*>(seed16->data);
+            leaf.residual_f16_n=uint64_t(5120)*in.count;pinned->validate(leaf,"seed_leaf");
+            llama_dsv41_layer_log("DS4PERF_SEED_LEAF_CLEAN layer=0 rows=%u record_bytes=%llu\n",
+                in.count,(unsigned long long)ggml_nbytes(seed16));
+        }
+#endif
         upload_input(input.positions,p.positions);
         if(input.pair_history_ids&&!resident_metadata)upload_input(input.pair_history_ids,pair_history);
         if(!raw_template){if(input.history_ids)upload_input(input.history_ids,p.history_ids);upload_input(input.raw_ids,p.raw_ids);upload_input(input.raw_mask,p.raw_mask);}
@@ -1758,7 +1820,44 @@ bool llama_dsv41_tile_executor::run(const request&in,const llama_dsv41_layer_gra
             if(candidates){check.candidates=static_cast<const int32_t*>(input.candidate_ids->data);check.candidates_n=uint64_t(candidate_width)*in.count;}
             if(engram){check.engram=static_cast<const float*>(input.engram_rows->data);check.engram_n=uint64_t(row_width)*in.count;}
             up_validate_started_ms=elapsed(upload_start);
-            pinned->validate(check);
+            pinned->validate(check,"input");
+            if(std::getenv("DS4PERF_NAN_TRACE")!=nullptr){
+                // The same tensor the validator just certified, probed again after the layer graph
+                // has run. A buffer that was finite here and nonfinite later was overwritten.
+                llama_dsv41_layer_log("DS4PERF_RESIDUAL_STATE phase=input layer=%u ptr=%llu bytes=%llu type=%s flags=%u\n",
+                    in.layer,(unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),
+                    (unsigned long long)ggml_nbytes(input.residual),ggml_type_name(input.residual->type),
+                    pinned->residual_probe(input.residual));
+                // Every leaf the graph reads, before anything computes. A leaf is written once, at
+                // bind time: a nonfinite one is a wrong binding, not a recycled scratch span.
+                std::vector<const ggml_tensor*> leaves;uint32_t leaf_nonfinite=0;
+                for(int i=0;i<ggml_graph_n_nodes(graph);++i){const auto *n=ggml_graph_node(graph,i);
+                    for(int s=0;s<GGML_MAX_SRC;++s){const auto *t=n->src[s];
+                        if(!t||t->op!=GGML_OP_NONE||!t->data||!ggml_is_contiguous(t))continue;
+                        if(std::find(leaves.begin(),leaves.end(),t)!=leaves.end())continue;
+                        leaves.push_back(t);
+                        const size_t unit=t->type==GGML_TYPE_F32?sizeof(float):
+                            (t->type==GGML_TYPE_F16||t->type==GGML_TYPE_BF16)?sizeof(uint16_t):0;
+                        if(!unit)continue;   // a quantized leaf has no element-wise pattern to read
+                        const uint64_t elements=uint64_t(ggml_nbytes(t))/unit;
+                        if(!elements||elements>uint64_t(5120)*4*4096)continue;
+                        llama_dsv41_validation probe_leaf;
+                        if(t->type==GGML_TYPE_F32){probe_leaf.residual=static_cast<const float*>(t->data);probe_leaf.residual_n=elements;}
+                        else if(t->type==GGML_TYPE_BF16){probe_leaf.residual_bf16=static_cast<const uint16_t*>(t->data);probe_leaf.residual_bf16_n=elements;}
+                        else if(t->type==GGML_TYPE_F16){probe_leaf.residual_f16=static_cast<const uint16_t*>(t->data);probe_leaf.residual_f16_n=elements;}
+                        else continue;
+                        const uint32_t bad=pinned->carry_probe(probe_leaf);
+                        if(!bad)continue;
+                        ++leaf_nonfinite;
+                        if(leaf_nonfinite<=8)llama_dsv41_layer_log("DS4PERF_LEAF_STATE layer=%u before_compute name=%s "
+                            "op=%s type=%s bytes=%llu elements=%llu ptr=%llu flags=%u NONFINITE\n",in.layer,
+                            t->name?t->name:"unnamed",ggml_op_name(t->op),ggml_type_name(t->type),
+                            (unsigned long long)ggml_nbytes(t),(unsigned long long)elements,
+                            (unsigned long long)reinterpret_cast<uintptr_t>(t->data),bad);
+                    }}
+                llama_dsv41_layer_log("DS4PERF_LEAF_SCAN layer=%u before_compute leaves=%u nonfinite=%u\n",
+                    in.layer,(unsigned long long)leaves.size(),leaf_nonfinite);
+            }
 #endif
         }
         if(tile_timing_enabled())llama_dsv41_layer_log("LLAMADECODE_TILE_UPLOAD host_finite_ms=%.3f layer=%u tile=%u before_engram_ms=%.3f engram_ms=%.3f before_unpack_ms=%.3f before_validate_ms=%.3f total_ms=%.3f\n",
@@ -2076,8 +2175,134 @@ bool llama_dsv41_tile_executor::run(const request&in,const llama_dsv41_layer_gra
             check.compressed_rows=in.compressed_rows;
             if(values.selected){check.selected=static_cast<const int32_t*>(values.selected->data);check.selected_n=uint64_t(selected_width)*in.count;}
             if(values.candidates){check.candidates=static_cast<const int32_t*>(values.candidates->data);check.candidates_n=uint64_t(candidate_width)*in.count;}
+            // DS4PERF_NAN_TRACE: probe every tensor the sweep touches, in execution order, inputs
+            // first, over the whole graph rather than the executed view - a poisoned prefix node is
+            // still the producer. A graph node is visited after the node that produced its input, so
+            // the first NONFINITE line names the thing that arrived poisoned rather than the op that
+            // propagated it. BF16 is validated as bit patterns, so a NaN stored before the widening
+            // is caught too.
+            if(const char*trace=std::getenv("DS4PERF_NAN_TRACE");trace&&*trace){
+                std::vector<const ggml_tensor*> seen;
+                // Every tensor the graph touched, with its byte range. An input leaf whose range
+                // intersects a computed node's range is an allocation bug: the node overwrote the
+                // uploaded bytes, which is how a validated buffer arrives poisoned.
+                struct span{const ggml_tensor *t;uint64_t begin,end;int node;};
+                std::vector<span> spans;
+                std::function<uint32_t(const ggml_tensor*,const char*,int)> probe;
+                probe=[&](const ggml_tensor *t,const char *role,int node)->uint32_t{
+                    if(!t||!t->data||!ggml_is_contiguous(t))return 0;
+                    if(std::find(seen.begin(),seen.end(),t)!=seen.end())return 0;
+                    seen.push_back(t);
+                    spans.push_back({t,uint64_t(reinterpret_cast<uintptr_t>(t->data)),
+                        uint64_t(reinterpret_cast<uintptr_t>(t->data))+uint64_t(ggml_nbytes(t)),node});
+                    // Walk the operand chain, not just graph nodes: a copy whose destination is
+                    // poisoned has a source outside this graph, and that source is the answer.
+                    uint32_t upstream=0;
+                    for(int s=0;s<GGML_MAX_SRC;++s)upstream|=probe(t->src[s],"<-",node);
+                    if(t->type!=GGML_TYPE_F32&&t->type!=GGML_TYPE_BF16&&t->type!=GGML_TYPE_F16)return 0;
+                    const uint64_t elements=uint64_t(ggml_nbytes(t))/
+                        (t->type==GGML_TYPE_F32?sizeof(float):sizeof(uint16_t));
+                    if(!elements||elements>uint64_t(5120)*4*4096)return 0;
+                    llama_dsv41_validation p;
+                    if(t->type==GGML_TYPE_F32){p.residual=static_cast<const float*>(t->data);p.residual_n=elements;}
+                    else if(t->type==GGML_TYPE_BF16){p.residual_bf16=static_cast<const uint16_t*>(t->data);p.residual_bf16_n=elements;}
+                    else{p.residual_f16=static_cast<const uint16_t*>(t->data);p.residual_f16_n=elements;}
+                    const uint32_t bad=pinned->carry_probe(p);
+                    llama_dsv41_layer_log("DS4PERF_NAN_TRACE layer=%u node=%d %s type=%s op=%s name=%s "
+                        "ne=%llu x %llu x %llu elements=%llu flags=%u%s%s\n",in.layer,node,role,
+                        ggml_type_name(t->type),ggml_op_name(t->op),t->name?t->name:"",
+                        (unsigned long long)t->ne[0],(unsigned long long)t->ne[1],(unsigned long long)t->ne[2],
+                        (unsigned long long)elements,bad,bad?" NONFINITE":"",
+                        upstream&&!bad?" upstream-poisoned-input":"");
+                    // Name the operands of every poisoned tensor, including the ones the validator
+                    // cannot read: a quantized source feeding an all-NaN copy is the answer.
+                    if(bad){std::string srcs;
+                        for(int s=0;s<GGML_MAX_SRC;++s){const auto *u=t->src[s];if(!u)break;
+                            char one[160];std::snprintf(one,sizeof(one),"%s:%s:%s%s",ggml_op_name(u->op),
+                                ggml_type_name(u->type),u->name?u->name:"unnamed",t->src[s+1]?",":"");
+                            srcs+=one;}
+                        llama_dsv41_layer_log("DS4PERF_NAN_TRACE_SRC layer=%u node=%d %s op=%s name=%s "
+                            "bytes=%llu srcs=[%s]\n",in.layer,node,role,ggml_op_name(t->op),
+                            t->name?t->name:"",(unsigned long long)ggml_nbytes(t),srcs.c_str());
+                    }
+                    return bad;
+                };
+                for(int i=0;i<ggml_graph_n_nodes(graph);++i){const auto *n=ggml_graph_node(graph,i);
+                    for(int s=0;s<GGML_MAX_SRC;++s)probe(n->src[s],"src",i);
+                    probe(n,"out",i);
+                }
+                // An input leaf is written by the upload, not by a graph node, so it predates them
+                // all. Give it an index below every node's.
+                for(auto &entry:spans)if(entry.t->op==GGML_OP_NONE)entry.node=-1;
+                // A leaf and the views made from it share storage; that is intended. A computed node
+                // whose byte range intersects an input leaf it is not derived from overwrote the
+                // uploaded bytes, which is how a buffer validated clean arrives poisoned.
+                std::function<bool(const ggml_tensor*,const ggml_tensor*,int)> derived;
+                derived=[&](const ggml_tensor *from,const ggml_tensor *leaf,int depth)->bool{
+                    if(!from||depth>8)return false;
+                    if(from==leaf)return true;
+                    const char *op=ggml_op_name(from->op);
+                    if(std::strcmp(op,"reshape")&&std::strcmp(op,"view")&&std::strcmp(op,"permute")
+                        &&std::strcmp(op,"contiguous"))return false;
+                    for(int s=0;s<GGML_MAX_SRC;++s)if(derived(from->src[s],leaf,depth+1))return true;
+                    return false;};
+                // Liveness: a tensor must keep its bytes until the last node that consumes it, or
+                // consumes a view of it. Anything else sharing its range overwrote live state.
+                std::map<const ggml_tensor*,int> last_use;
+                std::function<void(const ggml_tensor*,int)> mark;
+                mark=[&](const ggml_tensor *t,int i){
+                    if(!t)return;
+                    int &at=last_use[t];if(i>at)at=i;
+                    const char *op=ggml_op_name(t->op);
+                    if(!std::strcmp(op,"reshape")||!std::strcmp(op,"view")||!std::strcmp(op,"permute")||
+                       !std::strcmp(op,"contiguous"))for(int s=0;s<GGML_MAX_SRC;++s)mark(t->src[s],i);
+                };
+                for(int i=0;i<ggml_graph_n_nodes(graph);++i){const auto *n=ggml_graph_node(graph,i);
+                    for(int s=0;s<GGML_MAX_SRC;++s)mark(n->src[s],i);}
+                auto writes=[&](const ggml_tensor *t){const char *op=ggml_op_name(t->op);
+                    return t->op==GGML_OP_NONE||std::strcmp(op,"reshape")||std::strcmp(op,"view")||
+                        std::strcmp(op,"permute")||std::strcmp(op,"contiguous")?false:true;};
+                uint32_t reported=0;
+                for(size_t a=0;a<spans.size()&&reported<12;++a)for(size_t b=a+1;b<spans.size()&&reported<12;++b){
+                    const auto &x=spans[a],&y=spans[b];
+                    if(x.t->op==GGML_OP_NONE&&y.t->op==GGML_OP_NONE)continue;
+                    if(x.end<=y.begin||y.end<=x.begin)continue;
+                    const span &first=x.node<y.node?x:y,other=x.node<y.node?y:x;
+                    // Only a node whose kernel writes its own storage can overwrite anything;
+                    // views and reshapes share their base and are the base's own alias.
+                    if(!writes(other.t))continue;
+                    if(derived(other.t,first.t,0))continue;
+                    const auto found=last_use.find(first.t);
+                    const int used=found==last_use.end()?-1:found->second;
+                    if(used<=other.node)continue;             // the earlier span was already dead
+                    llama_dsv41_layer_log("DS4PERF_NAN_TRACE_OVERLAP layer=%u held:%s op=%s type=%s bytes=%llu "
+                        "range=%llu..%llu needed_until=%u overwriter:%s op=%s type=%s bytes=%llu range=%llu..%llu "
+                        "written_at=%u src0=%s\n",in.layer,first.t->name?first.t->name:"unnamed",
+                        ggml_op_name(first.t->op),ggml_type_name(first.t->type),(unsigned long long)ggml_nbytes(first.t),
+                        (unsigned long long)first.begin,(unsigned long long)first.end,used,
+                        other.t->name?other.t->name:"unnamed",ggml_op_name(other.t->op),ggml_type_name(other.t->type),
+                        (unsigned long long)ggml_nbytes(other.t),(unsigned long long)other.begin,(unsigned long long)other.end,
+                        other.node,other.t->src[0]?(other.t->src[0]->name?other.t->src[0]->name:"unnamed"):"none");
+                    ++reported;
+                }
+            }
             if(values.dspark_mean){check.mean=static_cast<const float*>(values.dspark_mean->data);check.mean_n=uint64_t(5120)*in.count;}
-            pinned->validate(check);pinned->readback_ready();
+            // The validator sees raw pointers. If the extent below disagrees with the tensor the
+            // graph actually produced, a refusal is a binding bug, not a numeric one.
+            llama_dsv41_layer_log("DS4PERF_CARRY_VALIDATE_INPUT layer=%u start=%u count=%u residual_type=%s "
+                "residual_bytes=%llu validated_floats=%llu pre_type=%s pre_bytes=%llu next_pre_floats=%llu\n",
+                in.layer,in.start,in.count,ggml_type_name(values.residual->type),
+                (unsigned long long)ggml_nbytes(values.residual),(unsigned long long)check.residual_n,
+                ggml_type_name(values.next_pre->type),(unsigned long long)ggml_nbytes(values.next_pre),
+                (unsigned long long)check.pre_n);
+            if(std::getenv("DS4PERF_NAN_TRACE")!=nullptr&&pinned){
+                ggml_backend_synchronize(backend);
+                llama_dsv41_layer_log("DS4PERF_RESIDUAL_STATE phase=post_compute layer=%u input_ptr=%llu "
+                    "input_flags=%u output_ptr=%llu output_flags=%u\n",in.layer,
+                    (unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),pinned->residual_probe(input.residual),
+                    (unsigned long long)reinterpret_cast<uintptr_t>(values.residual->data),pinned->residual_probe(values.residual));
+            }
+            pinned->validate(check,"reader");pinned->readback_ready();
             if(!defer_hidden_readback||(in.layer==39&&!export_hidden_after_head)){
                 require(!in.direct->compact_record(),"Compact carry records hold no F32 per-layer hidden mirror");
                 pinned->queue(false,*in.direct,0,81920,values.residual);pinned->queue(false,*in.direct,81920,16,values.next_pre);

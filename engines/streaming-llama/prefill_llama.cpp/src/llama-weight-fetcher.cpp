@@ -237,6 +237,11 @@ struct wf_buffer_slot {
     int     layer_idx = -1;            // which layer occupies this slot (-1 = free)
     bool    owns_ptr  = false;         // true when WF allocated ptr itself
     std::atomic<bool> in_use{false};
+    // A freshly created compute fence reports cudaErrorNotReady until something records it. The
+    // decode layout switch recreates the pipeline, so gating on the event alone makes every
+    // bank look permanently busy and the H2D phase never runs. Kept outside the CUDA guard so
+    // the CPU-only build and its diagnostics see the same layout.
+    bool compute_recorded = false;
 #ifdef WF_HAS_CUDA
     cudaEvent_t upload_done  = nullptr; // signalled when H2D is complete
     cudaEvent_t compute_done = nullptr; // signalled when GPU compute finishes
@@ -244,7 +249,8 @@ struct wf_buffer_slot {
 
     wf_buffer_slot() = default;
     wf_buffer_slot(wf_buffer_slot && o) noexcept
-        : ptr(o.ptr), capacity(o.capacity), layer_idx(o.layer_idx), owns_ptr(o.owns_ptr), in_use(o.in_use.load())
+        : ptr(o.ptr), capacity(o.capacity), layer_idx(o.layer_idx), owns_ptr(o.owns_ptr), in_use(o.in_use.load()),
+          compute_recorded(o.compute_recorded)
 #ifdef WF_HAS_CUDA
         , upload_done(o.upload_done), compute_done(o.compute_done)
 #endif
@@ -1247,7 +1253,7 @@ static int wf_find_free_gpu_buf(wf_context * wf) {
             // When skip_eval_sync is active, compute may still be running on this
             // buffer even though in_use was cleared by wf_release_layer().
             // Check the compute_done event to avoid DMA/compute race.
-            if (wf->gpu_bufs[i].compute_done) {
+            if (wf->gpu_bufs[i].compute_done && wf->gpu_bufs[i].compute_recorded) {
                 cudaError_t err = cudaEventQuery(wf->gpu_bufs[i].compute_done);
                 if (err == cudaErrorNotReady) {
                     continue;  // GPU still using this buffer, try next
@@ -1259,6 +1265,36 @@ static int wf_find_free_gpu_buf(wf_context * wf) {
         }
     }
     return -1;
+}
+
+// Direct compute binds stage id into bank (id % banks). The provider writes each stage's
+// named file extents into that region and pins the expert cache and the next-tail hint to
+// the same addresses, so an upload must never take a different free bank. Waiting for the
+// intended bank is correct; grabbing the other one is what makes "Stage landed outside its
+// own bank" fire intermittently once a lookahead occupies the bank the stage wants.
+static int wf_pick_gpu_buf(wf_context * wf, int layer_idx) {
+    if (!wf->ds_direct_mode || wf->gpu_bufs.size() != 2) return wf_find_free_gpu_buf(wf);
+    const int want = layer_idx % (int)wf->gpu_bufs.size();
+    if (wf->gpu_bufs[want].in_use) return -1;
+#ifdef WF_HAS_CUDA
+    // Free but still draining compute: wait for that event instead of giving up. The
+    // consumer is blocked on this upload, so bailing out of the submit loop starves the
+    // pipeline - it was the decode-layout hang (wait_layer_gpu: layer 0 stuck, gpu=-1,
+    // io=0/184, both banks in_use=0). The work on the bank is from an already-consumed
+    // stage, so waiting on it cannot circle back to this upload.
+    if (wf->gpu_bufs[want].compute_done && wf->gpu_bufs[want].compute_recorded) {
+        const cudaError_t status = cudaEventQuery(wf->gpu_bufs[want].compute_done);
+        if (status == cudaErrorNotReady) {
+            // Free but still draining compute: wait for that event instead of giving up. The
+            // consumer is blocked on this upload, so bailing out of the submit loop starves
+            // the pipeline. The work on the bank is from an already-consumed stage, so waiting
+            // on it cannot circle back to this upload.
+            const int waited = cudaEventSynchronize(wf->gpu_bufs[want].compute_done);
+            if (waited != cudaSuccess) { WF_ERR("Direct bank compute fence did not complete"); return -1; }
+        }
+    }
+#endif
+    return want;
 }
 
 // A stage published GPU_READY owns its bank region until the consumer releases
@@ -1415,7 +1451,30 @@ static void wf_upload_to_gpu(wf_context * wf, int layer_idx) {
         const bool has_cache_hits = layer.cache_hits.size() == layer.spans.size() &&
                 std::find(layer.cache_hits.begin(), layer.cache_hits.end(), true) != layer.cache_hits.end();
         if (!has_cache_hits) {
-            cudaMemcpyAsync(dst, src, n, cudaMemcpyHostToDevice, wf->copy_stream);
+            // The staging relay packs spans tightly, but the compute bank places each tensor at
+            // its aligned allocation offset. Copying the relay as one block only works while the
+            // two agree; after any span whose size is not a multiple of the buffer alignment,
+            // every later tensor would land short by the padding it skipped. Copy runs that are
+            // contiguous on both sides, and split where the provider inserted padding.
+            size_t relay = 0, run_src = 0, run_dst = 0, run_end = 0, runs = 0;
+            for (int si = 0; si < (int)layer.spans.size(); ++si) {
+                const auto & span = layer.spans[si];
+                if (!span.nbytes) { relay += span.nbytes; continue; }
+                if (runs == 0) {
+                    run_src = relay; run_dst = span.gpu_offset; run_end = relay + span.nbytes;
+                    ++runs;
+                } else if (relay == run_end && span.gpu_offset == run_dst + (run_end - run_src)) {
+                    run_end += span.nbytes;
+                } else {
+                    cudaMemcpyAsync((char *)dst + run_dst, (char *)src + run_src,
+                                    run_end - run_src, cudaMemcpyHostToDevice, wf->copy_stream);
+                    run_src = relay; run_dst = span.gpu_offset; run_end = relay + span.nbytes;
+                    ++runs;
+                }
+                relay += span.nbytes;
+            }
+            if (runs) cudaMemcpyAsync((char *)dst + run_dst, (char *)src + run_src,
+                                      run_end - run_src, cudaMemcpyHostToDevice, wf->copy_stream);
         } else {
             size_t span_offset = 0;
             size_t run_start = 0;
@@ -1744,11 +1803,12 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
                 auto & layer = wf->layers[il];
                 if (layer.stage.load() != WF_STAGE_RAM_READY) continue;
 
-                int gpu_idx = wf_find_free_gpu_buf(wf);
+                int gpu_idx = wf_pick_gpu_buf(wf, il);
                 if (gpu_idx < 0) break;
 
                 wf->gpu_bufs[gpu_idx].in_use = true;
                 wf->gpu_bufs[gpu_idx].layer_idx = il;
+                wf->gpu_bufs[gpu_idx].compute_recorded = false;
                 layer.gpu_buf_idx = gpu_idx;
                 layer.stage.store(WF_STAGE_H2D_FLIGHT);
 
@@ -1774,11 +1834,12 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
 
 #ifdef WF_HAS_GDS
                 if (wf->effective_mode == WF_MODE_GDS && wf->gds_available) {
-                    int gpu_idx = wf_find_free_gpu_buf(wf);
+                    int gpu_idx = wf_pick_gpu_buf(wf, il);
                     if (gpu_idx < 0) break;
 
                     wf->gpu_bufs[gpu_idx].in_use = true;
                     wf->gpu_bufs[gpu_idx].layer_idx = il;
+                    wf->gpu_bufs[gpu_idx].compute_recorded = false;
                     layer.gpu_buf_idx = gpu_idx;
                     layer.stage.store(WF_STAGE_NVME_READ);
 
@@ -1880,6 +1941,9 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
 // ---------------------------------------------------------------------------
 // Public API implementation
 // ---------------------------------------------------------------------------
+
+// Defined with the start path, where the reader pool must be rebuilt after a stop.
+static void wf_spawn_readers(wf_context * wf);
 
 static wf_context * wf_create_impl(const wf_params * params, bool strict_streaming) {
     if (!params || !params->model_path || params->n_layers <= 0) {
@@ -2152,22 +2216,7 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
     }
 
     // -- Create the reader queue and the reader threads --
-    {
-        wf->io_shutdown.store(false);
-        int n_io = std::max(1, params->io_threads);
-#ifdef WF_HAS_IO_URING
-        wf->use_io_uring = wf_io_uring_wanted() && wf_io_uring_available();
-        if (wf_io_uring_wanted() && !wf->use_io_uring) {
-            WF_LOG("io_uring is not available here; reading with pread");
-        }
-#endif
-        for (int i = 0; i < n_io; i++) {
-            wf->io_threads.emplace_back(wf_io_worker, wf, i);
-        }
-        WF_LOG("started %d %s readers (QD=%d each, block=%zuKiB)",
-               n_io, wf->use_io_uring ? "io_uring" : "pread",
-               std::max(1, params->io_queue_depth), params->io_block_size / 1024);
-    }
+    wf_spawn_readers(wf);
 
     // -- GDS setup --
 #ifdef WF_HAS_GDS
@@ -2415,10 +2464,33 @@ void wf_hold_from(wf_context * wf, int first_held_stage) {
     wf->pipeline_cv.notify_all();
 }
 
+// The reader pool is the only thing that settles NVMe chunks, and wf_stop joins and clears it.
+// Every start after a stop therefore has to rebuild it: the prefill-to-decode layout switch is
+// exactly that sequence, and without this the submitted chunks stay outstanding forever with
+// no reader alive (decode hung at stage 1 with readers=0). wf_stop resets io_shutdown, so
+// re-spawning here is safe.
+static void wf_spawn_readers(wf_context * wf) {
+    if (!wf->io_threads.empty()) return;
+    const wf_params * params = &wf->params;
+    wf->io_shutdown.store(false);
+    const int n_io = std::max(1, params->io_threads);
+#ifdef WF_HAS_IO_URING
+    wf->use_io_uring = wf_io_uring_wanted() && wf_io_uring_available();
+    if (wf_io_uring_wanted() && !wf->use_io_uring) {
+        WF_LOG("io_uring is not available here; reading with pread");
+    }
+#endif
+    for (int i = 0; i < n_io; i++) wf->io_threads.emplace_back(wf_io_worker, wf, i);
+    WF_LOG("started %d %s readers (QD=%d each, block=%zuKiB)", n_io,
+           wf->use_io_uring ? "io_uring" : "pread",
+           std::max(1, params->io_queue_depth), params->io_block_size / 1024);
+}
+
 void wf_start(wf_context * wf) {
     if (!wf || wf->pipeline_running.load()) return;
     if (wf->strict_streaming && wf->ds_failed.load(std::memory_order_acquire)) return;
 
+    wf_spawn_readers(wf);
     wf_cache_init(wf);
     wf_expert_prefetch_init(wf);
     if (wf_cache_enabled(wf) && wf->expert_cache_passes == 0) wf->expert_cache_passes = 1;
@@ -2633,20 +2705,32 @@ void * wf_wait_layer_gpu(wf_context * wf, int layer_idx) {
             int gpu = layer.gpu_buf_idx;
             auto & trk = wf->io_trackers[layer_idx];
             WF_ERR("wait_layer_gpu: layer %d stuck (stage=%d, ram=%d, gpu=%d, "
-                   "io=%d/%d done, %zu bytes, next=%d)",
+                   "io=%d/%d done, %zu bytes, next=%d, hold_from=%d, persistent=%d)",
                    layer_idx, (int)s, ram, gpu,
                    trk.completed.load(), trk.total_chunks.load(),
                    trk.bytes_done.load(),
-                   wf->pipeline_next_layer.load());
+                   wf->pipeline_next_layer.load(),
+                   wf->hold_from.load(std::memory_order_acquire),
+                   int(layer.persistent));
             // Also dump buffer status
             for (int bi = 0; bi < (int)wf->ram_bufs.size(); bi++) {
                 WF_ERR("  ram_buf[%d]: in_use=%d layer=%d",
                        bi, (int)wf->ram_bufs[bi].in_use.load(), wf->ram_bufs[bi].layer_idx);
             }
             for (int bi = 0; bi < (int)wf->gpu_bufs.size(); bi++) {
-                WF_ERR("  gpu_buf[%d]: in_use=%d layer=%d",
-                       bi, (int)wf->gpu_bufs[bi].in_use.load(), wf->gpu_bufs[bi].layer_idx);
+                WF_ERR("  gpu_buf[%d]: in_use=%d layer=%d compute_recorded=%d",
+                       bi, (int)wf->gpu_bufs[bi].in_use.load(), wf->gpu_bufs[bi].layer_idx,
+                       int(wf->gpu_bufs[bi].compute_recorded));
             }
+            // Distinguishes "the reads were never handed to a reader" (outstanding 0 with
+            // completed 0) from "a reader is holding them" (outstanding > 0 forever).
+            int outstanding_total = 0;
+            for (int il = 0; il < (int)wf->io_trackers.size(); il++)
+                outstanding_total += wf->io_trackers[il].outstanding.load();
+            WF_ERR("  io state: this_layer_outstanding=%d all_layers_outstanding=%d readers=%zu "
+                   "mode=%d pipeline_running=%d",
+                   trk.outstanding.load(), outstanding_total, wf->io_threads.size(),
+                   (int)wf->effective_mode, int(wf->pipeline_running.load()));
         }
     }
 
@@ -3100,6 +3184,7 @@ void wf_cuda_record_compute_done(wf_context * wf, int layer_idx) {
     if (slot.compute_done) {
         const cudaError_t recorded = cudaEventRecord(slot.compute_done, wf->cuda_compute_stream);
         if (wf->strict_streaming && recorded != cudaSuccess) { wf->ds_failed.store(true,std::memory_order_release);return; }
+        if (recorded == cudaSuccess) slot.compute_recorded = true;
     }
     if (!wf->strict_streaming && wf_lockfree_ready_enabled() && gpu_idx < (int)wf->dma_buf_pending.size()) {
         // Fires on the compute stream AFTER this layer's compute completes,

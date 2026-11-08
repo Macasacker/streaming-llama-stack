@@ -26,6 +26,8 @@
 #include <climits>
 #include <stdexcept>
 #include <atomic>
+#include <fstream>
+#include <vector>
 #include <chrono>
 #include <exception>
 #include <thread>
@@ -974,6 +976,39 @@ struct llama_dsv41_weight_provider::implementation {
         fetched_total+=fetched;fetch_ms_total+=fetch_ms;
         llama_dsv41_layer_log("[dsv41-fetch] stage=%u bytes=%llu fetch_ms=%.6f decimal_GB_s=%.6f\n",
             id,(unsigned long long)fetched,fetch_ms,double(fetched)/fetch_ms/1e6);
+        // Compare what actually landed in the compute bank against the same extent in the file.
+        // A difference here means the transfer delivered wrong bytes; no difference while a later
+        // probe still sees NaN means something wrote into the bank after this stage was bound.
+        if(std::getenv("DS4PERF_NAN_TRACE")!=nullptr){
+            std::ifstream in(path.c_str(),std::ios::binary);
+            uint32_t compared=0,mismatching=0;
+            for(const auto&e:stage_at(id).entries){
+                const uint64_t bytes=ggml_nbytes(e.t);
+                if(!bytes||bytes>(uint64_t(4)<<20))continue;
+                if(compared++>=24)break;
+                std::vector<uint8_t> bank(size_t(bytes),0),file(size_t(bytes),0);
+                ggml_backend_tensor_get(e.t,bank.data(),0,bytes);
+                in.seekg(std::streamoff(e.file_offset));
+                in.read(reinterpret_cast<char*>(file.data()),std::streamsize(bytes));
+                if(in.gcount()!=std::streamsize(bytes)){
+                    llama_dsv41_layer_log("DS4PERF_STAGE_DIFF stage=%u name=%s short_file_read=%lld of %llu\n",
+                        id,e.t->name,(long long)in.gcount(),(unsigned long long)bytes);
+                    ++mismatching;continue;}
+                uint64_t at=0;while(at<bytes&&bank[size_t(at)]==file[size_t(at)])++at;
+                if(at==bytes)continue;
+                ++mismatching;
+                std::string bh,fh;
+                for(uint64_t k=at;k<at+16&&k<bytes;++k){char one[3];std::snprintf(one,sizeof(one),"%02x",bank[size_t(k)]);bh+=one;}
+                for(uint64_t k=at;k<at+16&&k<bytes;++k){char one[3];std::snprintf(one,sizeof(one),"%02x",file[size_t(k)]);fh+=one;}
+                llama_dsv41_layer_log("DS4PERF_STAGE_DIFF stage=%u name=%s bytes=%llu file_offset=%llu "
+                    "gpu_offset=%llu first_diff=%llu bank=[%s] file=[%s]\n",id,e.t->name,
+                    (unsigned long long)bytes,(unsigned long long)e.file_offset,(unsigned long long)e.gpu_offset,
+                    (unsigned long long)at,bh.c_str(),fh.c_str());
+            }
+            llama_dsv41_layer_log("DS4PERF_STAGE_DIFF_SUM stage=%u compared=%u mismatching=%u fetched=%llu\n",
+                id,compared,mismatching,(unsigned long long)fetched);
+            std::fflush(stderr);
+        }
         if(byte_ledger)for(const auto&e:stage_at(id).entries){
             if(lazy_tensor(e.t))continue;
             llama_dsv41_layer_log("[dsv41-byte-ledger] stage=%u tensor=%s file_offset=%llu bytes=%llu source=stage\n",

@@ -1,6 +1,7 @@
 #pragma once
 // Internal C++ CUDA utility. No llama object, engine, file or allocator dependency.
 #include "ggml-backend.h"
+#include <cstddef>
 #include <cstdint>
 namespace ggml_dsv41_copy {
 constexpr uint64_t record_bytes=92176,page_bytes=2953216,header_bytes=4096;
@@ -24,7 +25,29 @@ struct ggml_dsv41_validation {
     uint32_t compressed_rows=0;
     // OPUS22 round 8: a BF16 residual (bit patterns) validated in place.
     const uint16_t *residual_bf16=nullptr;uint64_t residual_bf16_n=0;
+    // An F16 residual: exponent mask 0x7C00, so a NaN or Inf inside a half table is caught
+    // before it is widened and mistaken for a compute result.
+    const uint16_t *residual_f16=nullptr;uint64_t residual_f16_n=0;
 };
+// Validator result buffer. `bad` is the region bitmask; the rest names the first offending
+// element so a refusal can say what it found rather than only that something was wrong.
+// Bytes 4..7 stay zero: the fixed-open warm validation reads them as one float and must see 0.0f,
+// so they are reserved, never written by the kernel.
+struct ggml_dsv41_carry_flags {
+    uint32_t bad=0;
+    uint32_t warm=0;
+    uint32_t count=0;   // how many elements offended
+    uint32_t region=0;  // region of the first offender: 1 residual, 2 pre, 4 mean, 8 engram,
+                        // 16 selected, 32 candidates, 64 F16 residual
+    // The first four offenders. A refusal whose samples all carry the same bit pattern is a
+    // buffer that was never written or is read as the wrong type; varied patterns are arithmetic.
+    struct sample { uint64_t index=0; uint32_t bits=0; uint32_t region=0; } sample[4];
+};
+constexpr uint32_t carry_flags_samples=4;
+constexpr uint32_t carry_flags_bytes=sizeof(ggml_dsv41_carry_flags);
+static_assert(carry_flags_bytes==80,"carry flag buffer layout differs from the allocation");
+static_assert(offsetof(ggml_dsv41_carry_flags,warm)==4,"the warmup validation reads the float at byte 4");
+static_assert(offsetof(ggml_dsv41_carry_flags,sample)==16,"the device kernel writes its samples at byte 16");
 GGML_BACKEND_API int ggml_dsv41_cuda_validate(const ggml_dsv41_validation &,void *device_flags,void *stream);
 GGML_BACKEND_API int ggml_dsv41_cuda_copy_ram(bool to_device,const ggml_dsv41_ram_slice &,
     uint64_t record_offset,uint64_t row_bytes,void *device,void *stream);
