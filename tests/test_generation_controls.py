@@ -15,7 +15,9 @@ class LiveControls(unittest.TestCase):
         self.assertGreater(p['reasoning']['temperature'], p['answer']['temperature'])
         self.assertLess(p['tool_call']['temperature'], p['answer']['temperature'])
         with tempfile.TemporaryDirectory() as root:
-            store=Store(dict(runtime_root=root))
+            # A calibration bound to the model is what makes a nonzero bias applicable at all;
+            # see test_uncalibrated_box_publishes_an_unbiased_profile_and_refuses_a_bias.
+            store=Store(dict(runtime_root=root, cache_affinity_spread_file='spreads.txt'))
             self.assertEqual(store.bias('max_speed')['value'],1.36125)
             self.assertFalse(store.get()['per_phase'])
             store.bias(dict(reasoning='fast',answer='balanced',tool_call='max_quality'))
@@ -33,6 +35,39 @@ class LiveControls(unittest.TestCase):
             self.assertEqual(row['phases']['reasoning']['temperature'],1.2)
             self.assertEqual(row['phases']['tool_call']['top_k'],8)
             self.assertEqual(row['phases']['answer'],original['phases']['answer'])
+
+    def test_uncalibrated_box_publishes_an_unbiased_profile_and_refuses_a_bias(self):
+        # ds4x_set_affinity refuses any mean > 0 without a spread file bound to this exact model,
+        # and it refuses at the first decoded token. Nothing here may offer one.
+        with tempfile.TemporaryDirectory() as root:
+            store = Store(dict(runtime_root=root, cache_affinity_spread_file=''))
+            row = store.get()
+            self.assertEqual(row['value'], 0)
+            self.assertEqual({phase: knobs['bias'] for phase, knobs in row['phases'].items()},
+                             dict(reasoning=0, answer=0, tool_call=0, code=0))
+            self.assertEqual(row['phases']['answer']['temperature'], .6)   # samplers unchanged
+            with self.assertRaises(ValueError) as caught:
+                store.bias('fast')
+            self.assertIn('DS4_CACHE_AFFINITY_CALIBRATE', str(caught.exception))
+            with self.assertRaises(ValueError):
+                store.bias(dict(reasoning='balanced', answer='balanced', tool_call='max_quality', code='max_quality'))
+            self.assertEqual(store.bias(0)['value'], 0)
+
+    def test_a_stale_nonzero_profile_is_reported_and_zeroed_without_losing_samplers(self):
+        with tempfile.TemporaryDirectory() as root:
+            bound = Store(dict(runtime_root=root, cache_affinity_spread_file='spreads.txt'))
+            bound.bias(dict(reasoning='max_speed', answer='balanced', tool_call='max_quality', code='max_quality'))
+            bound.update(dict(phases=dict(reasoning=dict(temperature=1.2))))
+            before = bound.get()
+            unbound = Store(dict(runtime_root=root, cache_affinity_spread_file=''))
+            self.assertEqual(unbound.unusable_bias(), dict(reasoning=1.36125, answer=.35))
+            after = unbound.zero_bias()
+            self.assertEqual({phase: knobs['bias'] for phase, knobs in after['phases'].items()},
+                             dict(reasoning=0, answer=0, tool_call=0, code=0))
+            self.assertEqual(after['revision'], before['revision'] + 1)
+            self.assertEqual(after['phases']['reasoning']['temperature'], 1.2)
+            self.assertIsNone(unbound.unusable_bias())
+            self.assertIsNone(bound.unusable_bias())   # a calibrated box keeps its profile
 
     def test_bad_settings_never_replace_the_last_confirmed_file(self):
         with tempfile.TemporaryDirectory() as root:

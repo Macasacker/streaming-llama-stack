@@ -163,7 +163,7 @@ class KeptKeyTests(unittest.TestCase):
                              runtime_root='r', studio_root='s', llama_producer='p', library_directories=[], revision='x')
         self.assertEqual(row['producer_host_reserve_gib'], 1)
 
-    def test_stack_single_engine_uses_the_packaged_spread_file_by_default(self):
+    def test_stack_single_engine_offers_no_calibration_that_is_not_bound_to_the_model(self):
         from slstack.single_runtime import stack_config
         with tempfile.TemporaryDirectory() as folder:
             producer = Path(folder) / 'llama-dsv41-prefill'
@@ -173,7 +173,10 @@ class KeptKeyTests(unittest.TestCase):
                    'ds4_url': 'http://127.0.0.1:8089', 'studio_root': 'vendor/studio', 'host_budget_gib': 8,
                    'min_available_gib': 2, 'cache_affinity_spread_file': ''}
             row = stack_config(cfg)
-        self.assertEqual(Path(row['cache_affinity_spread_file']), ROOT / 'presets' / 'dsv41-affinity-spreads.txt')
+        # The packaged preset is calibrated for a 315838021632-byte V4.1 file. Offering it for a
+        # model it was not measured on makes ds4x_set_affinity refuse a nonzero bias at the first
+        # decoded token, so an unbound box decodes unbiased and names no spread.
+        self.assertNotIn('cache_affinity_spread_file', row)
         self.assertEqual((row['context'], row['ctx_cache_precision'], row['ctx_cache_growable']), (262144, 'f32', True))
         self.assertEqual(row['env_overrides']['LLAMADECODE_ENGRAM_CACHE_MB'], '0')
         self.assertEqual(row['producer_host_reserve_gib'], .5)

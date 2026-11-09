@@ -11,14 +11,21 @@ Measured on this box (RTX 5090, 32 GiB VRAM, 93 GiB RAM, NVMe), 2026-11-08.
 
 | | Strata + DeepSeek V4.1-Flash (IST-DAS 2.00 bpw, 129 GB) | This stack (IQ2_XXS-Q2_K imatrix, 365 GB) |
 |---|---|---|
-| decode | median **23.9 tok/s**, mean 24.2, p10 21.4, p90 27.2 (n=67 requests ≥200 tokens) | **1.04 tok/s** (16 tokens in 15419 ms = 964 ms/token) |
+| decode | median **23.9 tok/s**, mean 24.2, p10 21.4, p90 27.2 (n=67 requests ≥200 tokens) | **1.04 tok/s** mean (16 tokens in 15419 ms = 964 ms/token); median step 292 ms = 3.4 tok/s, first step 11.4 s (Step 1) |
 | prefill | ~1450 tok/s | ~2000 tok/s (64854 tokens in 33.2 s) |
 | prompt prefix reuse | mean 81.6 % | unmeasured (`cache_n=0` on the first turn) |
-| expert cache | `--expert-cache auto`, `--resident-experts`, learned `expert-profile`, hit rate 98.9-99.6 % on gyro traffic | `DS4_CUDA_STREAMING_EXPERT_CACHE_RESERVE_GB=2` (engine default), **hit rate 0** |
-| speculative decode | `--spec 4 --spec-min-p 0.5 --mtp mtp/rt` | none |
+| context served | `--max-context 131072` (prompts in the log run 51-69 k tokens) | 262k |
+| experts per word | `--experts 5` - five of the model's six, Strata's "Faster" setting; `CPU lane 5.7-9.8 % of the experts` on the same lines | all six, no CPU lane |
+| expert cache | `--expert-cache auto`, `--resident-experts`, learned `expert-profile`. **This log records no hit-rate line** - the 98.9-99.6 % figures are gyro traffic, not this run | VRAM tiers 449 L1 + 1636 L2 slots; `host_slots=0` in every step, so no RAM tier |
+| drafting | `--dspark on --dspark-conf 0.65`: DSpark, a block-5 drafter with its own 128-expert MoE (3 per token, target layers 37-39, per the pack's `ds4.txt`), loaded from a separate `dspark-…-Q8_0.gguf`. **No accepted-draft count is recorded in this log** | none |
+
+The `--spec 4 --spec-min-p 0.5 --mtp mtp/rt` line is the gyro-m (Qwen3.8) serve, not this baseline;
+the DeepSeek run carries no `--spec` and no `--mtp` flag. Its drafter is DSpark.
 
 Baseline source: `~/workspace/local-llm-playground/qwen38-gyro/Strata/strata-deepseek-v4.1-flash-ist-das-2.00bpw.log`,
-read with `~/workspace/local-llm-playground/qwen38-gyro/decode-rates.py`.
+read with `~/workspace/local-llm-playground/qwen38-gyro/decode-rates.py`. The engine line it records
+is `strata-dsv41 --serve --pack …/deepseek-v4.1-flash-ist-das-2.00bpw --max-context 131072 --eos 1
+--vision on --dspark-conf 0.65 --experts 5 --dspark on`.
 
 ## Why decode costs what it costs
 
@@ -40,15 +47,20 @@ Target arithmetic: 24 tok/s is 42 ms per step.
 | host RAM, no hit | ~25-40 GB/s | ~60-100 ms | 10-17 |
 | VRAM | ~88 GB/s | ~27 ms | ~37 |
 
-So the gap is a cache-placement problem, and the ceiling without speculative decoding is roughly
-10-17 tok/s even with a perfect host cache. Strata clears 20 because its quant is ~0.85 GB per step
-and several accepted draft tokens amortise each step.
+So the gap is a cache-placement problem, and the ceiling without tokens-per-step is roughly
+10-17 tok/s even with a perfect host cache. Strata clears 20 with a smaller step and a drafter: its
+quant is ~0.85 GB per step against our 2.22 GB measured, it routes five experts per word rather
+than six (≈0.71 GB), and 5.7-9.8 % of the experts are computed on the CPU lane from RAM instead of
+being uploaded. At 24 tok/s a 0.85 GB step is ~20 GB/s, which is RAM/VRAM bandwidth, not NVMe. How
+much of that 24 comes from DSpark is not readable from this log - it records no accepted-draft
+count - so the drafter's share is unknown, not assumed.
 
 ## Step 1 - Measure the step budget before changing anything
 
-Nothing below is worth doing until decode reports what a step actually costs. Tonight the producer
-log has no per-token byte accounting: the ds4x decode path emits no `LLAMADECODE_STEP` line, and
-prefill's `[dsv41-prefill-experts]` shows `new == active`, i.e. zero reuse.
+Nothing below is worth doing until decode reports what a step actually costs. Before this change the
+producer logged a step's wall time and its file bytes (`LLAMADECODE_STEP`, `LLAMADECODE_DS4X_TOKEN`),
+but not which tier served the rest: hit counts without bytes, so the RAM tier could not be told apart
+from a VRAM L2 hit. Prefill's `[dsv41-prefill-experts]` shows `new == active`, i.e. zero reuse.
 
 - Add a per-step accounting line to the decode path: bytes fetched from file, bytes served from the
   host cache, bytes served from the VRAM expert cache, and step wall time. One line per token,
@@ -59,14 +71,64 @@ prefill's `[dsv41-prefill-experts]` shows `new == active`, i.e. zero reuse.
 Accept: a run whose log answers "how many of these 2.4 GB came from disk" without inference.
 Risk: none; instrumentation only, off unless the trace variable is set.
 
+### Done (2026-11-09)
+
+- `LLAMADECODE_STEP_BYTES` is one line per decoded token: `experts`, `slot_bytes`, `footprint`, and
+  the bytes each tier served (`from_file`, `from_ram`, `from_l2`, `from_l1`), plus device copies,
+  RAM-tier writes, per-tier hit counts and `step_ms`. It is built by
+  `src/llama-dsv41-step-ledger.h` and emitted from `ds4_external::step()` in
+  `tools/dsv41-prefill/live-session.inc`, gated on the existing `LLAMADECODE_BYTE_LEDGER=1`. The
+  counters (`assign_expert_slots` in `src/llama-dsv41-weights.cpp`, exposed through `cache_stats()`)
+  are increments, so the switch costs a line and nothing else. A step whose tiers do not add up to
+  its footprint says so in `unattributed=` / `over_served=`.
+- `tests/dsv41_step_ledger.cpp` proves the arithmetic and the line format:
+  `c++ -std=c++17 -I engines/streaming-llama/prefill_llama.cpp/src tests/dsv41_step_ledger.cpp`.
+- `scripts/analyze_dsv41_decode.py <producer log>` reads a run end to end: median/mean/p10/p90 of
+  `step_ms` as tok/s, the tier split and implied read rate, prefill expert reuse, and the admission,
+  host-plan and ds4x-open lines. A log taken before the ledger existed is still readable - it falls
+  back to `LLAMADECODE_DS4X_TOKEN` and labels the tier split as inferred, because that line carries
+  file bytes only and cannot separate the RAM tier from VRAM L2.
+- `~/bin/ds4-first-run` prints that summary after every run. The switch has to be in the producer's
+  own environment (the launcher drops inherited variables - `slstack/envvars.py` prints
+  "inherited X ignored"), so the probe starts from a derived config,
+  `runtime/ds4-first-run.local.json`, which adds `LLAMADECODE_BYTE_LEDGER=1` to `rtx.local.json`.
+
+Reading the 16-token run in the table above with the new script changes what the gap is:
+
+| | |
+|---|---|
+| first decode step | 11 389 ms - the prefill→decode layout switch and a cold cache (2.389 GiB fetched, `misses=240`) |
+| the other 14 steps | median 292 ms, p10 137, p90 504 → 3.4 tok/s steady |
+| footprint | ~2.22 GiB/step (240 expert triples × ~9.5 MiB), not 2.4 GiB |
+| from NVMe | 0.98 GiB/step, 44 % of the footprint, implied read rate 3.40 GiB/s |
+| from VRAM L1+L2 | 1.25 GiB/step, 56 %; `l1_slots=449 l2_slots=1636` |
+| prefill reuse | 0 % - 9 908 experts active, 9 908 newly read over 40 layers |
+
+So 1.04 tok/s is the mean of a run dominated by its own first step; steady state on the current
+placement is ~3.4 tok/s with 44 % of the step still read from disk. The distance to 23.9 is real,
+but it now has two separate targets rather than one: the cold first step, and the 44 % of a warm
+step that comes off NVMe.
+
+Not yet satisfied: the accept needs a run of ≥200 tokens (the probe's non-`--quick` path decodes
+256). The three runs after the measured one aborted before reaching a token on `Live bias refused`;
+the message now names the refused bias and the spread file, which is Step 4's calibration item and
+the current blocker for any measurement run.
+
 ## Step 2 - Size the two cache tiers and buy their room
 
-The expert cache is 2 GiB by engine default, which is smaller than one step's footprint.
+The measured run already corrects this step's premise. The ds4x decode path does not use ds4's own
+streaming expert cache, so `DS4_CUDA_STREAMING_EXPERT_CACHE_RESERVE_GB=2` is not the knob that sizes
+what decode hits; the provider's VRAM tiers were 449 L1 slots (~4.2 GiB) and 1636 L2 slots
+(16.28 GiB, `LLAMADECODE_L2 slots=1636 bytes=16283566080`), and there was **no RAM tier at all** -
+`host_slots=0 host_bytes=0` in every one of the 15 steps. The tier to buy is the third one, and the
+2 GiB figure was reading the other engine's cache.
 
-- Raise `--ds4-cuda-streaming-expert-cache-reserve-gb` from 2 to 4-6 (VRAM tier) and give the host
-  tier 16-24 GiB. Both need VRAM and RSS headroom the current plan does not have:
-  device bill 27574 MiB against ~30.5 GiB free, `host_budget_gib` 31.5 against a measured
-  `peak_rss` of 26.2 GiB.
+- Give the host tier 16-24 GiB (`LLAMADECODE_HOST_CACHE_MB` / `DS4_CUDA_STREAMING_HOST_CACHE_N` for
+  the provider's RAM tier) and check whether the VRAM L1 pool should grow with it: 449 L1 slots is
+  less than two steps' worth of distinct experts at 240 triples per step. The VRAM reserve
+  (`--ds4-cuda-streaming-expert-cache-reserve-gb`) only matters on the native ds4 decode path.
+  Both tiers need VRAM and RSS headroom the current plan does not have: device bill 27574 MiB
+  against ~30.5 GiB free, `host_budget_gib` 31.5 against a measured `peak_rss` of 26.2 GiB.
 - Fund them by trimming, in this order: `producer_graph_cap_gib` 5.5 → 3.5, context 262k → 128k
   for the decode-focused config, and re-check `--provider-host-bytes` / `--job-host-bytes` against
   the host plan. RAM available is ~75 GiB, so a host budget near 50 GiB is affordable; keep
@@ -86,7 +148,10 @@ carry bank can only lock 8 MiB, so most of the resident carry traffic is pageabl
 reads pay for it.
 
 - Run the launcher under `LimitMEMLOCK=infinity` (systemd unit or the wrapper's service scope, not a
-  shell `ulimit -l`, which is capped by `ulimit -Hl` = 8192 KB here).
+  shell `ulimit -l`, which is capped by `ulimit -Hl` = 8192 KB here). Measured on this box: a user
+  scope cannot carry it either - `systemd-run --user --scope -p LimitMEMLOCK=…` answers "Unknown
+  assignment" - and `sudo` asks for a password, so this needs a system-level unit or a
+  `/etc/security/limits.conf` entry. That is root, and it is the owner's action, not the agent's.
 - Confirm `CARRY_RAM_LOCK_PARTIAL` disappears from the producer log and re-measure the decode step.
 
 Accept: no `CARRY_RAM_LOCK_PARTIAL` line, and a measured step-time delta attributed to it.
@@ -103,10 +168,14 @@ Cache placement caps out near 10-17 tok/s. The remaining levers change the footp
   and lowers the ceiling distance. The provider pins the accepted expert type set
   (`docs/FIRST_RUN.md` records which files on this box are refused and why), so this needs a
   quant the validator accepts, not an arbitrary one.
-- **Route-tail skip.** Strata's `STRATA_ROUTE_TAIL_SKIP=7` buys +10-20 % decode on miss-heavy cards
-  by skipping a missed expert ranked ≤7 in a verify window, at the cost of slightly different
-  answers. Equivalent here would be a bounded skip on the decode routing path; treat it as a
-  quality trade to measure, not a default.
+- **Route-tail skip.** The baseline already runs this lever: `--experts 5` drops the sixth expert per
+  word (Strata's "Faster", automatic on cards ≤16 GiB), which is ~17 % fewer expert bytes per step,
+  and its release notes record +7-8 % decode with a 19/19 versus 18/19 task pass rate against the
+  reference. Strata's `STRATA_ROUTE_TAIL_SKIP=7` is the miss-aware version: skip a missed expert
+  ranked ≤7 in a verify window, +10-20 % on miss-heavy cards. Equivalent here would be a bounded
+  skip on the decode routing path - `llama-dsv41-prefill-routes.h` currently rejects any row that is
+  not exactly six ids, so it is a routing-contract change, not a flag. Treat it as a quality trade
+  to measure, not a default.
 - **Bias calibration.** The reasoning phase asks for a 0.35 expert-affinity bias and
   `ds4x_set_affinity` refuses any mean > 0 without a spread file bound to this exact
   model bytes/experts/layers. `presets/dsv41-affinity-spreads.txt` is calibrated for a
@@ -116,24 +185,51 @@ Cache placement caps out near 10-17 tok/s. The remaining levers change the footp
   `quality_speed: 0`. The affinity bias is also what keeps the hot expert set small, so it is part
   of step 2's hit rate rather than only a quality knob.
 
+  Decided and landed 2026-11-09: an unbound box decodes unbiased, and it fails at launch instead
+  of mid-decode.
+  - `slstack/affinity_spread.py` reads the spread's own header line and checks it against the model
+    file's bytes (and the 384/40 geometry). The hash stays the engine's - the launcher does not
+    reimplement `cuda_affinity_header_hash`.
+  - `slstack/single_runtime.py:affinity_spread` replaces the unconditional preset fallback in
+    `stack_config`: an explicit `cache_affinity_spread_file` that names a different model is a
+    launch error, and with nothing configured the packaged preset is offered only when it matches
+    this file. `stage` refuses to package a runtime with no bound calibration.
+  - `slstack/generation.py`: the published control profile is unbiased when nothing is bound, and
+    `Store.bias` refuses a nonzero value with the same message. A control file that was nonzero
+    before this rule existed is zeroed at the start of a request - `combo_single.run` calls
+    `unusable_bias()`/`zero_bias()` and prints what it changed to the engine log - because leaving
+    it is a session that dies after its prefill.
+  - `tests/test_affinity_spread.py` and two cases in `tests/test_generation_controls.py` cover it;
+    `tests/test_combo_single.py`'s harness now declares a calibration, since it tests the
+    bias-application path. `LLAMADECODE_LIVE_BIAS` in the producer log shows which bias a run
+    actually applied.
+
 Accept for step 4: a measured decode rate for each change in isolation, and the quality difference
 where the change trades accuracy (tail skip, quant).
 
 ## Step 5 - Decode several tokens per step
 
 The per-step bytes are paid once per step, so tokens per step is the only lever that multiplies
-throughput without shrinking the model or the cache. This is the difference between Strata's 24
-tok/s and the ~10-17 tok/s host-cache ceiling, and it is the work that makes the engine usable for
-agentic decoding rather than merely faster.
+throughput without shrinking the model or the cache. It is the one difference from Strata's 24 tok/s
+that the baseline's own log cannot be read for - it runs a drafter but records no acceptance rate -
+and it is the work that makes the engine usable for agentic decoding rather than merely faster.
 
-- Establish what V4.1-Flash offers here: whether the checkpoint carries a draft/MTP head, and
-  whether the decode graph can verify k candidate ids in one step against the existing carry and
-  HC state without re-running the routed FFN per candidate.
+- Establish what V4.1-Flash offers here. Measured on the file this box serves: **no draft head of
+  any kind** - 1046 tensors, none named `mtp`/`draft`/`dspark`, and no matching metadata key. The
+  baseline's drafter is a separate artifact: the Strata pack's `ds4.txt` declares
+  `dspark_block_size 5`, `dspark_n_routed_experts 128`, `dspark_num_experts_per_tok 3`,
+  `dspark_target_layer_ids 37,38,39`, `dspark_markov_rank 256`, `dspark_noise_token_id 128799`, and
+  setup packs it from `dspark-…-Q8_0.gguf`. `engines/ds4` carries the DSpark kernels and a
+  `dspark_capture_enabled` graph path, so the question is two-part: is there a DSpark artifact for
+  the 1017 weights, and does `ds41_graph_step` (the ds4x external decode entry) reach the drafter at
+  all, verifying k candidate ids in one step against the existing carry and HC state without
+  re-running the routed FFN per candidate.
 - Verify against the existing state contracts rather than around them: `llama_dsv41_decode_delta`
   and the owner-digest checkpoints already certify device state, so a draft must extend them and
   keep the accepted-token count honest in `usage`.
-- Measure acceptance rate and quality against the no-draft path at the same sampling settings, the
-  way Strata reports drafts accepted (e.g. 236 of 287).
+- Measure acceptance rate and quality against the no-draft path at the same sampling settings. The
+  baseline's log records no accepted-draft count, so it cannot be the reference for this; the
+  `236 of 287` figure is a gyro-m line. Ours has to be measured, not inherited.
 
 Accept: sustained decode ≥ 12 tok/s from cache placement alone (steps 2-4) and ≥ 24 tok/s with a
 verified draft, on a real multi-turn session, with acceptance rate and a quality comparison
@@ -167,10 +263,51 @@ The bar is the measured Strata + DeepSeek number on this box, on agentic traffic
 - answers that match the no-bias, no-draft reference within the tolerance the affinity bias is
   allowed to introduce.
 
+Compare like for like. The 23.9 tok/s baseline is `--max-context 131072`, five experts per word
+instead of six, DSpark on, and a CPU lane for 5.7-9.8 % of the experts, on a 129 GB quant. Hitting
+24 tok/s at 262k with six experts and no drafter is a harder number than the table suggests; the
+honest reading of this bar is that one of those trades has to be made and recorded, not that all of
+them can stay.
+
 Steps 1-4 are tuning and are worth doing in order. Step 5 is the structural one: without tokens per
 step, cache placement alone cannot reach the bar with a 365 GB file. If steps 1-4 land and steps 5-6
 have not, the honest report is "understood, not accepted": the gap is real, and the fix is draft
 decoding plus reuse, not a narrower role for the engine.
+
+## Where this stands (2026-11-09)
+
+Step 1 is landed and measured, the baseline has been re-read, and the bias blocker is closed as a
+launch-time decision. Next, in order:
+
+1. **Free the card.** `strata --serve --pack packs/gyro-m` holds ~29 GiB here; the stack's own lease
+   gate refuses admission while the card is busy, so every measurement below needs it stopped.
+2. **Run the probe with calibration:** `~/bin/ds4-first-run --calibrate runtime/qualification/
+   dsv41-1017-iq2xxs-spreads.txt` (not `--quick`). The flag puts `DS4_CACHE_AFFINITY_CALIBRATE` in
+   the derived config's `env_overrides`, so one sitting gives Step 1's accept (256 decoded tokens
+   with `LLAMADECODE_STEP_BYTES`), whether the RAM tier is admitted at all, and a spread bound to
+   these 365713686528 bytes for Step 4's bias item. Read the result with
+   `scripts/analyze_dsv41_decode.py`, which prints the calibration line the producer wrote (or
+   `incomplete affinity calibration` if some layer never reached 16 samples).
+3. **Then Step 6 and Step 2**, against the numbers from (2) rather than the arithmetic here: the
+   multi-turn reuse probe, and the host-tier sizing whose 3.5 GiB offer is derived, not measured
+   (`--job-host-bytes` 30 GiB minus a 26.2 GiB peak RSS minus the 256 MiB margin in
+   `configure_host_cache`).
+4. **Step 5 begins with a lookup, not a run:** is there a DSpark artifact for the 1017 weights? If
+   there is none, the choice is self-speculation against the carry and HC state contracts, or Step 5
+   is deferred with that reason written down.
+
+Two files this work touched live outside the repo: `~/bin/ds4-first-run` (the probe; it now runs the
+analysis and takes `--quick` / `--calibrate PATH`) and `runtime/ds4-first-run.local.json` (the
+derived config that puts `LLAMADECODE_BYTE_LEDGER=1`, and any calibration path, in the producer's
+environment; the probe regenerates it from `rtx.local.json` on each run).
+
+Verification baseline for this box, so a later session does not chase it: `pytest tests/` was
+31 failed / ~680 passed before any of this work - the cgroup and RAM-scope tests in
+`tests/test_working_set.py`, the guard and process tests, `tests/test_yoco.py` - and
+`tests/test_combo_single_stop.py::test_disconnect_inside_reasoning_then_next_turn_appends_only`
+fails 3 to 4 runs in 10 under load on a clean checkout as well. The C++ selftests
+(`tests/dsv41_host_plan_log.cpp`, `tests/dsv41_step_ledger.cpp`) are hand-compiled; `build.sh` has
+no C++ harness.
 
 ## What tonight fixed, so the plan is measured on a working pipeline
 

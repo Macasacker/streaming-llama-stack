@@ -476,6 +476,14 @@ class SingleEngine:
         think = request['think_mode'] != ds4_render.THINK_NONE
         if hasattr(self.producer, 'generation'):
             from .generation import vocabulary, SAMPLERS, number
+            # The producer reads this file at every token boundary. A bias it cannot apply -
+            # nonzero with no calibration bound to these weights - would abort the decode after
+            # the prefill, so the published profile is corrected before the session starts.
+            stale = self.generation.unusable_bias()
+            if stale:
+                print(f'Generation bias {stale} needs a routing calibration this model does not have; '
+                      f'publishing max_quality for this session', file=sys.stderr, flush=True)
+                self.generation.zero_bias()
             overrides = dict(request.get('sampling') or {})
             seed = overrides.pop('seed', secrets.randbits(53))
             if type(seed) is not int or not 0 <= seed < 2**53:raise ValueError('seed must be an integer in [0,2^53)')

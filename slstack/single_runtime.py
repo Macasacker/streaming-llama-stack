@@ -131,6 +131,30 @@ def receipt_config(cfg):
     return result
 
 
+def affinity_spread(cfg):
+    """The routing calibration to offer, or None when nothing is bound to this model.
+
+    An explicit `cache_affinity_spread_file` must name this model's bytes: a file calibrated
+    elsewhere is a launch error, not a session that dies at its first decode token after a full
+    prefill. With nothing configured, the packaged 1017 preset is offered only when its header
+    line matches this model, so an uncalibrated box decodes unbiased and the quality-speed tool
+    stays off until `DS4_CACHE_AFFINITY_CALIBRATE` has produced a file for these weights."""
+    from .affinity_spread import declared, matches_model
+    from .config import path, ROOT
+    named = cfg.get('cache_affinity_spread_file')
+    if named:
+        target = path(named)
+        if not matches_model(target, cfg.get('model')):
+            bound = declared(target)
+            size = Path(cfg.get('model', '')).stat().st_size if cfg.get('model') and Path(cfg['model']).is_file() else None
+            raise ValueError(f'cache_affinity_spread_file {target} is calibrated for another model: it names '
+                             f'{bound[0] if bound else "no readable header"} bytes, this model is {size}; '
+                             f'run a decode with DS4_CACHE_AFFINITY_CALIBRATE to produce one for these weights')
+        return target
+    packaged = ROOT / 'presets' / 'dsv41-affinity-spreads.txt'
+    return packaged if matches_model(packaged, cfg.get('model')) else None
+
+
 def stack_config(cfg):
     """The stack's own single-RTX endpoint: the source-built producer, its ds4-decode.so
     beside it, and paths inside the stack runtime. The controller and producer share the
@@ -155,8 +179,9 @@ def stack_config(cfg):
     except (OSError, subprocess.CalledProcessError):revision = 'unknown'
     result = serving_config(base, runtime_root=receipt_config(cfg)['runtime_root'], studio_root=path(cfg['studio_root']),
         llama_producer=producer, library_directories=[producer.parent, *[path(p) for p in cfg.get('producer_library_directories', [])]],
-        # The packaged 1017 routing calibration, as on the native path: quality/speed needs it.
-        spread_file=path(cfg.get('cache_affinity_spread_file') or 'presets/dsv41-affinity-spreads.txt'),
+        # The routing calibration bound to this model, or none: quality/speed needs it, and a
+        # wrong-model file is refused at launch instead of at the first decode token.
+        spread_file=affinity_spread(cfg),
         model_receipt=path(cfg['model_receipt']) if cfg.get('model_receipt') else None, revision=revision,
         host_budget_gib=cfg['host_budget_gib'] - .25)
     result.update(producer_sha256=sha256(producer), producer_source_revision=revision)
@@ -226,7 +251,11 @@ def stage(args):
     for name in PRODUCER_FILES:copy(producer.parent / name, name)
     for source in extension_files(cfg).values():copy(source, source.name)
     for directory in ('temp', 'cuda-cache'):(target / 'runtime' / directory).mkdir(parents=True, exist_ok=True)
-    copy(cfg['cache_affinity_spread_file'], 'qualification/affinity-spreads.txt')
+    spread = affinity_spread(cfg)
+    if spread is None:raise ValueError('The packaged runtime needs a routing calibration bound to this model; '
+                                      'run a decode with DS4_CACHE_AFFINITY_CALIBRATE and set '
+                                      'cache_affinity_spread_file to the file it writes')
+    copy(spread, 'qualification/affinity-spreads.txt')
     copy(cfg['model_receipt'], 'qualification/original-model.json')
     result = single_config(cfg, installed, revision);definition = preset(cfg, installed)
     result['studio_expected_args'] = normal_argv(args.studio_native, definition)

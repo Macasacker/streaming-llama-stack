@@ -12,6 +12,14 @@ writing them. It records the decisions taken on 2026-11-06 (reuse into this repo
 prefill and decode are targets, locked memory is best-effort) and the measurements those decisions
 rest on. Read it before starting anything outside the port backlog.
 
+Decode for the served model is planned in `docs/DECODE_GAP_PLAN.md` - DS4.1-Flash decode on this box
+measured against Strata + DeepSeek, and how far the stack is from that number. Step 1 (the per-token
+byte ledger, `LLAMADECODE_STEP_BYTES`, read with `scripts/analyze_dsv41_decode.py`) is landed, the
+Strata baseline in that document has been re-read against its own log, and the affinity-bias
+blocker is closed as a launch-time check in `slstack/affinity_spread.py`. Its "Where this stands"
+section carries the next actions in order, what needs the GPU quiet, and this box's test-failure
+baseline. Read it before starting decode or cache work.
+
 What a chunk landed *is* in its commit message and in the plan; this file only carries what neither
 records - the open decisions, the box's constraints, the verification method, and the traps.
 

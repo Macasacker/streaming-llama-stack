@@ -35,14 +35,19 @@ def publish(path, row):
             time.sleep(.002)
 
 
-def defaults():
+def defaults(calibrated=True):
     # Studio's five bias points, with the requested phase ordering. Explicit
     # sampler fields in an API request still override this profile for that turn.
-    return dict(revision=1, per_phase=True, value=0.35,
+    # With no routing calibration bound to this model, no bias can be applied at all:
+    # ds4x_set_affinity refuses any mean > 0 without a spread file for these exact bytes,
+    # and it refuses at the first decoded token. The published profile is then unbiased.
+    biases = dict(reasoning=1.36125, answer=.35, tool_call=0.0, code=0.0)
+    if not calibrated:biases = {phase: 0.0 for phase in biases}
+    return dict(revision=1, per_phase=True, value=0.35 if calibrated else 0.0,
         sampler=dict(temperature=0.6, top_p=0.95, top_k=0, min_p=0.0),
         phases={p: dict(bias=b, temperature=t, top_p=0.95, top_k=0, min_p=0.0)
-                for p, b, t in [('reasoning', 1.36125, 1.0), ('answer', .35, .6),
-                                 ('tool_call', 0.0, .1), ('code', 0.0, .2)]})
+                for p, b, t in [('reasoning', biases['reasoning'], 1.0), ('answer', biases['answer'], .6),
+                                 ('tool_call', biases['tool_call'], .1), ('code', biases['code'], .2)]})
 
 
 def number(value, lo, hi, integer=False):
@@ -72,11 +77,14 @@ def validate(row):
 
 class Store:
     def __init__(self, cfg):
+        # A bias above 0 needs a routing calibration bound to the model being served; without one
+        # the producer refuses it mid-decode, so nothing here offers it.
+        self.calibrated = bool(cfg.get('cache_affinity_spread_file'))
         self.path = Path(cfg.get('generation_control_file') or Path(cfg['runtime_root']) / 'generation' / 'live.json')
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         with self.exclusive():
-            if not self.path.exists():publish(self.path, defaults())
+            if not self.path.exists():publish(self.path, defaults(self.calibrated))
 
     @contextmanager
     def exclusive(self):
@@ -120,8 +128,37 @@ class Store:
     def bias(self, value):
         vendor();from studio.quality_speed_contract import validate as check
         value = check(value)
+        if not self.calibrated:
+            scalars = value.values() if isinstance(value, dict) else [value]
+            if any(scalar > 0 for scalar in scalars):
+                raise ValueError('A quality setting above max_speed needs a routing calibration for this model: '
+                                 'set cache_affinity_spread_file to a file written by '
+                                 'DS4_CACHE_AFFINITY_CALIBRATE, or use max_speed=0 (max_quality)')
         if isinstance(value, dict):return self.update(dict(per_phase=True, phases={p:dict(bias=v) for p,v in value.items()}))
         return self.update(dict(per_phase=False, value=value))
+
+    def unusable_bias(self):
+        """Bias settings the producer will refuse: nonzero while no calibration is bound.
+
+        A control file published before this rule existed (or by a toolbar on a box that later
+        lost its calibration) is a session that dies at its first decoded token, after its
+        prefill. The nonzero entries are returned so the caller can say what it is changing."""
+        if self.calibrated:return None
+        row = self.get()
+        found = {phase: knobs['bias'] for phase, knobs in row['phases'].items() if knobs['bias'] > 0} \
+            if row['per_phase'] else {}
+        if not row['per_phase'] and row['value'] > 0:found['value'] = row['value']
+        return found or None
+
+    def zero_bias(self):
+        """Publish the same samplers with every bias at 0, keeping the revision sequence."""
+        with self.exclusive():
+            row = self.get()
+            for knobs in row['phases'].values():knobs['bias'] = 0.0
+            row['value'] = 0.0
+            row['revision'] += 1
+            row = validate(row);publish(self.path, row)
+            return row
 
 
 def vocabulary(tokenizer, directory):

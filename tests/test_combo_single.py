@@ -48,7 +48,11 @@ def ids(tok, text):return tok.rendered(text)
 class Harness:
     def __init__(self, scripts):
         self.tok = char_tokenizer();self.dir = tempfile.mkdtemp();self.launched = [];self.scripts = scripts;self.leases = []
-        cfg = dict(context=4096, lease_minutes=19, model='unused', runtime_root=self.dir)
+        # A routing calibration is what makes a nonzero quality setting applicable at all
+        # (slstack/generation.py refuses one without it, because ds4x_set_affinity would); this
+        # harness exercises the bias-application path, so it is a calibrated box.
+        cfg = dict(context=4096, lease_minutes=19, model='unused', runtime_root=self.dir,
+                   cache_affinity_spread_file='spreads.txt')
         @contextlib.contextmanager
         def lease():
             self.leases.append('held');yield 'lease-1';self.leases.append('released')
