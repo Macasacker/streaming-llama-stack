@@ -385,13 +385,17 @@ path to it. Everything still open needs the card.
    `scripts/analyze_dsv41_decode.py`, which prints the calibration line the producer wrote (or
    `incomplete affinity calibration` if some layer never reached 16 samples). `runtime/qualification/`
    is still empty.
-3. **Then Step 6 and Step 2**, against the numbers from (2) rather than the arithmetic here: the
-   multi-turn reuse probe, and the host-tier sizing whose 3.5 GiB offer is derived, not measured
-   (`--job-host-bytes` 30 GiB minus a 26.2 GiB peak RSS minus the 256 MiB margin in
-   `configure_host_cache`).
-4. **Step 5, once the card is free:** measure the drafter's acceptance rate on the native
-   `--dspark --mtp-model` path with `DS4_ALLOW_MTP_STREAMING=1`, which is what makes the 5.5×
-   arithmetic above a measurement. Only then decide whether `ds4x` grows a verify-shaped entry.
+3. **Then Step 6 and Step 2**, against the numbers from (2) rather than the arithmetic here:
+   `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the
+   second turn and marks PASS/FAIL against the 70 % bar), and the host-tier sizing whose 3.5 GiB
+   offer is derived, not measured (`--job-host-bytes` 30 GiB minus a 26.2 GiB peak RSS minus the
+   256 MiB margin in `configure_host_cache`).
+4. **Step 5, once the card is free:** `scripts/ds4_dspark_probe.sh` measures the drafter's
+   acceptance rate on the native `--dspark --mtp-model` path with `DS4_ALLOW_MTP_STREAMING=1` -
+   `DS4_DSPARK_SPEC_LOG=1` prints one `DSpark V4.1 cycle drafted= accepted=` line per verify cycle,
+   and the script turns those into an acceptance rate next to the tok/s. Run it twice, with and
+   without `--no-draft`, at the same `max_tokens`. That is what makes the 5.5× arithmetic above a
+   measurement. Only then decide whether `ds4x` grows a verify-shaped entry.
 
 Two files this work touched live outside the repo: `~/bin/ds4-first-run` (the probe; it now runs the
 analysis and takes `--quick` / `--calibrate PATH`) and `runtime/ds4-first-run.local.json` (the
