@@ -764,6 +764,42 @@ removes prefill from every turn after the first.
 Accept: ≥ 70 % of the second turn's prompt tokens reported as reused, and the retired-producer
 path taken only on a real prefix divergence.
 
+### Answered by production traffic (2026-11-09 21:38-21:45): reuse works
+
+The first real pi session against the stack ran six turns through **one** producer
+(`runtime/single-engine/ultra-73c876d05eb4e674`), and every turn after the first took the append
+path. From `runtime/single-engine/single-request-*.json` and the session's `DS4PERF_PROMPT_HEAD_COMPLETE`
+lines:
+
+| turn | prompt tokens | reused | new | append ms | decode ms | generated | tok/s | finish |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 16 666 | 0 | 16 666 | 33 300 | 21 164 | 81 | 3.78 | stop |
+| 2 | 16 768 | 16 746 (99.9 %) | 22 | 6 006 | 15 572 | 190 | 12.14 | tool_calls |
+| 3 | 18 362 | 16 957 (92.3 %) | 1 405 | 28 888 | 34 812 | 270 | 7.73 | tool_calls |
+| 4 | 25 021 | 18 631 (74.5 %) | 6 390 | 33 849 | 32 752 | 281 | 8.55 | tool_calls |
+| 5 | 26 899 | 25 301 (94.1 %) | 1 598 | 28 542 | 23 217 | 133 | 5.69 | tool_calls |
+| 6 | 42 381 | 27 031 (63.8 %) | 15 350 | 32 642 | 12 271 | 3 | 0.16 | cancelled |
+
+Turn 6 was cancelled by the client three tokens in (`cancelled=1`), which is why its tok/s is
+noise. Reuse averaged ~86 % across turns 2-5 and the mechanism is exactly what the step predicted:
+`prefix_source: "memory-token"`, reused equal to the previous turn's context length.
+
+This also corrects what the probe runs seemed to show. `cached_tokens=0` in every earlier run was
+not the append path refusing - `combo_single.py:539-540` does publish `reused_prefix_tokens` as
+both `usage.prompt_tokens_details.cached_tokens` and `timings.cache_n`. It was that each probe
+request is a different prompt, so each one retired the producer and opened a new session, and a
+fresh session has nothing to reuse. A client that grows its context monotonically - which is what
+an agent does - keeps one producer alive and reuses.
+
+What the numbers do not support is the claim that reuse removes prefill from later turns. The
+append path has a large fixed cost: 22 new tokens took 6.0 s, 1 405 took 28.9 s, 1 598 took 28.5 s,
+6 390 took 33.8 s and 15 350 took 32.6 s - so turn 5 paid ~28 s to prefill 1 598 tokens (56 tok/s)
+while a cold 16 666-token prompt cost 33.3 s (500 tok/s). Reuse of 25 301 tokens bought almost
+nothing on wall clock. Turn costs were 20-76 s, dominated by this, not by decode. The session's
+`DS4PERF_UNALIGNED_APPEND_COMPLETE` lines show the appended rows handled as 2 048-row tiles per
+layer, so the sweep granularity, not the token count, looks like the floor - that is the next thing
+to measure before touching Step 4's quant lever.
+
 ## Acceptance
 
 The bar is the measured Strata + DeepSeek number on this box, on agentic traffic, at 262k context:
@@ -804,12 +840,11 @@ path to it. Everything still open needs the card.
    against the repacked sidecar, twice (`--no-draft` for the comparison), and prints acceptance rate
    beside tok/s. Only after that number exists does the question of extending `ds4x`'s producer ABI
    with a verify-shaped entry make sense - the producer currently has no drafter entry at all.
-3. **Step 6 in the same sitting as Step 5**, since it only needs the stack left running:
-   `scripts/start-dsv41-single-262k.sh --config runtime/ds4-first-run.local.json --model …`, then
-   `python3 scripts/dsv41_reuse_probe.py`, then stop. Every request in every run so far reported
-   `cached_tokens=0` and got its own producer directory, so turn-boundary reuse has still never been
-   measured; a `cache_n=0` on turn 2 with a surviving producer is the append path refusing, which is
-   the answer Step 6 wants.
+3. **Step 6 is measured** (see the Step 6 section): pi's first real session reused 74-99 % of each
+   turn's prompt through one producer. What is left there is not reuse but cost - the append path
+   spends 6-34 s per turn whatever the new-token count, so turn 5 paid ~28 s to prefill 1 598
+   tokens. Measure the append's fixed cost (tile sweep vs row count) before Step 4's quant lever;
+   that is the difference between a 20-76 s agent turn and a usable one.
 
 ### I (21:16): the control, and the attribution is clean
 
