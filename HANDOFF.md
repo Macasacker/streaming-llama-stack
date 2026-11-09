@@ -16,9 +16,12 @@ Decode for the served model is planned in `docs/DECODE_GAP_PLAN.md` - DS4.1-Flas
 measured against Strata + DeepSeek, and how far the stack is from that number. Step 1 (the per-token
 byte ledger, `LLAMADECODE_STEP_BYTES`, read with `scripts/analyze_dsv41_decode.py`) is landed, the
 Strata baseline in that document has been re-read against its own log, and the affinity-bias
-blocker is closed as a launch-time check in `slstack/affinity_spread.py`. Its "Where this stands"
-section carries the next actions in order, what needs the GPU quiet, and this box's test-failure
-baseline. Read it before starting decode or cache work.
+blocker is closed as a launch-time check in `slstack/affinity_spread.py`. Step 5's lookup is
+answered: the DSpark drafter for the 1017 weights is on this box, `scripts/repack_dsv41_dspark_sidecar.py`
+converts it into the name-and-metadata contract `engines/ds4` binds (engine-checked with
+`./ds4 --inspect --cpu`, no GPU), and the producer's `ds4x` decode ABI has no drafter entry at all.
+Its "Where this stands" section carries the next actions in order, what needs the GPU quiet, and
+this box's test-failure baseline. Read it before starting decode or cache work.
 
 What a chunk landed *is* in its commit message and in the plan; this file only carries what neither
 records - the open decisions, the box's constraints, the verification method, and the traps.

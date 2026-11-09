@@ -224,6 +224,97 @@ and it is the work that makes the engine usable for agentic decoding rather than
   the 1017 weights, and does `ds41_graph_step` (the ds4x external decode entry) reach the drafter at
   all, verifying k candidate ids in one step against the existing carry and HC state without
   re-running the routed FFN per candidate.
+
+### The lookup (done 2026-11-09)
+
+**The artifact exists, and it is for these weights.**
+`~/workspace/qwen38-gyro/Strata-data/models/deepseek-v4.1-flash-shared/dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf`,
+7 976 914 240 bytes, sha256 `6ba6ac1b…3927a` as recorded by its `.done` file. Its header says
+`general.name "DeepSeek V4.1 Flash 1017"`, `general.version "1017"`, arch `dflash`, 78 tensors,
+`dflash.block_count 3` - the three stages over target layers 37, 38, 39 - `dflash.expert_count 128`
+with `expert_used_count 3`, `tokenizer.ggml.mask_token_id 128799`, markov rank 256, vocab 129 280,
+hidden 5120. Every one of those matches the pack's `ds4.txt`, so it is the baseline's drafter, on
+this box.
+
+The `Q8_0` in its name is the dense part. By tensor bytes it is 6.72 GiB MXFP4 (9 routed-expert
+tensors, 17 bytes per 32 elements = 4.25 bpw), 0.62 GiB Q8_0 (attention, shared experts, main_proj),
+0.02 GiB F32, and 2 × 66 MB BF16 Markov tables. The experts are therefore ~5.98 MB per tensor
+slice, and one proposed block routes 3 experts per stage across 3 stages and 3 tensors:
+
+    3 experts x 3 tensors x 3 stages x ~5.98 MB ≈ 161 MB per draft block
+
+against the target's 2.22 GiB per step. A block of 5 drafts plus the seed verifies at most 6 tokens
+for 2.22 + 0.16 GiB ≈ 0.40 GiB per token, where a serial step is 2.22 GiB per token. That is the
+whole argument for step 5, and the acceptance rate is what turns it into a measured number rather
+than arithmetic.
+
+**It is not consumable as released.** Four things stand between the file and `engines/ds4`, each
+read from the source rather than inferred:
+
+| gate | what the released file carries | what ds4 requires |
+|---|---|---|
+| `support_model_detect` (`ds4.c:3161`) | `blk.N.<role>.weight` and flat `fc`, `enc.output_norm`, `output_norm`, `conf_proj`, `markov_w1/w2` | names starting `mtp.<stage>.`, plus `.main_proj.`, `.markov_head.`, `.confidence_head.`; without them the kind is `DS4_SUPPORT_NONE` |
+| `dspark_weights_validate_metadata` (`ds4.c:6517`) | none of it - the hyper-parameters are in `ds4.txt` | `deepseek41.dspark.block_size`, `.markov_rank`, `.noise_token_id`, `.target_layer_ids`. `.n_routed_experts` defaults to 0, which makes the block validator expect 384-expert tensors and reject the 128-expert ones |
+| `deepseek41_sidecar_checkpoint_matches` (`ds4.c:3192`) | no `general.source.revision` at all | both files must carry it, equal, and one of the two pinned revisions. The language file has `1bae0e1088993b9b82de08f59de5be5a34e42170`, which is accepted |
+| `dspark_weights_validate_layout` (`ds4.c:6638`) | Markov tables BF16 | DENSE = F16/F32/Q8_0, and the Markov argmax path (`ds4.c:36611`) wants Q8_0 |
+
+Everything else already agrees: shape for shape the file matches
+`scripts/dsv41/reference-layout.json`'s `components.dspark` map, MXFP4 experts are accepted
+(`tensor_is_routed_expert_type` includes `DS4_TENSOR_MXFP4`), F32 `hc_attn_fn`/`hc_ffn_fn` are
+accepted as PLAIN, and the final stage's `hc_head_*` trio is bound with `required = !v41`, so its
+absence is correct for V4.1 rather than a gap.
+
+**Landed: `scripts/repack_dsv41_dspark_sidecar.py`.** It renames to the `mtp.<stage>.` contract,
+takes the six draft hyper-parameters from the pack's `ds4.txt` (refusing to guess them), adds
+`general.source.revision`, re-encodes only the two Markov tables BF16 → Q8_0, and copies every
+other payload verbatim. It runs the engine's own gates before writing and re-reads the result to
+check both the gates and byte identity of each copied tensor. Written
+`ds4-models/dspark-DeepSeek-V4.1-Flash-1017-mtp-q8.gguf`, 7 914 860 960 bytes
+(Markov 66 MB → 35 MB each), sha256 `84ce012e5274f92d…01cf24`, verified clean. The engine agrees,
+with no GPU involved:
+
+    ./engines/ds4/ds4 --inspect --cpu -m <language gguf> --mtp-model <repacked gguf>
+      support model (DSpark, stages=3)
+      mtp/dspark: stages=3 block=5 markov_rank=256 noise_token=128799 target_layers=37,38,39
+      mtp/dspark tensors: main_proj=yes main_norm=yes markov=yes confidence=yes final_head=yes
+      support binding: tensors=78 missing=0 invalid=0 metadata_errors=0
+
+One claim in that file is not self-evidenced: the released sidecar states no source revision, so
+`general.source.revision` is copied from the language checkpoint and the reasoning - same release
+named in `general.version 1017`, every draft tensor shape matching the reference layout - is written
+into `deepseek41.dspark.repack_provenance` rather than left implicit. It should be checked against
+the upstream repo before the drafter is trusted for quality, not only for shape.
+`tests/test_repack_dsv41_dspark_sidecar.py` (6 cases, no GPU) pins the two header-encoding bugs
+found while writing it: a BOOL metadata value decoded as an int re-encodes as a uint32 three bytes
+longer and desynchronises the rest of the header, and an array whose items each repeat the element
+type pushes the tensor directory past the window. Both produced a file that parsed as garbage
+instead of failing, which is why the repack's own reader is what the test drives.
+
+**The second half of the lookup: the producer's decode entry cannot reach the drafter.** `ds4x`
+exports 22 symbols - `ds4x_open`, `ds4x_decode`, `ds4x_prefill`, `ds4x_bind_state`,
+`ds4x_set_expert_hook{,_l2}`, `ds4x_set_affinity`, `ds4x_host_cache_v{1,2}`, `ds4x_host_timing_v1`,
+the weight registry, `ds4x_vision_file`, `ds4x_close` - and none of them drafts. `ds41_graph_alloc`
+under `g_ds4x_external_alloc` deliberately sizes the graph for one-token decode (`prefill_cap` for
+16 rows, `carry_cap = 0`, no growth), and nothing on that path sets `g->draft`. `ds4_native_session`
+refuses a state read or delta while `s->ds41_graph.draft` is set (`ds4_native_session.inc:128`), so
+the checkpoint contracts do not describe drafted state today. The drafter is live only on the native
+`ds4-server` path (`--dspark --mtp-model <gguf>`), which this stack already launches through
+`slstack/backends.py` (`dspark`, `mtp_model`, `mtp_draft`), and which refuses to combine
+`--ssd-streaming` with `--mtp-model` unless `DS4_ALLOW_MTP_STREAMING=1` or
+`DS4_CUDA_DSPARK_RESIDENT=1` is set (`ds4.c:73341`). A 340.6 GiB file cannot be served there without
+streaming, so that combination is the whole question, not a footnote.
+
+That leaves the choice Step 5 was written to make, and it is now a choice between two known things
+rather than a guess:
+
+1. **Measure the drafter on the native path first.** Card free, one short request,
+   `--dspark --mtp-model <repacked gguf>` with `DS4_ALLOW_MTP_STREAMING=1`, and read the acceptance
+   rate the engine reports. It buys the number that steps 5 and the acceptance bar need, and it is
+   weak evidence about the serving shape, not a change to it.
+2. **Then decide whether to extend `ds4x`.** A `ds4x_verify`-shaped entry that drafts k ids and
+   commits them through `llama_dsv41_decode_delta` and the owner-digest checkpoints is the
+   structural change; the session path refusing drafted state today is exactly the risk Step 5's
+   risk line names, so it gates on the delta and digest contracts, not on a throughput number.
 - Verify against the existing state contracts rather than around them: `llama_dsv41_decode_delta`
   and the owner-digest checkpoints already certify device state, so a draft must extend them and
   keep the accepted-token count honest in `usage`.
@@ -274,36 +365,45 @@ step, cache placement alone cannot reach the bar with a 365 GB file. If steps 1-
 have not, the honest report is "understood, not accepted": the gap is real, and the fix is draft
 decoding plus reuse, not a narrower role for the engine.
 
-## Where this stands (2026-11-09)
+## Where this stands (2026-11-09, later in the day)
 
-Step 1 is landed and measured, the baseline has been re-read, and the bias blocker is closed as a
-launch-time decision. Next, in order:
+Step 1 is landed and measured, the baseline has been re-read, the bias blocker is closed as a
+launch-time decision, and Step 5's lookup is answered: the DSpark artifact for the 1017 weights is
+on this box, it is now repacked into the contract `engines/ds4` binds and the engine accepts it
+(`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
+path to it. Everything still open needs the card.
 
-1. **Free the card.** `strata --serve --pack packs/gyro-m` holds ~29 GiB here; the stack's own lease
-   gate refuses admission while the card is busy, so every measurement below needs it stopped.
+1. **Free the card.** `strata --serve --pack packs/gyro-m` holds ~29 GiB here and is still serving -
+   measured 30 849 MiB used, 1 346 MiB free, with a `strata-vision` generation in flight - so the
+   stack's lease gate refuses admission and no measurement below can run. Stopping it is the
+   owner's call, not the agent's.
 2. **Run the probe with calibration:** `~/bin/ds4-first-run --calibrate runtime/qualification/
    dsv41-1017-iq2xxs-spreads.txt` (not `--quick`). The flag puts `DS4_CACHE_AFFINITY_CALIBRATE` in
    the derived config's `env_overrides`, so one sitting gives Step 1's accept (256 decoded tokens
    with `LLAMADECODE_STEP_BYTES`), whether the RAM tier is admitted at all, and a spread bound to
    these 365713686528 bytes for Step 4's bias item. Read the result with
    `scripts/analyze_dsv41_decode.py`, which prints the calibration line the producer wrote (or
-   `incomplete affinity calibration` if some layer never reached 16 samples).
+   `incomplete affinity calibration` if some layer never reached 16 samples). `runtime/qualification/`
+   is still empty.
 3. **Then Step 6 and Step 2**, against the numbers from (2) rather than the arithmetic here: the
    multi-turn reuse probe, and the host-tier sizing whose 3.5 GiB offer is derived, not measured
    (`--job-host-bytes` 30 GiB minus a 26.2 GiB peak RSS minus the 256 MiB margin in
    `configure_host_cache`).
-4. **Step 5 begins with a lookup, not a run:** is there a DSpark artifact for the 1017 weights? If
-   there is none, the choice is self-speculation against the carry and HC state contracts, or Step 5
-   is deferred with that reason written down.
+4. **Step 5, once the card is free:** measure the drafter's acceptance rate on the native
+   `--dspark --mtp-model` path with `DS4_ALLOW_MTP_STREAMING=1`, which is what makes the 5.5×
+   arithmetic above a measurement. Only then decide whether `ds4x` grows a verify-shaped entry.
 
 Two files this work touched live outside the repo: `~/bin/ds4-first-run` (the probe; it now runs the
 analysis and takes `--quick` / `--calibrate PATH`) and `runtime/ds4-first-run.local.json` (the
 derived config that puts `LLAMADECODE_BYTE_LEDGER=1`, and any calibration path, in the producer's
-environment; the probe regenerates it from `rtx.local.json` on each run).
+environment; the probe regenerates it from `rtx.local.json` on each run). Step 5's repacked
+sidecar is a third: `ds4-models/dspark-DeepSeek-V4.1-Flash-1017-mtp-q8.gguf`, next to the language
+file, regenerable from `scripts/repack_dsv41_dspark_sidecar.py`.
 
 Verification baseline for this box, so a later session does not chase it: `pytest tests/` was
 31 failed / ~680 passed before any of this work - the cgroup and RAM-scope tests in
-`tests/test_working_set.py`, the guard and process tests, `tests/test_yoco.py` - and
+`tests/test_working_set.py`, the guard and process tests, `tests/test_yoco.py` - and it is still
+those same 31 (now 31 failed / 691 passed, six of the passes from the sidecar test).
 `tests/test_combo_single_stop.py::test_disconnect_inside_reasoning_then_next_turn_appends_only`
 fails 3 to 4 runs in 10 under load on a clean checkout as well. The C++ selftests
 (`tests/dsv41_host_plan_log.cpp`, `tests/dsv41_step_ledger.cpp`) are hand-compiled; `build.sh` has
