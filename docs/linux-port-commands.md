@@ -1074,6 +1074,41 @@ cd engines/ds4
 DS4_DS_SELFTEST=64 DS4_DS_SELFTEST_CHUNKS_MIB=1,4,8,16 DS4_DS_SELFTEST_BATCHES=8,32,64 ./ds4 --cuda --model /path/to/supported.gguf
 ```
 
+### The decode probes (same requirement: the card quiet)
+
+`~/bin/ds4-first-run` is the one command for `docs/DECODE_GAP_PLAN.md`'s measurements. It gates on
+the card, starts the stack, sends a short request, a 256-token decode and a ~65K-token prefill,
+stops the stack and prints the per-step ledger for every producer log the run wrote.
+
+```bash
+~/bin/ds4-first-run                                   # decode rates, byte tiers, headroom
+~/bin/ds4-first-run --bias                            # same with quality_speed 0.5 on every request
+~/bin/ds4-first-run --calibrate runtime/qualification/dsv41-1017-iq2xxs-spreads.txt
+~/bin/ds4-first-run --quick                           # one 16-token request, heartbeat, then stop
+scripts/dsv4_dspark_probe.sh                          # drafter acceptance, native --dspark path
+scripts/dsv41_reuse_probe.py                          # Step 6's multi-turn prefix reuse
+```
+
+Three things it exists to avoid, all measured rather than guessed:
+
+- A relative `--calibrate` path resolves against the producer's working directory and `ds4` aborts
+  when the open fails, so the run's 255 decoded steps wrote nothing. The probe makes the path
+  absolute and proves it writable first.
+- Binding `cache_affinity_spread_file` does not apply a bias. `combo_single` calls
+  `generation.bias(quality_speed)` (`slstack/combo_single.py:266`), so a request that sends no
+  `quality_speed` decodes unbiased and the log reads `DS4X_AFFINITY … enabled=0`. That is what
+  `--bias` is for; it refuses to start when nothing is bound, because `Store.bias` raises then.
+- A producer that outlives a cooperative stop keeps its VRAM, and a *worker* that outlives one keeps
+  the engine's port, which makes the next run answer `503 [Errno 98] Address already in use` on its
+  first request without ever loading a model. The probe force-kills stack processes still holding
+  either port - matched on the command line, so Strata's own server on 8084 is never touched.
+
+Config traps on the same path: `LLAMADECODE_VRAM_RESERVE_MIB` and `LLAMADECODE_VRAM_MARGIN_MIB` are
+pinned by `COMMON_ENV` in `scripts/dsv41_single.py` and cannot be raised from a local config, so
+the decode-slack knob is `LLAMADECODE_L2_MAX_SLOTS`. And the calibration file's first number is
+`ds4_model.size` - the model minus its disk-only Engram region - not the file length; see
+`slstack/affinity_spread.py`.
+
 ## Engine scope, for reference
 
 Accepted architectures (`engines/ds4/ds4.c:588-602`, validated at `ds4.c:7873-7890`):

@@ -345,6 +345,66 @@ C is the comparison against the 19:28 baseline's 5.97 tok/s and 77.2 % hit rate;
 (~1540 rather than ~1639) so the smaller cache is visible in the hit rate. D is the same run with
 the bias live; Step 4's accept also needs the output compared by hand, since the bias re-ranks
 experts and can trade speed for quality.
+
+### C and D (20:40, 20:44): the margin change was inert, and the guard is a coin flip
+
+C ran with the same L2 as B: 1633 slots, `offered=16 263 151 616` from `nvml_free=16 474 963 968`.
+That subtracts 202 MiB, which is `128 + 64 + 10` - the engine's default margin, not the 1024 the
+config asked for. `scripts/dsv41_single.py` is why:
+
+```python
+env = dict(result.get('env_overrides') or {})
+env.update(COMMON_ENV)          # COMMON_ENV overwrites whatever the local config set
+```
+
+and `COMMON_ENV` pins `LLAMADECODE_VRAM_MARGIN_MIB: '64'` and `LLAMADECODE_VRAM_RESERVE_MIB: '128'`.
+`DEFAULT_ENV` just below it uses `setdefault`, so ordinary keys do survive a local config -
+`LLAMADECODE_HOST_CACHE_MB` reached the producer, which is why the tier was funded at all - but
+those two are gated and a local value is silently dropped. Running `dsv41_single.overlay('262k',
+rtx.local.json)` shows it directly: the merged env carries margin 64 while `LLAMADECODE_L2_MAX_SLOTS`
+carries whatever the config asked. So the margin override in `rtx.local.json` was removed rather
+than left in looking like it was doing something.
+
+The gate is deliberate - the comment on it says 128 + 0 breached the reserve in every measured run -
+so the lever is the ungated one: **`LLAMADECODE_L2_MAX_SLOTS: "1500"`**, which `grow_decode_cache`
+applies to any caller and which the variable's own doc describes as being for reproducible tier
+comparisons. 1633 → 1500 slots is 133 × 9.95 MiB ≈ **1.3 GiB** returned to the device, moving the
+steady free from ~154 MiB to ~1.5 GiB above a 128 MiB reserve.
+
+And C proved the abort is not bad luck. The session that *survived* its decode - the 64-token
+long-prefill run, 63 steps, 4.20 tok/s - recorded:
+
+```
+LLAMADECODE_VRAM_HEADROOM nvml_free_now=199098368 min_free_since_l2=35520512 samples=3249 reserve=134217728
+```
+
+The sampler saw free VRAM at 34 MiB, well under the 128 MiB the guard refuses below, and the run
+lived anyway because `check_decode_vram_reserve` reads NVML at its own call sites rather than at
+the dip. The 256-token session died on the same dip at 30 MiB. So the plan currently over-subscribes
+the card by about a gigabyte and whether a run finishes depends on when the guard happens to look.
+
+C's measurement content, for the record: no session reached 200 steps; `from_ram` was 0.0 % and
+0.1 % with `stored` at 0.015 GiB/step; prefill was 864.9 tok/s, a fourth reproduction of the
+848-922 band.
+
+D failed before any producer started: `[Errno 98] Address already in use`, returned as
+`engine_unavailable` in 0 s. C's forced producer kill left the *worker* alive, and the worker binds
+its own port (`runtime/single-engine.json` says 8089, the router takes 8088), so D's engine could
+not listen. `~/bin/ds4-first-run` now reads both ports from the configs, force-kills stack processes
+still holding either after the cooperative stop, and waits for them to clear before starting -
+matching on the command line (`slstack`, `llama-dsv41-prefill`, `ds4-server`) rather than on the
+port alone, so a different service on a neighbouring port is never killed: Strata serves its own
+UI on 8084 and stays out of it.
+
+The next run is therefore E, with the L2 capped and the bias still off:
+
+```bash
+~/bin/ds4-first-run          # E: tier 12 GiB + L2 1500 slots, bias off - Step 2's number
+~/bin/ds4-first-run --bias   # F: the same configuration with quality_speed 0.5 - Step 4's
+```
+
+Read `LLAMADECODE_L2 slots=` first to confirm the cap took effect (it should read 1500, not 1633),
+then `LLAMADECODE_VRAM_HEADROOM`'s `min_free_since_l2` before trusting any rate.
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -599,20 +659,19 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Run C: the RAM tier with room to finish.** `rtx.local.json` is set for it -
-   `LLAMADECODE_HOST_CACHE_MB: "12288"`, `producer_job_host_gib` 48, `host_budget_gib` 50,
-   `producer_graph_cap_gib` 5.5, `LLAMADECODE_VRAM_MARGIN_MIB: "1024"`, bias off:
-   `~/bin/ds4-first-run`. Nothing in A or B reached the plan's 200-step bar, because the decode sat
-   150 MiB above a 128 MiB reserve and dipped into it at 16-32 steps. Read
-   `LLAMADECODE_VRAM_HEADROOM` before believing anything else: if `min_free_since_l2` still sits
-   near the reserve, the margin needs more. Note the L2 slot count too (~1540 rather than ~1639),
-   so the smaller cache is visible in the hit rate. Strata has to be off for the whole sitting; it
-   is back on the card as of 20:17 (pid 317822, 29.7 GiB VRAM, 43 GiB RSS).
-2. **Run D: the bias, actually applied.** `~/bin/ds4-first-run --bias`, which puts `quality_speed`
+1. **Run E: the RAM tier with the L2 capped.** `rtx.local.json` is set for it -
+   `LLAMADECODE_HOST_CACHE_MB: "12288"`, `LLAMADECODE_L2_MAX_SLOTS: "1500"`,
+   `producer_job_host_gib` 48, `host_budget_gib` 50, `producer_graph_cap_gib` 5.5, bias off:
+   `~/bin/ds4-first-run`. Two things to read before any rate: `LLAMADECODE_L2 slots=` should say
+   1500 rather than ~1633 (the cap is ungated; the VRAM margin is gated by `COMMON_ENV` and cannot
+   be set from a local config), and `LLAMADECODE_VRAM_HEADROOM`'s `min_free_since_l2` should sit
+   about 1.5 GiB above the 128 MiB reserve rather than 150 MiB. Strata has to be off for the whole
+   sitting; it is back on the card as of 20:47 (pid 317822, 29.7 GiB VRAM, 43 GiB RSS).
+2. **Run F: the bias, actually applied.** `~/bin/ds4-first-run --bias`, which puts `quality_speed`
    0.5 on every request. `cache_affinity_spread_file` is already set and the spread does reach the
-   engine; run B showed `spread=… enabled=0` and `LLAMADECODE_LIVE_BIAS value=0`, because the bias
-   comes from the request's quality setting and the probe sent none. Compare D's hit rate and
-   median step against C, and read the generated text - the bias re-ranks experts, so Step 4's
+   engine; C showed `spread=… enabled=0` and `LLAMADECODE_LIVE_BIAS value=0`, because the bias
+   comes from the request's quality setting and the probe sent none. Compare F's hit rate and
+   median step against E, and read the generated text - the bias re-ranks experts, so Step 4's
    accept asks for a quality check and not only a rate.
 3. **Then Step 6**, against the numbers above rather than the arithmetic here:
    `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the

@@ -62,6 +62,13 @@ validator:
    ~98 MiB; `docs/evidence/cuda-headroom-probe.cpp` reported 360 MiB free at the time of
    writing. The presets assume the card is nearly whole (`LLAMADECODE_VRAM_RESERVE_MIB=128`,
    `LLAMADECODE_VRAM_MARGIN_MIB=64`, and `producer_graph_floor_gib: 3.0` on the 1M preset).
+   Those two VRAM numbers are pinned by `COMMON_ENV` in `scripts/dsv41_single.py`, applied with
+   `env.update(COMMON_ENV)` **after** the config's `env_overrides`, so a local config cannot raise
+   them and a value set there is dropped without a word. `DEFAULT_ENV` below it uses `setdefault`,
+   so every other key does take. To give the decode device slack, use the ungated
+   `LLAMADECODE_L2_MAX_SLOTS` instead. Measured 2026-11-09: a run asking for
+   `LLAMADECODE_VRAM_MARGIN_MIB: "1024"` sized its L2 with the default 64, and
+   `dsv41_single.overlay('262k', rtx.local.json)` prints the merged 64.
    Stopping Strata also stops the assistant, so GPU work is the user's to run by hand.
    Admission itself gates on the device, not on which process holds it: `slstack/lease.py:210`
    refuses when `memory.used > gpu_idle_max_mib` or `utilization.gpu > 5`. With the serve
