@@ -16,7 +16,11 @@ Decode for the served model is planned in `docs/DECODE_GAP_PLAN.md` - DS4.1-Flas
 measured against Strata + DeepSeek, and how far the stack is from that number. Step 1 (the per-token
 byte ledger, `LLAMADECODE_STEP_BYTES`, read with `scripts/analyze_dsv41_decode.py`) is landed, the
 Strata baseline in that document has been re-read against its own log, and the affinity-bias
-blocker is closed as a launch-time check in `slstack/affinity_spread.py`. Step 5's lookup is
+blocker is closed as a launch-time check in `slstack/affinity_spread.py` - which binds a calibration
+to `ds4_model.size`, not the file length. Steps 2 and 4 are measured: the RAM expert tier is
+neutral-to-negative on this box (kept off) and the affinity bias is the lever, 3.0-3.2x on the
+median step and 93 % cache hit at `quality_speed 0.5`. What is left is the p90 tail, 3.5x Strata's,
+which is Step 5's drafter question rather than a cache one. Step 5's lookup is
 answered: the DSpark drafter for the 1017 weights is on this box, `scripts/repack_dsv41_dspark_sidecar.py`
 converts it into the name-and-metadata contract `engines/ds4` binds (engine-checked with
 `./ds4 --inspect --cpu`, no GPU), and the producer's `ds4x` decode ABI has no drafter entry at all.
