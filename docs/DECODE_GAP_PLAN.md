@@ -405,6 +405,88 @@ The next run is therefore E, with the L2 capped and the bias still off:
 
 Read `LLAMADECODE_L2 slots=` first to confirm the cap took effect (it should read 1500, not 1633),
 then `LLAMADECODE_VRAM_HEADROOM`'s `min_free_since_l2` before trusting any rate.
+
+### E (20:55): Step 2 has a number, and it clears everything except the 90 % bar
+
+The cap took effect (`LLAMADECODE_L2 slots=1500`, `total_vram_slots=1949`), and for the first time
+since the RAM tier was funded the decode finished its 256 tokens:
+
+```
+LLAMADECODE_VRAM_HEADROOM nvml_free_now=1611923456 min_free_since_l2=1448738816 samples=7679 reserve=134217728
+LLAMADECODE_DECODE_COMPLETE generated=256 evaluated=255 stopped=0 decode_ms=52736.117 tok_s=4.835396
+```
+
+| run | L2 | tier | steps | median | tok/s median | hit rate | from_ram | device copies |
+|---|---|---|---|---|---|---|---|---|
+| 19:28 baseline | 1633 | off | 255 | 167.5 ms | 5.97 | 77.2 % | 0 % | 2.007 GiB |
+| E | 1500 | 12.9 GiB | 255 | **151.7 ms** | **6.59** | 77.0 % | **1.4 %** | 3.953 GiB |
+
+So the tier costs device-to-device traffic (1.95 GiB/step more than the no-tier run) and buys a
+10 % better median step and the first nonzero `from_ram` on a long decode: 0.032 GiB/step, which is
+3-4 of its 1 288 slots per token. The hit rate is the same 77 % as without it, which is the point:
+the tier is fed by L1/L2 victims and a RAM hit consumes the slot
+(`engines/ds4/ds4_cuda.cu:6845-6853` invalidates it after the upload), so it cannot absorb the 23 % miss
+stream that reaches NVMe every step. 90 % needs the miss stream to land in RAM, and this placement
+policy does not do that.
+
+Against Step 2's accept bar:
+
+- decode ≥ 4 tok/s: **pass**, 6.59 tok/s median, 4.84 tok/s mean over 255 steps.
+- `host_slots > 0` and `from_ram > 0`: **pass**, 1 288 slots and 1.4 % of the footprint.
+- no admission refusal, no paging stop: **pass** - the guard saw 2.3 MiB of system swap growth,
+  unattributed, and let the run finish.
+- hit rate ≥ 90 %: **fail at 77.0 %**, for the mechanism reason above rather than a sizing one.
+- no `budget_breaches`: pass.
+
+Prefill reproduced again at 904.8 tok/s, fifth run in the 848-922 band. The port cleanup landed in
+the same run: `stack worker still holding a port (8088 8089): 372891 - forcing kill`, after
+`Single-engine graceful shutdown failed; stopping the owned job` in the router's log - which is
+exactly the case F would otherwise have died on.
+
+### F (21:00): the bias applies, and the paging guard measures the machine, not the producer
+
+`--bias` did what Step 4's first item asks:
+
+```
+LLAMADECODE_DS4X_AFFINITY mean=0.5 warmup=0 ramp=0 spread=runtime/qualification/…  enabled=1
+LLAMADECODE_LIVE_BIAS value=0.5 position=588
+```
+
+No `Live bias refused`, the spread bound, bias nonzero at the reasoning phase. It then died at the
+first decoded step:
+
+```
+DSV41_HOST_MEMORY_PAGING_BASELINE pagefile_in_use_bytes=1394110464 growth_bytes=0 limit_bytes=256000000
+DSV41_HOST_MEMORY_PAGING_STOP     pagefile_in_use_bytes=1719590912 growth_bytes=325480448 low_memory_events=0
+```
+
+That is not the producer swapping. `slstack/cgroup_scope.py:107` sets `memory.swap.max=0` on the
+scope the producer runs in, so it cannot swap at all, and the guard's `pagefile_in_use` is
+`SwapTotal - SwapFree` from `/proc/meminfo` - machine-wide. The same guard log prints
+"pagefile-specific hard-fault events are not available on this platform", which is why it can only
+report growth and never a cause. With 56 GiB of RAM available and `low_memory_events=0`, the 325 MiB
+went to the desktop: reading `/proc/*/status` afterwards, 1.82 GiB of swap sits spread across
+uvicorn (0.16), Hyprland (0.12), four `pi` processes (0.34), Brave (0.16), ghostty, the Hermes
+gateway and the VPN UI - nothing from the stack.
+
+So the honest reading is that the producer's 12.9 GiB pinned tier plus its 23 GiB RSS pushes
+*other* processes' anonymous pages out, and the guard attributes that to the run. E did the same
+thing and grew only 2.3 MiB; F's first step read 2.225 GiB entirely from file (bias re-ranks
+experts, so nothing in the cache is the expert the router now wants) and pushed the reclaim further.
+
+Step 4's speed question therefore needs a run that does not add 12.9 GiB of pinned memory to a box
+that is already swapping 1.33 GiB. Next is G, with the tier off, which also pairs with the 19:28
+baseline as the clean single-variable comparison - bias on versus off, same device plan:
+
+```bash
+# rtx.local.json: LLAMADECODE_HOST_CACHE_MB "0", LLAMADECODE_L2_MAX_SLOTS "1500" (keep)
+~/bin/ds4-first-run --bias     # G: bias on, tier off
+```
+
+If G trips the same guard, the bias path itself is what pushes this desktop into swap and the fix is
+machine-level (`vm.swappiness`, root) rather than anything in the stack. Raising `paging_limit` is
+still not the answer - the guard is telling the truth about a box that is swapping; it is just not
+telling the truth about *who* swapped.
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -659,20 +741,18 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Run E: the RAM tier with the L2 capped.** `rtx.local.json` is set for it -
-   `LLAMADECODE_HOST_CACHE_MB: "12288"`, `LLAMADECODE_L2_MAX_SLOTS: "1500"`,
-   `producer_job_host_gib` 48, `host_budget_gib` 50, `producer_graph_cap_gib` 5.5, bias off:
-   `~/bin/ds4-first-run`. Two things to read before any rate: `LLAMADECODE_L2 slots=` should say
-   1500 rather than ~1633 (the cap is ungated; the VRAM margin is gated by `COMMON_ENV` and cannot
-   be set from a local config), and `LLAMADECODE_VRAM_HEADROOM`'s `min_free_since_l2` should sit
-   about 1.5 GiB above the 128 MiB reserve rather than 150 MiB. Strata has to be off for the whole
-   sitting; it is back on the card as of 20:47 (pid 317822, 29.7 GiB VRAM, 43 GiB RSS).
-2. **Run F: the bias, actually applied.** `~/bin/ds4-first-run --bias`, which puts `quality_speed`
-   0.5 on every request. `cache_affinity_spread_file` is already set and the spread does reach the
-   engine; C showed `spread=… enabled=0` and `LLAMADECODE_LIVE_BIAS value=0`, because the bias
-   comes from the request's quality setting and the probe sent none. Compare F's hit rate and
-   median step against E, and read the generated text - the bias re-ranks experts, so Step 4's
-   accept asks for a quality check and not only a rate.
+1. **Run G: the bias without the pinned tier.** `rtx.local.json` is set for it -
+   `LLAMADECODE_HOST_CACHE_MB: "0"`, `LLAMADECODE_L2_MAX_SLOTS: "1500"`,
+   `cache_affinity_spread_file` bound, bias on:
+   `~/bin/ds4-first-run --bias`. Compare its median step and hit rate against the 19:28 no-tier,
+   no-bias baseline (5.97 tok/s, 77.2 %) - that is a single-variable pair, and F showed the bias
+   does apply (`enabled=1`, `value=0.5`) but died on machine-wide swap growth with the tier funded.
+   Read the generated text too: Step 4's accept asks for a quality check, not only a rate.
+2. **Step 2 is measured, and its bar is partly unreachable.** E got 6.59 tok/s median over 255
+   steps with `from_ram` nonzero and no breach, so the rate, the tier and the no-refusal rows pass;
+   the 90 % hit rate does not, because the RAM tier is victim-fed and a RAM hit consumes its slot.
+   Writing that into the plan's Step 2 verdict is the remaining paperwork before Step 4's quant
+   lever (the `e4m3` Engram tier) gets considered.
 3. **Then Step 6**, against the numbers above rather than the arithmetic here:
    `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the
    second turn and marks PASS/FAIL against the 70 % bar). It cannot be read yet - A and B each put
