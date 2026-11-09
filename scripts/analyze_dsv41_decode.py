@@ -34,8 +34,8 @@ WATCH = ("DS4PERF_GPU_JOB_ADMISSION", "LLAMADECODE_HOST_PLAN", "LLAMADECODE_DS4X
          "LLAMADECODE_DS4X_OPENED", "LLAMADECODE_DS4X_READY", "LLAMADECODE_L2 ",
          "LLAMADECODE_HOST_CACHE slots=", "CARRY_RAM_LOCK_PARTIAL", "LLAMADECODE_LIVE_BIAS",
          "DS4X_AFFINITY", "affinity calibration written", "incomplete affinity calibration",
-         "wrong-model affinity calibration", "PRODUCER_ABORT", "LLAMADECODE_DECODE_COMPLETE",
-         "budget_breaches")
+         "wrong-model affinity calibration", "cannot write affinity calibration",
+         "PRODUCER_ABORT", "LLAMADECODE_DECODE_COMPLETE", "budget_breaches")
 
 
 def kv(line):

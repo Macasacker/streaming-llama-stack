@@ -109,10 +109,64 @@ placement is ~3.4 tok/s with 44 % of the step still read from disk. The distance
 but it now has two separate targets rather than one: the cold first step, and the 44 % of a warm
 step that comes off NVMe.
 
-Not yet satisfied: the accept needs a run of ≥200 tokens (the probe's non-`--quick` path decodes
-256). The three runs after the measured one aborted before reaching a token on `Live bias refused`;
-the message now names the refused bias and the spread file, which is Step 4's calibration item and
-the current blocker for any measurement run.
+### Step 1 accept, measured (2026-11-09 19:28)
+
+A 256-token decode on the current placement, read with the script over the run's three producer
+logs (`runtime/debug/run-20261109-192819.log`):
+
+| session | steps | median step | mean step | tok/s median | from_file | hit rate |
+|---|---|---|---|---|---|---|
+| short (23 tokens) | 23 | 312.9 ms | 801.3 ms | 3.20 | 36.8 % | 63.2 % |
+| **decode (256 tokens)** | **255** | **167.5 ms** | 226.8 ms | **5.97** (mean 4.41) | **22.8 %** | **77.2 %** |
+| long prefill (64 tokens, after 64 854) | 63 | 229.6 ms | 440.7 ms | 4.35 | 30.2 % | 69.8 % |
+
+The 255-step row is the plan's accept: a run of ≥ 200 tokens whose log says where each step's
+2.22 GiB came from, with `from_l1 42.6 %`, `from_l2 34.6 %`, `from_file 22.8 %`, `from_ram 0 %`,
+`copied 2.007 GiB/step` device-to-device, and zero steps with unattributed bytes. Steady decode
+is 5.97 tok/s median, not 3.4, and the disk share of a warm step is 22.8 %, not 44 %. The p10 of
+88.6 ms says the cache can serve a step at 11 tok/s when the hot set holds; p90 283.7 ms is a step
+that pays NVMe again. Against the bar: 5.97 of 23.9 tok/s.
+
+Prefill on this box measured 859 tok/s (64 854 tokens in 75.5 s) in the same run, well below the
+2 000 tok/s in the table above, and prefill expert reuse is again 0 % (10 009 active, 10 009 newly
+read over 40 layers). That is a second, unexplained number: prefill rate is not this plan's bar,
+but a 2.3× spread between two measurements of the same file on the same box means the table's
+prefill row is not a stable reference.
+
+Three things this run also proved, each of which changes a later step:
+
+1. **`host_slots=0` is a default, not a refusal.** `configure_host_cache`
+   (`llama-dsv41-weights.cpp:1613`) returns immediately when `LLAMADECODE_HOST_CACHE_MB` is unset,
+   empty or `0`; the doc line that says "auto uses admitted physical/process headroom" reads as
+   though unset were auto, and it is not. The room was there - `row_cache_headroom=5.80 GiB`,
+   `available 61 GiB`, `admitted_host=32.08 GiB` - and nothing claimed it. Step 2's first move is
+   therefore to set the variable, and its second is to raise what the offer is bounded by:
+   `offer = min(requested, physical, --job-host-bytes - rss - 256 MiB)`, which on today's numbers
+   (30 GiB job host, ~26 GiB RSS) is ~3.5 GiB even with `auto`. That is the plan's derived 3.5 GiB,
+   now confirmed as the formula's output rather than a guess.
+2. **The calibration was collected and lost.** Two sessions show
+   `ds4: cannot write affinity calibration` followed by `LLAMADECODE_PRODUCER_ABORT`: the publish
+   gate passed (`ds4_gpu_cache_affinity_finish` only writes when every layer reached 16 samples,
+   and 255 decoded tokens cleared it), then `fopen` failed because `--calibrate` was given a path
+   *relative to the repo* while the producer resolves it against its own working directory, and
+   ds4 `abort()`s on that write failure (`ds4_cuda.cu:1005`). `runtime/qualification/` is empty.
+   `~/bin/ds4-first-run` now resolves the path to absolute and proves the target writable before
+   starting anything.
+3. **That abort is why turn reuse cannot be measured yet.** Each of the three requests got its own
+   producer directory (`ultra-e989bff…`, `ultra-f80a97f…`, `ultra-a955e1d9…`) and reported
+   `cached_tokens=0`, because the producer killed itself at session close instead of surviving to
+   the next turn. Step 6 needs the fixed path first; with it, `cache_n=0` on turn 2 would be the
+   append path refusing, which is the thing Step 6 is actually about.
+
+The bias rule worked as designed on a live run for the first time: `LLAMADECODE_LIVE_BIAS value=0`,
+`DS4X_AFFINITY mean=0 … enabled=1`, all three requests served, no `Live bias refused`. Step 3's
+pageable carry is unchanged and still needs root: `CARRY_RAM_LOCK_PARTIAL bytes=2522877952
+locked_bytes=8388608 pageable_tail_bytes=2514489344 errno=12` in the 255-step session, and
+3.32 GiB in the prefill-heavy one.
+
+Step 1's accept is met by the 255-step row. What is still open is the calibration itself: the file
+was collected and lost to the relative path, so Step 4's bias item and Step 6's reuse measurement
+both wait on a rerun with an absolute `--calibrate` path.
 
 ## Step 2 - Size the two cache tiers and buy their room
 
@@ -123,9 +177,14 @@ what decode hits; the provider's VRAM tiers were 449 L1 slots (~4.2 GiB) and 163
 `host_slots=0 host_bytes=0` in every one of the 15 steps. The tier to buy is the third one, and the
 2 GiB figure was reading the other engine's cache.
 
-- Give the host tier 16-24 GiB (`LLAMADECODE_HOST_CACHE_MB` / `DS4_CUDA_STREAMING_HOST_CACHE_N` for
-  the provider's RAM tier) and check whether the VRAM L1 pool should grow with it: 449 L1 slots is
-  less than two steps' worth of distinct experts at 240 triples per step. The VRAM reserve
+- Give the host tier 16-24 GiB. The knob is `LLAMADECODE_HOST_CACHE_MB`, and it is **off unless
+  set**: `configure_host_cache` returns when it is unset, empty or `0`, so every run so far has had
+  no RAM tier because nobody asked for one, not because admission refused it. `auto` takes
+  `min(physical headroom, --job-host-bytes - rss - 256 MiB)`, which at today's numbers is ~3.5 GiB;
+  reaching 16-24 GiB needs `producer_job_host_gib` raised as well, not just the variable set.
+  `DS4_CUDA_STREAMING_HOST_CACHE_N` caps the same tier by expert count. Check whether the VRAM L1
+  pool should grow with it: 449 L1 slots is less than two steps' worth of distinct experts at 240
+  triples per step, and L1 already serves 42.6 % of a warm step's bytes. The VRAM reserve
   (`--ds4-cuda-streaming-expert-cache-reserve-gb`) only matters on the native ds4 decode path.
   Both tiers need VRAM and RSS headroom the current plan does not have: device bill 27574 MiB
   against ~30.5 GiB free, `host_budget_gib` 31.5 against a measured `peak_rss` of 26.2 GiB.
@@ -138,6 +197,9 @@ what decode hits; the provider's VRAM tiers were 449 L1 slots (~4.2 GiB) and 163
 
 Accept: expert-cache hit rate ≥ 90 % on a repeated decode, and decode ≥ 4 tok/s with no admission
 refusal and no `budget_breaches`. Record the hit rate and tok/s per setting so the trade is visible.
+The rate half is already met without the RAM tier - 5.97 tok/s median, 4.41 mean, on the 255-step
+run - so Step 2 is judged on hit rate (77.2 % today, bar 90 %) and on `host_slots` becoming
+non-zero at all.
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -373,23 +435,25 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Free the card.** `strata --serve --pack packs/gyro-m` holds ~29 GiB here and is still serving -
-   measured 30 849 MiB used, 1 346 MiB free, with a `strata-vision` generation in flight - so the
-   stack's lease gate refuses admission and no measurement below can run. Stopping it is the
-   owner's call, not the agent's.
-2. **Run the probe with calibration:** `~/bin/ds4-first-run --calibrate runtime/qualification/
-   dsv41-1017-iq2xxs-spreads.txt` (not `--quick`). The flag puts `DS4_CACHE_AFFINITY_CALIBRATE` in
-   the derived config's `env_overrides`, so one sitting gives Step 1's accept (256 decoded tokens
-   with `LLAMADECODE_STEP_BYTES`), whether the RAM tier is admitted at all, and a spread bound to
-   these 365713686528 bytes for Step 4's bias item. Read the result with
-   `scripts/analyze_dsv41_decode.py`, which prints the calibration line the producer wrote (or
-   `incomplete affinity calibration` if some layer never reached 16 samples). `runtime/qualification/`
-   is still empty.
-3. **Then Step 6 and Step 2**, against the numbers from (2) rather than the arithmetic here:
+1. **Rerun the probe with an absolute calibration path.** Step 1 is measured (5.97 tok/s median
+   over 255 steps, 77.2 % hit rate, RAM tier absent because it is off by default), so what the next
+   sitting is for is the calibration file and the RAM tier:
+   `~/bin/ds4-first-run --calibrate "$PWD/runtime/qualification/dsv41-1017-iq2xxs-spreads.txt"`
+   - the probe now resolves and write-checks that path itself, so a relative argument is fine too.
+   Add `"LLAMADECODE_HOST_CACHE_MB": "auto"` to `rtx.local.json`'s `env_overrides` in the same
+   sitting, and read the new `LLAMADECODE_HOST_CACHE slots=… offer=…` line. The card has to be
+   free: `strata --serve --pack packs/gyro-m` holds ~29.7 GiB here and the lease gate refuses
+   admission below `gpu_idle_max_mib`.
+2. **Publish the calibration, prove the bias applies.** Set `cache_affinity_spread_file` to the file
+   the run wrote, rerun, and check `LLAMADECODE_LIVE_BIAS` shows the profile bias with no
+   `Live bias refused`. The unbiased path is already proven: `value=0`, requests served.
+3. **Then Step 6 and Step 2**, against the numbers above rather than the arithmetic here:
    `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the
-   second turn and marks PASS/FAIL against the 70 % bar), and the host-tier sizing whose 3.5 GiB
-   offer is derived, not measured (`--job-host-bytes` 30 GiB minus a 26.2 GiB peak RSS minus the
-   256 MiB margin in `configure_host_cache`).
+   second turn and marks PASS/FAIL against the 70 % bar). It cannot be read yet - the calibration
+   abort killed each producer at session close, so every request in the 19:28 run started a fresh
+   producer and reported `cached_tokens=0`. With the fixed path, `cache_n=0` on turn 2 means the
+   append path refused, which is the measurement Step 6 wants. The host-tier sizing is item 1's
+   `offer` line, no longer a derived guess.
 4. **Step 5, once the card is free:** `scripts/ds4_dspark_probe.sh` measures the drafter's
    acceptance rate on the native `--dspark --mtp-model` path with `DS4_ALLOW_MTP_STREAMING=1` -
    `DS4_DSPARK_SPEC_LOG=1` prints one `DSpark V4.1 cycle drafted= accepted=` line per verify cycle,
