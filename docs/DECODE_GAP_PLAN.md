@@ -487,6 +487,51 @@ If G trips the same guard, the bias path itself is what pushes this desktop into
 machine-level (`vm.swappiness`, root) rather than anything in the stack. Raising `paging_limit` is
 still not the answer - the guard is telling the truth about a box that is swapping; it is just not
 telling the truth about *who* swapped.
+
+### G and H (21:06, 21:10): ~20 tok/s and a 93 % hit rate - and H was not the control
+
+G ran with the tier off and the bias live, and finished its 256 tokens:
+
+```
+LLAMADECODE_LIVE_BIAS value=0.5 position=590
+LLAMADECODE_DS4X_AFFINITY mean=0.5 … enabled=1
+LLAMADECODE_VRAM_HEADROOM … min_free_since_l2=1543700480 reserve=134217728
+LLAMADECODE_DECODE_COMPLETE generated=256 evaluated=255 decode_ms=26064.967 tok_s=9.783
+```
+
+| run | bias | tier | steps | median | tok/s median | mean | hit rate | from_file | copies |
+|---|---|---|---|---|---|---|---|---|---|
+| E | 0 | 12.9 GiB | 255 | 151.7 ms | 6.59 | 4.84 | 77.0 % | 23.0 % | 3.953 GiB |
+| G | 0.5 | off | 255 | 50.4 ms | **19.83** | 9.78 | **93.4 %** | **6.6 %** | **1.693 GiB** |
+| H | 0.5 | off | 255 | 46.9 ms | **21.31** | 10.22 | **93.0 %** | 7.0 % | 1.727 GiB |
+
+H was meant to be the unbiased control and it was not. `runtime/generation/live.json` holds
+`"value": 0.5, "revision": 14`, and `combo_single.py:753` calls `set_quality` **only when the
+request body contains `quality_speed`** - so a request that omits the key leaves the previous run's
+published bias in force. H's log reads `mean=0.5 … enabled=1` for exactly that reason. The accidental
+second bias run is still worth having: it reproduces G within 7 % on the median (19.83 / 21.31) and
+within 0.4 points on the hit rate, which is the first pair of runs on this box that agrees at the
+255-step scale.
+
+What E and G differ by is two things at once - the bias and the tier - so neither of those numbers
+is attributable yet. The 93 % hit rate and 6.6 % from-file could be the bias shrinking the hot set
+(it re-ranks experts, so the working set stops reaching past VRAM), or the tier going away
+(copies fell from 3.953 to 1.693 GiB/step, which is the tier's traffic, not the bias's), or both.
+Run I is the control: bias explicitly 0, tier off, same L2 cap.
+
+`~/bin/ds4-first-run` now sends `quality_speed` on **every** request - `0` when `--bias` is not
+given - and prints the persisted control value before starting, because "no `--bias`" no longer
+means "unbiased" on a box that has run `--bias` before. It also prints the 503 body of the long
+prefill (three runs' refusals were unreadable because the probe printed only the exception) and the
+reasoning/answer split of the decode.
+
+That split matters for Step 4's quality item. All three decode responses were read off disk: each
+spent the entire 256-token budget in `reasoning_content` with an empty message and
+`finish_reason=length`, so none of them reached an answer. The reasoning text is coherent in all
+three and shows no repetition degeneration (166-186 words, unique-word ratio 0.69-0.75, worst
+repeated 5-gram 1-2 occurrences - H repeats its own opening draft line once). So the bias has not
+produced garbage, but "compare the output" needs a request whose budget outlasts the reasoning
+phase; the 48-token short request is what actually answers ("Lisbon" in all three).
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -741,18 +786,18 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Run G: the bias without the pinned tier.** `rtx.local.json` is set for it -
-   `LLAMADECODE_HOST_CACHE_MB: "0"`, `LLAMADECODE_L2_MAX_SLOTS: "1500"`,
-   `cache_affinity_spread_file` bound, bias on:
-   `~/bin/ds4-first-run --bias`. Compare its median step and hit rate against the 19:28 no-tier,
-   no-bias baseline (5.97 tok/s, 77.2 %) - that is a single-variable pair, and F showed the bias
-   does apply (`enabled=1`, `value=0.5`) but died on machine-wide swap growth with the tier funded.
-   Read the generated text too: Step 4's accept asks for a quality check, not only a rate.
-2. **Step 2 is measured, and its bar is partly unreachable.** E got 6.59 tok/s median over 255
-   steps with `from_ram` nonzero and no breach, so the rate, the tier and the no-refusal rows pass;
-   the 90 % hit rate does not, because the RAM tier is victim-fed and a RAM hit consumes its slot.
-   Writing that into the plan's Step 2 verdict is the remaining paperwork before Step 4's quant
-   lever (the `e4m3` Engram tier) gets considered.
+1. **Run I: the control G needed.** `~/bin/ds4-first-run`, which now sends `quality_speed: 0` on
+   every request instead of omitting it. Tier stays off (`LLAMADECODE_HOST_CACHE_MB: "0"`),
+   `LLAMADECODE_L2_MAX_SLOTS` stays 1500. If I lands near E (6.59 tok/s, 77 % hit), the bias is the
+   lever that took G and H to 93 % and ~20 tok/s. If it lands near G/H, the tier was the cost and
+   the bias is speed-neutral, which changes Step 4's whole argument. Read
+   `bias: this run sends quality_speed=0 … persisted control is value=0.5` at the top and
+   `LLAMADECODE_LIVE_BIAS value=0` in the log before believing the comparison - H is the cautionary
+   example.
+2. **Then Step 6, in the same sitting.** G and H both refused the third request with a 503 whose
+   reason the probe threw away; it prints the body now. Step 6 needs the producer to survive turn
+   boundaries and every run so far has reported `cached_tokens=0`, so once the refusal is readable,
+   `python3 scripts/dsv41_reuse_probe.py` against a stack left running is the measurement.
 3. **Then Step 6**, against the numbers above rather than the arithmetic here:
    `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the
    second turn and marks PASS/FAIL against the 70 % bar). It cannot be read yet - A and B each put
