@@ -244,6 +244,36 @@ What must not happen is raising `paging_limit` to make the run pass. The guard i
 that says "this machine is now paging"; the plan's line stands - a refusing guard is information,
 not a regression to silence. What is still owed is the number the tier was bought for: hit rate
 against 90 % and `from_ram` greater than zero on a ≥ 200-step decode.
+
+### Second funded attempt (2026-11-09 19:51): the tier served bytes and decode got worse
+
+`LLAMADECODE_HOST_CACHE_MB=12288`. No paging stop this time - the guard saw 36 864 bytes of system
+swap growth, unattributed - the tier was admitted at 12.88 GiB / 1 288 slots, and it did serve
+bytes. It also made decode slower than the run with no tier at all:
+
+| config | steps | median step | tok/s median | from_file | from_ram | hit rate | device copies |
+|---|---|---|---|---|---|---|---|
+| no tier, graph cap 5.5, job host 30 | 255 | 167.5 ms | **5.97** | 22.8 % | 0 % | **77.2 %** | 2.007 GiB |
+| tier 12.9 GiB, graph cap 3.5, job host 48 | 160 | 219.5 ms | **4.56** | 26.5 % | 1.5 % | **73.5 %** | 3.938 GiB |
+
+The 160-step session also ended on `LLAMADECODE_PRODUCER_ABORT kind=exception reason=Physical free
+VRAM fell below the decode VRAM reserve` partway through a 256-token request, and the
+post-prefill session came in at 3.80 tok/s with a 68.6 % hit rate.
+
+Two things are being blamed for that and only one of them can be. The tier explains `from_ram` and
+the RAM-tier stores (0.028 GiB/step), but nothing explains copies nearly doubling - 1.93 GiB more
+device-to-device traffic per step than a run whose footprint is the same 2.22 GiB. The graph cap
+went 5.5 → 3.5 in the same edit, and prefill fell from 2 000 tok/s in the table to 859 and then
+848 tok/s in these two runs, which is the same direction and the same suspicious magnitude. So
+`producer_graph_cap_gib` is back to 5.5 and the next run changes only the tier:
+
+| run | changes from the 19:28 baseline | what it decides |
+|---|---|---|
+| A | tier 12.9 GiB, cap 5.5 | whether the tier itself costs the 1.3 tok/s and the copies |
+| B | A, plus `cache_affinity_spread_file` bound | what the bias buys, measured against A |
+
+A is the run Step 2's accept is judged on. If A still shows ~4.5 tok/s and doubled copies, the RAM
+tier is not the lever on this box at this footprint, and Step 4's quant lever moves up the list.
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -309,6 +339,25 @@ Cache placement caps out near 10-17 tok/s. The remaining levers change the footp
     `tests/test_combo_single.py`'s harness now declares a calibration, since it tests the
     bias-application path. `LLAMADECODE_LIVE_BIAS` in the producer log shows which bias a run
     actually applied.
+
+  Corrected the same day, by the first calibration this box produced. The rule above checked the
+  model file's *length*, and that is not what the engine binds: `model_unmap_engram`
+  (`engines/ds4/ds4.c`) sets `ds4_model.size` to the start of the disk-only Engram region - those
+  rows are deliberately outside the mapping - and `cuda_affinity_model` compares that size plus the
+  FNV-1a hash of the first 64 KiB of the mapping. The producer calibrated this 365 713 686 528-byte
+  file and wrote `DS4AFFINITY1 162955640832 384 40 436cb28b0673b077` - the offset of
+  `blk.1.engram_embd.weight` - and the launcher refused its own calibration as wrong-model.
+  `slstack/affinity_spread.py` now derives the bound bytes from the GGUF tensor directory the way
+  ds4 does, and mirrors the hash too: reading 64 KiB costs nothing at launch and turns a
+  same-length-different-file refusal, which would otherwise happen at the first decoded token, into
+  a launch error. Verified against the real file: derived bound 162 955 640 832, derived hash
+  `436cb28b0673b077`, both equal to the header the engine wrote; the packaged preset still does not
+  match and bias stays off.
+
+  The calibration exists now - `runtime/qualification/dsv41-1017-iq2xxs-spreads.txt`, 40 layers,
+  61 samples each, written by the 160-step session at 19:55. Binding it is a separate measurement
+  from the cache work, because the bias changes routing and therefore changes the hit rate: run the
+  cache comparison unbiased first, then set `cache_affinity_spread_file` and compare.
 
 Accept for step 4: a measured decode rate for each change in isolation, and the quality difference
 where the change trades accuracy (tail skip, quant).
@@ -479,14 +528,15 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Rerun the probe with a capped RAM tier.** The device and host budgets admitted at
-   `host_budget_gib` 50 / `producer_job_host_gib` 48 / `producer_graph_cap_gib` 3.5 (gate needs
-   28 086 MiB free), and `auto` sized a 26.3 GiB tier that pushed swap past the 256 MB guard one
-   token in. `rtx.local.json` now asks for 12 GiB explicitly
-   (`LLAMADECODE_HOST_CACHE_MB: "12288"`), so the next run should read
-   `LLAMADECODE_HOST_CACHE slots=… offer=…` *and* survive to 256 tokens, which is what publishes
-   the calibration. Strata has to stay off for the whole run, not just its VRAM: it held 41.3 GiB
-   of RSS at 19:28.
+1. **Run A: the RAM tier alone.** `rtx.local.json` is set for it -
+   `LLAMADECODE_HOST_CACHE_MB: "12288"`, `producer_job_host_gib` 48, `host_budget_gib` 50,
+   `producer_graph_cap_gib` back to **5.5** - and `cache_affinity_spread_file` stays empty so the
+   bias is not a second variable:
+   `~/bin/ds4-first-run --calibrate runtime/qualification/dsv41-1017-iq2xxs-spreads.txt`
+   Compare the 255-step row against the 19:28 baseline's 5.97 tok/s and 77.2 % hit rate, and read
+   `from_ram` and `copied`. The calibration is already written, so this run overwrites it; that is
+   fine and it keeps the run producing evidence even if the decode dies early. Strata has to be off
+   for the whole sitting - it held 41.3 GiB of RSS as well as 29.7 GiB of VRAM at 19:28.
 2. **Publish the calibration, prove the bias applies.** Set `cache_affinity_spread_file` to the file
    the run wrote, rerun, and check `LLAMADECODE_LIVE_BIAS` shows the profile bias with no
    `Live bias refused`. The unbiased path is already proven: `value=0`, requests served.
