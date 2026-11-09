@@ -1078,7 +1078,12 @@ DS4_DS_SELFTEST=64 DS4_DS_SELFTEST_CHUNKS_MIB=1,4,8,16 DS4_DS_SELFTEST_BATCHES=8
 
 `~/bin/ds4-first-run` is the one command for `docs/DECODE_GAP_PLAN.md`'s measurements. It gates on
 the card, starts the stack, sends a short request, a 256-token decode and a ~65K-token prefill,
-stops the stack and prints the per-step ledger for every producer log the run wrote.
+stops the stack and prints the per-step ledger for every producer log the run wrote. It is a symlink
+to `scripts/ds4-first-run.sh`, which is the tracked copy.
+
+`scripts/start-dsv41-single-262k.sh` stays attached after the router answers, so `Ctrl+C` is the
+shutdown - graceful stop, force-kill of anything that cannot honour it, port cleanup, and hold
+release. The probes pass `--detach` because they drive the stack from the same shell.
 
 ```bash
 ~/bin/ds4-first-run                                   # decode rates, byte tiers, headroom

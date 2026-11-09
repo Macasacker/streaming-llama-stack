@@ -13,6 +13,9 @@ Run it against a started stack:
         --model ~/workspace/local-llm-playground/ds4-models/DeepSeek-V4.1-Flash-1017-IQ2_XXS-Q2_K-imatrix.gguf
     python3 scripts/dsv41_reuse_probe.py
 
+The launcher stays attached so `Ctrl+C` is the shutdown; run it in its own terminal, or pass
+`--detach` and stop later with `scripts/start-dsv41-single.sh --preset 262k --stop`.
+
 It needs the card. Turn 2 is byte-identical to turn 1 up to the appended line, so a zero here is
 the append path not being taken, not a prompt that drifted.
 """

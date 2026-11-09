@@ -8,6 +8,8 @@
 #   --vision             native image prefill
 #   --dry-run            print the resolved start config, start nothing
 #   --stop               ask the running stack to shut down gracefully
+#   --detach             start and return; the stack keeps running until --stop
+#                        (default: stay attached, Ctrl+C stops the stack and releases the GPU)
 #   --preset 262k|1m     required
 #   --keep 2541|140      dependency cone: 2541 exact cone (default), 140 approximate YOCO
 set -eu
@@ -21,6 +23,7 @@ webui=0
 vision=0
 dry_run=0
 stop=0
+detach=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --preset) preset=$2; shift 2 ;;
@@ -31,6 +34,7 @@ while [ $# -gt 0 ]; do
         --vision) vision=1; shift ;;
         --dry-run) dry_run=1; shift ;;
         --stop) stop=1; shift ;;
+        --detach) detach=1; shift ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -114,6 +118,76 @@ nohup env PYTHONDONTWRITEBYTECODE=1 sh -c "$command" >"$log" 2>&1 &
 pid=$!
 echo "Started DSV4.1 single engine ($preset) pid $pid; log: $log"
 
+# The stack's two listeners: the router's port and the single engine worker's own port. Killing by
+# port plus command line (rather than a broad pattern) is what keeps another service - Strata's own
+# server on 8084, say - out of the cleanup.
+stack_listeners() {
+    PYTHONDONTWRITEBYTECODE=1 "$python" -B - "$1" "$runtime/single-engine.json" <<'PY'
+import json, os, re, subprocess, sys
+
+action = sys.argv[1]
+ports = set()
+for path in sys.argv[2:]:
+    try:
+        port = int(json.load(open(path)).get('port') or 0)
+    except (OSError, ValueError, TypeError):
+        continue
+    if port:
+        ports.add(port)
+listed = []
+for line in subprocess.run(['ss', '-ltnp'], capture_output=True, text=True).stdout.splitlines():
+    fields = line.split()
+    if len(fields) < 5 or not any(fields[3].endswith(':' + str(port)) for port in ports):
+        continue
+    match = re.search(r'pid=(\d+)', line)
+    if not match:
+        continue
+    pid = int(match.group(1))
+    try:
+        cmd = open('/proc/%d/cmdline' % pid, 'rb').read().replace(b'\0', b' ').decode('utf-8', 'replace')
+    except OSError:
+        continue
+    if not any(own in cmd for own in ('slstack', 'llama-dsv41-prefill', 'ds4-server')):
+        continue
+    listed.append(pid)
+    if action == 'kill':
+        try:
+            os.kill(pid, 9)
+        except OSError:
+            pass
+if listed:
+    print('%s stack listeners on %s: %s' % (action.capitalize(), ' '.join(str(p) for p in sorted(ports)),
+                                            ' '.join(map(str, sorted(set(listed))))))
+PY
+}
+
+stop_owned() {
+    # Cooperative first: the start process retires the engine worker and its producer, and that is
+    # what releases the GPU hold. A producer wedged inside wait_layer_gpu cannot honour it, which is
+    # why the forced cleanup follows instead of trusting the shutdown call.
+    curl -sS -m 15 -X POST "$url/v1/stack/shutdown" -H 'content-type: application/json' -d '{}' >/dev/null 2>&1 || true
+    waited=0
+    while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 45 ]; do sleep 1; waited=$((waited + 1)); done
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "start process still alive after 45s - stopping it"
+        kill "$pid" 2>/dev/null || true
+    fi
+    pids="$(pgrep -f 'llama-dsv41-prefill' || true)"
+    if [ -n "$pids" ]; then
+        echo "producer still alive: $pids - forcing kill"
+        kill -9 $pids 2>/dev/null || true
+    fi
+    stack_listeners kill
+    PYTHONDONTWRITEBYTECODE=1 "$python" -B -m slstack --config "${config:-$root/config.example.json}" release-holds 2>&1 | tail -2 \
+        || echo 'release-holds refused; inspect runtime/state/gpu.holds'
+    echo "GPU free: $(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1) MiB"
+}
+
+# Installed before the readiness wait: interrupting a stack that never finished starting is the
+# case that used to leave its worker and producer holding the card with nobody attached to stop
+# them (measured 2026-11-09, where a hold from a killed producer refused the next run's requests).
+trap 'echo; echo "interrupted: stopping the stack"; stop_owned; exit 130' INT TERM
+
 # Wait while the launcher is alive and the router is not yet answering (no fixed deadline).
 while kill -0 "$pid" 2>/dev/null; do
     if curl -sS -m 2 "$url/health" >/dev/null 2>&1; then break; fi
@@ -122,8 +196,20 @@ done
 if ! curl -sS -m 2 "$url/health" >/dev/null 2>&1; then
     tail -n 40 "$log" 2>/dev/null || true
     echo "The stack exited before its router answered; see $log" >&2
+    stop_owned
     exit 1
 fi
 echo "Router ready: $url"
 echo "Health:   curl $url/health"
 echo "Shutdown: $0 --preset $preset --stop   (or POST $url/v1/stack/shutdown with body {})"
+
+if [ "$detach" = 1 ]; then
+    echo "Detached as requested: this shell returns and the stack keeps running until --stop."
+    exit 0
+fi
+
+# Stay attached so Ctrl+C is the shutdown. The server itself is still a detached child (nohup), so
+# closing the terminal without signalling does not take it down; interrupting this launcher does.
+echo "Attached: Ctrl+C stops the stack and releases the GPU. Ctrl+Z then 'bg' detaches instead."
+while kill -0 "$pid" 2>/dev/null; do sleep 1; done
+echo "The start process exited on its own; the stack is stopped."

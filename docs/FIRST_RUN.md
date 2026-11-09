@@ -102,6 +102,16 @@ python3 -B -c "import sys; sys.path.insert(0,'.'); from slstack.gguf_header impo
 ./scripts/start-dsv41-single-262k.sh --model <same-path>
 ```
 
+The launcher stays **attached** after the router answers, so `Ctrl+C` is the shutdown: it asks the
+stack to retire gracefully, waits for the start process to exit, force-kills a producer that cannot
+honour the stop (`wait_layer_gpu` blocks cooperative retirement), clears any process still holding
+the router or engine port, and releases the GPU hold. The server itself runs as a detached child, so
+closing the terminal without signalling leaves it serving; interrupting the launcher does not.
+`--detach` returns immediately and keeps the old behaviour, where stopping means
+`scripts/start-dsv41-single.sh --preset 262k --stop`. The interrupt trap is installed before the
+readiness wait, because a stack that never finished starting used to leave its worker and producer
+holding the card with nothing attached to stop them.
+
 The launcher is the only route that serves this file on one 32 GB card. The native
 `ds4-server` backend refuses a V4.1 GGUF larger than VRAM both ways: without
 `--ssd-streaming` the admission check demands the mapped region resident
