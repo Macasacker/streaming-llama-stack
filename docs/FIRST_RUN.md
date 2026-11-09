@@ -77,6 +77,14 @@ validator:
    `gpu_idle_max_mib: 1024` cannot admit here. `rtx.local.json` sets 2560, which still
    refuses a real model serve (29 GiB) and still fails while one is decoding (utilisation
    was measured at 94%).
+   A second refusal is not about the card at all: a producer that is `kill -9`'d leaves an
+   `ACTIVE` line in `runtime/state/gpu.holds` that never expires by inference, and the next
+   admission fails with `RTX admission refused: ACTIVE holds exist: …` even on a quiet GPU
+   (measured 2026-11-09 21:28, after a run whose producer was force-killed). Release it with
+   `python3 -m slstack --config rtx.local.json release-holds`, which takes only holds whose
+   guardian process is gone and refuses while the card is busy - so free the card first.
+   `scripts/start-dsv41-single.sh` now runs that before starting; `~/bin/ds4-first-run` already
+   did.
 
 Download rate measured against that repository with a 64 MiB ranged request: 63.6 MB/s,
 so ~96 minutes for the file.

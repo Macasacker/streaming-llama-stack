@@ -91,6 +91,22 @@ if [ "$dry_run" = 1 ]; then
     exit 0
 fi
 
+# A producer that was force-killed leaves an ACTIVE hold that never expires by inference, and the
+# next admission refuses while any ACTIVE hold exists. Measured 2026-11-09 21:28: the first request
+# to a freshly started stack answered "RTX admission refused: ACTIVE holds exist: ACTIVE: DS4STACK
+# fa4d5b6a…" because the previous run's producer had been killed rather than retired. release-holds
+# only takes holds whose guardian process is gone and refuses while the card is busy above the idle
+# gate, so a live stack keeps its own hold; a refusal is printed, not fatal, because the admission
+# below reports the real reason.
+hold_config=${config:-$root/config.example.json}
+if holds=$(PYTHONDONTWRITEBYTECODE=1 "$python" -B -m slstack --config "$hold_config" release-holds 2>&1); then
+    echo "GPU holds: $(printf '%s\n' "$holds" | tail -1 | cut -c1-200)"
+else
+    echo "release-holds refused: $(printf '%s\n' "$holds" | tail -2 | tr '\n' ' ')"
+    echo "  If a dead holder's ACTIVE line is in $runtime/state/gpu.holds, free the card and rerun:"
+    echo "  $python -B -m slstack --config $hold_config release-holds"
+fi
+
 logs="$runtime/logs"
 mkdir -p "$logs"
 log="$logs/dsv41-single-$preset-$(date +%Y%m%d-%H%M%S).log"
