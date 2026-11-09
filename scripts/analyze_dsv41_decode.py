@@ -138,12 +138,22 @@ def report(path, min_steps):
 
     print("  run setup and refusals:")
     last_token = tokens[-1] if tokens else None
+    sized = [kv(line) for line in lines if "LLAMADECODE_HOST_CACHE slots=" in line]
     if last_token:
         print("    expert tiers in the cache: l1_slots=%s l2_slots=%s host_slots=%s host_bytes=%s"
               % (last_token.get("l1_slots"), last_token.get("l2_slots"),
                  last_token.get("host_slots"), last_token.get("host_bytes")))
-        if last_token.get("host_slots") == "0":
-            print("    the RAM expert tier was never admitted, so every victim went back to the file")
+        if sized and sized[-1].get("slots") not in (None, "0"):
+            # The step lines report what the last step hit; the HOST_CACHE line is the only
+            # one that says the tier was sized at all. Conflating them read a run that died at
+            # its first token as "the RAM tier was never admitted".
+            print("    RAM tier sized at open: slots=%s bytes=%s offer=%s; the last step served "
+                  "host_slots=%s from it"
+                  % (sized[-1].get("slots"), sized[-1].get("bytes"), sized[-1].get("offer"),
+                     last_token.get("host_slots")))
+        elif last_token.get("host_slots") == "0":
+            print("    no RAM tier: LLAMADECODE_HOST_CACHE_MB unset (unset is off), so every "
+                  "victim went back to the file")
     for tag in WATCH:
         seen = []
         for line in lines:

@@ -200,6 +200,50 @@ refusal and no `budget_breaches`. Record the hit rate and tok/s per setting so t
 The rate half is already met without the RAM tier - 5.97 tok/s median, 4.41 mean, on the 255-step
 run - so Step 2 is judged on hit rate (77.2 % today, bar 90 %) and on `host_slots` becoming
 non-zero at all.
+
+### First funded attempt (2026-11-09 19:44): the tier exists, the paging guard stopped it
+
+`host_budget_gib` 50, `producer_job_host_gib` 48, `producer_graph_cap_gib` 3.5,
+`LLAMADECODE_HOST_CACHE_MB=auto`. The device side improved as designed and admitted cleanly -
+graph 5 120 MiB (was 5 632), bill 27 062 MiB, gate needs 28 086 MiB free, `measured_admission` 30.5
+GiB - and the tier was sized for the first time:
+
+    LLAMADECODE_HOST_CACHE slots=2833 bytes=28257361920 offer=28204511232
+                          host_limit=51539607552 rss_before=23006941184 available_after=41876819968
+
+26.3 GiB of RAM tier, 2 833 slots, and 41.9 GiB still available afterwards. Then the producer
+aborted after one decoded token:
+
+    HTTP 503  "Persistent producer stopped: paging detected (pagefile usage rose 293703680 bytes)"
+    LLAMADECODE_PRODUCER_ABORT kind=host_memory reason=… (swap growth limit 256 MB)
+
+That is the risk this step names, firing immediately rather than silently. It is not an availability
+failure - `runtime_min_free_gib` never tripped, 41.9 GiB stayed available - it is the *swap* guard:
+`paging_limit = 256 000 000` bytes of growth in system-wide swap-in-use
+(`llama-dsv41-host-memory.h:159`, a constant carried over from Studio's Windows pagefile check, and
+the box has 10 GiB of swap with 1.4 GiB already in use). `auto` took the entire 26.3 GiB offer as
+anonymous memory, and with the default `vm.swappiness` the kernel pages anonymous memory out before
+it reclaims the model's file cache, so a 26 GiB anonymous jump crosses 256 MB of swap even while
+41 GiB is available. The calibration was lost to the same death, but honestly this time -
+`ds4: incomplete affinity calibration; no file published`, because the producer reached one token,
+not the 16 samples per layer.
+
+Three ways to take Step 2, in the order they should be tried:
+
+1. **Cap the tier explicitly.** `LLAMADECODE_HOST_CACHE_MB: "12288"` - a 12 GiB tier, half the
+   anonymous jump, still twice what `auto` offered at the old 30 GiB job host. Set on this box
+   after this run.
+2. **Lower the offer instead**, by taking `producer_job_host_gib` back toward 40, which bounds
+   `auto` without a second knob.
+3. **`vm.swappiness` near 0** is the setting that fits this box's design - the engine leans on
+   reclaimable page cache from a 340 GiB file, and the guard's 256 MB limit assumes a Windows
+   pagefile. That is a sysctl, so it is root and the owner's action, in the same category as
+   Step 3's `LimitMEMLOCK`.
+
+What must not happen is raising `paging_limit` to make the run pass. The guard is the only thing
+that says "this machine is now paging"; the plan's line stands - a refusing guard is information,
+not a regression to silence. What is still owed is the number the tier was bought for: hit rate
+against 90 % and `from_ram` greater than zero on a ≥ 200-step decode.
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -435,15 +479,14 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Rerun the probe with an absolute calibration path.** Step 1 is measured (5.97 tok/s median
-   over 255 steps, 77.2 % hit rate, RAM tier absent because it is off by default), so what the next
-   sitting is for is the calibration file and the RAM tier:
-   `~/bin/ds4-first-run --calibrate "$PWD/runtime/qualification/dsv41-1017-iq2xxs-spreads.txt"`
-   - the probe now resolves and write-checks that path itself, so a relative argument is fine too.
-   Add `"LLAMADECODE_HOST_CACHE_MB": "auto"` to `rtx.local.json`'s `env_overrides` in the same
-   sitting, and read the new `LLAMADECODE_HOST_CACHE slots=… offer=…` line. The card has to be
-   free: `strata --serve --pack packs/gyro-m` holds ~29.7 GiB here and the lease gate refuses
-   admission below `gpu_idle_max_mib`.
+1. **Rerun the probe with a capped RAM tier.** The device and host budgets admitted at
+   `host_budget_gib` 50 / `producer_job_host_gib` 48 / `producer_graph_cap_gib` 3.5 (gate needs
+   28 086 MiB free), and `auto` sized a 26.3 GiB tier that pushed swap past the 256 MB guard one
+   token in. `rtx.local.json` now asks for 12 GiB explicitly
+   (`LLAMADECODE_HOST_CACHE_MB: "12288"`), so the next run should read
+   `LLAMADECODE_HOST_CACHE slots=… offer=…` *and* survive to 256 tokens, which is what publishes
+   the calibration. Strata has to stay off for the whole run, not just its VRAM: it held 41.3 GiB
+   of RSS at 19:28.
 2. **Publish the calibration, prove the bias applies.** Set `cache_affinity_spread_file` to the file
    the run wrote, rerun, and check `LLAMADECODE_LIVE_BIAS` shows the profile bias with no
    `Live bias refused`. The unbiased path is already proven: `value=0`, requests served.
