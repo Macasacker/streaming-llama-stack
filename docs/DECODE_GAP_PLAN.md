@@ -274,6 +274,77 @@ went 5.5 → 3.5 in the same edit, and prefill fell from 2 000 tok/s in the tabl
 
 A is the run Step 2's accept is judged on. If A still shows ~4.5 tok/s and doubled copies, the RAM
 tier is not the lever on this box at this footprint, and Step 4's quant lever moves up the list.
+
+### A and B (20:09, 20:13): neither reached 200 steps, and the reason is 30 MiB
+
+Run A changed the tier and nothing else. Run B additionally bound the calibration. Both ended the
+256-token decode on the same guard, at 16 and 32 steps:
+
+| session | steps | median | hit rate | from_ram | device copies | how it ended |
+|---|---|---|---|---|---|---|
+| A short (24 tok) | 23 | 295.4 ms | 63.2 % | 0 % | 3.328 GiB | completed |
+| A 256-token | 16 | 390.9 ms | 50.8 % | 0 % | 2.956 GiB | **VRAM reserve breach** |
+| A long prefill | 0 | - | - | - | - | HTTP 503, producer never opened |
+| B short (28 tok) | 27 | 176.8 ms | 66.5 % | 0 % | 3.420 GiB | completed |
+| B 256-token | 32 | 169.0 ms | 64.5 % | 0 % | 3.665 GiB | **VRAM reserve breach** |
+| B long prefill | 63 | 199.1 ms | 69.0 % | 0.2 % | 3.794 GiB | completed, 64 tok |
+
+None of these can decide Step 2 - the plan's bar is a run of at least 200 tokens, and a 16-step or
+27-step session has a cold cache by construction. Prefill reproduced a third time: 922 tok/s, in
+the same 848-922 band as the previous two runs.
+
+The breach is now measured rather than assumed, from the headroom lines the guard prints:
+
+```
+steady, just after L2 fill   nvml_free_now=152 961 024  reserve=134 217 728   device_used=34 037 956 608
+dip that killed run A        nvml_free_now= 80 412 672  min_free_since_l2=80 412 672  samples=1959
+the 255-step run that lived  min_free_since_l2=169 869 312  reserve=134 217 728
+```
+
+So the plan leaves about **150 MiB above a 128 MiB reserve**, and the decode's transient
+allocation dips ~70-80 MiB below its own steady state. The run that survived 255 steps sat 42 MiB
+higher and never dipped into the reserve. That is the whole margin, which is why the funded-tier
+runs die at 16-32 steps and the no-tier run does not: the tier's pinned rings are host memory, but
+whatever the decode adds on the device is enough to cross 128 MiB when there are only 150 MiB of
+slack.
+
+`LLAMADECODE_VRAM_MARGIN_MIB` is the knob, and its own comment states the owner rule: the margin
+"may be cut but not zeroed", default 64 MiB, and 128+0 "breached the reserve in every run". The
+stack does not set it, so 64 applies. Raised to **1024** in `rtx.local.json`: the L2 stops growing
+~100 slots earlier (out of ~1640, about 6 %) and the free VRAM sits ~1.15 GiB above the reserve
+instead of 0.15 GiB. That is moving the plan back from the edge, not widening the guard - the
+reserve stays 128 MiB and the guard still fires if the plan is too big.
+
+Run B also settled something about Step 4 that the probe had been getting wrong. The spread reached
+the engine (`DS4X_AFFINITY spread=runtime/qualification/dsv41-1017-iq2xxs-spreads.txt`) - the bound
+size and hash check above is what let it through - but the bias stayed at zero:
+
+```
+LLAMADECODE_LIVE_BIAS value=0 position=588
+LLAMADECODE_DS4X_AFFINITY mean=0 warmup=0 ramp=0 spread=… enabled=0
+```
+
+Because the bias is not a config value: `combo_single` calls `generation.bias(quality_speed)` at
+`slstack/combo_single.py:266`, and the probe's requests send no `quality_speed`, so every request
+resolved to 0.0. Binding a calibration makes a nonzero bias *possible* - `Store.bias` raises when
+nothing is bound (`slstack/generation.py:128`) - it does not apply one. `~/bin/ds4-first-run`
+now takes `--bias[=VALUE]`, puts `quality_speed` on all three requests, and refuses to start if
+`cache_affinity_spread_file` is unset, since that raises on the first request instead of on the
+card. `scripts/analyze_dsv41_decode.py` prints the headroom and breach lines, so the reserve's
+real margin is in every summary from now on.
+
+The next two runs, in this order, with Strata off:
+
+```bash
+~/bin/ds4-first-run              # C: tier 12 GiB, margin 1024, bias off - Step 2's number
+~/bin/ds4-first-run --bias       # D: same, with quality_speed 0.5 on every request - Step 4's
+```
+
+C is the comparison against the 19:28 baseline's 5.97 tok/s and 77.2 % hit rate; read
+`min_free_since_l2` in the headroom line before believing anything else, and note the L2 slot count
+(~1540 rather than ~1639) so the smaller cache is visible in the hit rate. D is the same run with
+the bias live; Step 4's accept also needs the output compared by hand, since the bias re-ranks
+experts and can trade speed for quality.
 Risk: less context or less graph scratch changes what the engine can serve; keep the 262k config
 separate from the decode-tuned one rather than degrading the delivered 262k plan.
 
@@ -528,25 +599,27 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Run A: the RAM tier alone.** `rtx.local.json` is set for it -
+1. **Run C: the RAM tier with room to finish.** `rtx.local.json` is set for it -
    `LLAMADECODE_HOST_CACHE_MB: "12288"`, `producer_job_host_gib` 48, `host_budget_gib` 50,
-   `producer_graph_cap_gib` back to **5.5** - and `cache_affinity_spread_file` stays empty so the
-   bias is not a second variable:
-   `~/bin/ds4-first-run --calibrate runtime/qualification/dsv41-1017-iq2xxs-spreads.txt`
-   Compare the 255-step row against the 19:28 baseline's 5.97 tok/s and 77.2 % hit rate, and read
-   `from_ram` and `copied`. The calibration is already written, so this run overwrites it; that is
-   fine and it keeps the run producing evidence even if the decode dies early. Strata has to be off
-   for the whole sitting - it held 41.3 GiB of RSS as well as 29.7 GiB of VRAM at 19:28.
-2. **Publish the calibration, prove the bias applies.** Set `cache_affinity_spread_file` to the file
-   the run wrote, rerun, and check `LLAMADECODE_LIVE_BIAS` shows the profile bias with no
-   `Live bias refused`. The unbiased path is already proven: `value=0`, requests served.
-3. **Then Step 6 and Step 2**, against the numbers above rather than the arithmetic here:
+   `producer_graph_cap_gib` 5.5, `LLAMADECODE_VRAM_MARGIN_MIB: "1024"`, bias off:
+   `~/bin/ds4-first-run`. Nothing in A or B reached the plan's 200-step bar, because the decode sat
+   150 MiB above a 128 MiB reserve and dipped into it at 16-32 steps. Read
+   `LLAMADECODE_VRAM_HEADROOM` before believing anything else: if `min_free_since_l2` still sits
+   near the reserve, the margin needs more. Note the L2 slot count too (~1540 rather than ~1639),
+   so the smaller cache is visible in the hit rate. Strata has to be off for the whole sitting; it
+   is back on the card as of 20:17 (pid 317822, 29.7 GiB VRAM, 43 GiB RSS).
+2. **Run D: the bias, actually applied.** `~/bin/ds4-first-run --bias`, which puts `quality_speed`
+   0.5 on every request. `cache_affinity_spread_file` is already set and the spread does reach the
+   engine; run B showed `spread=… enabled=0` and `LLAMADECODE_LIVE_BIAS value=0`, because the bias
+   comes from the request's quality setting and the probe sent none. Compare D's hit rate and
+   median step against C, and read the generated text - the bias re-ranks experts, so Step 4's
+   accept asks for a quality check and not only a rate.
+3. **Then Step 6**, against the numbers above rather than the arithmetic here:
    `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the
-   second turn and marks PASS/FAIL against the 70 % bar). It cannot be read yet - the calibration
-   abort killed each producer at session close, so every request in the 19:28 run started a fresh
-   producer and reported `cached_tokens=0`. With the fixed path, `cache_n=0` on turn 2 means the
-   append path refused, which is the measurement Step 6 wants. The host-tier sizing is item 1's
-   `offer` line, no longer a derived guess.
+   second turn and marks PASS/FAIL against the 70 % bar). It cannot be read yet - A and B each put
+   every request in its own producer, and all three reported `cached_tokens=0`. With a run whose
+   producers survive, `cache_n=0` on turn 2 means the append path refused, which is the measurement
+   Step 6 wants. The host-tier sizing is item 1's `offer` line, no longer a derived guess.
 4. **Step 5, once the card is free:** `scripts/ds4_dspark_probe.sh` measures the drafter's
    acceptance rate on the native `--dspark --mtp-model` path with `DS4_ALLOW_MTP_STREAMING=1` -
    `DS4_DSPARK_SPEC_LOG=1` prints one `DSpark V4.1 cycle drafted= accepted=` line per verify cycle,
