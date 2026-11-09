@@ -197,9 +197,16 @@ what decode hits; the provider's VRAM tiers were 449 L1 slots (~4.2 GiB) and 163
 
 Accept: expert-cache hit rate ≥ 90 % on a repeated decode, and decode ≥ 4 tok/s with no admission
 refusal and no `budget_breaches`. Record the hit rate and tok/s per setting so the trade is visible.
-The rate half is already met without the RAM tier - 5.97 tok/s median, 4.41 mean, on the 255-step
-run - so Step 2 is judged on hit rate (77.2 % today, bar 90 %) and on `host_slots` becoming
-non-zero at all.
+
+Measured verdict, 2026-11-09 (runs E, I, G, H in the next subsections): **the bar is met, but by the
+affinity bias and not by the RAM tier.** At bias 0 the hit rate is 75.7-77.0 % and the median step
+is ~150 ms (6.6-6.7 tok/s) whether the 12.9 GiB tier is funded or not; at bias 0.5 with the tier
+off it is 93.0-93.4 % and ~47-50 ms (19.8-21.3 tok/s). The tier cost 1.88 GiB/step of extra
+device-to-device traffic and served 1.4 % of the footprint, so `LLAMADECODE_HOST_CACHE_MB` stays
+off on this box. What the bar does not capture is the distribution: our p10 (25.2 ms) already
+matches Strata's (21.4 ms) while our p90 (94.8 ms) is 3.5× its 27.2 ms, so the mean a reader
+experiences is still 10.2 against Strata's 24.2. That tail is Step 5's problem, not a cache-sizing
+problem.
 
 ### First funded attempt (2026-11-09 19:44): the tier exists, the paging guard stopped it
 
@@ -786,18 +793,78 @@ on this box, it is now repacked into the contract `engines/ds4` binds and the en
 (`support binding: tensors=78 missing=0 invalid=0`), and the producer's `ds4x` decode ABI has no
 path to it. Everything still open needs the card.
 
-1. **Run I: the control G needed.** `~/bin/ds4-first-run`, which now sends `quality_speed: 0` on
-   every request instead of omitting it. Tier stays off (`LLAMADECODE_HOST_CACHE_MB: "0"`),
-   `LLAMADECODE_L2_MAX_SLOTS` stays 1500. If I lands near E (6.59 tok/s, 77 % hit), the bias is the
-   lever that took G and H to 93 % and ~20 tok/s. If it lands near G/H, the tier was the cost and
-   the bias is speed-neutral, which changes Step 4's whole argument. Read
-   `bias: this run sends quality_speed=0 … persisted control is value=0.5` at the top and
-   `LLAMADECODE_LIVE_BIAS value=0` in the log before believing the comparison - H is the cautionary
-   example.
-2. **Then Step 6, in the same sitting.** G and H both refused the third request with a 503 whose
-   reason the probe threw away; it prints the body now. Step 6 needs the producer to survive turn
-   boundaries and every run so far has reported `cached_tokens=0`, so once the refusal is readable,
-   `python3 scripts/dsv41_reuse_probe.py` against a stack left running is the measurement.
+1. **Run I is done; the setting to keep is bias on, tier off.** `rtx.local.json` already carries
+   `cache_affinity_spread_file`, `LLAMADECODE_HOST_CACHE_MB: "0"` and `LLAMADECODE_L2_MAX_SLOTS:
+   "1500"`, and Step 4's first item (the bias applies at a nonzero value with no refusal) is closed
+   by F, G and H. Any further decode measurement should therefore be `~/bin/ds4-first-run --bias`;
+   a `--bias`-less run is the control and should be used only when a comparison needs it.
+2. **Step 5, next on the critical path.** With p10 matching Strata and p90 3.5× worse, the
+   remaining 2.4× on the mean is a tail problem, and the drafter is how the reference implementation
+   gets under it. `scripts/ds4_dspark_probe.sh` measures the native `--dspark --mtp-model` path
+   against the repacked sidecar, twice (`--no-draft` for the comparison), and prints acceptance rate
+   beside tok/s. Only after that number exists does the question of extending `ds4x`'s producer ABI
+   with a verify-shaped entry make sense - the producer currently has no drafter entry at all.
+3. **Step 6 in the same sitting as Step 5**, since it only needs the stack left running:
+   `scripts/start-dsv41-single-262k.sh --config runtime/ds4-first-run.local.json --model …`, then
+   `python3 scripts/dsv41_reuse_probe.py`, then stop. Every request in every run so far reported
+   `cached_tokens=0` and got its own producer directory, so turn-boundary reuse has still never been
+   measured; a `cache_n=0` on turn 2 with a surviving producer is the append path refusing, which is
+   the answer Step 6 wants.
+
+### I (21:16): the control, and the attribution is clean
+
+`bias: this run sends quality_speed=0 on every request; persisted control is value=0.5 revision=14`
+then `LLAMADECODE_LIVE_BIAS value=0`, `DS4X_AFFINITY mean=0 … enabled=0` - the control is a control.
+Same device plan as G and H (tier off, L2 1500, graph cap 5.5), 255 steps completed:
+
+| run | bias | tier | steps | median | tok/s median | mean | hit | from_file | copies |
+|---|---|---|---|---|---|---|---|---|---|
+| E | 0 | 12.9 GiB | 255 | 151.7 ms | 6.59 | 4.84 | 77.0 % | 23.0 % | 3.953 GiB |
+| **I** | **0** | **off** | 255 | **149.2 ms** | **6.70** | 4.83 | **75.7 %** | 24.3 % | **2.073 GiB** |
+| G | 0.5 | off | 255 | 50.4 ms | 19.83 | 9.78 | 93.4 % | 6.6 % | 1.693 GiB |
+| H | 0.5 | off | 255 | 46.9 ms | 21.31 | 10.22 | 93.0 % | 7.0 % | 1.727 GiB |
+
+So, one variable at a time:
+
+- **The RAM tier is neutral-to-negative.** I against E: +0.11 tok/s median, hit rate down 1.3
+  points, and 1.88 GiB/step of extra device-to-device traffic for the tier's presence. It served
+  1.4 % of E's bytes and bought nothing measurable. Keep `LLAMADECODE_HOST_CACHE_MB` off.
+- **The affinity bias is the lever.** 149.2 ms → 46.9-50.4 ms median, 3.0-3.2×, and the hit rate
+  goes 75.7 % → 93.0-93.4 % - Step 2's 90 % bar is met, but by bias, not by a host cache. The bias
+  re-ranks experts so the hot set stops reaching past VRAM: from-file falls 24.3 % → 6.6 %.
+
+One caveat on what "bias 0.5" means here. `quality_speed` publishes a **scalar** -
+`runtime/generation/live.json` went to `per_phase: false, value: 0.5` - so every phase got 0.5,
+not the five-point profile that `generation.defaults()` publishes (`reasoning 1.36125`,
+`answer 0.35`). The 3× is a flat-bias measurement; a per-phase run is a separate setting and will
+need its own number.
+
+Step 2's accept bar as written (hit ≥ 90 % from the tier) is the wrong instrument on this box; the
+finding that replaces it is this table. Prefill reproduced a sixth time at 847.2 tok/s, and this
+run's long-prefill request **succeeded** where G's and H's got 503s, so that refusal is not
+systematic - the probe prints the body now if it returns.
+
+### What the remaining gap actually is: the tail, not the median
+
+Strata's baseline is `median 23.9 tok/s, mean 24.2, p10 21.4, p90 27.2` over 67 runs ≥ 200 tokens -
+median and mean within 1.3 % of each other because its distribution is tight. Ours at bias 0.5:
+
+| | p10 step | median step | p90 step | median tok/s | mean tok/s |
+|---|---|---|---|---|---|
+| Strata | 21.4 ms | 41.8 ms | 27.2 ms | 23.9 | 24.2 |
+| G (bias 0.5) | 25.2 ms | 50.4 ms | 94.8 ms | 19.83 | 9.78 |
+| H (bias 0.5) | 25.2 ms | 46.9 ms | 92.8 ms | 21.31 | 10.22 |
+
+The p10 already matches Strata's - 25.2 ms against 21.4 ms, so a step whose experts are resident
+runs at the same speed. The gap is entirely the tail: our p90 is 94.8 ms against 27.2 ms, 3.5×, and
+that is what drags the mean to 10.2 against 24.2. A user reading a 500-token answer experiences the
+mean, so the honest distance is still **2.4×**, not 12 %.
+
+The tail is steps that pay NVMe again - 6.6 % of bytes on average, concentrated rather than spread.
+Two things attack it, and neither is cache sizing: Step 5's drafter, which removes full steps from
+the critical path (Strata's own note in this plan says it clears 20 tok/s "with a smaller step and a
+drafter"), and whatever makes a miss cost less than the 2.22 GiB footprint it currently costs. That
+is the ordering from here.
 3. **Then Step 6**, against the numbers above rather than the arithmetic here:
    `scripts/dsv41_reuse_probe.py` is the multi-turn reuse probe (it reads `timings.cache_n` on the
    second turn and marks PASS/FAIL against the 70 % bar). It cannot be read yet - A and B each put
