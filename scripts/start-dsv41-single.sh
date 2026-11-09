@@ -78,51 +78,11 @@ case "$runtime" in
 esac
 url="http://$bind_host:$port"
 
-if [ "$stop" = 1 ]; then
-    curl -sS -X POST "$url/v1/stack/shutdown" -H 'content-type: application/json' -d '{}'
-    echo "Shutdown requested at $url; the start process exits once the engine has stopped."
-    exit 0
-fi
-
-start_args=start
-[ "$webui" = 1 ] && start_args="$start_args --webui"
-command="$python -B $root/scripts/bootstrap.py --config $start_config $start_args"
-
-if [ "$dry_run" = 1 ]; then
-    echo "Start config: $start_config"
-    echo "Would run (detached, from $root): $command"
-    echo "Router / web UI: $url"
-    exit 0
-fi
-
-# A producer that was force-killed leaves an ACTIVE hold that never expires by inference, and the
-# next admission refuses while any ACTIVE hold exists. Measured 2026-11-09 21:28: the first request
-# to a freshly started stack answered "RTX admission refused: ACTIVE holds exist: ACTIVE: DS4STACK
-# fa4d5b6a…" because the previous run's producer had been killed rather than retired. release-holds
-# only takes holds whose guardian process is gone and refuses while the card is busy above the idle
-# gate, so a live stack keeps its own hold; a refusal is printed, not fatal, because the admission
-# below reports the real reason.
-hold_config=${config:-$root/config.example.json}
-if holds=$(PYTHONDONTWRITEBYTECODE=1 "$python" -B -m slstack --config "$hold_config" release-holds 2>&1); then
-    echo "GPU holds: $(printf '%s\n' "$holds" | tail -1 | cut -c1-200)"
-else
-    echo "release-holds refused: $(printf '%s\n' "$holds" | tail -2 | tr '\n' ' ')"
-    echo "  If a dead holder's ACTIVE line is in $runtime/state/gpu.holds, free the card and rerun:"
-    echo "  $python -B -m slstack --config $hold_config release-holds"
-fi
-
-logs="$runtime/logs"
-mkdir -p "$logs"
-log="$logs/dsv41-single-$preset-$(date +%Y%m%d-%H%M%S).log"
-nohup env PYTHONDONTWRITEBYTECODE=1 sh -c "$command" >"$log" 2>&1 &
-pid=$!
-echo "Started DSV4.1 single engine ($preset) pid $pid; log: $log"
-
-# The stack's two listeners: the router's port and the single engine worker's own port. Killing by
-# port plus command line (rather than a broad pattern) is what keeps another service - Strata's own
-# server on 8084, say - out of the cleanup.
+# The stack's two listeners: the router's port and the single engine worker's own port. Matching the
+# command line as well as the port is what keeps another service - Strata's own server on 8084, say -
+# out of the cleanup.
 stack_listeners() {
-    PYTHONDONTWRITEBYTECODE=1 "$python" -B - "$1" "$runtime/single-engine.json" <<'PY'
+    PYTHONDONTWRITEBYTECODE=1 "$python" -B - "$1" "$start_config" "$runtime/single-engine.json" <<'PY'
 import json, os, re, subprocess, sys
 
 action = sys.argv[1]
@@ -161,6 +121,72 @@ if listed:
 PY
 }
 
+# A cooperative stop is not always honoured. A worker whose producer is wedged inside wait_layer_gpu
+# keeps its port: measured 2026-11-09 21:34, where --stop answered {"stopping": true}, the router
+# exited, the old engine worker went on holding 8089, and the first request to the next stack came
+# back "[Errno 98] Address already in use" four times. Clear what is left before starting, so a
+# start either gets a clean stack or reports what it had to take.
+clear_leftovers() {
+    pids=$(pgrep -f 'llama-dsv41-prefill' || true)
+    if [ -n "$pids" ]; then
+        echo "Leftover producer processes: $pids - forcing kill"
+        kill -9 $pids 2>/dev/null || true
+    fi
+    stack_listeners kill
+    holders="$(stack_listeners list)"
+    waited=0
+    while [ -n "$holders" ] && [ "$waited" -lt 20 ]; do
+        sleep 1; waited=$((waited + 1)); holders="$(stack_listeners list)"
+    done
+    if [ -n "$holders" ]; then
+        echo "Still holding the stack ports after 20s: $holders"
+        echo "  Inspect: ss -ltnp | grep -E ':(${port}|8089)'   and   curl -s -X POST $url/v1/stack/shutdown -d '{}'"
+    fi
+}
+
+if [ "$stop" = 1 ]; then
+    curl -sS -X POST "$url/v1/stack/shutdown" -H 'content-type: application/json' -d '{}'
+    echo "Shutdown requested at $url; the start process exits once the engine has stopped."
+    exit 0
+fi
+
+start_args=start
+[ "$webui" = 1 ] && start_args="$start_args --webui"
+command="$python -B $root/scripts/bootstrap.py --config $start_config $start_args"
+
+if [ "$dry_run" = 1 ]; then
+    echo "Start config: $start_config"
+    echo "Would run (detached, from $root): $command"
+    echo "Router / web UI: $url"
+    exit 0
+fi
+
+clear_leftovers
+
+# A producer that was force-killed leaves an ACTIVE hold that never expires by inference, and the
+# next admission refuses while any ACTIVE hold exists. Measured 2026-11-09 21:28: the first request
+# to a freshly started stack answered "RTX admission refused: ACTIVE holds exist: ACTIVE: DS4STACK
+# fa4d5b6a…" because the previous run's producer had been killed rather than retired. release-holds
+# only takes holds whose guardian process is gone and refuses while the card is busy above the idle
+# gate, so a live stack keeps its own hold; a refusal is printed, not fatal, because the admission
+# below reports the real reason.
+hold_config=${config:-$root/config.example.json}
+if holds=$(PYTHONDONTWRITEBYTECODE=1 "$python" -B -m slstack --config "$hold_config" release-holds 2>&1); then
+    echo "GPU holds: $(printf '%s\n' "$holds" | tail -1 | cut -c1-200)"
+else
+    echo "release-holds refused: $(printf '%s\n' "$holds" | tail -2 | tr '\n' ' ')"
+    echo "  If a dead holder's ACTIVE line is in $runtime/state/gpu.holds, free the card and rerun:"
+    echo "  $python -B -m slstack --config $hold_config release-holds"
+fi
+
+logs="$runtime/logs"
+mkdir -p "$logs"
+log="$logs/dsv41-single-$preset-$(date +%Y%m%d-%H%M%S).log"
+nohup env PYTHONDONTWRITEBYTECODE=1 sh -c "$command" >"$log" 2>&1 &
+pid=$!
+echo "Started DSV4.1 single engine ($preset) pid $pid; log: $log"
+
+# stop_owned waits on the start process's pid, so it is defined after that process exists.
 stop_owned() {
     # Cooperative first: the start process retires the engine worker and its producer, and that is
     # what releases the GPU hold. A producer wedged inside wait_layer_gpu cannot honour it, which is
@@ -172,12 +198,7 @@ stop_owned() {
         echo "start process still alive after 45s - stopping it"
         kill "$pid" 2>/dev/null || true
     fi
-    pids="$(pgrep -f 'llama-dsv41-prefill' || true)"
-    if [ -n "$pids" ]; then
-        echo "producer still alive: $pids - forcing kill"
-        kill -9 $pids 2>/dev/null || true
-    fi
-    stack_listeners kill
+    clear_leftovers
     PYTHONDONTWRITEBYTECODE=1 "$python" -B -m slstack --config "${config:-$root/config.example.json}" release-holds 2>&1 | tail -2 \
         || echo 'release-holds refused; inspect runtime/state/gpu.holds'
     echo "GPU free: $(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1) MiB"
