@@ -3,6 +3,7 @@
 #include "llama-dsv41-artifact.h"
 #include "llama-dsv41-layer-log.h"
 #include "llama-dsv41-resident-append.h"
+#include "llama-dsv41-step-ledger.h"
 #include <thread>
 #include <filesystem>
 #include <optional>
@@ -192,6 +193,11 @@ bool ds4x_keep_open(){static const bool on=[]{const char*e=std::getenv("LLAMADEC
 const std::filesystem::path&decode_cancel_file(){static const std::filesystem::path p=[]{const char*e=std::getenv("LLAMADECODE_DECODE_CANCEL_FILE");
     return e&&*e?native_path(e):std::filesystem::path();}();return p;}
 bool decode_cancel_requested(){const auto&p=decode_cancel_file();return !p.empty()&&file_present(p);}
+// LLAMADECODE_BYTE_LEDGER=1 turns on the provider's per-tensor extents ledger and, with
+// it, one LLAMADECODE_STEP_BYTES line per decoded token saying which tier paid for the
+// step's expert bytes. Both answer the same question, so they share one switch; the
+// counters the step line reads are kept anyway because they are increments.
+bool byte_ledger_enabled(){static const bool on=[]{const char*e=std::getenv("LLAMADECODE_BYTE_LEDGER");return e&&!std::strcmp(e,"1");}();return on;}
 void clear_decode_cancel(){const auto&p=decode_cancel_file();if(!p.empty())(void)remove_file(p);}
 struct ds4_external {
     library module=nullptr;bool open=false;
@@ -403,6 +409,17 @@ struct ds4_external {
             f1[0]-f0[0],f1[1]-f0[1],f1[2]-f0[2],f1[3]-f0[3],(unsigned long long)(r1-r0),(unsigned long long)(b1-b0),
             after.assign_ms-before.assign_ms,after.copy_sync_ms-before.copy_sync_ms,(unsigned long long)(after.l2_stored-before.l2_stored),
             (unsigned long long)(after.host_hits-before.host_hits),(unsigned long long)(after.host_stored-before.host_stored),after.host_slots,(unsigned long long)after.host_bytes);
+        if(byte_ledger_enabled()){
+            llama_dsv41_step_ledger::step s;
+            s.position=position;s.step_ms=decode_ms;
+            s.experts=after.expert_slots-before.expert_slots;s.slot_bytes=after.slot_bytes;
+            s.from_file=after.fetched_bytes-before.fetched_bytes;s.from_ram=after.ram_bytes-before.ram_bytes;
+            s.from_l2=after.l2_bytes-before.l2_bytes;s.from_l1=after.l1_bytes-before.l1_bytes;
+            s.copied=after.copied_bytes-before.copied_bytes;s.stored=after.stored_bytes-before.stored_bytes;
+            s.l1_hits=after.hits-before.hits;s.l2_hits=after.l2_hits-before.l2_hits;
+            s.ram_hits=after.host_hits-before.host_hits;s.misses=after.misses-before.misses;
+            std::fprintf(stderr,"%s\n",llama_dsv41_step_ledger::line(s).c_str());std::fflush(stderr);
+        }
     }
     // Multi-row append: `count` tokens at `position` in one ds4 prefill; the producer
     // commits them with the frontier logits (the per-token path's final state).
@@ -454,7 +471,13 @@ void run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,
             // token. No restarted warmup/ramp may defer a live slider update.
             if(index==0||bias!=ds4x.quality){
                 const char*spread=std::getenv("LLAMADECODE_DS4_SPREAD");
-                require(ds4x.x_affinity(bias,0,0,spread,&ds4_external::residency_hook,&ds4x)==1,"Live bias refused");
+                // The refusal is the one failure in this loop that says nothing about what
+                // was refused: name the bias, the spread file and the way to get one.
+                require(ds4x.x_affinity(bias,0,0,spread,&ds4_external::residency_hook,&ds4x)==1,
+                    (std::string("Live bias refused: value=")+std::to_string(bias)+" spread="+
+                        (spread&&*spread?spread:"(unset)")+"; a bias above 0 needs a spread-calibration file"
+                        " bound to this model's bytes, experts and layers (DS4_CACHE_AFFINITY_CALIBRATE writes"
+                        " one, and quality_speed 0 decodes without a bias)").c_str());
                 ds4x.quality=bias;
                 std::fprintf(stderr,"LLAMADECODE_LIVE_BIAS value=%.6g position=%u\n",bias,current.frontier.position+uint32_t(index));std::fflush(stderr);
             }

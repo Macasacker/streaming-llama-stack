@@ -174,6 +174,12 @@ struct llama_dsv41_weight_provider::implementation {
     std::vector<int32_t>slot_key;std::unordered_map<int32_t,int32_t>key_slot;
     std::list<int32_t>lru;std::vector<std::list<int32_t>::iterator>lru_pos;
     uint64_t cache_hits=0,cache_misses=0,cache_bytes=0;double cache_ms=0,assign_ms=0,copy_sync_ms=0;
+    // LLAMADECODE byte ledger: which tier supplied each routed expert triple, in bytes.
+    // A VRAM L1 hit moves nothing, an L2 hit moves the triple (copied in, or read in
+    // place), a RAM hit uploads it, a miss reads it from the file. `expert_served` is
+    // the step's expert count, so footprint = expert_served * a triple's bytes.
+    uint64_t l1_served=0,l2_served=0,ram_served=0,device_copied=0,ram_stored=0,expert_served=0;
+    uint64_t triple_bytes()const{return pool_stride[0]+pool_stride[1]+pool_stride[2];}
     // LLAMADECODE bind-once: set after a complete decode-layout pass; cleared on any layout rebuild.
     bool resident_bound=false;
     static bool bind_once_enabled(){static const bool on=[]{const char*e=std::getenv("LLAMADECODE_BIND_ONCE");return !(e&&e[0]=='0'&&!e[1]);}();return on;}
@@ -253,6 +259,7 @@ struct llama_dsv41_weight_provider::implementation {
         {timer measured_sync(host_sync_ms);require(cudaStreamSynchronize(static_cast<cudaStream_t>(stream))==cudaSuccess,"RAM expert victim synchronization failed");}
 #endif
         require(host.store(layer,uint32_t(key)%384,src,sizes)==1,"RAM expert victim admission failed");
+        ram_stored+=sizes[0]+sizes[1]+sizes[2];
         if(host.find(layer,uint32_t(key)%384)>=0)++host_stored;
     }
     // RAMFIX (owner 2026-10-29): RAM-tier data movement off the critical path.
@@ -311,6 +318,7 @@ struct llama_dsv41_weight_provider::implementation {
     std::vector<store_job> pending_stores;std::vector<copy_job> pending_copies;std::vector<ram_job> pending_ram;
     std::vector<int32_t> l2_written;bool defer_copies=false;
     void copy_slot(char*const dst[3],uint64_t dst_slot,const char*const src[3],uint64_t src_slot,void*stream,bool to_l2){
+        device_copied+=pool_stride[0]+pool_stride[1]+pool_stride[2];   // counted whether deferred or issued now
         if(defer_copies){pending_copies.push_back({to_l2,dst_slot,src_slot});if(to_l2)l2_written.push_back(int32_t(dst_slot));return;}
 #ifdef GGML_USE_CUDA
         for(uint32_t k=0;k<3;++k)require(cudaMemcpyAsync(dst[k]+dst_slot*(to_l2?pool_max_stride[k]:pool_stride[k]),src[k]+src_slot*(to_l2?pool_stride[k]:pool_max_stride[k]),pool_stride[k],
@@ -338,6 +346,7 @@ struct llama_dsv41_weight_provider::implementation {
         timer measured(hook_ms);
         select_host_working_set(layer);
         select_pool(layer);
+        const uint64_t triple=triple_bytes();   // bytes of one (gate,up,down) triple in this layer
         hook_stream=stream;defer_copies=host_async();pending_stores.clear();pending_copies.clear();pending_ram.clear();l2_written.clear();
         struct defer_reset{bool&d;~defer_reset(){d=false;}}defer_guard{defer_copies};
         std::vector<int32_t>unique;for(size_t i=0;i<count;++i){const auto id=ids[i];require(id>=0&&id<384,"Routed expert id out of range");if(std::find(unique.begin(),unique.end(),id)==unique.end())unique.push_back(id);}
@@ -348,10 +357,10 @@ struct llama_dsv41_weight_provider::implementation {
         }
         std::vector<int32_t>missing;std::unordered_map<int32_t,int32_t>slot_of;std::vector<int32_t>in_use_l2;
         for(const auto e:unique){const int32_t key=int32_t(layer)*384+e;auto it=key_slot.find(key);
-            if(it!=key_slot.end()){slot_of[e]=it->second;lru.splice(lru.begin(),lru,lru_pos[size_t(it->second)]);++cache_hits;continue;}
+            if(it!=key_slot.end()){slot_of[e]=it->second;lru.splice(lru.begin(),lru,lru_pos[size_t(it->second)]);++cache_hits;++expert_served;l1_served+=triple;continue;}
             if(direct&&l2_slots){auto l2=l2_of.find(key);
                 if(l2!=l2_of.end()){const int32_t t=l2->second;slot_of[e]=int32_t(pool_slots)+t;in_use_l2.push_back(t);
-                    l2_lru.splice(l2_lru.begin(),l2_lru,l2_pos[size_t(t)]);++l2_hits;continue;}}
+                    l2_lru.splice(l2_lru.begin(),l2_lru,l2_pos[size_t(t)]);++l2_hits;++expert_served;l2_served+=triple;continue;}}
             missing.push_back(e);}
         auto l2_in_use=[&](int32_t t){return std::find(in_use_l2.begin(),in_use_l2.end(),t)!=in_use_l2.end();};
         std::vector<wf_extent>extents;bool copied=false;
@@ -382,12 +391,12 @@ struct llama_dsv41_weight_provider::implementation {
             if(from_l2>=0){
                 copy_slot(l1,uint64_t(slot),l2_base.data(),uint64_t(from_l2),stream,false);copied=true;
                 l2_of.erase(key);l2_key[size_t(from_l2)]=-1;l2_lru.splice(l2_lru.end(),l2_lru,l2_pos[size_t(from_l2)]);++l2_hits;
-                continue;
+                ++expert_served;l2_served+=triple;continue;
             }
             const int ram=host_slots?host.find(layer,uint32_t(e)):-1;
             if(ram>=0&&defer_copies){
                 pending_ram.push_back({uint32_t(ram),{l1[0]+uint64_t(slot)*pool_stride[0],l1[1]+uint64_t(slot)*pool_stride[1],l1[2]+uint64_t(slot)*pool_stride[2]}});
-                ++host_hits;++host_async_hits;continue;
+                ++host_hits;++host_async_hits;++expert_served;ram_served+=triple;continue;
             }
             if(ram>=0){
                 timer measured_upload(host_upload_ms);
@@ -395,9 +404,10 @@ struct llama_dsv41_weight_provider::implementation {
                 require(cudaStreamSynchronize(static_cast<cudaStream_t>(stream))==cudaSuccess,"RAM hit destination synchronization failed");
 #endif
                 char*dst[3]={l1[0]+uint64_t(slot)*pool_stride[0],l1[1]+uint64_t(slot)*pool_stride[1],l1[2]+uint64_t(slot)*pool_stride[2]};
-                require(host.upload(uint32_t(ram),dst,pool_stride.data())==1,"RAM cached expert upload failed");++host_hits;continue;
+                require(host.upload(uint32_t(ram),dst,pool_stride.data())==1,"RAM cached expert upload failed");
+                ++host_hits;++expert_served;ram_served+=triple;continue;
             }
-            ++cache_misses;
+            ++cache_misses;++expert_served;
             for(uint32_t k=0;k<3;++k){
                 uint64_t file=0;for(const auto&entry:stages[layer+1].entries)if(entry.t==routed[layer*3+k])file=entry.file_offset;
                 require(file,"Routed expert file extent missing");
@@ -512,6 +522,7 @@ struct llama_dsv41_weight_provider::implementation {
         for(size_t i=0;i<pending_stores.size();++i){const auto&j=pending_stores[i];const uint32_t layer=uint32_t(j.key)/384,e=uint32_t(j.key)%384;
             const char*src[3]={in_ring[i].p+ring_offset[0],in_ring[i].p+ring_offset[1],in_ring[i].p+ring_offset[2]};
             require(host2.store_host(layer,e,src,j.sizes)==1,"RAM expert victim admission failed");
+            ram_stored+=j.sizes[0]+j.sizes[1]+j.sizes[2];
             if(host.find(layer,e)>=0)++host_stored;}
         pending_stores.clear();
 #endif
@@ -1580,7 +1591,9 @@ llama_dsv41_weight_provider::expert_cache_stats llama_dsv41_weight_provider::cac
     s.l2_slots=p->l2_slots;s.l2_hits=p->l2_hits;s.l2_stored=p->l2_stored;s.assign_ms=p->assign_ms;s.copy_sync_ms=p->copy_sync_ms;
     s.host_slots=p->host_slots;s.host_hits=p->host_hits;s.host_stored=p->host_stored;s.host_bytes=p->host_bytes;
     s.host_store_ms=p->host_store_ms;s.host_sync_ms=p->host_sync_ms;s.host_upload_ms=p->host_upload_ms;s.hook_ms=p->hook_ms;s.residency_ms=p->residency_ms;
-    s.host_overlap_ms=p->host_overlap_ms;s.host_async_hits=p->host_async_hits;s.host_dropped=p->host_dropped;s.host_direct_hits=p->host_direct_hits;return s;}
+    s.host_overlap_ms=p->host_overlap_ms;s.host_async_hits=p->host_async_hits;s.host_dropped=p->host_dropped;s.host_direct_hits=p->host_direct_hits;
+    s.l1_bytes=p->l1_served;s.l2_bytes=p->l2_served;s.ram_bytes=p->ram_served;s.copied_bytes=p->device_copied;
+    s.stored_bytes=p->ram_stored;s.expert_slots=p->expert_served;s.slot_bytes=p->triple_bytes();return s;}
 bool llama_dsv41_weight_provider::decode_residency(uint32_t layer,uint8_t*tier,uint32_t experts)const{
     std::lock_guard<std::mutex>lock(p->mutex);
     implementation::timer measured(p->residency_ms);
