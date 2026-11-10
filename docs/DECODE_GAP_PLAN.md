@@ -1032,7 +1032,7 @@ file, regenerable from `scripts/repack_dsv41_dspark_sidecar.py`.
 Verification baseline for this box, so a later session does not chase it: `pytest tests/` was
 31 failed / ~680 passed before any of this work - the cgroup and RAM-scope tests in
 `tests/test_working_set.py`, the guard and process tests, `tests/test_yoco.py` - and it is still
-those same 31 (now 31 failed / 691 passed, six of the passes from the sidecar test).
+those same 31 (now 31 failed / 696 passed, six of the passes from the sidecar test).
 `tests/test_combo_single_stop.py::test_disconnect_inside_reasoning_then_next_turn_appends_only`
 fails 3 to 4 runs in 10 under load on a clean checkout as well. The C++ selftests
 (`tests/dsv41_host_plan_log.cpp`, `tests/dsv41_step_ledger.cpp`) are hand-compiled; `build.sh` has
