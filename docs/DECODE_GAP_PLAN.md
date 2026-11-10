@@ -940,6 +940,12 @@ path to it. Everything still open needs the card.
    384 experts per block per pass (~75 GiB a turn) at 5.0-5.6 GiB/s, the rate that relay actually
    reaches. Widening routing onto those layers is the byte-side lever beside the window-side one,
    and it needs a matched control because `tail` from layer 21 is a deliberate setting.
+   `~/bin/ds4-first-run --routed` is that comparison: it puts
+   `LLAMADECODE_PREFILL_ROUTED=1` in the derived config, which `combo_producer.py:413` passes
+   through untouched (`COMMON_ENV` does not gate it), so the early layers demand-read instead of
+   pulling every expert in the block. Run it against a run without it and read the two halves of
+   the table above separately - the routed column should grow and the whole-stage column should
+   disappear.
 3. **Then retention across the turn boundary, not a cache tier.** Turn 3 re-read 40.4 GiB with
    `new=4356` - nothing the previous turn fetched was kept - and a retained stage re-reads in
    67-155 ms instead of 457-738 ms. The measurable question is what keeps one block's active

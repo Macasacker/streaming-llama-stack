@@ -19,10 +19,19 @@
 #             run. The value drives the bias (`combo_single` calls `generation.bias(quality_speed)`
 #             at slstack/combo_single.py:266); binding a calibration only makes a nonzero value
 #             possible - `Store.bias` raises when nothing is bound (slstack/generation.py:128).
+#   --routed  demand-read experts on every layer instead of only the tail: sets
+#             LLAMADECODE_PREFILL_ROUTED=1 in the derived config, which
+#             slstack/combo_producer.py:413 passes through untouched. The default for a prompt
+#             above 2 048 rows is `tail`, which reads layers 0-20 whole - all 384 experts per
+#             block, ~75 GiB a turn - and that is the larger half of a turn's prompt head
+#             (docs/DECODE_GAP_PLAN.md, Step 6). This is a measurement flag, not a recommendation:
+#             the routing change trades the overlapped full-stage prefetch that the matched ULTRA
+#             control was qualified with, so read it against a run without it.
 set -uo pipefail
 quick=0
 calibrate=
 bias=
+routed=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --quick) quick=1; shift ;;
@@ -34,7 +43,8 @@ while [ $# -gt 0 ]; do
     --bias) case "$1" in *=*) bias="${1#*=}"; shift ;; *) bias="0.5"; shift ;; esac ;;
     # Without --bias every request sends quality_speed 0 rather than nothing: the published bias
     # survives in runtime/generation/live.json, so an omitted value is not an unbiased run.
-    *) echo "unknown option: $1 (use --quick, --calibrate PATH or --bias[=VALUE])" >&2; exit 2 ;;
+    --routed) routed=1; shift ;;
+    *) echo "unknown option: $1 (use --quick, --calibrate PATH, --bias[=VALUE] or --routed)" >&2; exit 2 ;;
   esac
 done
 # A producer crash on Linux hands systemd-coredump the whole address space (~22 GiB of
@@ -203,14 +213,19 @@ fi
 # on a derived config that adds LLAMADECODE_BYTE_LEDGER=1 to the local one. Everything else
 # - paths, ports, budgets - is rtx.local.json unchanged.
 TRACE_CONFIG="$REPO/runtime/ds4-first-run.local.json"
-python3 - "$REPO/rtx.local.json" "$TRACE_CONFIG" "${calibrate:-}" <<'PY' || exit 1
+python3 - "$REPO/rtx.local.json" "$TRACE_CONFIG" "${calibrate:-}" "${routed}" <<'PY' || exit 1
 import json, os, sys
-src, dst, calibrate = sys.argv[1], sys.argv[2], sys.argv[3]
+src, dst, calibrate, routed = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == '1'
 try:
     cfg = json.load(open(src))
 except OSError as exc:
     print('cannot read %s: %s' % (src, exc)); raise SystemExit(1)
 env = dict(cfg.get('env_overrides') or {}); env['LLAMADECODE_BYTE_LEDGER'] = '1'
+if routed:
+    # '1' routes from layer 0; the unset default resolves through routed_prefill_choice, which
+    # answers 'tail' above 2 048 rows and leaves layers 0-20 reading every expert in the block.
+    env['LLAMADECODE_PREFILL_ROUTED'] = '1'
+    print('routed prefill on every layer: LLAMADECODE_PREFILL_ROUTED=1')
 if calibrate:
     if any(c in calibrate for c in '*?['):
         print('calibrate path must be a plain file name, not a glob: %s' % calibrate); raise SystemExit(1)
