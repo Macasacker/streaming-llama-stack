@@ -221,6 +221,20 @@ try:
 except OSError as exc:
     print('cannot read %s: %s' % (src, exc)); raise SystemExit(1)
 env = dict(cfg.get('env_overrides') or {}); env['LLAMADECODE_BYTE_LEDGER'] = '1'
+# The extent relay's window is a planned host setting (docs/TURN_COST_PLAN.md Step 2), and
+# inherited variables are dropped by the launcher, so forward it explicitly and print which
+# window this run planned. A log that cannot say whether it ran at 4 or 8 slots is the same
+# mistake this probe already makes with bias and routing.
+# The RAM tier's two names ride the same rule (Step 3): MB funds it, ADMIT=0 leaves it funded
+# but never admitting, and ADMIT_TOUCH replaces the 32-pass snapshot with continuous admission,
+# which is how a funded tier with no hits is told apart from no tier at all.
+for name in ('LLAMADECODE_EXTENT_SLOTS', 'LLAMADECODE_EXTENT_SLOT_MIB',
+             'LLAMADECODE_HOST_CACHE_MB', 'LLAMADECODE_HOST_CACHE_ADMIT',
+             'LLAMADECODE_HOST_CACHE_ADMIT_TOUCH'):
+    value = os.environ.get(name)
+    if value:
+        env[name] = value
+        print('%s=%s forwarded to the producer' % (name, value))
 if routed:
     # '1' routes from layer 0; the unset default resolves through routed_prefill_choice, which
     # answers 'tail' above 2 048 rows and leaves layers 0-20 reading every expert in the block.
@@ -350,8 +364,7 @@ else
   curl -s -m 1800 -o "$OUT/short-$STAMP.json" -w 'short wall %.2fs http %{http_code}\n' \
     http://127.0.0.1:8088/v1/chat/completions -H 'content-type: application/json' \
     -d "$(with_bias '{"messages":[{"role":"user","content":"Capital of Portugal, one line."}],"max_tokens":48}')"
-  echo "short wall elapsed: $(( $(date +%s) - T0 ))s"
-  python3 -c "
+  echo "short wall elapsed: $(( $(date +%s) - T0 ))s"  python3 -c "
 import json,sys
 d=json.load(open('$OUT/short-$STAMP.json'))
 print('usage', d.get('usage'))
@@ -360,12 +373,37 @@ print('content', (c.get('message') or {}).get('content','')[:300] if 'error' not
 " 2>/dev/null || head -c 400 "$OUT/short-$STAMP.json"
 fi
 
+# The decoder is one lock in the single engine (slstack/combo_single.py:712), and a producer that
+# kept it open after its request still owns it when the next request arrives: Run J's third
+# request failed HTTP 409 "Another request owns this decoder", and the 2026-11-10 19:45 run lost
+# its long prefill the same way, which cost the run its third producer. The probe owns the whole
+# window, so it waits for the release instead of dropping a measurement it was asked for.
+post() {                    # post <outfile> <label> <payload>
+  local file="$1" label="$2" payload="$3" attempt=0 started code
+  started=$(date +%s)
+  while :; do
+    code=$(curl -s -m 1800 -o "$file" -w '%{http_code}' \
+      http://127.0.0.1:8088/v1/chat/completions -H 'content-type: application/json' -d "$payload")
+    if grep -q 'owns this decoder' "$file" 2>/dev/null; then
+      attempt=$((attempt + 1))
+      if [ "$attempt" -ge 6 ]; then
+        echo "$label: the previous request never released the decoder ($attempt waits of 15 s)"
+        return 1
+      fi
+      echo "$label: decoder still held, waiting 15 s (attempt $attempt)"
+      sleep 15
+      continue
+    fi
+    echo "$label wall $(( $(date +%s) - started ))s http $code"
+    return 0
+  done
+}
+
 if [ "$quick" -eq 0 ]; then
 # --- 4. timed decode ------------------------------------------------------------------------
 echo "--- decode 256 tokens ---"
-curl -s -m 1800 -o "$OUT/decode-$STAMP.json" -w 'decode wall %.2fs\n' \
-  http://127.0.0.1:8088/v1/chat/completions -H 'content-type: application/json' \
-  -d "$(with_bias '{"messages":[{"role":"user","content":"Write 250 words about harbor ledgers."}],"max_tokens":256}')"
+post "$OUT/decode-$STAMP.json" decode \
+  "$(with_bias '{"messages":[{"role":"user","content":"Write 250 words about harbor ledgers."}],"max_tokens":256}')"
 python3 - "$OUT/decode-$STAMP.json" <<'PY' || head -c 400 "$OUT/decode-$STAMP.json"
 import json, sys
 # The 256-token budget has been going entirely into reasoning_content with an empty message and
@@ -398,15 +436,27 @@ body = json.dumps(request).encode()
 req = urllib.request.Request('http://127.0.0.1:8088/v1/chat/completions',
                              data=body, headers={'content-type': 'application/json'})
 t = time.time()
-try:
-    raw = urllib.request.urlopen(req, timeout=1800).read()
-except urllib.error.HTTPError as exc:
-    # The refusal reason is in the body, and losing it is what left three runs' long-prefill
-    # 503s undiagnosed: "HTTP Error 503" on its own says nothing about which guard refused.
-    print('long request failed: HTTP %d %s' % (exc.code, exc.read(3000).decode('utf-8', 'replace')))
+raw = None
+for attempt in range(6):
+    try:
+        raw = urllib.request.urlopen(req, timeout=1800).read()
+        break
+    except urllib.error.HTTPError as exc:
+        # The refusal reason is in the body, and losing it is what left three runs' long-prefill
+        # 503s undiagnosed: "HTTP Error 503" on its own says nothing about which guard refused.
+        detail = exc.read(3000).decode('utf-8', 'replace')
+        if 'owns this decoder' in detail:
+            print('long request: decoder still held, waiting 15 s (attempt %d)' % (attempt + 1))
+            time.sleep(15)
+            continue
+        print('long request failed: HTTP %d %s' % (exc.code, detail))
+        raise SystemExit(5)
+    except Exception as exc:
+        print('long request failed:', repr(exc))
+        raise SystemExit(5)
+else:
+    print('long request: the previous request never released the decoder')
     raise SystemExit(5)
-except Exception as exc:
-    print('long request failed:', repr(exc)); raise SystemExit(5)
 dt = time.time() - t
 d = json.loads(raw)
 open(out, 'w').write(json.dumps(d))
