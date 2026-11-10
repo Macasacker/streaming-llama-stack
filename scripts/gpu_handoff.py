@@ -98,6 +98,47 @@ def stack_processes():
     return [int(p) for p in out.split() if p.isdigit() and int(p) != os.getpid()]
 
 
+def stack_ports():
+    """The ports the probe's stack binds: the router and the single engine.
+
+    A process list is not enough. A worker force-killed at the end of a run can still hold the
+    engine's port, and the next run then answers 503 with `[Errno 98] Address already in use` on
+    its first request without ever starting a producer (measured 2026-11-10 21:15, where that
+    cost the funded-tier probe all three of its requests).
+    """
+    try:
+        with open(os.path.join(ROOT, 'rtx.local.json')) as handle:
+            cfg = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    ports = set()
+    for value in (cfg.get('port'), cfg.get('ds4_url')):
+        if isinstance(value, int):
+            ports.add(value)
+        elif isinstance(value, str) and value.rsplit(':', 1)[-1].isdigit():
+            ports.add(int(value.rsplit(':', 1)[-1]))
+    return sorted(ports)
+
+
+def ports_held():
+    """Ports the stack binds, in ANY socket state - not only LISTEN.
+
+    A producer force-killed after carrying 21.9 GiB of pinned host staging and a 3.3 GiB mlock'd
+    carry tier takes seconds to unwind in the kernel; its port stays occupied while it does, and
+    `ss -ltn` reports nothing because the socket never reaches LISTEN again. The next run then
+    answers 503 with `[Errno 98] Address already in use` on its first request (2026-11-10 21:15
+    and 21:23, twice in a row, only ever on a window's second probe).
+    """
+    out = subprocess.run(['ss', '-tanH'], capture_output=True, text=True).stdout
+    occupied = set()
+    for line in out.splitlines():
+        fields = line.split()
+        if len(fields) < 4 or ':' not in fields[3]:
+            continue
+        occupied.add(fields[3].rsplit(':', 1)[-1])
+    return [port for port in stack_ports() if str(port) in occupied]
+
+
 def idle_gate_mib():
     try:
         with open(os.path.join(ROOT, 'rtx.local.json')) as handle:
@@ -318,13 +359,14 @@ def main(argv=None):
                 break
             # Only between probes: the first one clears any stale stack itself, and ds4-first-run
             # retires and force-kills holders before it sends anything.
-            if index and not wait_until('the previous probe stack to be gone',
-                                        lambda: not stack_processes(), 120):
-                # Its env is the previous probe's, so anything it serves would be attributed here.
-                print('probe stack still running: %s; its log would mix two probes, so the next '
-                      'probe is skipped' % ' '.join(str(pid) for pid in stack_processes()),
-                      file=sys.stderr)
-                failures.append('a producer outlived the previous probe')
+            if index and not wait_until('the previous probe stack and its ports to be gone',
+                                        lambda: not stack_processes() and not ports_held(), 180):
+                # Its env is the previous probe's and its port is still bound, so the next probe
+                # would measure nothing and look like a run that had.
+                print('the previous probe left pids %s and ports %s; the next probe is skipped'
+                      % (' '.join(str(pid) for pid in stack_processes()),
+                         ' '.join(str(port) for port in ports_held())), file=sys.stderr)
+                failures.append('a producer outlived the previous probe, or its port was still bound')
                 break
             stamp, code = run_probe([pair for pair in extra.split() if pair], flags, args.timeout)
             if stamp:
@@ -337,8 +379,15 @@ def main(argv=None):
             argv = [sys.executable, os.path.join(ROOT, 'scripts', 'ds4_run_metrics.py')]
             for stamp in stamps:
                 argv += ['--stamp', stamp]
-            subprocess.run(argv + ['--output', report], check=False)
-            print('report: %s' % report)
+            result = subprocess.run(argv + ['--output', report], check=False)
+            # The metrics module exits non-zero when no stamp produced a producer. Naming a report
+            # that was never written is how an empty window reads as a measured one.
+            if result.returncode or not os.path.isfile(report):
+                report = ''
+                failures.append('no comparison report: %s produced no producer log'
+                                % ' '.join(stamps))
+            else:
+                print('report: %s' % report)
     finally:
         if strata is not None and not args.keep_down:
             # The probe force-kills its producer, and the driver takes a moment to hand the memory
@@ -348,7 +397,9 @@ def main(argv=None):
             wait_until('the card to be free before restoring Strata', lambda: gpu_used_mib() <= gate, 120)
             restored = start_strata(strata, args.restore_timeout)
     print('stamps: %s' % ' '.join(stamps))
-    print('strata restored: %s' % restored)
+    print('strata restored: %s' % ('not touched (--no-strata)' if args.no_strata else
+                                    'not stopped - no server on port %d' % args.strata_port
+                                    if strata is None else restored))
     if failures:
         print('problems: %s' % '; '.join(failures), file=sys.stderr)
     return 0 if stamps and restored and not failures else 1

@@ -326,6 +326,27 @@ turns on. The next instrument, if Step 3 is reopened, is a reuse counter on the 
 distinct keys missed against total misses, and their distance against the slot count — because
 that is the only measurement that can say whether *any* tier size gets to 50 %.
 
+**Re-measured with Step 4 in place (`20261110-213146`), and it is worse than expected, not better.
+** The tier funds everywhere now - `LLAMADECODE_HOST_CACHE slots=1288 bytes=12879544320 …
+available_after=55360221184` on all three producers, no `DSV41_HOST_MEMORY_PAGING_STOP` - and it
+absorbs **nothing**:
+
+    LLAMADECODE_HOST_WORKING_SET observed_passes=32 selected=0 bounded_admission=1
+    … host_hits=0 host_stored=0 host_slots=1288   (every decode step, all three producers)
+
+The snapshot ran, saw its 32 passes, and chose zero keys, so `host_admitted` stayed empty and
+`store_host` refused every victim. Against the post-Step-4 control (`20261110-212041`): 0 hits of
+6 798 misses, and the run is slower end to end - routed 3.05 → 2.83 GiB/s summed, step medians
+53.0 → 81.3 and 59.0 → 86.6 ms, `layout_ms` 804 → 1 338-1 555 ms with the 12.9 GiB tier allocated
+at the first decode. Read those deltas as indicative rather than attributable: they are two
+single-probe windows 11 minutes apart, not one matched pair, because a window's second probe is
+broken (below). The tier facts are not indicative - 12.9 GiB of pinned host that stores no entry
+can only be cost.
+
+What is still unanswered is why the snapshot sees no layer-0 victims on the `--routed` path when
+Run E selected 900 of them. That is a question about the observation window, and it is the only
+way the shipping policy could ever hold anything.
+
 Risk: pinned/anonymous host memory is what pushed this desktop into swap during Step 2 of
 the decode plan. Fund it from `producer_job_host_gib`, watch `available_after`, and keep the
 `runtime_min_free_gib` and paging guards honest.
@@ -338,6 +359,21 @@ the decode plan. Fund it from `producer_job_host_gib`, watch `available_after`, 
   file; the box swaps anonymous memory first.
 - Note for whoever runs them: the paging guard reads machine-wide `SwapTotal - SwapFree`,
   not the producer's own swap.
+
+**Done 2026-11-10, on this box.** `vm.swappiness` is 10 (`/etc/sysctl.d/99-llm-page-cache.conf`;
+10 rather than 0 because the producer scope carries `memory.swap.max=0` *and* `oom_group=True`, so
+a hard 0 turns a failed reclaim into an OOM kill instead of a page-out), and machine-wide swap went
+from 1.55 GiB in use to 0. `LimitMEMLOCK` is `infinity` on `user@.service`, applied by a session
+restart, so `/proc/self/limits` reads `unlimited` for everything in the session. The carry tier now
+logs `CARRY_RAM_LOCKED bytes=3329343488 active_bytes=3329343488 locked_bytes=3329343488` on every
+producer instead of the partial lock, and `reason=mlock` is gone. What it unblocked is Step 3's
+measurement, not Step 3's conclusion: the funded tier now starts on all three producers without
+`DSV41_HOST_MEMORY_PAGING_STOP`.
+
+Watch one thing after this change: reclaim pressure moves onto the model's page cache, which is
+what makes a cold expert read fast. The first post-change control read 3.05 GiB/s summed against
+2.89 before it, so there is no evidence of a loss yet, but cross-window rates were never
+comparable at this resolution.
 
 ## Step 5 — quant, the ceiling (−90 s per session, the expensive one)
 
@@ -396,6 +432,18 @@ because a bias-0.5 run never places the same experts twice.
   | slstack | ds4-server`) to be gone before starting a probe after the first, and skips the probe
   if it isn't; `scripts/ds4_run_metrics.py` assigns each producer directory to the stamp that
   created it, by the creation time of its oldest file, rather than to every stamp that mentions it.
+- The process list is not enough between probes. A producer force-killed while it holds 21.9 GiB
+  of pinned staging and a 3.3 GiB locked carry tier takes seconds to unwind, and its port stays
+  occupied while the kernel does - `ss -ltn` shows nothing because the socket never reaches LISTEN
+  again. Both the 21:15 and 21:23 windows lost their second probe to `HTTP 503` with
+  `[Errno 98] Address already in use`, on every request, without ever starting a producer. The
+  wait now checks the stack's ports (8088/8089 from `rtx.local.json`) in **any** socket state for
+  up to 180 s. Until that is proven on a real two-probe window, run one probe per window and pair
+  the stamps afterwards with `scripts/ds4_run_metrics.py --stamp A --stamp B`.
+- `strata restored: True` printed even when there was no server on the port to stop (a session
+  restart had killed it), and the report path printed even when the metrics module had exited
+  without writing one. Both now say what actually happened, and a stamp whose run produced no
+  producer is reported inside the report instead of aborting the comparison for the other stamps.
 - `~/bin/ds4-first-run` should print `layout_ms`/`layout_rebuilt` per request and report
   decode rates excluding step 0, or every future run will repeat the 10.56-vs-20 tok/s
   confusion.

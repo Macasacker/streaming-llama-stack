@@ -108,8 +108,9 @@ def producers_for_stamp(stamp, next_stamp=None):
                 continue
             dirs.append(path)
     if not dirs:
-        raise SystemExit('stamp %s names no producer directory created in its own window under %s'
-                         % (stamp, SINGLE_ENGINE))
+        # Not fatal: a probe that never started a producer is a result, and the other stamps in
+        # the same window still have theirs. `main` says so in the report.
+        return []
     return dirs
 
 
@@ -410,8 +411,15 @@ def main(argv=None):
     for index, stamp in enumerate(args.stamp):
         later = args.stamp[index + 1] if index + 1 < len(args.stamp) else None
         paths = producers_for_stamp(stamp, later)
-        headings.append('%s: %s' % (stamp, ' '.join(os.path.basename(p) for p in paths)))
-        rows += grouped(paths, [stamp])
+        if paths:
+            headings.append('%s: %s' % (stamp, ' '.join(os.path.basename(p) for p in paths)))
+            rows += grouped(paths, [stamp])
+        else:
+            headings.append('%s: no producer directory was created in this stamp\'s window, so the '
+                            'run never started a producer and contributes nothing to the comparison'
+                            % stamp)
+    if not rows:
+        raise SystemExit('no stamp produced a producer log; there is nothing to compare')
 
     parts = [head for head in headings if head]
     parts.append(table(rows))
