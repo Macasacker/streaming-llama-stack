@@ -187,6 +187,39 @@ recorded), `1d47e54` (7.1e), `37e62a2` + `fbdb761` (7.1e recorded), `9465b60` an
 `origin/linux-only` when this session opened; check `git status -sb` rather than assuming it
 still is.
 
+Three settings came out of the turn-cost plan (chunk 7.3), and none of them can live in a tracked
+file, so they are recorded here:
+
+- **The box.** `vm.swappiness = 10` in `/etc/sysctl.d/99-llm-page-cache.conf`, and
+  `LimitMEMLOCK=infinity` on `user@.service` (applied by a session restart, so check
+  `grep 'Max locked memory' /proc/self/limits` in a fresh shell). 10 rather than 0 because the
+  producer scope carries `memory.swap.max=0` *and* `oom_group=True`, so a hard zero turns a failed
+  reclaim into an OOM kill instead of a page-out. Machine-wide swap went 1.55 GiB -> 0 and the
+  carry tier now logs `CARRY_RAM_LOCKED bytes=3329343488 … locked_bytes=3329343488` on every
+  producer instead of `CARRY_RAM_LOCK_PARTIAL … errno=12`.
+- **The launch config.** `rtx.local.json`'s `env_overrides` gained `LLAMADECODE_EXTENT_SLOTS: "8"`
+  - the widened extent window that measured x1.376 on the routed column for identical bytes, 25.5 s
+  off three prompt heads, against a code default of 4 slots. `envvars.json` gives that name no
+  scope default and no flag, so `env_overrides` is the only thing that can set it. Verify without
+  the card: `scripts/start-dsv41-single.sh --preset 262k --config rtx.local.json --dry-run` shows
+  it in the resolved config, and the producer says `LLAMADECODE_EXTENT_WINDOW_PLAN slots=8 …
+  source=env` in its own log. 16 slots is measured too and is **not** shipped: same lift
+  (x1.349), twice the pinned host per producer.
+- **What stayed off.** `LLAMADECODE_HOST_CACHE_MB` remains `0`: funded at 12.9 GiB after the
+  swappiness change it now starts on every producer without tripping the paging guard, but it
+  stores nothing - `LLAMADECODE_HOST_WORKING_SET observed_passes=32 selected=0`, then
+  `host_hits=0 host_stored=0` on every decode step - so the RAM tier is off until that empty
+  selection is understood. `LLAMADECODE_PREFILL_ROUTED` remains unset for the reason its own probe
+  text gives: it is a measurement flag that trades the overlapped full-stage prefetch.
+
+The layout-flip fix needs no setting at all - it is compiled in, and the producer logs
+`WF_STAGING reused` with `switch_ms` around 45 ms instead of 9.6 s.
+
+Suite on this tree after the chunk 7.3 commits: **726 passed, 2 failed, 37 skipped**, the same two
+failures as on the untouched baseline (`test_yoco`, and the moving
+`test_disconnect_inside_reasoning_then_next_turn_appends_only`), confirmed by re-running them with
+this session's changes stashed.
+
 The Python suite needs `STUDIO_RUNTIME_ROOT` set or 21 process tests raise `KeyError` for it (the
 guardian and combo-process files, plus three others); the repo's gitignored `runtime/` works
 (`mkdir -p runtime` then
