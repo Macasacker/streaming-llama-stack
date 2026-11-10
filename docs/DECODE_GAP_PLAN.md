@@ -806,25 +806,38 @@ Two guesses about the append cost were wrong, and both were settled without the 
 anything could be measured while Strata was serving.
 
 Reading the session's `[dsv41-prefill-experts]` lines as bursts rather than per layer is what moved
-the question, and it also showed the lines are only half the story: they belong to the **routed**
+the question, and it also showed the lines are only part of the story: they belong to the **routed**
 layers. `LLAMADECODE_PREFILL_ROUTED=tail` demand-reads layers 21-39 and leaves layers 0-20 on
-whole-stage prefetch, so a prompt head is two rates, not one:
+whole-stage prefetch, so a prompt head is more than one rate:
 
-| turn | new tokens | head total | layers 21-39 (routed) | rate | layers 0-20 (whole stage) | its rate |
-|---|---|---|---|---|---|---|
-| 2 | 22 | 6.0 s | not logged as routed | | | |
-| 3 | 1 405 | 28.9 s | 40.38 GiB in 15.4 s | **2.63** | 13.5 s for ~75 GiB | 5.55 |
-| 4 | 6 390 | 33.8 s | 50.16 GiB in 18.9 s | **2.66** | 15.0 s | 5.00 |
-| 5 | 1 598 | 28.5 s | 41.59 GiB in 15.0 s | **2.77** | 13.5 s | 5.55 |
-| 6 | 15 350 | 32.6 s | 55.52 GiB in 18.1 s | **3.06** | 14.5 s | 5.18 |
+| turn | new tokens | head total | routed layers 21-39 | rate | not explained by a fetch line |
+|---|---|---|---|---|---|
+| 1 | 16 666 | 33.3 s | 52.86 GiB in 18.82 s | 2.81 GiB/s | 14.5 s |
+| 2 | 22 | **6.0 s** | **none logged at all** | - | **6.0 s** |
+| 3 | 1 405 | 28.9 s | 40.38 GiB in 15.37 s | 2.63 | 13.5 s |
+| 4 | 6 390 | 33.8 s | 50.16 GiB in 18.86 s | 2.66 | 15.0 s |
+| 5 | 1 598 | 28.5 s | 41.59 GiB in 15.02 s | 2.77 | 13.5 s |
+| 6 | 15 350 | 32.6 s | 55.52 GiB in 18.15 s | 3.06 | 14.5 s |
 
-The two halves each match the standalone rate of the relay they run through (below), which is what
-makes this a model rather than a guess. And it explains the "fixed cost" Step 6 found: a turn re-reads
-40-55 GiB of *active* experts through layers 21-39 and the **entire** expert set of layers 0-20,
-whatever the new-token count.
+Two separate findings are in that table.
 
-**The tile-sweep theory is dead.** `DS4PERF_UNALIGNED_APPEND_COMPLETE` shows a 22-token append as
-one tile of 22 rows per layer, not a 2 048-row tile - the sweep granularity is not the floor.
+**The append's floor is not I/O.** Turn 2 appended 22 rows across 40 layers (`UNALIGNED_APPEND_COMPLETE
+count=22`) and logged no routed expert fetch at all - no `[dsv41-prefill-experts]` line with
+`rows<=32` exists in the session - yet its prompt head was 6.0 s. That is ~150 ms per layer of work
+that reads no expert bytes: the resident sweep and the attention pass over the 16 746-token prefix.
+This is the fixed cost Step 6 was looking for, and it is the floor every later turn sits on: 13.5-15 s
+of the table's last column is the same thing scaled over 40 layers, plus the layers the routed path
+does not cover.
+
+**The routed fetches themselves run at 2.6-3.1 GiB/s and are serialised.** Each burst's `fetch_ms`
+sum is 91-101 % of its own span, so the fetches do not overlap each other or the compute. Prefill is
+bytes over bandwidth, and that bandwidth is the thing the next paragraphs measure.
+
+**The tile-sweep theory is dead, and it was replaced by something worse.**
+`DS4PERF_UNALIGNED_APPEND_COMPLETE` shows a 22-token append as one tile of 22 rows per layer, not a
+2 048-row tile, so the sweep granularity is not the floor - but the 6 s it costs has no fetch line to
+blame, which is the paragraph above. The next instrument on this path has to say what a layer does
+when nothing is fetched, not what it fetches.
 
 **The routed half is the extent relay, and its window is 32 MiB.** `[dsv41-prefill-experts]` measures
 `wf_fetch_extents_direct`, which is its own loop and not the fetcher's reader pool: one io_uring ring
@@ -863,12 +876,13 @@ Four things follow.
    instead of overlapping. `fetch_ms` therefore needs `read_ms` / `stage_ms` / `upload_ms`, the way
    Step 1's ledger made decode attributable. Queue depth is not in it: 8 rings at QD1 (5.07) is
    within 6 % of the same rings at QD8 (5.34).
-3. **The whole-stage half reads experts a routed pass would not need.** Layers 0-20 pull their full
-   384-expert set every pass, ~75 GiB per turn, at the rate their relay can do. Routing those layers
-   is the byte-side lever beside the window-side one; `tail` from layer 21 is a deliberate setting
-   (`routed_prefill_choice` keeps whole-stage prefetch above 2 048 rows), so this is a qualification
-   question - demand reads on the early layers, measured against the matched control - not a flag to
-   flip.
+3. **The whole-stage half reads experts a routed pass would not need - and is not measured.** The
+   last column above is head time with no fetch line behind it. Part of it is layers 0-20 pulling
+   their expert set every pass (`tail` from layer 21 is a deliberate setting,
+   `routed_prefill_choice` keeps whole-stage prefetch above 2 048 rows), and part of it is the
+   resident sweep and the prefix attention that turn 2 proved costs ~150 ms per layer with no bytes
+   read at all. Which part is which is not yet knowable from any log, so the byte-side lever has to
+   be measured against the compute-side one before either is called a win.
 4. **Whether those slots are pinned at all was unrecorded, and the answer belongs to Step 3.** The
    window is `cudaHostAlloc`'d and `ulimit -l` on this box is **8192 KB**, so a 32 MiB window cannot
    pin; `wf_extent_window_init` then falls back to `aligned_alloc`, whose comment says it "still
@@ -936,22 +950,19 @@ path to it. Everything still open needs the card.
    `aligned_alloc`, which uploads through a driver bounce buffer. The line that says which
    transport a run got (`DS4X_EXTENT_WINDOW … transport=`) is landed; the slot count is not.
    `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` stay off this list: they belong to the whole-stage
-   relay, which serves the *other* half of the prompt head - layers 0-20, whose prefetch reads all
-   384 experts per block per pass (~75 GiB a turn) at 5.0-5.6 GiB/s, the rate that relay actually
-   reaches. Widening routing onto those layers is the byte-side lever beside the window-side one,
-   and it needs a matched control because `tail` from layer 21 is a deliberate setting.
-   `~/bin/ds4-first-run --routed` is that comparison: it puts
+   relay, which is not the path those lines measure.
+3. **Then find what an append costs when it fetches nothing, and keep it across turns.** Turn 2
+   appended 22 rows over 40 layers, logged no routed fetch at all, and still took 6.0 s - ~150 ms per
+   layer with no expert bytes read. Nothing in a log says what those 150 ms are, so the first
+   instrument is per-layer time on the append path, split from fetch time. Alongside it, retention:
+   turn 3 re-read 40.4 GiB with `new=4356`, nothing kept from turn 2, and a resident stage re-reads
+   at 17.4 GiB/s against 3.65 GiB/s cold. Page cache is where to test that (reads are buffered);
+   Step 2 already ruled out the pinned RAM tier.
+   `~/bin/ds4-first-run --routed` is the byte-side comparison: it puts
    `LLAMADECODE_PREFILL_ROUTED=1` in the derived config, which `combo_producer.py:413` passes
    through untouched (`COMMON_ENV` does not gate it), so the early layers demand-read instead of
-   pulling every expert in the block. Run it against a run without it and read the two halves of
-   the table above separately - the routed column should grow and the whole-stage column should
-   disappear.
-3. **Then retention across the turn boundary, not a cache tier.** Turn 3 re-read 40.4 GiB with
-   `new=4356` - nothing the previous turn fetched was kept - and a retained stage re-reads in
-   67-155 ms instead of 457-738 ms. The measurable question is what keeps one block's active
-   experts between turns (page cache, or the L1/L2 tiers keyed the same way), and the per-turn
-   `new=` / `resident=` counts are the instrument. Step 2 already ruled out the pinned RAM tier.
-   Step 5's drafter, item 4 below, is the next structural lever after these two.
+   reading whole. Run it against a run without it and read the fetch column and the column beside it
+   separately - it moves bytes between relays, and only the split says whether that is a win.
 
 ### I (21:16): the control, and the attribution is clean
 

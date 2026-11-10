@@ -22,20 +22,22 @@ neutral-to-negative on this box (kept off) and the affinity bias is the lever, 3
 median step and 93 % cache hit at `quality_speed 0.5`. What is left is the p90 tail, 3.5x Strata's,
 which is Step 5's drafter question rather than a cache one. Step 6 is measured: pi's first real
 session reused 63.8-99.9 % of each turn's prompt through one producer, and what costs now is the
-append, not the reuse. A prompt head is two relays, not one rate: `LLAMADECODE_PREFILL_ROUTED=tail`
-demand-reads layers 21-39 (40-55 GiB a turn at 2.63-3.06 GiB/s) and leaves layers 0-20 on whole-stage
-prefetch, which reads all 384 experts per block (~75 GiB a turn) at 5.0-5.6 GiB/s. Measured without
-the card (`scripts/wf_read_spans.py`, `scripts/wf_read_bench.cpp`, `scripts/wf_read_matrix.py`), the
-routed column is the **extent** relay - one ring, `extent_slots = 4` slots of 8 MiB, 32 MiB in
-flight, a slot reusable only after its upload event synchronises - and the same stage geometry reads
-at 3.59-3.65 GiB/s in that shape against 5.67 GiB/s at 128 MiB in flight and 5.19 GiB/s at 8 slots.
-So the levers are the slot count (a `constexpr`, no knob), whether the window pinned at all
-(`ulimit -l` is 8192 KB against a 32 MiB window; `DS4X_EXTENT_WINDOW … transport=` now says which),
-and routing the early layers - not `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD`, which serve the other
-relay. A retained stage re-reads at 17 GiB/s and turn 3 re-read 40.4 GiB with `new=4356`, so
-cross-turn retention is a fifth lever and the pinned RAM tier is none of them. That subsection also
-records a hazard: dropping the page cache for a cold pass evicts what the serving engine runs on,
-which left Strata 7.6 GiB swapped - cold measurements here come from untouched blocks instead.
+append, not the reuse. A prompt head is fetch time and non-fetch time, and the logs only cover the
+fetch half: `LLAMADECODE_PREFILL_ROUTED=tail` demand-reads layers 21-39 (40-55 GiB a turn at
+2.63-3.06 GiB/s, each burst's `fetch_ms` 91-101 % of its span), and turn 2 appended 22 rows over 40
+layers with **no** routed fetch line at all yet still cost 6.0 s - ~150 ms per layer of sweep and
+prefix attention with nothing read. Measured without the card (`scripts/wf_read_spans.py`,
+`scripts/wf_read_bench.cpp`, `scripts/wf_read_matrix.py`), the routed half is the **extent** relay -
+one ring, `extent_slots = 4` slots of 8 MiB, 32 MiB in flight, a slot reusable only after its upload
+event synchronises - and the same stage geometry reads at 3.59-3.65 GiB/s in that shape, 5.19 at 8
+slots, 5.67 at 128 MiB in flight. So its levers are the slot count (a `constexpr`, no knob) and
+whether the window pinned at all (`ulimit -l` is 8192 KB against a 32 MiB window;
+`DS4X_EXTENT_WINDOW … transport=` now says which), not `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD`,
+which serve a relay those lines do not measure. A resident stage re-reads at 17.4 GiB/s and turn 3
+re-read 40.4 GiB with `new=4356`, so retention is another lever and the pinned RAM tier is none of
+them. That subsection also records a hazard: dropping the page cache for a cold pass evicts what the
+serving engine runs on, which left Strata 7.6 GiB swapped - cold measurements here come from
+untouched blocks instead.
 Step 5's lookup is
 answered: the DSpark drafter for the 1017 weights is on this box, `scripts/repack_dsv41_dspark_sidecar.py`
 converts it into the name-and-metadata contract `engines/ds4` binds (engine-checked with
