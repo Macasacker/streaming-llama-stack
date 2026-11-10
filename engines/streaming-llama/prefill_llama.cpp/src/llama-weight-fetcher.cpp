@@ -3539,6 +3539,7 @@ static bool wf_extent_window_init(wf_context * wf) {
 #ifdef WF_HAS_CUDA
     wf_cuda_device_scope scope(wf->cuda_device_index);
 #endif
+    int pinned = 0;
     for (int i = 0; i < wf_context::extent_slots; i++) {
         void * p = nullptr;
 #ifdef WF_HAS_CUDA
@@ -3548,7 +3549,7 @@ static bool wf_extent_window_init(wf_context * wf) {
         if (cudaHostAlloc(&p, wf_context::extent_slot_bytes, cudaHostAllocDefault) != cudaSuccess) {
             p = nullptr;
             (void) cudaGetLastError();
-        }
+        } else pinned++;
 #endif
         if (!p) p = aligned_alloc(4096, wf_context::extent_slot_bytes);
         if (!p) return false;
@@ -3562,6 +3563,23 @@ static bool wf_extent_window_init(wf_context * wf) {
 #endif
         wf->extent_window.push_back(static_cast<char *>(p));
     }
+    // Named and unconditional, not WF_LOG: which transport the window got is the
+    // difference between an upload that DMAes from the slot and one that goes
+    // through a driver bounce buffer, and the extent relay's throughput turns on
+    // it. Where pinned host memory is charged against RLIMIT_MEMLOCK - as the
+    // carry bank's CARRY_RAM_LOCK_PARTIAL line shows it is here, at a soft limit
+    // of 8 MiB against a 4 x 8 MiB window - a partial or empty pin is the
+    // expected answer, and nothing recorded which one a run got until now.
+    const char * transport =
+#ifdef WF_HAS_CUDA
+        pinned == wf_context::extent_slots ? "pinned" : (pinned > 0 ? "mixed" : "pageable");
+#else
+        "host";
+#endif
+    std::fprintf(stderr, "DS4X_EXTENT_WINDOW slots=%d slot_bytes=%llu pinned=%d bytes=%llu transport=%s\n",
+                 wf_context::extent_slots, (unsigned long long) wf_context::extent_slot_bytes,
+                 pinned, (unsigned long long) (wf_context::extent_slot_bytes * wf_context::extent_slots),
+                 transport);
     return true;
 }
 

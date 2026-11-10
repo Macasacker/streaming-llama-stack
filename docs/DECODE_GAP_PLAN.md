@@ -800,60 +800,98 @@ nothing on wall clock. Turn costs were 20-76 s, dominated by this, not by decode
 layer, so the sweep granularity, not the token count, looks like the floor - that is the next thing
 to measure before touching Step 4's quant lever.
 
-### The append's cost is not the disk, and not the reader pool (measured 2026-11-10, card busy)
+### The append's fetch is a 32 MiB window, not a bandwidth limit (measured 2026-11-10, card busy)
 
-The tile-sweep guess above is wrong, and the read-path guess that replaced it is wrong too. Both
-were settled without the card, which is the only way anything could be measured while Strata was
-serving.
+Two guesses about the append cost were wrong, and both were settled without the card - the only way
+anything could be measured while Strata was serving.
 
-Reading the session's `[dsv41-prefill-experts]` lines as bursts rather than per layer (the script
-now does this) is what moved the question: a turn's expert fetch is 40-55 GiB and its `fetch_ms`
-sum is ~94 % of the burst's own span, so the fetches are serialised against each other, at
-**2.67-2.81 GiB/s**. That is the number worth attacking - prefill is bytes over bandwidth, and the
-bytes are the same 3.73 GiB block every turn.
+Reading the session's `[dsv41-prefill-experts]` lines as bursts rather than per layer is what moved
+the question, and it also showed the lines are only half the story: they belong to the **routed**
+layers. `LLAMADECODE_PREFILL_ROUTED=tail` demand-reads layers 21-39 and leaves layers 0-20 on
+whole-stage prefetch, so a prompt head is two rates, not one:
 
-`scripts/wf_read_bench.cpp` replays the strict relay's reader loop - one io_uring ring per thread,
-top up to `io_queue_depth - inflight`, `submit_and_wait(1)`, drain what is posted - against the real
-span geometry of `blk.22` (`scripts/wf_read_spans.py`: 262 active experts x 3 routed projections +
-22 dense tensors = 808 spans, 2.60 GiB, which reproduces the logged `bytes=2607759360` of the live
-prefill stage to the byte). `scripts/wf_read_matrix.py` drives it, dropping the block's page-cache
-window first so the first pass is NVMe and the second is a retained re-read:
+| turn | new tokens | head total | layers 21-39 (routed) | rate | layers 0-20 (whole stage) | its rate |
+|---|---|---|---|---|---|---|
+| 2 | 22 | 6.0 s | not logged as routed | | | |
+| 3 | 1 405 | 28.9 s | 40.38 GiB in 15.4 s | **2.63** | 13.5 s for ~75 GiB | 5.55 |
+| 4 | 6 390 | 33.8 s | 50.16 GiB in 18.9 s | **2.66** | 15.0 s | 5.00 |
+| 5 | 1 598 | 28.5 s | 41.59 GiB in 15.0 s | **2.77** | 13.5 s | 5.55 |
+| 6 | 15 350 | 32.6 s | 55.52 GiB in 18.1 s | **3.06** | 14.5 s | 5.18 |
 
-| reader shape | cold | same stage again |
-|---|---|---|
-| 1 ring x QD4, 4 MiB | 3.52 GiB/s | 14.20 |
-| 2 rings x QD4, 4 MiB | 5.06 | 24.98 |
-| 4 rings x QD4, 4 MiB | 5.56 | 34.19 |
-| **8 rings x QD4, 4 MiB - the engine's shape** | **5.69** | 24.98 |
-| 8 rings x QD1, 4 MiB | 5.07 | 38.78 |
-| 8 rings x QD8, 4 MiB | 5.34 | 16.76 |
+The two halves each match the standalone rate of the relay they run through (below), which is what
+makes this a model rather than a guess. And it explains the "fixed cost" Step 6 found: a turn re-reads
+40-55 GiB of *active* experts through layers 21-39 and the **entire** expert set of layers 0-20,
+whatever the new-token count.
 
-Three things follow, and the first one removes a lever this plan was about to pull:
+**The tile-sweep theory is dead.** `DS4PERF_UNALIGNED_APPEND_COMPLETE` shows a 22-token append as
+one tile of 22 rows per layer, not a 2 048-row tile - the sweep granularity is not the floor.
 
-1. **Concurrency is not the lever.** The engine's own shape (8 rings, QD4, and the auto-sized
-   ~4 MiB block) reads the same bytes at 5.69 GiB/s standalone, against the 2.67 GiB/s its
-   `fetch_ms` reports. QD is inside noise: 8 rings at QD1 is 5.07, at QD8 is 5.34. So raising
-   `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` - which the strict provider never reads anyway,
-   because `create_pipeline` builds `wf_params_default()` and `exact_relay_profile` pins
-   `io_block_size` - would buy close to nothing.
-2. **What is left is inside `fetch_ms`, not on the disk.** The line's window contains the staging
-   slot gate and the upload wait, and those are ~half of it: 470 ms of reads inside 975 ms of
-   `fetch_ms`. The next instrumented change is therefore to split that line (`read_ms` vs
-   `stage_ms` vs `upload_ms`) before any read-side tuning is proposed. A 2.1x on the fetch lines is
-   reachable without touching the reader at all.
-3. **Retention across the turn boundary is the prize.** The same 2.60 GiB stage read a second time
-   costs 67-155 ms instead of 457-738 ms. Turn 3 re-read 40.4 GiB with `new=4356` - nothing from
-   turn 2 was retained - so an append pays NVMe for experts the previous turn already fetched. The
-   page cache is the cheapest place to hold them (reads are buffered, `general.alignment` is 16384,
-   and 2.6 GiB per stage is small against ~60 GiB available), which is why the pinned RAM tier
-   measured neutral in Step 2 and why item 2 of "Where this stands" is now the cross-turn `new=`
-   count rather than a tier size.
+**The routed half is the extent relay, and its window is 32 MiB.** `[dsv41-prefill-experts]` measures
+`wf_fetch_extents_direct`, which is its own loop and not the fetcher's reader pool: one io_uring ring
+sized `2 * extent_slots`, `extent_slots = 4` host slots of `extent_slot_bytes = 8 MiB` - **32 MiB in
+flight** - and a slot is reusable only after `slot_ready()` has synchronised its upload event on the
+host. `io_threads = 8` and `io_queue_depth = 4` belong to the whole-stage relay (`wf_io_uring_worker`),
+which is the other half of the table; and the strict provider builds its params from
+`wf_params_default()` while `exact_relay_profile` pins `io_block_size`, so `LLAMA_WF_IO_THREADS` /
+`LLAMA_WF_IO_QD` / `LLAMA_WF_IO_BLOCK_MB` - which nothing in the stack sets anyway - could not have
+moved either column at any value.
 
-The cold column is only reproducible with the card idle. Dropping the page cache on this box evicts
-bytes the *serving* engine needs: one such run left Strata at 7.6 GiB swapped with `SwapFree` down to
-19 MiB, and the bench itself was OOM-killed at 63 GiB of anon before its pool got a 1 GiB ceiling and
-a `MemAvailable` refusal. Both guards are in `wf_read_bench.cpp`; the eviction hazard is the reason
-this subsection says "measured while the card was busy" and not "measured cleanly".
+`scripts/wf_read_bench.cpp` replays a reader loop against a real stage's span list, and
+`scripts/wf_read_spans.py` builds that list from the GGUF tensor directory: `blk.22` with 262 active
+experts x 3 routed projections + 22 dense tensors = 808 spans, **2.60 GiB**, which reproduces the
+live `[dsv41-prefill-experts] bytes=2607759360` to the byte. Run in the extent relay's shape and in
+the shapes around it, on blocks nothing had read (so cold without evicting anything):
+
+| relay shape | in flight | cold | same stage again |
+|---|---|---|---|
+| **extent relay as built: 1 ring, 4 x 8 MiB** | 32 MiB | **3.59-3.65 GiB/s** | 17.4 |
+| 1 ring, 8 x 8 MiB | 64 MiB | 4.82-5.19 | 17.5 |
+| whole-stage relay shape: 8 rings x QD4 x 4 MiB | 128 MiB | 5.67 | 25.0 |
+| 8 rings x QD1, 4 MiB | 128 MiB | 5.07 | 38.8 |
+| 8 rings x QD8, 4 MiB | 128 MiB | 5.34 | 16.8 |
+
+Four things follow.
+
+1. **The routed window, not the disk, is the routed half's limit.** The same 2.60 GiB stage at
+   128 MiB in flight reads at 5.67 GiB/s; the extent relay's 32 MiB reaches 3.65, and doubling it to
+   8 slots measured 5.19. So `extent_slots` 4 -> 8 is worth up to 1.42x on the routed column - on
+   turn 5, 15.0 s -> ~10.6 s - and it is a `constexpr` with no knob: a source change in the relay,
+   planned against the host bytes the slots cost.
+2. **The upload gate is the remaining 26 %.** The engine measures 2.63-3.06 GiB/s where the identical
+   shape standalone measures 3.59-3.65. That is `slot_ready()` blocking the host on the previous
+   slot's upload event before its next read is submitted - reads and uploads alternate in one loop
+   instead of overlapping. `fetch_ms` therefore needs `read_ms` / `stage_ms` / `upload_ms`, the way
+   Step 1's ledger made decode attributable. Queue depth is not in it: 8 rings at QD1 (5.07) is
+   within 6 % of the same rings at QD8 (5.34).
+3. **The whole-stage half reads experts a routed pass would not need.** Layers 0-20 pull their full
+   384-expert set every pass, ~75 GiB per turn, at the rate their relay can do. Routing those layers
+   is the byte-side lever beside the window-side one; `tail` from layer 21 is a deliberate setting
+   (`routed_prefill_choice` keeps whole-stage prefetch above 2 048 rows), so this is a qualification
+   question - demand reads on the early layers, measured against the matched control - not a flag to
+   flip.
+4. **Whether those slots are pinned at all was unrecorded, and the answer belongs to Step 3.** The
+   window is `cudaHostAlloc`'d and `ulimit -l` on this box is **8192 KB**, so a 32 MiB window cannot
+   pin; `wf_extent_window_init` then falls back to `aligned_alloc`, whose comment says it "still
+   reads correctly" - true of the bytes, not of the upload, which from pageable host memory goes
+   through a driver bounce buffer. That is likely the largest single share of the 2.67 against
+   3.65, and nothing in any log said which transport a run got. `DS4X_EXTENT_WINDOW slots=4
+   slot_bytes=… pinned=… transport=pinned|mixed|pageable` now prints once per fetcher at window
+   init, and `scripts/analyze_dsv41_decode.py` reads it. If that reads `transport=pageable`,
+   Step 3's `LimitMEMLOCK` is a prefill lever as well as a decode-carry one, and its measured
+   value is a fetch rate rather than a carry detail.
+
+**Retention across the turn boundary is the other prize, and it is not a tier.** The same stage
+re-read while resident costs 149 ms instead of 711 ms. Turn 3 re-read 40.4 GiB with `new=4356` -
+nothing from turn 2 was retained - so an append pays NVMe for experts the previous turn already
+fetched. Reads are buffered, `general.alignment` is 16384, and 2.6 GiB per stage is small against
+~60 GiB available, so the page cache is where to test that; the pinned RAM tier measured neutral in
+Step 2 and is not it.
+
+The hazard this measurement created is worth carrying: dropping the page cache to force a cold pass
+evicts bytes the *serving* engine needs. One such run left Strata at 7.6 GiB swapped with `SwapFree`
+at 19 MiB, and the bench itself was OOM-killed at 63 GiB of anon before its pool got a 1 GiB
+ceiling and a `MemAvailable` refusal; both guards are in `wf_read_bench.cpp`, and the cold numbers
+above come from untouched blocks rather than from eviction.
 
 ## Acceptance
 
@@ -889,13 +927,19 @@ path to it. Everything still open needs the card.
    "1500"`, and Step 4's first item (the bias applies at a nonzero value with no refusal) is closed
    by F, G and H. Any further decode measurement should therefore be `~/bin/ds4-first-run --bias`;
    a `--bias`-less run is the control and should be used only when a comparison needs it.
-2. **Split `fetch_ms` before tuning anything that reads.** An append's cost is ~94 % expert fetch
-   time at 2.67 GiB/s, and the same bytes at the engine's own ring shape read at 5.69 GiB/s
-   standalone (see "The append's cost is not the disk, and not the reader pool"), so about half of
-   every `[dsv41-prefill-experts]` line is the staging slot gate and the upload wait rather than
-   NVMe. That line needs `read_ms` / `stage_ms` / `upload_ms`, the same way Step 1's ledger made
-   decode attributable. Raising `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` is off this list: 8 rings
-   at QD1 is 5.07 GiB/s against 5.34 at QD8, and the strict provider reads neither variable.
+2. **Widen the extent relay's window, and say whether it pinned.** Routed prefill's expert fetch is
+   `wf_fetch_extents_direct`: one ring, `extent_slots = 4` slots of 8 MiB, 32 MiB in flight, each
+   slot gated on its upload event before the next read. That shape reads 3.59-3.65 GiB/s cold
+   against 5.67 GiB/s at 128 MiB in flight, and the engine's `fetch_ms` reports 2.67 GiB/s. So the
+   lever is the slot count (a `constexpr`, no knob) and the pin `wf_extent_window_init` asks for -
+   `ulimit -l` here is 8192 KB, so a 32 MiB window cannot all pin and the fallback is
+   `aligned_alloc`, which uploads through a driver bounce buffer. The line that says which
+   transport a run got (`DS4X_EXTENT_WINDOW … transport=`) is landed; the slot count is not.
+   `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` stay off this list: they belong to the whole-stage
+   relay, which serves the *other* half of the prompt head - layers 0-20, whose prefetch reads all
+   384 experts per block per pass (~75 GiB a turn) at 5.0-5.6 GiB/s, the rate that relay actually
+   reaches. Widening routing onto those layers is the byte-side lever beside the window-side one,
+   and it needs a matched control because `tail` from layer 21 is a deliberate setting.
 3. **Then retention across the turn boundary, not a cache tier.** Turn 3 re-read 40.4 GiB with
    `new=4356` - nothing the previous turn fetched was kept - and a retained stage re-reads in
    67-155 ms instead of 457-738 ms. The measurable question is what keeps one block's active
