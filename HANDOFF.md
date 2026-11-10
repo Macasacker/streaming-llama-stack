@@ -28,12 +28,19 @@ fetch half: `LLAMADECODE_PREFILL_ROUTED=tail` demand-reads layers 21-39 (40-55 G
 layers with **no** routed fetch line at all yet still cost 6.0 s - ~150 ms per layer of sweep and
 prefix attention with nothing read. Measured without the card (`scripts/wf_read_spans.py`,
 `scripts/wf_read_bench.cpp`, `scripts/wf_read_matrix.py`), the routed half is the **extent** relay -
-one ring, `extent_slots = 4` slots of 8 MiB, 32 MiB in flight, a slot reusable only after its upload
+one ring, four host slots of 8 MiB, 32 MiB in flight, a slot reusable only after its upload
 event synchronises - and the same stage geometry reads at 3.59-3.65 GiB/s in that shape, 5.19 at 8
-slots, 5.67 at 128 MiB in flight. So its levers are the slot count (a `constexpr`, no knob) and
-whether the window pinned at all (`ulimit -l` is 8192 KB against a 32 MiB window;
-`DS4X_EXTENT_WINDOW … transport=` now says which), not `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD`,
-which serve a relay those lines do not measure. A resident stage re-reads at 17.4 GiB/s and turn 3
+slots, 5.67 at 128 MiB in flight. So its levers are the slot count - now `LLAMADECODE_EXTENT_SLOTS`
+and `LLAMADECODE_EXTENT_SLOT_MIB`, planned into the provider's host admission and passed to the
+fetcher as `wf_params.extent_window_slots` / `extent_window_slot_bytes` - and the pin, which is
+answered: `DS4X_EXTENT_WINDOW slots=4 … transport=pinned` on a rebuilt binary, at `ulimit -l` 8192 KB.
+`cudaHostAlloc` is not charged against `RLIMIT_MEMLOCK` here, as chunk 3.1h already recorded, so
+`LimitMEMLOCK` is a carry-tier lever and not an extent-window one. What is still open is the
+measurement at 8 slots, not the knob. `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` stay off this list,
+as they serve a relay those lines do not measure. The 8-slot measurement is done: the routed column
+went 3.05 → 4.19 GiB/s (1.37×) for identical bytes, 25.5 s off three prompt heads, and the decode
+step did not fall because that run also missed more bytes per step - see Step 2 of
+`docs/TURN_COST_PLAN.md`. A resident stage re-reads at 17.4 GiB/s and turn 3
 re-read 40.4 GiB with `new=4356`, so retention is another lever and the pinned RAM tier is none of
 them. That subsection also records a hazard: dropping the page cache for a cold pass evicts what the
 serving engine runs on, which left Strata 7.6 GiB swapped - cold measurements here come from
@@ -278,7 +285,7 @@ relinked and re-run after chunk 4.2b rebuilt every CUDA object, since four of th
 `libggml.a`/`libggml-cuda.a`:
 `docs/evidence/platform-selftest.cpp` (44 checks, the producer's file/hash/VRAM layer),
 `docs/evidence/wf-io-selftest.cpp` (139 checks, the fetcher's relay through the real `wf_*`
-pipeline), `docs/evidence/wf-extent-selftest.cpp` (33 checks, the strict extent reader),
+pipeline), `docs/evidence/wf-extent-selftest.cpp` (38 checks, the strict extent reader),
 `docs/evidence/provider-lease-selftest.cpp` (14 checks, the provider's lease through `inspect()`
 with no backend), and `docs/evidence/uring-flush-probe.cpp` (3 checks, the io_uring flush rule).
 Three more are real test sources rather than evidence files, and all three still have no build
@@ -517,7 +524,8 @@ compiler already kept". Use the scaffolding in `scripts/port/`:
   `messages-2.2e.json` is 2.2e's message map, `platform-selftest.cpp` is chunk 3.1c's
   platform-layer program, `wf-io-selftest.cpp` is chunk 3.1e's reader program (io_uring against the
   pread baseline, byte-compared through the real `wf_*` pipeline), `wf-extent-selftest.cpp` is chunk
-  3.1f's extent reader (33 checks, including a seven-part batch against four slots),
+  3.1f's extent reader (38 checks, including a seven-part batch against four slots, twelve parts
+  against an eight-slot window, and the two create-time window refusals),
   `provider-lease-selftest.cpp` is 3.1f's lease program (14 checks through the public `inspect()`
   with no backend), `uring-flush-probe.cpp` is the 3.1f probe for the io_uring submit/wait rule,
   and `cuda-headroom-probe.cpp` is the two-call answer to "can this box make a CUDA context right

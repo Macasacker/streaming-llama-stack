@@ -24,7 +24,9 @@ CTYPES = {'const char *': lambda: ctypes.c_char_p, 'const char **': lambda: ctyp
           'size_t': lambda: ctypes.c_size_t, 'int': lambda: ctypes.c_int, 'bool': lambda: ctypes.c_bool,
           'void *': lambda: ctypes.c_void_p, 'uint64_t': lambda: ctypes.c_uint64,
           'float': lambda: ctypes.c_float, 'wf_transfer_mode': lambda: ctypes.c_int,
-          'wf_moe_mode': lambda: ctypes.c_int, 'wf_post_prefill_mode': lambda: ctypes.c_int}
+          'wf_moe_mode': lambda: ctypes.c_int, 'wf_post_prefill_mode': lambda: ctypes.c_int,
+          # Opaque tier handle handed to the next create; a pointer to ctypes' void pointer.
+          'struct wf_staging_tier *': lambda: ctypes.c_void_p}
 
 
 def ds_backend():

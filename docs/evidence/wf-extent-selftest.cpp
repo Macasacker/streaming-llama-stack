@@ -257,6 +257,50 @@ int main(void) {
     wf_quiesce(third);
     wf_destroy(third);
 
+    // A window the caller widened: eight 1 MiB slots instead of four 8 MiB ones,
+    // so twelve 1 MiB parts recycle the slots twice over. The split, the ring and
+    // the byte placement must all follow the planned geometry, not the shape this
+    // relay was first qualified with.
+    wf_params wide_plan = plan();
+    wide_plan.extent_window_slots = 8;
+    wide_plan.extent_window_slot_bytes = 1u << 20;
+    wf_context * wide = wf_create_required_streaming(&wide_plan);
+    if (!wide) { std::printf("FAIL the widened extent window was refused\n"); return 1; }
+    wf_register_layer(wide, 0, only.data(), int(only.size()), 1u << 20);
+    wf_start(wide);
+    check("a layer transfers before the widened window is used", wf_wait_layer_gpu(wide, 0) != nullptr);
+    {
+        std::vector<wf_extent> parts;
+        for (int i = 0; i < 12; i++)          // twelve parts against eight slots
+            parts.push_back({uint64_t(i) * (1u << 20), uint64_t(8u << 20) + uint64_t(i) * (1u << 20),
+                             1u << 20, 0});
+        uint64_t n = 0; double m = 0;
+        const bool ok = wf_fetch_extents_direct(wide, 0, parts.data(), int(parts.size()), nullptr, &n, &m);
+        bool placed = ok && n == uint64_t(parts.size()) * (1u << 20);
+        for (const auto & e : parts)
+            placed = placed && bank_matches(wide, 0, e.bank_offset, e.file_offset, e.nbytes, file);
+        check("a window of eight 1 MiB slots wraps twelve parts and lands every byte",
+              placed && !wf_has_failed(wide) && (16u << 20) <= wf_get_gpu_buf_capacity(wide));
+    }
+    wf_stop(wide);
+    wf_quiesce(wide);
+    wf_destroy(wide);
+
+    // The bounds are refused at create, before any host memory is pinned: a
+    // clamped window would charge the caller's plan one geometry and pin another.
+    wf_params too_many = plan();
+    too_many.extent_window_slots = 65;
+    check("a slot count past the relay's own bound is refused", wf_create_required_streaming(&too_many) == nullptr);
+    wf_params unaligned = plan();
+    unaligned.extent_window_slot_bytes = 3u << 10;      // below the 64 KiB floor, not a 4 KiB multiple of it
+    check("a slot size below the relay's own bound is refused", wf_create_required_streaming(&unaligned) == nullptr);
+    wf_params ask_default = plan();
+    ask_default.extent_window_slots = 0;                // 0 means the source default, not zero slots
+    ask_default.extent_window_slot_bytes = 0;
+    wf_context * defaulted = wf_create_required_streaming(&ask_default);
+    check("a zero extent window request keeps the source default", defaulted && !wf_has_failed(defaulted));
+    if (defaulted) { wf_stop(defaulted); wf_quiesce(defaulted); wf_destroy(defaulted); }
+
     std::remove(path.c_str());
     std::printf("SELFTEST %s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;

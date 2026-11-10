@@ -36,8 +36,10 @@ WATCH = ("DS4PERF_GPU_JOB_ADMISSION", "LLAMADECODE_HOST_PLAN", "LLAMADECODE_DS4X
          "DS4X_AFFINITY", "affinity calibration written", "incomplete affinity calibration",
          "wrong-model affinity calibration", "cannot write affinity calibration",
          # The extent relay's host slots are cudaHostAlloc'd and the fallback is silent; this says
-         # which transport a run actually got, which is what its fetch rate turns on.
-         "DS4X_EXTENT_WINDOW",
+         # which transport a run actually got, which is what its fetch rate turns on. The plan line
+         # says the geometry the run asked for, so a log can be read as 4 or 8 slots without
+         # guessing from the environment.
+         "DS4X_EXTENT_WINDOW", "LLAMADECODE_EXTENT_WINDOW_PLAN",
          # The decode VRAM guard is what ended three runs on 2026-11-09; the headroom line says
          # how far above the reserve the steady state actually sat.
          "LLAMADECODE_VRAM_HEADROOM", "VRAM_RESERVE_BREACH",

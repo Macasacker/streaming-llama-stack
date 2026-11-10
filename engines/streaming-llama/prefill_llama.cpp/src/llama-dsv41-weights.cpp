@@ -183,6 +183,32 @@ struct llama_dsv41_weight_provider::implementation {
     // LLAMADECODE bind-once: set after a complete decode-layout pass; cleared on any layout rebuild.
     bool resident_bound=false;
     static bool bind_once_enabled(){static const bool on=[]{const char*e=std::getenv("LLAMADECODE_BIND_ONCE");return !(e&&e[0]=='0'&&!e[1]);}();return on;}
+    // LLAMADECODE_EXTENT_SLOTS / LLAMADECODE_EXTENT_SLOT_MIB: the named-extent
+    // relay's host window (docs/TURN_COST_PLAN.md Step 2). The window is what is
+    // in flight on a cold span - 32 MiB reads 3.6 GiB/s, 64 MiB 5.19 - and it is
+    // pinned host RAM, so the slots are read once, planned into the provider's
+    // host admission before anything is allocated, and passed to the fetcher
+    // unchanged. A bad value refuses rather than falling back to the default:
+    // a silent revert would leave the host plan charging bytes nobody pinned.
+    struct extent_window_geometry {int slots;uint64_t slot_bytes;uint64_t bytes;};
+    static extent_window_geometry extent_window(){
+        static const extent_window_geometry geometry=[]{
+            extent_window_geometry g{4,8ull<<20,32ull<<20};
+            const char*slots=std::getenv("LLAMADECODE_EXTENT_SLOTS");
+            const char*mib=std::getenv("LLAMADECODE_EXTENT_SLOT_MIB");
+            if(slots&&*slots){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(slots,&end,10);
+                require(slots[0]!='-'&&!errno&&end!=slots&&!*end&&v>=1&&v<=64,"LLAMADECODE_EXTENT_SLOTS must be a whole number in 1..64 (unset is 4)");
+                g.slots=int(v);}
+            if(mib&&*mib){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(mib,&end,10);
+                require(mib[0]!='-'&&!errno&&end!=mib&&!*end&&v>=1&&v<=1024,"LLAMADECODE_EXTENT_SLOT_MIB must be a whole number of MiB in 1..1024 (unset is 8)");
+                g.slot_bytes=v<<20;}
+            g.bytes=uint64_t(g.slots)*g.slot_bytes;
+            std::fprintf(stderr,"LLAMADECODE_EXTENT_WINDOW_PLAN slots=%d slot_bytes=%llu window_bytes=%llu source=%s\n",
+                g.slots,(unsigned long long)g.slot_bytes,(unsigned long long)g.bytes,slots||mib?"env":"default");
+            return g;
+        }();
+        return geometry;
+    }
     bool bound()const{return decode_layout&&resident_bound&&bind_once_enabled();}
     // LLAMADECODE L2 (exclusive victim tier, own VRAM buffer: [gate|up|down] x l2_slots).
     ggml_backend_buffer_ptr l2_buffer;uint32_t l2_slots=0;std::array<char*,3>l2_base{};
@@ -208,14 +234,45 @@ struct llama_dsv41_weight_provider::implementation {
     uint32_t host_slots=0;uint64_t host_hits=0,host_stored=0,host_bytes=0;
     double host_store_ms=0,host_sync_ms=0,host_upload_ms=0,hook_ms=0;
     mutable double residency_ms=0;
+    // Layout-flip breakdown (docs/TURN_COST_PLAN.md Step 1 item 1). `switch_ms` covered the whole
+    // flip, so the ~10 s it reports could not be attributed to the tier release, the fetcher
+    // rebuild, the bank realloc or the 924-tensor re-registration - and the plan says nothing in
+    // Step 1 is worth doing blind. Every build records its own split; the flip reads it back
+    // straight after its own create_pipeline call.
+    double build_total_ms=0,build_fetcher_ms=0,build_banks_ms=0,build_register_ms=0;
+    // The pinned host staging tier carried across a layout flip. Non-null only between the flip's
+    // destroy and its create; invalidate frees anything a failed create left held.
+    wf_staging_tier * staging=nullptr;
     // Observe evictions without moving payloads, then admit one bounded hot
     // working set. Rewriting an LRU on every L2 eviction streams gigabytes
     // backwards over PCIe even when the RAM tier never produces a hit.
     std::array<uint32_t,40*384> host_frequency{};
     std::array<uint8_t,40*384> host_admitted{};
     uint32_t host_observations=0;bool host_selected=false;
+    // LLAMADECODE_HOST_CACHE_ADMIT_TOUCH: continuous admission. A victim earns its RAM store on
+    // its Nth eviction instead of after the 32-pass snapshot, so a key that turns hot late in a
+    // long session still reaches the tier. Unset or 0 keeps the snapshot. That snapshot's ceiling
+    // is whatever the first 32 passes happened to evict - run E saw 900 distinct keys against
+    // 14 055 misses, so its 6.3 % was the ceiling of the snapshot and not of the tier's 1 288
+    // slots. Threshold 1 stores every victim, which is the writeback the comment above warns
+    // about; read that as an experiment, not a setting.
+    static uint32_t host_admit_touch(){static const uint32_t n=[]{const char*v=std::getenv("LLAMADECODE_HOST_CACHE_ADMIT_TOUCH");
+        if(!v||!v[0]||!std::strcmp(v,"0"))return 0u;
+        char*end=nullptr;errno=0;const unsigned long long t=std::strtoull(v,&end,10);
+        require(v[0]!='-'&&!errno&&end!=v&&!*end&&t>=1&&t<=255,"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH must be 0 or 1..255");
+        std::fprintf(stderr,"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH threshold=%u policy=continuous\n",uint32_t(t));
+        return uint32_t(t);}();return n;}
+    // Whether this victim earns a store now. The count lives here rather than in the caller so a
+    // key already in the tier still records the touch that keeps it admitted.
+    bool host_admits(int32_t key){
+        const uint32_t touch=host_admit_touch();
+        if(touch){if(host_frequency[key]!=UINT32_MAX)++host_frequency[key];return host_frequency[key]>=touch;}
+        if(!host_selected){if(host_frequency[key]!=UINT32_MAX)++host_frequency[key];return false;}
+        return host_admitted[key]!=0;
+    }
     void select_host_working_set(uint32_t layer){
         if(!host_slots||host_selected||layer!=0)return;
+        if(host_admit_touch())return;   // continuous admission takes no snapshot
         const char*admit=std::getenv("LLAMADECODE_HOST_CACHE_ADMIT");
         if(admit&&!std::strcmp(admit,"0"))return;
         if(++host_observations<=32)return;
@@ -240,8 +297,7 @@ struct llama_dsv41_weight_provider::implementation {
     }
     void store_host(int32_t key,const char*const bases[3],uint64_t slot,const std::array<uint64_t,3>&stride,void*stream){
         if(!host_slots||key<0)return;
-        if(!host_selected){if(host_frequency[key]!=UINT32_MAX)++host_frequency[key];return;}
-        if(!host_admitted[key])return;
+        if(!host_admits(key))return;
         const uint32_t layer=uint32_t(key)/384;
         if(host.find(layer,uint32_t(key)%384)>=0)return;
         if(defer_copies){
@@ -718,6 +774,7 @@ struct llama_dsv41_weight_provider::implementation {
         if(options.backend&&allocated)ggml_backend_synchronize(options.backend);
         release_host();release_l2();
         if(fetcher){wf_stop(fetcher);wf_quiesce(fetcher);wf_destroy(fetcher);fetcher=nullptr;}
+        wf_staging_free(staging);staging=nullptr;   // a flip that took a tier and never rebuilt it
         mark_weight_stream(false);
         for(auto&s:stages)for(auto&e:s.entries){e.t->data=nullptr;e.t->buffer=nullptr;}
         buffers.clear();allocated=false;leased=false;resident_bound=false;
@@ -938,8 +995,9 @@ struct llama_dsv41_weight_provider::implementation {
         // previous layer's upload is still in flight.
         planned.host_bytes=add(planned.host_bytes,uint64_t(staging_buffers())*planned.compute_buffer_bytes);
         // The named-extent reader's pinned window, allocated by the fetcher on
-        // first use and held for its lifetime.
-        planned.host_bytes=add(planned.host_bytes,32*mib);
+        // first use and held for its lifetime. Charged at exactly the geometry
+        // create_pipeline will pass it, so the plan and the pin cannot diverge.
+        planned.host_bytes=add(planned.host_bytes,extent_window().bytes);
         if(options.engram_prefetch_host_bytes){
             require(options.engram_prefetch_tokens&&options.engram_prefetch_tokens<=1048576,
                 "Whole-prompt Engram requires an explicit admitted token count");
@@ -1128,6 +1186,8 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     throw std::runtime_error("V4.1 physical weight provider requires a CUDA backend");
 #else
     auto*p=this;
+    timer measured_build_total(build_total_ms);
+    build_total_ms=0;build_fetcher_ms=0;build_banks_ms=0;build_register_ms=0;
     const char*lazy=std::getenv("LLAMADECODE_PREFILL_ROUTED");
     require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
     p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
@@ -1152,6 +1212,12 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     // by default). With io_direct false the reader never rounds a chunk up, so the
     // fetcher's banks are exactly the admitted compute_buffer_bytes.
     params.io_direct=false;
+    // The extent relay's window, at the geometry this provider's host plan
+    // charged. 8 slots is the widened shape (64 MiB in flight); unset stays the
+    // source-pinned 4 x 8 MiB.
+    const auto extent_geometry=extent_window();
+    params.extent_window_slots=extent_geometry.slots;
+    params.extent_window_slot_bytes=extent_geometry.slot_bytes;
     // Named, not inherited: the relay must be at least one stage ahead in bank
     // assignment for a stage to land in bank id%2 (the bank its regions, and the
     // extents the provider writes later, are planned in). With the consumer
@@ -1159,8 +1225,14 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     // stage deep, both banks are free at that moment and the first-free scan puts
     // an odd stage in bank 0 - which acquire()'s guard then refuses.
     params.prefetch_depth=3;
-    p->fetcher=wf_create_required_streaming(&params);require(p->fetcher,"Required original weight stream initialization failed");
+    // A layout flip hands its retired tier here so this create reuses those buffers instead of
+    // paying cudaMallocHost for the same geometry. The caller frees whatever the create left in
+    // the handle, matched or not.
+    if(p->staging)wf_params_adopt_staging(&params,p->staging);
+    {timer measured_wf_create(build_fetcher_ms);
+    p->fetcher=wf_create_required_streaming(&params);require(p->fetcher,"Required original weight stream initialization failed");}
     p->allocated=true; // All subsequent failures must synchronize before free.
+    {timer measured_banks(build_banks_ms);
     for(uint32_t i=0;i<p->options.buffers;++i){
         if(p->options.compute_direct)require(wf_is_ds_direct(p->fetcher)&&wf_get_n_gpu_bufs(p->fetcher)==int(p->options.buffers)&&wf_get_gpu_buf_ptr(p->fetcher,int(i)),"Required direct bank was not allocated; no relay fallback");
         ggml_backend_buffer_ptr b(p->options.compute_direct?
@@ -1168,8 +1240,9 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
             ggml_backend_alloc_buffer(p->options.backend,p->planned.compute_buffer_bytes));
         require(bool(b),"Admitted weight buffer allocation/wrapping failed");ggml_backend_buffer_set_usage(b.get(),GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
         if(!p->options.compute_direct)wf_set_gpu_buf_ptr(p->fetcher,int(i),ggml_backend_buffer_get_base(b.get()));p->buffers.push_back(std::move(b));
-    }
-    for(uint32_t i=0;i<p->stage_count();++i){std::vector<wf_weight_span>spans;p->spans_for(p->stage_at(i),spans);wf_register_layer(p->fetcher,int(i),spans.data(),int(spans.size()),p->stage_at(i).bytes);}
+    }}
+    {timer measured_layers(build_register_ms);
+    for(uint32_t i=0;i<p->stage_count();++i){std::vector<wf_weight_span>spans;p->spans_for(p->stage_at(i),spans);wf_register_layer(p->fetcher,int(i),spans.data(),int(spans.size()),p->stage_at(i).bytes);}}
     if(p->options.yoco_encoder_only){
         require(!p->decode_layout,"YOCO encoder requires the prefill streaming layout");
         for(uint32_t i=22;i<42;++i)require(wf_set_layer_skipped(p->fetcher,int(i),true),"YOCO fetch omission refused");
@@ -1218,13 +1291,34 @@ bool llama_dsv41_weight_provider::restart_prompt(const config&options,std::strin
         require(!options.decode_layout||(p->options.compute_direct&&p->options.buffers==2),
             "Decode layout requires the strict two-bank direct fetch profile");
         const auto started=std::chrono::steady_clock::now();
-        p->release_host();p->release_l2();   // return decode tiers before prefill restores its plan
-        wf_destroy(p->fetcher);p->fetcher=nullptr;
-        for(auto&s:p->stages)for(auto&e:s.entries){e.t->data=nullptr;e.t->buffer=nullptr;}
-        p->buffers.clear();p->decode_layout=options.decode_layout;p->experts_prebound=false;p->dense_held=-1;p->resident_bound=false;p->create_pipeline();
-        wf_stop(p->fetcher);wf_quiesce(p->fetcher);require(!wf_has_failed(p->fetcher),"Switched provider could not quiesce before request start");
-        std::fprintf(stderr,"LLAMADECODE_LAYOUT_SWITCH decode=%d switch_ms=%.3f same_admission=1\n",int(p->decode_layout),
-            std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count());
+        struct span { double&sum; std::chrono::steady_clock::time_point begin=std::chrono::steady_clock::now();
+            explicit span(double&s):sum(s){} ~span(){sum+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();} };
+        double tiers_ms=0,destroy_ms=0,detach_ms=0,build_ms=0,quiesce_ms=0;
+        {span measured_tiers(tiers_ms);p->release_host();p->release_l2();}   // return decode tiers before prefill restores its plan
+        {span measured_destroy(destroy_ms);
+         // The context is rebuilt because its layer table changes; the pinned tier is not, because
+         // this pipeline's staging is the same geometry the retired context was using.
+         p->staging=wf_staging_take(p->fetcher);
+         wf_destroy(p->fetcher);p->fetcher=nullptr;}
+        {span measured_detach(detach_ms);
+         for(auto&s:p->stages)for(auto&e:s.entries){e.t->data=nullptr;e.t->buffer=nullptr;}
+         p->buffers.clear();}
+        p->decode_layout=options.decode_layout;p->experts_prebound=false;p->dense_held=-1;p->resident_bound=false;
+        {span measured_build(build_ms);p->create_pipeline();}
+        const bool staging_reused=wf_staging_empty(p->staging);
+        wf_staging_free(p->staging);p->staging=nullptr;   // reused: an empty handle; mismatch: the buffers
+        {span measured_quiesce(quiesce_ms);
+         wf_stop(p->fetcher);wf_quiesce(p->fetcher);require(!wf_has_failed(p->fetcher),"Switched provider could not quiesce before request start");}
+        std::fprintf(stderr,"LLAMADECODE_LAYOUT_SWITCH decode=%d switch_ms=%.3f same_admission=1 "
+            "tiers_ms=%.3f destroy_ms=%.3f detach_ms=%.3f build_ms=%.3f quiesce_ms=%.3f "
+            "build_fetcher_ms=%.3f build_banks_ms=%.3f build_register_ms=%.3f build_other_ms=%.3f "
+            "staging_reused=%d\n",
+            int(p->decode_layout),
+            std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count(),
+            tiers_ms,destroy_ms,detach_ms,build_ms,quiesce_ms,
+            p->build_fetcher_ms,p->build_banks_ms,p->build_register_ms,
+            p->build_total_ms-p->build_fetcher_ms-p->build_banks_ms-p->build_register_ms,
+            int(staging_reused));
     }
     if(p->early&&p->early->adopted)p->join_early();
     p->engram_prompt.reset();p->options.engram_prefetch_tokens=options.engram_prefetch_tokens;p->next=0;

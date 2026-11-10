@@ -74,7 +74,8 @@ Native controls take effect at token boundaries. The response reports requested 
 | `--llamadecode-engram-whole-prompt` | Explicit runtime value | PAIRFIX: 1 (default) makes the early Engram load cover every sweep of a multi-sweep prompt; later sweeps reuse those rows (no Engram reads). The slstack planner admits the whole prompt's rows outside the sweep-capacity search, within physical RAM. 0 restores one load per sweep. |
 | `--llamadecode-host-async` | Explicit runtime value | Single-engine RAM expert tier data movement. 0 = original synchronous copies (stream drain per expert, uploads finish before the DirectStorage batch); 1 = VRAM-to-RAM copy-in on its own non-blocking stream with batched D2H and one event; 2 = also submit the DirectStorage batch first and upload RAM hits on a separate H2D stream while it is in flight (per-expert wait); 3 = as 2 with one event per stream. Byte-identical expert data in every level. |
 | `--llamadecode-host-cache-admit` | rtx-llama: `1` | Single-engine bounded RAM admission. Observe 32 scalar layer passes, select frequently evicted experts, then fill at most one payload per selected key until the next prefill. 0 retains an empty admitted tier for zero-hit overhead qualification; it never changes router scores at quality bias 0. |
-| `--llamadecode-host-cache-mb` | rtx-llama: `0` | Single-engine locked RAM expert tier after VRAM L1/L2. Off by default: unset, empty or `0` sizes nothing, so `host_slots=0` is the default rather than a refusal. `auto` uses admitted physical/process headroom; integer MiB is an upper bound. Bounded hot-set admission avoids continuous GPU victim writeback. Keeps the runtime floor plus 512 MiB desktop reserve and 256 MiB margin; drops before append prefill. See LLAMADECODE_HOST_MODE for upload/CPU service. |
+| `--llamadecode-host-cache-admit-touch` | rtx-llama: `0` | RAM expert tier admission policy. Unset or 0 keeps the bounded 32-pass snapshot; 1..255 admits a victim on its Nth eviction instead, so a key that turns hot late in a session reaches the tier without waiting for the snapshot. 1 stores every victim. Measured 2026-11-10 funded at 12.9 GiB (1 288 slots against 15 360 expert keys): the snapshot absorbed 6.3 percent of misses and second-touch 1.7 percent, both under the turn-cost plan's 50 percent clause and paid for with 10-12 ms of decode step median, so this is an instrument rather than a recommendation. |
+| `--llamadecode-host-cache-mb` | rtx-llama: `0` | Single-engine locked RAM expert tier after VRAM L1/L2. 0 disables; auto uses admitted physical/process headroom; integer MiB is an upper bound. Bounded hot-set admission avoids continuous GPU victim writeback. Keeps the runtime floor plus 512 MiB desktop reserve and 256 MiB margin; drops before append prefill. See LLAMADECODE_HOST_MODE for upload/CPU service. |
 | `--llamadecode-host-cpu-verify` | rtx-llama: `0` | Optional CPU RAM-expert diagnostic: compare the first 16 hybrid FFN rows with the all-GPU result on identical activations. Logs relative RMS/max error; disabled when unset or 0. Extra GPU work is excluded from performance qualification. |
 | `--llamadecode-host-mode` | rtx-llama: `upload` | Single-engine RAM expert service: upload (pinned staging), cpu, or mix (per layer, the cheaper of CPU and upload by measured cost). Packed FP4 experts: cpu computes RAM-tier experts in place on a persistent AVX-512 pool (exact replica of the GPU packed kernels: Q8_1 activations, per-lane FMA order, slot-order merge) concurrently with the expert hook and GPU experts, joined once per layer before the down projection; verified bit-identical per layer. Q4_K: cpu uses the ds4 worker pool with llama CPU dot kernels (experimental, not exact). Other formats and multi-row calls use upload. Requires a matching producer and decode library. |
 | `--llamadecode-host-register` | Explicit runtime value | Single-engine RAM expert tier: try to CUDA-register the tier payload (slot-aligned 512 MiB chunks, all or nothing) so RAM hits DMA straight from it; 0 skips the attempt. On refusal (WDDM reported out of memory on the RTX in every run so far) the tier stays VirtualLocked and hits are staged through pinned buffers. |
@@ -715,7 +716,7 @@ CUDA_PATH: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:60`. Unset read: None.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:64`. Unset read: None.
 
 ```text
         # and the retired DirectStorage runtime was preloaded so its COM apartment existed first.
@@ -9166,7 +9167,7 @@ Expert-count upper bound for the host cache. On the single engine it optionally 
 
 Scope: ds4, rtx-llama. Class: preset.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1641`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1735`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     require(p->pool_max_stride[0]==p->pool_max_stride[1],"RAM expert gate/up geometry mismatch");
@@ -20818,7 +20819,7 @@ GGML_CUDA_ENABLE_UNIFIED_MEMORY: advanced engine setting; built-in default retai
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1075`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1133`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size),
@@ -22338,10 +22339,10 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1
     // LLAMADECODE bind-once: set after a complete decode-layout pass; cleared on any layout rebuild.
     bool resident_bound=false;
     static bool bind_once_enabled(){static const bool on=[]{const char*e=std::getenv("LLAMADECODE_BIND_ONCE");return !(e&&e[0]=='0'&&!e[1]);}();return on;}
-    bool bound()const{return decode_layout&&resident_bound&&bind_once_enabled();}
-    // LLAMADECODE L2 (exclusive victim tier, own VRAM buffer: [gate|up|down] x l2_slots).
-    ggml_backend_buffer_ptr l2_buffer;uint32_t l2_slots=0;std::array<char*,3>l2_base{};
-    std::vector<int32_t>l2_key;std::unordered_map<int32_t,int32_t>l2_of;
+    // LLAMADECODE_EXTENT_SLOTS / LLAMADECODE_EXTENT_SLOT_MIB: the named-extent
+    // relay's host window (docs/TURN_COST_PLAN.md Step 2). The window is what is
+    // in flight on a cold span - 32 MiB reads 3.6 GiB/s, 64 MiB 5.19 - and it is
+    // pinned host RAM, so the slots are read once, planned into the provider's
 ```
 
 ### LLAMADECODE_BYTE_LEDGER
@@ -22350,7 +22351,7 @@ Diagnostic per-tensor file extents and byte counts for every acquired weight sta
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1136`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1196`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),
@@ -22416,7 +22417,7 @@ Opt-in exact next-layer routed-tail hint. Default0. When1, one worker predicts a
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1079`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1137`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const char*device=ggml_backend_dev_description(ggml_backend_get_device(options.backend));
@@ -22944,6 +22945,42 @@ bool llama_dsv41_engram_whole_prompt(){
 bool llama_dsv41_engram_early_enabled(){return llama_dsv41_engram_early_mode()!=llama_dsv41_engram_early::mode::off;}
 ```
 
+### LLAMADECODE_EXTENT_SLOTS
+
+Named-extent relay's host window slot count (the pinned staging tier `wf_fetch_extents_direct` reads cold expert spans through). Unset is 4; 1..64, whole integers only, and anything else refuses the provider plan. Slots x slot bytes is what the relay has in flight on a cold read (32 MiB measured 3.6 GiB/s, 64 MiB 5.19) and is charged in LLAMADECODE_HOST_PLAN's provider component, so widening it is an admitted host cost, not a silent one. DS4X_EXTENT_WINDOW reports the window the fetcher actually pinned.
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:197`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+
+```text
+        static const extent_window_geometry geometry=[]{
+            extent_window_geometry g{4,8ull<<20,32ull<<20};
+            const char*slots=std::getenv("LLAMADECODE_EXTENT_SLOTS");
+            const char*mib=std::getenv("LLAMADECODE_EXTENT_SLOT_MIB");
+            if(slots&&*slots){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(slots,&end,10);
+                require(slots[0]!='-'&&!errno&&end!=slots&&!*end&&v>=1&&v<=64,"LLAMADECODE_EXTENT_SLOTS must be a whole number in 1..64 (unset is 4)");
+                g.slots=int(v);}
+```
+
+### LLAMADECODE_EXTENT_SLOT_MIB
+
+Named-extent relay's slot size in MiB. Unset is 8; 1..1024, whole MiB only, and anything else refuses the provider plan. Read once per process with LLAMADECODE_EXTENT_SLOTS and planned into the provider's host admission before the fetcher allocates, so the bytes charged are the bytes pinned.
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:198`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+
+```text
+            extent_window_geometry g{4,8ull<<20,32ull<<20};
+            const char*slots=std::getenv("LLAMADECODE_EXTENT_SLOTS");
+            const char*mib=std::getenv("LLAMADECODE_EXTENT_SLOT_MIB");
+            if(slots&&*slots){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(slots,&end,10);
+                require(slots[0]!='-'&&!errno&&end!=slots&&!*end&&v>=1&&v<=64,"LLAMADECODE_EXTENT_SLOTS must be a whole number in 1..64 (unset is 4)");
+                g.slots=int(v);}
+            if(mib&&*mib){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(mib,&end,10);
+```
+
 ### LLAMADECODE_GRAPH_MATERIALIZE_PLAN
 
 Reuse the already admitted V4.1 graph lifetime plan when materializing buffers. Default1 avoids the repeated plan without changing arithmetic or admission; 0 retains the second-reserve control.
@@ -22998,7 +23035,7 @@ Single-engine RAM expert tier data movement. 0 = original synchronous copies (st
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:270`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:326`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // batch first and upload RAM hits on a separate H2D stream while it is in flight, waiting
@@ -23016,11 +23053,11 @@ Single-engine bounded RAM admission. Observe 32 scalar layer passes, select freq
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:219`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:276`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    void select_host_working_set(uint32_t layer){
         if(!host_slots||host_selected||layer!=0)return;
+        if(host_admit_touch())return;   // continuous admission takes no snapshot
         const char*admit=std::getenv("LLAMADECODE_HOST_CACHE_ADMIT");
         if(admit&&!std::strcmp(admit,"0"))return;
         if(++host_observations<=32)return;
@@ -23028,13 +23065,31 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:2
         for(int32_t k=0;k<int32_t(host_frequency.size());++k)if(host_frequency[k])keys.push_back(k);
 ```
 
-### LLAMADECODE_HOST_CACHE_MB
+### LLAMADECODE_HOST_CACHE_ADMIT_TOUCH
 
-Single-engine locked RAM expert tier after VRAM L1/L2. Off by default: unset, empty or `0` sizes nothing, so a run reporting `host_slots=0` has no tier rather than a refused one. `auto` uses admitted physical/process headroom - `min(physical, --job-host-bytes - rss - 256 MiB)` - and an integer MiB is an upper bound. Bounded hot-set admission avoids continuous GPU victim writeback. Keeps the runtime floor plus 512 MiB desktop reserve and 256 MiB margin; drops before append prefill. See LLAMADECODE_HOST_MODE for upload/CPU service.
+RAM expert tier admission policy. Unset or 0 keeps the bounded 32-pass snapshot; 1..255 admits a victim on its Nth eviction instead, so a key that turns hot late in a session reaches the tier without waiting for the snapshot. 1 stores every victim. Measured 2026-11-10 funded at 12.9 GiB (1 288 slots against 15 360 expert keys): the snapshot absorbed 6.3 percent of misses and second-touch 1.7 percent, both under the turn-cost plan's 50 percent clause and paid for with 10-12 ms of decode step median, so this is an instrument rather than a recommendation.
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1620`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:259`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+
+```text
+    // slots. Threshold 1 stores every victim, which is the writeback the comment above warns
+    // about; read that as an experiment, not a setting.
+    static uint32_t host_admit_touch(){static const uint32_t n=[]{const char*v=std::getenv("LLAMADECODE_HOST_CACHE_ADMIT_TOUCH");
+        if(!v||!v[0]||!std::strcmp(v,"0"))return 0u;
+        char*end=nullptr;errno=0;const unsigned long long t=std::strtoull(v,&end,10);
+        require(v[0]!='-'&&!errno&&end!=v&&!*end&&t>=1&&t<=255,"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH must be 0 or 1..255");
+        std::fprintf(stderr,"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH threshold=%u policy=continuous\n",uint32_t(t));
+```
+
+### LLAMADECODE_HOST_CACHE_MB
+
+Single-engine locked RAM expert tier after VRAM L1/L2. 0 disables; auto uses admitted physical/process headroom; integer MiB is an upper bound. Bounded hot-set admission avoids continuous GPU victim writeback. Keeps the runtime floor plus 512 MiB desktop reserve and 256 MiB margin; drops before append prefill. See LLAMADECODE_HOST_MODE for upload/CPU service.
+
+Scope: rtx-llama. Class: advanced.
+
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1714`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     (void)limit;(void)floor;throw std::runtime_error("RAM expert cache requires a CUDA backend");
@@ -23190,7 +23245,7 @@ Optional single-engine VRAM L2 slot upper bound. Useful for reproducible tier co
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1661`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1755`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     const uint64_t slot_bytes=p->pool_max_stride[0]+p->pool_max_stride[1]+p->pool_max_stride[2];
@@ -23226,7 +23281,7 @@ E8 experiment: LFU score half life in tokens, 1 (default) or 16. Only used when 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:202`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:228`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     }();return enabled;}
@@ -23304,11 +23359,11 @@ Router-driven prefill expert reads: 0 off, 1 all layers, tail layers21-39. The s
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1131`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1191`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#else
-    auto*p=this;
+    timer measured_build_total(build_total_ms);
+    build_total_ms=0;build_fetcher_ms=0;build_banks_ms=0;build_register_ms=0;
     const char*lazy=std::getenv("LLAMADECODE_PREFILL_ROUTED");
     require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
     p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
@@ -23340,7 +23395,7 @@ E8 experiment: recency-weighted LFU admission for the L2 expert victim cache; 0 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:194`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:220`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     llama_dsv41_recency_lfu::scores lfu_scores;
@@ -27894,7 +27949,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:733
         if(p->options.images){
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1318`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1412`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     if(!llama_dsv41_engram_early_enabled()||p->options.engram_early_tokens.empty())return;
@@ -27906,7 +27961,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1
     const auto&tokens=p->options.engram_early_tokens;const auto&tail=p->options.engram_early_tail;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1347`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1441`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 bool llama_dsv41_weight_provider::start_engram_append(const std::vector<int32_t>&tokens,llama_dsv41::engram_history initial,double gap_s,std::string&error){return p->guard([&]{
@@ -27918,7 +27973,7 @@ bool llama_dsv41_weight_provider::start_engram_append(const std::vector<int32_t>
     require(overlap&&std::strcmp(overlap,"1")==0,"LLAMADECODE_ENGRAM_EARLY requires LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP=1 (per-table adoption)");
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1368`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1462`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 bool llama_dsv41_weight_provider::prepare_engram_prompt(const std::vector<int32_t>&tokens,const std::function<bool()>&stop,std::string&error,llama_dsv41::engram_history initial,const uint8_t* text_mask){return p->guard([&]{
@@ -28086,7 +28141,7 @@ inline uint64_t reserve_bytes(){
 inline bool requested(){const char *v=std::getenv("LLAMA_DSV41_FLASHINFER_MXFP4");return v&&!std::strcmp(v,"1");}
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:775`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:832`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 "Unknown or mismatched native FP4 expert layout");
@@ -29976,7 +30031,7 @@ LLAMA_DSV4_WF_CKSUM: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3107`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3250`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // every other layer-selective mechanism; the surviving gap is upload fidelity of specific
@@ -38388,7 +38443,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
     // otherwise gpu_buf_a would be left null with no WF to provide the heap.
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1998`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2042`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // never adds its own prefetch buffer on top of them.
@@ -38424,7 +38479,7 @@ OPUS22 experiment, unset by default (about layer/1000 bytes per DirectStorage re
 
 Scope: rtx-llama. Class: qualified.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1987`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2026`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         return nullptr;
@@ -38490,7 +38545,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-context.cpp:6911`. 
         char * end = nullptr;
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:615`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:630`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     wf->expert_cache_initialized = true;
@@ -38508,7 +38563,7 @@ LLAMA_WF_EXPERT_CACHE_RAM_MB: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:616`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:631`. Unset read: Wrapper/conditional default: see the literal call and consumer below.
 
 ```text
     if (wf->strict_streaming) return;
@@ -38526,7 +38581,7 @@ LLAMA_WF_EXPERT_PREFETCH: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1635`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1650`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     wf->expert_prefetch_initialized = true;
@@ -38748,7 +38803,7 @@ LLAMA_WF_IO_URING: 0 forces the weight fetcher's synchronous pread baseline, so 
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1216`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:1231`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 // file and the same geometry (Phase 8 item 3).
@@ -38898,7 +38953,7 @@ LLAMA_WF_LOCKFREE_READY: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3152`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3295`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
 static bool wf_lockfree_ready_enabled() {
@@ -38988,7 +39043,7 @@ LLAMA_WF_PREFETCH_PCT: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2142`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2192`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // Set desired size here; actual allocation happens in wf_allocate_prefetch().
@@ -39024,7 +39079,7 @@ LLAMA_WF_RECORD_COMPUTE_DONE: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:297`. Unset read: _rc_default.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:301`. Unset read: _rc_default.
 
 ```text
             else:
@@ -39048,7 +39103,7 @@ LLAMA_WF_SPAN_DUMP: advanced engine setting; built-in default retained
 
 Scope: rtx-llama. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2445`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:2588`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
     // placement uses padded gpu_offsets — any overhang is silently dropped/under-copied.
@@ -45215,7 +45270,7 @@ Built weight-fetcher library used by streaming media.
 
 Scope: ds4, image, rtx-llama, studio, video. Class: preset.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:42`. Unset read: ''.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:46`. Unset read: ''.
 
 ```text
 class wf_weight_span(C.Structure):
@@ -45245,7 +45300,7 @@ if os.environ.get('STUDIO_WF_OVERLAP') == '1':
 # This mirror therefore offers no retired value, and a caller asks for the relay it can get.
 ```
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:296`. Unset read: None.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:300`. Unset read: None.
 
 ```text
                 self._record_compute_done = bool(self._rc_override) and has_sym
@@ -45785,7 +45840,7 @@ WF_PASS_BOUNDARY: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:235`. Unset read: 'cycle'.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:239`. Unset read: 'cycle'.
 
 ```text
                 s.alloc_offset = ao
@@ -45803,7 +45858,7 @@ WF_TRACE: advanced engine setting; built-in default retained
 
 Scope: image, video. Class: advanced.
 
-Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:207`. Unset read: '0'.
+Source: `vendor/engines/cosmos_windows/weight_streaming/ds_backend.py:211`. Unset read: '0'.
 
 ```text
         p.post_mode = WF_POST_KEEP_FETCHER
@@ -46079,7 +46134,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
                     (unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),pinned->residual_probe(input.residual),
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:993`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1051`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
         // A difference here means the transfer delivered wrong bytes; no difference while a later

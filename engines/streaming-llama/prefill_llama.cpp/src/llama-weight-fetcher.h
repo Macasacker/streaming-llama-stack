@@ -128,6 +128,25 @@ typedef struct {
     int     n_layers;                    // total model layers
     bool    trace;                       // emit per-operation timing to stderr
     bool ds_compute_direct;              // explicit strict dual-use compute heaps; no relay
+
+    // ---- Strict extent relay ----
+    // The named-extent reader's host window (wf_fetch_extents_direct): slots of
+    // slot_bytes filled by io_uring and uploaded into a compute bank. Slots x
+    // slot_bytes is what is in flight, and the fetcher's throughput on a cold
+    // span is that figure - 32 MiB reads 3.6 GiB/s, 64 MiB 5.19, 128 MiB 5.67.
+    // Zero keeps the source-pinned default. The strict provider plans the host
+    // bytes and charges them in its admission, so a widened window is a planned
+    // cost and not an allocation nobody accounted for.
+    int     extent_window_slots;         // host slots (default: 4)
+    size_t  extent_window_slot_bytes;    // bytes per slot (default: 8 MiB)
+
+    // ---- Layout flip: keep the pinned host staging tier ----
+    // The decode/prefill flip rebuilds a pipeline whose staging geometry is identical (same slot
+    // count, same slot size), and cudaMallocHost of that tier measured 6.9 s of the 9.6 s flip
+    // while the context around it costs 0.7 ms (docs/TURN_COST_PLAN.md Step 1). A context hands
+    // its tier to the next create through this field; the create moves the buffers out of the
+    // tier and leaves the handle to its caller. See wf_staging_take.
+    struct wf_staging_tier * staging_adopt;   // borrowed: the create consumes its buffers (default: NULL)
 } wf_params;
 
 // Default-initialise params with sensible values
@@ -155,6 +174,9 @@ static inline wf_params wf_params_default(void) {
     p.ds_async_drain = false;
     p.ds_compute_direct = false;
     p.n_sublayers      = 1;
+    p.extent_window_slots = 4;
+    p.extent_window_slot_bytes = 8 * 1024 * 1024;
+    p.staging_adopt = NULL;
     return p;
 }
 
@@ -199,6 +221,27 @@ WF_API bool wf_has_failed(const wf_context * wf);
 
 // Destroy the pipeline, free all resources, join threads.
 WF_API void wf_destroy(wf_context * wf);
+
+// A detached pinned host staging tier: the buffers a layout flip must not pay for twice.
+struct wf_staging_tier;
+
+// Move the context's pinned staging buffers out of it, so destroying the context leaves them
+// allocated and idle. Returns NULL when the context has none. The fetcher must already be
+// stopped: this takes slots the readers fill. The caller owns the result and must either hand it
+// to wf_params_adopt_staging or free it.
+WF_API wf_staging_tier * wf_staging_take(wf_context * wf);
+
+// Point the next create at a tier. Non-owning: the create moves matching buffers out of the tier
+// and clears it, and refuses a tier whose slot count or size differs from this pipeline's
+// staging (logged as fresh_mismatch). The caller frees whatever the create left behind.
+WF_API void wf_params_adopt_staging(wf_params * params, wf_staging_tier * tier);
+
+// Free a tier and any buffers still in it.
+WF_API void wf_staging_free(wf_staging_tier * tier);
+
+// True when a create took every buffer out of the tier, i.e. the pipeline was built on the
+// retired context's staging rather than allocating its own.
+WF_API bool wf_staging_empty(const wf_staging_tier * tier);
 
 // Release the process-global transfer cache. There is none on this build, so
 // this always reports 1. Call only after every wf_context is destroyed.

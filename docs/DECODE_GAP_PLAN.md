@@ -941,14 +941,15 @@ path to it. Everything still open needs the card.
    "1500"`, and Step 4's first item (the bias applies at a nonzero value with no refusal) is closed
    by F, G and H. Any further decode measurement should therefore be `~/bin/ds4-first-run --bias`;
    a `--bias`-less run is the control and should be used only when a comparison needs it.
-2. **Widen the extent relay's window, and say whether it pinned.** Routed prefill's expert fetch is
-   `wf_fetch_extents_direct`: one ring, `extent_slots = 4` slots of 8 MiB, 32 MiB in flight, each
-   slot gated on its upload event before the next read. That shape reads 3.59-3.65 GiB/s cold
-   against 5.67 GiB/s at 128 MiB in flight, and the engine's `fetch_ms` reports 2.67 GiB/s. So the
-   lever is the slot count (a `constexpr`, no knob) and the pin `wf_extent_window_init` asks for -
-   `ulimit -l` here is 8192 KB, so a 32 MiB window cannot all pin and the fallback is
-   `aligned_alloc`, which uploads through a driver bounce buffer. The line that says which
-   transport a run got (`DS4X_EXTENT_WINDOW … transport=`) is landed; the slot count is not.
+2. **Widen the extent relay's window, and say whether it pinned — done 2026-11-10.** Routed
+   prefill's expert fetch is `wf_fetch_extents_direct`: one ring, four host slots of 8 MiB, 32 MiB
+   in flight, each slot gated on its upload event before the next read. That shape reads 3.59-3.65
+   GiB/s cold against 5.67 GiB/s at 128 MiB in flight, and the engine's `fetch_ms` reported
+   2.67-3.05 GiB/s. Both levers are now closed: the pin (`DS4X_EXTENT_WINDOW … transport=pinned`, at
+   `ulimit -l` 8192 KB — `cudaHostAlloc` is not memlock-charged, only the carry tier's `mlock` is),
+   and the slot count, which is `LLAMADECODE_EXTENT_SLOTS` planned into the provider's host
+   admission. At 8 slots the routed column measured 4.19 GiB/s for identical bytes — Step 2 of
+   `docs/TURN_COST_PLAN.md` carries the matched pair, including why the decode step did not fall.
    `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` stay off this list: they belong to the whole-stage
    relay, which is not the path those lines measure.
 3. **Then find what an append costs when it fetches nothing, and keep it across turns.** Turn 2

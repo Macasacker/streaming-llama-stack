@@ -761,7 +761,11 @@ Chunk 3.1f gave the fetcher a reader for the provider's named extents (the
 expert-cache pool and the next-tail hint). Its program is committed at
 `docs/evidence/wf-extent-selftest.cpp`; it drives the real `wf_*` API over a
 throwaway 32 MiB file, byte-compares what each extent landed at inside a bank,
-and checks the refusals. It compiles the fetcher **without** `-DGGML_USE_CUDA`, so
+and checks the refusals. Its window is the caller's to plan
+(`wf_params.extent_window_slots` / `extent_window_slot_bytes`, `LLAMADECODE_EXTENT_SLOTS` /
+`LLAMADECODE_EXTENT_SLOT_MIB` on the provider), so the program also covers twelve 1 MiB parts
+against an eight-slot window and the two create-time refusals for an out-of-range slot count or
+slot size. It compiles the fetcher **without** `-DGGML_USE_CUDA`, so
 the banks are host buffers and the upload is a `memcpy`: the same reader, bounds
 checks, splitting, generation and accounting as the CUDA build, with no device
 allocation and no model.
@@ -774,7 +778,7 @@ g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -I$llama/ggml/src \
 g++ -std=gnu++17 -O1 -I$llama/src -I$llama/ggml/include -o build/wf-extent-selftest \
     build/wf-extent-selftest.cpp build/wf-extent-fetcher.o \
     build/llama/ggml/src/libggml-base.a build/llama/ggml/src/libggml-cpu.a -lpthread -luring
-./build/wf-extent-selftest    # 32 checks, "SELFTEST PASSED: 0 failure(s)"
+./build/wf-extent-selftest    # 38 checks, "SELFTEST PASSED: 0 failure(s)"
 ```
 
 The CUDA arms of that reader (pinned slots, the upload on the caller's stream, one

@@ -259,6 +259,14 @@ struct wf_buffer_slot {
     wf_buffer_slot & operator=(const wf_buffer_slot &) = delete;
 };
 
+// The pinned host staging tier, detached from the context that allocated it. A layout flip
+// rebuilds a pipeline with the same slot count and slot size, and paying cudaMallocHost again for
+// it is the bulk of the flip (docs/TURN_COST_PLAN.md Step 1), so the retiring context hands these
+// buffers to the next create instead of freeing them.
+struct wf_staging_tier {
+    std::vector<wf_buffer_slot> slots;
+};
+
 // File handle (platform-abstracted)
 struct wf_file_handle {
     int      fd = -1;
@@ -491,9 +499,16 @@ struct wf_context {
     // the "bank" is host memory and the upload is a memcpy, so the same reader
     // and the same accounting run - which is how docs/evidence/wf-extent-selftest
     // exercises it on a host with no free VRAM.
-    static constexpr size_t extent_slot_bytes = 8u << 20;
-    static constexpr int    extent_slots = 4;
+    // The window's geometry is the strict caller's to plan: wf_params
+    // extent_window_slots / extent_window_slot_bytes, defaulted here to the shape
+    // this relay was qualified with. Slots x slot_bytes is both what is in flight
+    // and what the caller's host plan must charge, so the two are set from one
+    // value and cannot disagree.
+    static constexpr size_t extent_slot_bytes_default = 8u << 20;
+    static constexpr int    extent_slots_default = 4;
     static constexpr size_t extent_batches = 8;
+    int                     extent_slots = extent_slots_default;
+    size_t                  extent_slot_bytes = extent_slot_bytes_default;
     struct extent_batch {
         uint64_t fence = 0;
 #ifdef WF_HAS_CUDA
@@ -1945,6 +1960,16 @@ static void wf_pipeline_thread_fn(wf_context * wf) {
 // Defined with the start path, where the reader pool must be rebuilt after a stop.
 static void wf_spawn_readers(wf_context * wf);
 
+// The layout flip costs 2.7 s of wf_destroy and 6.9 s of wf_create (docs/TURN_COST_PLAN.md Step 1,
+// measured 2026-11-10 19:45), and neither figure says which allocation it is: the provider wraps
+// the compute banks it gets back from the fetcher in 0.005 ms, so the cudaMalloc of those banks is
+// inside this create and invisible to the provider's own timers. These marks split one create and
+// one destroy, and print the split, so the fix targets the phase that is actually paying.
+static double wf_span(const std::chrono::steady_clock::time_point & from,
+                      const std::chrono::steady_clock::time_point & to) {
+    return std::chrono::duration<double, std::milli>(to - from).count();
+}
+
 static wf_context * wf_create_impl(const wf_params * params, bool strict_streaming) {
     if (!params || !params->model_path || params->n_layers <= 0) {
         WF_ERR("wf_create: invalid params");
@@ -1984,14 +2009,33 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
         WF_ERR("Typed fetch profiles belong to the required streaming caller only");
         return nullptr;
     }
+    // The extent window is host memory the caller admitted and plans. Zero means
+    // "the source default"; anything else is checked and refused rather than
+    // clamped, so a run cannot charge one geometry in its host plan and pin
+    // another. Slots are charged slots x slot_bytes, and the ring is sized to
+    // twice the slots, so both bounds belong to this relay's own cost.
+    if (params->extent_window_slots < 0 || params->extent_window_slots > 64) {
+        WF_ERR("Extent window slot count is outside 0..64");
+        return nullptr;
+    }
+    if (params->extent_window_slot_bytes && (params->extent_window_slot_bytes < (64u << 10) ||
+            params->extent_window_slot_bytes > (1ull << 30) || params->extent_window_slot_bytes % 4096)) {
+        WF_ERR("Extent window slot bytes must be 0, or a 4 KiB multiple in 64 KiB..1 GiB");
+        return nullptr;
+    }
     if (std::getenv("LLAMA_WF_DS_REQUEST_MIB")) WF_ERR("[dsv41-fetch-config] request_bytes=%zu typed_setting=1", params->io_block_size);
     // Ambient tuning is the non-strict caller's; the strict one passes
     // source-pinned settings and must not inherit unbounded environment knobs.
     wf_verbose = params->trace;
 
+    const auto t_begin = std::chrono::steady_clock::now();
     auto * wf = new wf_context();
     wf->params = *params;
     wf->strict_streaming = strict_streaming;
+    wf->extent_slots = params->extent_window_slots > 0 ? params->extent_window_slots
+                                                       : wf_context::extent_slots_default;
+    wf->extent_slot_bytes = params->extent_window_slot_bytes ? params->extent_window_slot_bytes
+                                                             : wf_context::extent_slot_bytes_default;
     // Direct compute banks: the caller owns the two ping-pong heaps and the relay
     // never adds its own prefetch buffer on top of them.
     {
@@ -2019,6 +2063,8 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
         return nullptr;
     }
 #endif
+
+    const auto t_context = std::chrono::steady_clock::now();
 
     // -- Resolve transfer mode --
     wf->effective_mode = params->mode;
@@ -2080,6 +2126,8 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
         wf->files.push_back(fh);
     }
 
+    const auto t_files = std::chrono::steady_clock::now();
+
     // -- Allocate GPU ping-pong buffers --
     size_t buf_size = params->max_layer_bytes;
     if (buf_size == 0) {
@@ -2136,6 +2184,8 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
         }
     }
 
+    const auto t_banks = std::chrono::steady_clock::now();
+
     // Prefetch buffer: allocated lazily after graph_alloc, using remaining VRAM.
     // Set desired size here; actual allocation happens in wf_allocate_prefetch().
     {
@@ -2159,9 +2209,29 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
     // Every mode reads through the RAM staging tier and the reader threads:
     // there is no NVMe-to-GPU queue compiled here.
 
-    // -- Allocate pinned RAM staging buffers --
+    // -- Allocate pinned RAM staging buffers, or take the tier a retired context left behind --
     {
         wf->ram_bufs.resize(params->n_ram_buffers);
+        wf_staging_tier * adopt = params->staging_adopt;   // the params belong to the caller
+        const size_t tier_bytes = adopt && !adopt->slots.empty() ? adopt->slots[0].capacity : 0;
+        const bool reuse = adopt && adopt->slots.size() == size_t(params->n_ram_buffers) &&
+                           tier_bytes == buf_size;
+        // Say which path this create took. A flip that quietly fell back to allocating a fresh
+        // 21.9 GiB tier would otherwise read the same as one that reused it in every other line.
+        std::fprintf(stderr, "WF_STAGING %s slots=%d bytes=%zu tier_slots=%zu tier_bytes=%zu\n",
+                     reuse ? "reused" : (adopt ? "fresh_mismatch" : "fresh"), params->n_ram_buffers,
+                     buf_size, adopt ? adopt->slots.size() : size_t(0), tier_bytes);
+        std::fflush(stderr);
+        if (reuse) {
+            wf->ram_bufs.swap(adopt->slots);        // same count and size, checked above
+            for (auto & slot : wf->ram_bufs) {
+                slot.owns_ptr = true;               // this context frees them now
+                slot.layer_idx = -1;
+                slot.in_use.store(false);
+                slot.compute_recorded = false;
+            }
+            adopt->slots.clear();
+        } else
         for (int i = 0; i < params->n_ram_buffers; i++) {
             auto & slot = wf->ram_bufs[i];
             slot.capacity = buf_size;
@@ -2192,6 +2262,8 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
         }
     }
 
+    const auto t_staging = std::chrono::steady_clock::now();
+
     // -- Create CUDA copy stream --
 #ifdef WF_HAS_CUDA
     const cudaError_t stream_created = cudaStreamCreateWithFlags(&wf->copy_stream,
@@ -2205,6 +2277,8 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
     }
 #endif
 
+    const auto t_stream = std::chrono::steady_clock::now();
+
     // -- Initialize chunk pool --
     {
         size_t chunks_per_layer = (buf_size + params->io_block_size - 1) / params->io_block_size;
@@ -2215,8 +2289,11 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
                pool_size, chunks_per_layer, params->prefetch_depth);
     }
 
+    const auto t_pool = std::chrono::steady_clock::now();
+
     // -- Create the reader queue and the reader threads --
     wf_spawn_readers(wf);
+    const auto t_readers = std::chrono::steady_clock::now();
 
     // -- GDS setup --
 #ifdef WF_HAS_GDS
@@ -2258,6 +2335,17 @@ static wf_context * wf_create_impl(const wf_params * params, bool strict_streami
     }
 #endif
 
+    const auto t_end = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "WF_CREATE_PHASE total_ms=%.1f context_ms=%.1f files_ms=%.1f banks_ms=%.1f "
+        "staging_ms=%.1f stream_ms=%.1f pool_ms=%.1f readers_ms=%.1f rest_ms=%.1f gpu_bufs=%d "
+        "ram_bufs=%d buf_bytes=%zu strict=%d\n",
+        wf_span(t_begin, t_end), wf_span(t_begin, t_context), wf_span(t_context, t_files),
+        wf_span(t_files, t_banks), wf_span(t_banks, t_staging), wf_span(t_staging, t_stream),
+        wf_span(t_stream, t_pool), wf_span(t_pool, t_readers), wf_span(t_readers, t_end),
+        (int) wf->gpu_bufs.size(), (int) wf->ram_bufs.size(),
+        wf->gpu_bufs.empty() ? size_t(0) : wf->gpu_bufs[0].capacity, int(strict_streaming));
+    std::fflush(stderr);
+
     return wf;
 }
 
@@ -2278,16 +2366,20 @@ static void wf_extent_window_release(wf_context * wf);
 void wf_destroy(wf_context * wf) {
     if (!wf) return;
 
+    const auto t_begin = std::chrono::steady_clock::now();
     wf_stop(wf);
+    const auto t_stop = std::chrono::steady_clock::now();
 
 #ifdef WF_HAS_CUDA
     wf_cuda_device_scope cuda_scope(wf->cuda_device_index);
 #endif
     wf_extent_window_release(wf);
+    const auto t_extent = std::chrono::steady_clock::now();
 
 
     // Close files
     for (auto & fh : wf->files) wf_close_file(&fh);
+    const auto t_files = std::chrono::steady_clock::now();
 
     // Free GPU buffers
     {
@@ -2311,6 +2403,8 @@ void wf_destroy(wf_context * wf) {
         }
     }
 
+    const auto t_banks = std::chrono::steady_clock::now();
+
     // Free RAM buffers
     {
         int slot_idx = 0;
@@ -2329,6 +2423,8 @@ void wf_destroy(wf_context * wf) {
             slot_idx++;
         }
     }
+
+    const auto t_staging = std::chrono::steady_clock::now();
 
 #ifdef WF_HAS_CUDA
     if (wf->copy_stream && wf_cache_enabled(wf)) {
@@ -2356,7 +2452,54 @@ void wf_destroy(wf_context * wf) {
     }
 #endif
 
+    const auto t_end = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "WF_DESTROY_PHASE total_ms=%.1f stop_ms=%.1f extent_ms=%.1f files_ms=%.1f "
+        "banks_ms=%.1f staging_ms=%.1f rest_ms=%.1f\n",
+        wf_span(t_begin, t_end), wf_span(t_begin, t_stop), wf_span(t_stop, t_extent),
+        wf_span(t_extent, t_files), wf_span(t_files, t_banks), wf_span(t_banks, t_staging),
+        wf_span(t_staging, t_end));
+    std::fflush(stderr);
+
     delete wf;
+}
+
+wf_staging_tier * wf_staging_take(wf_context * wf) {
+    if (!wf || wf->ram_bufs.empty()) return nullptr;
+
+    auto * tier = new wf_staging_tier();
+    wf->ram_bufs.swap(tier->slots);        // the context no longer holds them, so it cannot free them
+    for (auto & slot : tier->slots) {
+        slot.layer_idx = -1;
+        slot.in_use.store(false);
+        slot.compute_recorded = false;
+    }
+    std::fprintf(stderr, "WF_STAGING_TAKE slots=%zu bytes=%zu\n", tier->slots.size(),
+                 tier->slots.empty() ? size_t(0) : tier->slots[0].capacity);
+    std::fflush(stderr);
+    return tier;
+}
+
+void wf_params_adopt_staging(wf_params * params, wf_staging_tier * tier) {
+    if (params && tier) params->staging_adopt = tier;
+}
+
+void wf_staging_free(wf_staging_tier * tier) {
+    if (!tier) return;
+    for (auto & slot : tier->slots) {
+        if (!slot.ptr || !slot.owns_ptr) continue;
+#ifdef WF_HAS_CUDA
+        cudaFreeHost(slot.ptr);
+#else
+        free(slot.ptr);
+#endif
+        slot.ptr = nullptr;
+        slot.owns_ptr = false;
+    }
+    delete tier;
+}
+
+bool wf_staging_empty(const wf_staging_tier * tier) {
+    return !tier || tier->slots.empty();
 }
 
 void wf_register_layer(wf_context * wf, int layer_idx,
@@ -3540,18 +3683,18 @@ static bool wf_extent_window_init(wf_context * wf) {
     wf_cuda_device_scope scope(wf->cuda_device_index);
 #endif
     int pinned = 0;
-    for (int i = 0; i < wf_context::extent_slots; i++) {
+    for (int i = 0; i < wf->extent_slots; i++) {
         void * p = nullptr;
 #ifdef WF_HAS_CUDA
         // Pinned so an upload can DMA straight from it, as the relay's own
         // staging tier is. A host that refuses the pin still reads correctly
         // through an ordinary aligned buffer.
-        if (cudaHostAlloc(&p, wf_context::extent_slot_bytes, cudaHostAllocDefault) != cudaSuccess) {
+        if (cudaHostAlloc(&p, wf->extent_slot_bytes, cudaHostAllocDefault) != cudaSuccess) {
             p = nullptr;
             (void) cudaGetLastError();
         } else pinned++;
 #endif
-        if (!p) p = aligned_alloc(4096, wf_context::extent_slot_bytes);
+        if (!p) p = aligned_alloc(4096, wf->extent_slot_bytes);
         if (!p) return false;
 #ifdef WF_HAS_CUDA
         cudaEvent_t done = nullptr;
@@ -3566,19 +3709,20 @@ static bool wf_extent_window_init(wf_context * wf) {
     // Named and unconditional, not WF_LOG: which transport the window got is the
     // difference between an upload that DMAes from the slot and one that goes
     // through a driver bounce buffer, and the extent relay's throughput turns on
-    // it. Where pinned host memory is charged against RLIMIT_MEMLOCK - as the
-    // carry bank's CARRY_RAM_LOCK_PARTIAL line shows it is here, at a soft limit
-    // of 8 MiB against a 4 x 8 MiB window - a partial or empty pin is the
-    // expected answer, and nothing recorded which one a run got until now.
+    // it. `cudaHostAlloc` is not charged against RLIMIT_MEMLOCK on this kernel -
+    // only the carry tier's `mlock` is - and the measured answer at `ulimit -l`
+    // 8192 KB is `transport=pinned` (run 20261110-184342). The line stays, because
+    // a host or driver that refuses the pin still reads correct bytes and only
+    // this line says the upload stopped being a direct DMA.
     const char * transport =
 #ifdef WF_HAS_CUDA
-        pinned == wf_context::extent_slots ? "pinned" : (pinned > 0 ? "mixed" : "pageable");
+        pinned == wf->extent_slots ? "pinned" : (pinned > 0 ? "mixed" : "pageable");
 #else
         "host";
 #endif
     std::fprintf(stderr, "DS4X_EXTENT_WINDOW slots=%d slot_bytes=%llu pinned=%d bytes=%llu transport=%s\n",
-                 wf_context::extent_slots, (unsigned long long) wf_context::extent_slot_bytes,
-                 pinned, (unsigned long long) (wf_context::extent_slot_bytes * wf_context::extent_slots),
+                 wf->extent_slots, (unsigned long long) wf->extent_slot_bytes,
+                 pinned, (unsigned long long) (wf->extent_slot_bytes * wf->extent_slots),
                  transport);
     return true;
 }
@@ -3660,8 +3804,8 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
 
     std::vector<wf_extent_part> parts;
     for (int i = 0; i < n; i++)
-        for (uint64_t at = 0; at < extents[i].nbytes; at += wf_context::extent_slot_bytes) {
-            const size_t take = size_t(std::min<uint64_t>(wf_context::extent_slot_bytes, extents[i].nbytes - at));
+        for (uint64_t at = 0; at < extents[i].nbytes; at += wf->extent_slot_bytes) {
+            const size_t take = size_t(std::min<uint64_t>(wf->extent_slot_bytes, extents[i].nbytes - at));
             parts.push_back({extents[i].file_offset + at, extents[i].bank_offset + at, take, extents[i].file_idx});
         }
 
@@ -3670,7 +3814,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
 #endif
     const auto started = std::chrono::high_resolution_clock::now();
     size_t next = 0, done = 0;
-    std::vector<bool> busy(size_t(wf_context::extent_slots), false);
+    std::vector<bool> busy(size_t(wf->extent_slots), false);
     auto slot_ready = [&](int s) {
 #ifdef WF_HAS_CUDA
         return !wf->extent_slot_done[size_t(s)] || cudaEventSynchronize(wf->extent_slot_done[size_t(s)]) == cudaSuccess;
@@ -3693,7 +3837,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
 #ifdef WF_HAS_IO_URING
     if (wf->use_io_uring && !wf->extent_ring) {
         auto * ring = new struct io_uring;
-        if (io_uring_queue_init(2 * wf_context::extent_slots, ring, 0) != 0) {
+        if (io_uring_queue_init(2 * wf->extent_slots, ring, 0) != 0) {
             delete ring;
             wf->use_io_uring = false;
         } else wf->extent_ring = ring;
@@ -3702,7 +3846,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
         struct io_uring * ring = wf->extent_ring;
         auto fill = [&]() -> bool {
             while (next < parts.size()) {
-                const int s = int(next % wf_context::extent_slots);
+                const int s = int(next % wf->extent_slots);
                 if (busy[size_t(s)]) break;                    // slot still holding an upload
                 if (!slot_ready(s)) { wf_extent_fail(wf, "extent staging wait failed"); return false; }
                 struct io_uring_sqe * sqe = io_uring_get_sqe(ring);
@@ -3732,11 +3876,11 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
             const auto & p = parts[which];
             if (res < 0) { wf_extent_fail(wf, "an extent read failed"); return false; }
             if (size_t(res) != p.nbytes) { wf_extent_fail(wf, "an extent read was short"); return false; }
-            if (!upload_part(p, int(which % size_t(wf_context::extent_slots)))) {
+            if (!upload_part(p, int(which % size_t(wf->extent_slots)))) {
                 wf_extent_fail(wf, "extent upload failed");
                 return false;
             }
-            busy[which % size_t(wf_context::extent_slots)] = false;
+            busy[which % size_t(wf->extent_slots)] = false;
             ++done;
             if (!fill()) return false;
         }
@@ -3746,7 +3890,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
         // The pread baseline. It overlaps the hook with the uploads of the parts
         // after the first read, and the remaining reads with those uploads.
         for (size_t i = 0; i < parts.size(); i++) {
-            const int s = int(i % size_t(wf_context::extent_slots));
+            const int s = int(i % size_t(wf->extent_slots));
             if (!slot_ready(s)) { wf_extent_fail(wf, "extent staging wait failed"); return false; }
             const auto & p = parts[i];
             const int fd = wf->files[size_t(p.file_idx)].fd;
