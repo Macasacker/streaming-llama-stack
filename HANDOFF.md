@@ -20,7 +20,16 @@ blocker is closed as a launch-time check in `slstack/affinity_spread.py` - which
 to `ds4_model.size`, not the file length. Steps 2 and 4 are measured: the RAM expert tier is
 neutral-to-negative on this box (kept off) and the affinity bias is the lever, 3.0-3.2x on the
 median step and 93 % cache hit at `quality_speed 0.5`. What is left is the p90 tail, 3.5x Strata's,
-which is Step 5's drafter question rather than a cache one. Step 5's lookup is
+which is Step 5's drafter question rather than a cache one. Step 6 is measured: pi's first real
+session reused 63.8-99.9 % of each turn's prompt through one producer, and what costs now is the
+append, not the reuse - a turn's `[dsv41-prefill-experts]` bursts are 40-55 GiB at 2.67 GiB/s and
+~94 % of the turn's wall time. Measured without the card (`scripts/wf_read_bench.cpp`,
+`scripts/wf_read_matrix.py`): the same bytes at the engine's own 8-ring/QD4 shape read at 5.69
+GiB/s, so about half of `fetch_ms` is the staging gate and upload wait, queue depth is inside 6 %,
+and a retained stage re-reads at 16-38 GiB/s. The next two actions are to split that line and to
+keep a block's active experts across the turn boundary; neither is more I/O concurrency. Note the
+hazard that subsection records: dropping the page cache to get a cold measurement evicts what the
+serving engine is running on. Step 5's lookup is
 answered: the DSpark drafter for the 1017 weights is on this box, `scripts/repack_dsv41_dspark_sidecar.py`
 converts it into the name-and-metadata contract `engines/ds4` binds (engine-checked with
 `./ds4 --inspect --cpu`, no GPU), and the producer's `ds4x` decode ABI has no drafter entry at all.

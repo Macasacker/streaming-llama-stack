@@ -800,6 +800,61 @@ nothing on wall clock. Turn costs were 20-76 s, dominated by this, not by decode
 layer, so the sweep granularity, not the token count, looks like the floor - that is the next thing
 to measure before touching Step 4's quant lever.
 
+### The append's cost is not the disk, and not the reader pool (measured 2026-11-10, card busy)
+
+The tile-sweep guess above is wrong, and the read-path guess that replaced it is wrong too. Both
+were settled without the card, which is the only way anything could be measured while Strata was
+serving.
+
+Reading the session's `[dsv41-prefill-experts]` lines as bursts rather than per layer (the script
+now does this) is what moved the question: a turn's expert fetch is 40-55 GiB and its `fetch_ms`
+sum is ~94 % of the burst's own span, so the fetches are serialised against each other, at
+**2.67-2.81 GiB/s**. That is the number worth attacking - prefill is bytes over bandwidth, and the
+bytes are the same 3.73 GiB block every turn.
+
+`scripts/wf_read_bench.cpp` replays the strict relay's reader loop - one io_uring ring per thread,
+top up to `io_queue_depth - inflight`, `submit_and_wait(1)`, drain what is posted - against the real
+span geometry of `blk.22` (`scripts/wf_read_spans.py`: 262 active experts x 3 routed projections +
+22 dense tensors = 808 spans, 2.60 GiB, which reproduces the logged `bytes=2607759360` of the live
+prefill stage to the byte). `scripts/wf_read_matrix.py` drives it, dropping the block's page-cache
+window first so the first pass is NVMe and the second is a retained re-read:
+
+| reader shape | cold | same stage again |
+|---|---|---|
+| 1 ring x QD4, 4 MiB | 3.52 GiB/s | 14.20 |
+| 2 rings x QD4, 4 MiB | 5.06 | 24.98 |
+| 4 rings x QD4, 4 MiB | 5.56 | 34.19 |
+| **8 rings x QD4, 4 MiB - the engine's shape** | **5.69** | 24.98 |
+| 8 rings x QD1, 4 MiB | 5.07 | 38.78 |
+| 8 rings x QD8, 4 MiB | 5.34 | 16.76 |
+
+Three things follow, and the first one removes a lever this plan was about to pull:
+
+1. **Concurrency is not the lever.** The engine's own shape (8 rings, QD4, and the auto-sized
+   ~4 MiB block) reads the same bytes at 5.69 GiB/s standalone, against the 2.67 GiB/s its
+   `fetch_ms` reports. QD is inside noise: 8 rings at QD1 is 5.07, at QD8 is 5.34. So raising
+   `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` - which the strict provider never reads anyway,
+   because `create_pipeline` builds `wf_params_default()` and `exact_relay_profile` pins
+   `io_block_size` - would buy close to nothing.
+2. **What is left is inside `fetch_ms`, not on the disk.** The line's window contains the staging
+   slot gate and the upload wait, and those are ~half of it: 470 ms of reads inside 975 ms of
+   `fetch_ms`. The next instrumented change is therefore to split that line (`read_ms` vs
+   `stage_ms` vs `upload_ms`) before any read-side tuning is proposed. A 2.1x on the fetch lines is
+   reachable without touching the reader at all.
+3. **Retention across the turn boundary is the prize.** The same 2.60 GiB stage read a second time
+   costs 67-155 ms instead of 457-738 ms. Turn 3 re-read 40.4 GiB with `new=4356` - nothing from
+   turn 2 was retained - so an append pays NVMe for experts the previous turn already fetched. The
+   page cache is the cheapest place to hold them (reads are buffered, `general.alignment` is 16384,
+   and 2.6 GiB per stage is small against ~60 GiB available), which is why the pinned RAM tier
+   measured neutral in Step 2 and why item 2 of "Where this stands" is now the cross-turn `new=`
+   count rather than a tier size.
+
+The cold column is only reproducible with the card idle. Dropping the page cache on this box evicts
+bytes the *serving* engine needs: one such run left Strata at 7.6 GiB swapped with `SwapFree` down to
+19 MiB, and the bench itself was OOM-killed at 63 GiB of anon before its pool got a 1 GiB ceiling and
+a `MemAvailable` refusal. Both guards are in `wf_read_bench.cpp`; the eviction hazard is the reason
+this subsection says "measured while the card was busy" and not "measured cleanly".
+
 ## Acceptance
 
 The bar is the measured Strata + DeepSeek number on this box, on agentic traffic, at 262k context:
@@ -834,17 +889,19 @@ path to it. Everything still open needs the card.
    "1500"`, and Step 4's first item (the bias applies at a nonzero value with no refusal) is closed
    by F, G and H. Any further decode measurement should therefore be `~/bin/ds4-first-run --bias`;
    a `--bias`-less run is the control and should be used only when a comparison needs it.
-2. **Step 5, next on the critical path.** With p10 matching Strata and p90 3.5× worse, the
-   remaining 2.4× on the mean is a tail problem, and the drafter is how the reference implementation
-   gets under it. `scripts/ds4_dspark_probe.sh` measures the native `--dspark --mtp-model` path
-   against the repacked sidecar, twice (`--no-draft` for the comparison), and prints acceptance rate
-   beside tok/s. Only after that number exists does the question of extending `ds4x`'s producer ABI
-   with a verify-shaped entry make sense - the producer currently has no drafter entry at all.
-3. **Step 6 is measured** (see the Step 6 section): pi's first real session reused 74-99 % of each
-   turn's prompt through one producer. What is left there is not reuse but cost - the append path
-   spends 6-34 s per turn whatever the new-token count, so turn 5 paid ~28 s to prefill 1 598
-   tokens. Measure the append's fixed cost (tile sweep vs row count) before Step 4's quant lever;
-   that is the difference between a 20-76 s agent turn and a usable one.
+2. **Split `fetch_ms` before tuning anything that reads.** An append's cost is ~94 % expert fetch
+   time at 2.67 GiB/s, and the same bytes at the engine's own ring shape read at 5.69 GiB/s
+   standalone (see "The append's cost is not the disk, and not the reader pool"), so about half of
+   every `[dsv41-prefill-experts]` line is the staging slot gate and the upload wait rather than
+   NVMe. That line needs `read_ms` / `stage_ms` / `upload_ms`, the same way Step 1's ledger made
+   decode attributable. Raising `LLAMA_WF_IO_THREADS` / `LLAMA_WF_IO_QD` is off this list: 8 rings
+   at QD1 is 5.07 GiB/s against 5.34 at QD8, and the strict provider reads neither variable.
+3. **Then retention across the turn boundary, not a cache tier.** Turn 3 re-read 40.4 GiB with
+   `new=4356` - nothing the previous turn fetched was kept - and a retained stage re-reads in
+   67-155 ms instead of 457-738 ms. The measurable question is what keeps one block's active
+   experts between turns (page cache, or the L1/L2 tiers keyed the same way), and the per-turn
+   `new=` / `resident=` counts are the instrument. Step 2 already ruled out the pinned RAM tier.
+   Step 5's drafter, item 4 below, is the next structural lever after these two.
 
 ### I (21:16): the control, and the attribution is clean
 
@@ -906,6 +963,8 @@ is the ordering from here.
    every request in its own producer, and all three reported `cached_tokens=0`. With a run whose
    producers survive, `cache_n=0` on turn 2 means the append path refused, which is the measurement
    Step 6 wants. The host-tier sizing is item 1's `offer` line, no longer a derived guess.
+   (Superseded: pi's first real session is that run, and reuse is 63.8-99.9 % - see Step 6's
+   "Answered by production traffic". What survives here is the cost question, now item 2 above.)
 4. **Step 5, once the card is free:** `scripts/ds4_dspark_probe.sh` measures the drafter's
    acceptance rate on the native `--dspark --mtp-model` path with `DS4_ALLOW_MTP_STREAMING=1` -
    `DS4_DSPARK_SPEC_LOG=1` prints one `DSpark V4.1 cycle drafted= accepted=` line per verify cycle,
