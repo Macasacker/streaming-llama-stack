@@ -91,8 +91,28 @@ whose arguments contain `</｜DSML｜>`.
 
 Done: 8 checks added, suite unchanged at the 2 pre-existing failures. The Python parser is now
 deliberately more tolerant than the C one it was ported from; that divergence is recorded in
-`parse_deepseek_generated`'s docstring, since the single-engine path is the one that reads these
-blocks.
+`parse_deepseek_generated`'s docstring, since the single-engine path is these blocks.
+
+It came back the same session with a different drift, which the first fix did not reach:
+
+```
+<｜DSML｜ 调用>
+</｜DSML｜ invoke>
+<｜DSML｜ invoke name="bash"> … </｜DSML｜ calls>
+```
+
+The wrapper's *element name* was invented — the model translated `calls` to `调用` — so no style
+matched and the block was returned as prose, and there was a close with nothing opened before the
+first invoke. Fixed by `find_wrapper`: a tag in the wrapper position is the wrapper when the block
+is framed by a recognized calls end, and at wrapper level only, a tag the walk does not expect is
+passed over. Nothing inside is forgiven — a garbled parameter, an invoke with no `name=`, or a
+block holding no invocation is still refused with the raw markup, and quoting a tag in prose still
+produces no call. 5 checks added (`test_ds4_tool_parse.py::DriftedTagTests`).
+
+The limit worth naming: this is tolerance for a 2-bit model's tag drift, not a fix for it. The
+vocab keeps `｜DSML｜` (id 128825) as a NORMAL token, so the tag is four ids with nothing marking
+its boundary, and an IQ2_XXS model will keep inventing spellings. What is guaranteed is that a
+block whose invocations are readable runs, and one that is not is refused and reported.
 
 ## Item 1: the admission gate reports the wrong reason and never waits
 

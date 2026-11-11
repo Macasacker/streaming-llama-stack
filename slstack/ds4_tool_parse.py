@@ -1,9 +1,12 @@
 """DeepSeek generated-message parser: a Python port of the engine's exact logic.
 
 The parser is C, so this is a line-for-line port, not the process — except in tag matching, where
-this port accepts whitespace inside a DSML tag and the bare `</｜DSML｜>` close. This model writes
-both (docs/SESSION_FAILURE_PLAN.md), and the single-engine path reads the generated text here
+this port accepts whitespace inside a DSML tag, the bare `</｜DSML｜>` close, and a wrapper whose
+element name the model invented (`<｜DSML｜ 调用>` for `<｜DSML｜ calls>`). This model writes all
+three (docs/SESSION_FAILURE_PLAN.md), and the single-engine path reads the generated text here
 rather than in C, so the tolerance lives on this side and the C port stays as it was.
+Nothing inside the frame is forgiven: an invocation or an argument that cannot be read is still
+refused rather than guessed.
 Provenance: the Windows ds4 engine's ds4_server.c at stack revision b5907f2 (fork base
 058ae09159a1, merge e1e45374ddc3): find_any_tool_start/end, trim_tool_separator_ws,
 find_tool_structural_text, dsml_unescape_text, dsml_attr, tool_call_json_args_add,
@@ -117,6 +120,49 @@ def find_tool_markup_start(s):
 def find_any_tool_end(s, start=0):
     hits = [r[0] for r in (find_tag(s, n, start) for n in (DS41_TOOL_CALLS_END, TOOL_CALLS_END, TOOL_CALLS_END_SHORT, '</tool_calls>', '</tool_call>')) if r]
     return min(hits) if hits else None
+
+
+OPEN_MARKERS = ('<' + DSML, '<' + DSML_SHORT)
+
+
+def find_wrapper(s, start=0):
+    """The tool block's wrapper, as (index, length, style, loose).
+
+    Strictly it is one of the four wrapper spellings the writer emits. When the model garbles the
+    element name rather than the whitespace — `<｜DSML｜ 调用>` for `<｜DSML｜ calls>`, which this
+    box produced on 2026-11-11 — a tag in that position counts as the wrapper only if the block is
+    framed by a recognized calls end. Everything inside is still parsed invocation-by-invocation:
+    this forgives the frame, never an argument.
+    """
+    best = None
+    for tag, style in ((TOOL_CALLS_START, 0), (TOOL_CALLS_START_SHORT, 2), ('<tool_calls>', 1),
+                       (DS41_TOOL_CALLS_START, 3)):
+        hit = find_tag(s, tag, start)
+        if hit is not None and (best is None or hit[0] < best[0]):best = (hit[0], hit[1], style, False)
+    if best is not None:return best
+    i = start
+    while True:
+        found = [(pos, marker) for pos, marker in ((s.find(marker, i), marker) for marker in OPEN_MARKERS) if pos >= 0]
+        if not found:return None
+        pos, marker = min(found)
+        end = s.find('>', pos)
+        if end < 0:return None
+        framed = find_any_tool_end(s, end + 1)
+        if framed is not None and s[pos + len(marker):end].strip(SPACE):
+            style = 3
+            for candidate in (3, 0, 2, 1):
+                hit = find_tag(s, STYLES[candidate][1], end + 1)
+                if hit is not None and hit[0] == framed:style = candidate;break
+            return pos, end + 1 - pos, style, True
+        i = end + 1
+
+
+def skip_tag(s, p):
+    """The position past the next tag. Used at wrapper level only, to pass over a close the model
+    wrote without opening its element; anywhere else it is a parse failure, not a skip."""
+    if not s.startswith('<', p):return None
+    end = s.find('>', p)
+    return None if end < 0 else end + 1
 
 
 def skip_ws(s, i):
@@ -238,9 +284,10 @@ def parse_deepseek_generated(text, require_thinking_closed, note=None):
     """parse_deepseek_generated_message_ex -> (ok, content, reasoning, calls, raw_tool_text).
 
     Tags are matched tolerantly (`match_tag`, `close_at`): whitespace inside a DSML tag and the
-    bare `</｜DSML｜>` close are both read, because that is what this model writes. Arguments are
-    still never guessed — anything the walk cannot follow returns ok=False. When `note` is a
-    dict, it is filled with the tag the walk stopped at, for the refusal message.
+    bare `</｜DSML｜>` close are both read, and a wrapper whose name the model invented is accepted
+    when the block is framed by a recognized calls end (`find_wrapper`). Arguments are still never
+    guessed — anything the walk cannot follow returns ok=False. When `note` is a dict, it is
+    filled with the tag the walk stopped at, for the refusal message.
     """
     def stop(why):
         if note is not None:note.clear();note['why'] = why
@@ -256,22 +303,19 @@ def parse_deepseek_generated(text, require_thinking_closed, note=None):
             tool_search = candidate;recovered_unclosed_tool = True
         else:tool_search = think_end + 8
     start = None;style = 0
-    for tag, st in ((TOOL_CALLS_START, 0), (TOOL_CALLS_START_SHORT, 2), ('<tool_calls>', 1), (DS41_TOOL_CALLS_START, 3)):
-        hit = find_tag(text, tag, tool_search)
-        if hit is not None and (start is None or hit[0] < start):start = hit[0];style = st
-    if start is None:
+    hit = find_wrapper(text, tool_search)
+    if hit is None:
         content, reasoning = split_reasoning_content(text)
         return True, content, reasoning, [], None
+    tag_at, length, style, loose = hit
+    start = tag_at
     # The raw block keeps the blank line the writer puts before it: `tool_memory` replays it
     # verbatim into the next prompt, so the recorded text must match what was rendered.
-    tag_at = start
     if start >= 2 and text[start - 2:start] == '\n\n':start -= 2
     content_len = start
     while content_len > 0 and text[content_len - 1] in SPACE:content_len -= 1
     calls_start, calls_end, invoke_start, invoke_end, param_start, param_end = STYLES[style]
     bare = BARE_CLOSE.get(style)
-    length = match_tag(text, tag_at, calls_start)
-    if length is None:return stop('the tool block opens with ' + calls_start)
     p = tag_at + length;calls = []
     while True:
         p = skip_ws(text, p)
@@ -284,7 +328,11 @@ def parse_deepseek_generated(text, require_thinking_closed, note=None):
                 return True, '', body, calls, raw
             content, reasoning = split_reasoning_content(text[:content_len])
             return True, content, reasoning, calls, raw
-        if match_tag(text, p, invoke_start) is None:return stop('an invoke with an attribute list, ' + invoke_start + ' name="…"')
+        if match_tag(text, p, invoke_start) is None:
+            if loose:
+                passed = skip_tag(text, p)
+                if passed is not None:p = passed;continue
+            return stop('an invoke with an attribute list, ' + invoke_start + ' name="…"')
         tag_end = _find(text, '>', p)
         if tag_end is None:return stop('the closing > of the invoke tag')
         name = dsml_attr(text[p:tag_end + 1], 'name')

@@ -142,5 +142,51 @@ class DriftedTagTests(unittest.TestCase):
                                   r.DS41_TOOL_CALLS_END, has_tools=True, think=False, finish='stop')
         self.assertIn('invoke name=', result['tool_error']['reason'])
 
+    # The next drift this box produced (2026-11-11, later in the same session): the model
+    # translated the wrapper's element name and closed an invoke it had not opened.
+    TRANSLATED = ('<｜DSML｜ \u8c03\u7528>\n' + r.DS41_INVOKE_END + '\n' + r.DS41_INVOKE_START + ' name="bash">\n' +
+                  r.DS41_PARAM_START + ' name="command" string="true">grep -rn X a/*.inc b/*.cpp | head' +
+                  r.DS41_PARAM_END + '\n' + r.DS41_INVOKE_END + '\n' + r.DS41_TOOL_CALLS_END)
+
+    def test_a_wrapper_name_the_writer_never_uses_is_still_a_wrapper(self):
+        result = p.finish_message(self.TRANSLATED, has_tools=True, think=False, finish='stop')
+        self.assertTrue(result['ok'])
+        self.assertEqual(len(result['calls']), 1)
+        self.assertEqual(result['calls'][0]['name'], 'bash')
+        self.assertEqual(json.loads(result['calls'][0]['arguments']),
+                         {'command': 'grep -rn X a/*.inc b/*.cpp | head'})
+        self.assertEqual(result['finish'], 'tool_calls')
+        self.assertEqual(result['raw_tool_text'], self.TRANSLATED)
+
+    def test_a_stray_close_before_the_first_invoke_does_not_end_the_block(self):
+        ok, _, _, calls, _ = p.parse_deepseek_generated(self.TRANSLATED, False)
+        self.assertTrue(ok)
+        self.assertEqual([c['name'] for c in calls], ['bash'])
+
+    def test_a_wrapper_that_holds_no_invocation_is_still_refused(self):
+        for text in ('<｜DSML｜ \u8c03\u7528>\n' + r.DS41_TOOL_CALLS_END,
+                     '<｜DSML｜ \u8c03\u7528>\n' + r.DS41_INVOKE_START + '>\n' + r.DS41_TOOL_CALLS_END,
+                     '<｜DSML｜ \u8c03\u7528> nothing framed'):
+            result = p.finish_message(text, has_tools=True, think=False, finish='stop')
+            self.assertEqual(result['calls'], [], text)
+            self.assertTrue(result.get('tool_error'))
+
+    def test_parameters_inside_a_loose_wrapper_are_still_read_strictly(self):
+        broken = ('<｜DSML｜ \u8c03\u7528>\n' + r.DS41_INVOKE_START + ' name="f">\n' +
+                  r.DS41_PARAM_START + ' name="a" string="true">v' + '\n' + r.DS41_INVOKE_END + '\n' +
+                  r.DS41_TOOL_CALLS_END)
+        result = p.finish_message(broken, has_tools=True, think=False, finish='stop')
+        self.assertEqual(result['calls'], [])
+        self.assertTrue(result.get('tool_error'))
+
+    def test_markup_quoted_without_framing_is_not_read_as_a_call(self):
+        # Quoting a tag in prose has always refused rather than executing; the loose wrapper
+        # must not change that — nothing is framed by a recognized calls end, so nothing runs.
+        quoted = 'Here is the format: <｜DSML｜ \u8c03\u7528> and nothing else'
+        result = p.finish_message(quoted, has_tools=True, think=False, finish='stop')
+        self.assertEqual(result['calls'], [])
+        self.assertTrue(result.get('tool_error'))
+        self.assertEqual(result['tool_error']['raw'], quoted[quoted.index('<｜DSML｜'):])
+
 
 if __name__ == '__main__':unittest.main()
