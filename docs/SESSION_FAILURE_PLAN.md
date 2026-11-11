@@ -286,13 +286,35 @@ Fix, in order:
 2. Have the executor's scan stop special-casing `nrows<=1` and use the shared predicate instead,
    so single-row decode is counted exactly when the backend dispatches it.
 
-Tests: `tests/dsv41_topk_coverage.cpp` (new, table-driven, no GPU) over the shape grid already in
-`dsv41_topk_single_row.cpp` — `{272,272}, {384,6}, {8192,512}, {16384,512}, {65536,512},
-{131072,2048}` at `nrows` 1 and 3, with `LLAMA_DSV4_TOPK_CUB_1ROW` both unset and `1` — asserting
-the predicate's count equals the value the CUDA path would add. `tests/dsv41_topk_single_row.cpp`
-gains an assertion that the counter delta equals the predicate for each shape (runs only when a
-CUDA backend exists; skipped otherwise, as the gate already does). Then re-run the gate on the
-card when it is free, and record the numbers in this document.
+Tests: `tests/dsv41_topk_coverage.cpp` plus `tests/test_topk_coverage_gate.py` — a table-driven
+run of the shared rule with no CUDA and no ggml, over the shape grid already in
+`dsv41_topk_single_row.cpp` (`{272,272}, {384,6}, {8192,512}, {16384,512}, {48645,512}, {65536,512},
+{131072,2048}` at one row and three), the tagged selector, the CUB control, the
+`LLAMA_DSV41_TOPK_RADIX` unset case, the no-CUB build, and a check that the merge rounds follow the
+backend's own loop. 23 checks, both row-rule modes, no warnings from `-Wall`.
+`tests/dsv41_topk_single_row.cpp` gained the on-device assertion that the rule equals the counter
+delta, run by `tests/test_topk_single_row_gate.py` behind `SLSTACK_GPU_GATE=1` (it needs the card;
+the suite skips it otherwise).
+
+Done, and measured on the card rather than read from the source:
+
+```
+ncols=48645 k=512 rows=1: coverage rule == dispatched kernels dispatched=2 rule=2
+ncols=48645 k=512 rows=3: coverage rule == dispatched kernels dispatched=2 rule=2
+ncols=8192  k=512 rows=1: coverage rule == dispatched kernels dispatched=0 rule=0
+```
+
+The deleted scan answered `0` for the first line — that is the abort, and it is now 2 = 2.
+Two findings from running the gate:
+
+- The `LLAMA_DSV4_TOPK_CUB_1ROW=1` A/B control cannot be exercised by this gate on this box:
+  DeviceTopK's temporary storage for a 131072-column row trips
+  `GGML_ASSERT(!ggml_cuda_capturing_dispatch)` at `ggml-cuda.cu:1121`. That is the control path's
+  own limit, not the coverage rule's, and it predates this change — recorded in the gate's runner
+  so nobody reads it as a new failure.
+- The executor's scan had a second disagreement beyond the row count: it never asked whether the
+  radix kernel actually fits the device's shared memory, and it keyed on `node->ne[0]==512` before
+  asking the backend. Both now come from the shared rule.
 
 ## Item 3: a deterministic abort is retried three times against a cold engine
 

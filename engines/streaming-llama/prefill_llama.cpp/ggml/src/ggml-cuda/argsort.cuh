@@ -3,6 +3,10 @@
 void ggml_cuda_op_argsort(ggml_backend_cuda_context & ctx, ggml_tensor * dst);
 
 #ifdef GGML_CUDA_USE_CUB
+// Whether a tile of `tile_size` selecting `k` runs the exact radix kernel. Declared here because
+// ggml-cuda/top-k.cu must count the dispatches this decides, not re-derive them.
+bool dsv41_topk_radix_enabled(const int tile_size, const int k);
+
 void argsort_f32_i32_cuda_cub(ggml_cuda_pool & pool,
                               const float *    x,
                               int *            dst,

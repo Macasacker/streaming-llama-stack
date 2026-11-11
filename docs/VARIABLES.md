@@ -28631,7 +28631,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/argsort.cu
 
 ```text
     sizeof(dsv41_TopKBlockSort::TempStorage) : 8192 * sizeof(int);
-static bool dsv41_topk_radix_enabled(const int tile_size, const int k) {
+bool dsv41_topk_radix_enabled(const int tile_size, const int k) {
     const char *env = std::getenv("LLAMA_DSV41_TOPK_RADIX");
     return env && env[0] == '1' && tile_size == 8192 && k == 512 &&
         dsv41_topk_radix_smem + sizeof(unsigned) <= ggml_cuda_info().devices[ggml_cuda_get_device()].smpbo;
@@ -29947,16 +29947,16 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-kv-cache-dsv4.cpp:1
 
 Scope: rtx-llama, rtx-producer. Class: advanced.
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:91`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:48`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-    // LLAMA_DSV4_TOPK_CUB_1ROW=1, and for k > TOP_K_TILE_SIZE.
-    static const bool cub_single_row = []() {
+static bool top_k_cub_single_row() {
+    static const bool value = []() {
         const char * env = std::getenv("LLAMA_DSV4_TOPK_CUB_1ROW");
         return env != nullptr && env[0] == '1' && env[1] == '\0';
     }();
-    const bool deterministic_rows = nrows > 1 || force_bitonic_single_row || !cub_single_row;
-
+    return value;
+}
 ```
 
 ### LLAMA_DSV4_TOPK_FORCE_BITONIC
@@ -29977,16 +29977,16 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:
     LLAMA_LOG_INFO("%s: [DIAG] model has %d layers\n", __func__, n_layer);
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:82`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:36`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
-#ifdef CUB_TOP_K_AVAILABLE
-    static const bool force_bitonic_single_row = []() {
+static bool top_k_force_bitonic_single_row() {
+    static const bool value = []() {
         const char * env = std::getenv("LLAMA_DSV4_TOPK_FORCE_BITONIC");
         return env != nullptr && env[0] != '\0' && env[0] != '0';
     }();
-    // LLAMADECODE: a single row takes the SAME deterministic bitonic / bitonic-tiles
-    // network as multi-row (prefill), so a 1-row decode step selects the same ids
+    return value;
+}
 ```
 
 ### LLAMA_DSV4_WEIGHT_DUMPFILE
@@ -46110,7 +46110,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
                     in.layer,(unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2184`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2196`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
             // propagated it. BF16 is validated as bit patterns, so a NaN stored before the widening
@@ -46122,7 +46122,7 @@ Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:
                 // uploaded bytes, which is how a validated buffer arrives poisoned.
 ```
 
-Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2298`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
+Source: `engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2310`. Unset read: NULL from getenv; the literal consumer below supplies any fallback.
 
 ```text
                 ggml_type_name(values.next_pre->type),(unsigned long long)ggml_nbytes(values.next_pre),

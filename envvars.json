@@ -32213,7 +32213,7 @@
         "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/argsort.cu:532",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *env = std::getenv(\"LLAMA_DSV41_TOPK_RADIX\");",
-        "consumer": "    sizeof(dsv41_TopKBlockSort::TempStorage) : 8192 * sizeof(int);\nstatic bool dsv41_topk_radix_enabled(const int tile_size, const int k) {\n    const char *env = std::getenv(\"LLAMA_DSV41_TOPK_RADIX\");\n    return env && env[0] == '1' && tile_size == 8192 && k == 512 &&\n        dsv41_topk_radix_smem + sizeof(unsigned) <= ggml_cuda_info().devices[ggml_cuda_get_device()].smpbo;\n}\n#endif"
+        "consumer": "    sizeof(dsv41_TopKBlockSort::TempStorage) : 8192 * sizeof(int);\nbool dsv41_topk_radix_enabled(const int tile_size, const int k) {\n    const char *env = std::getenv(\"LLAMA_DSV41_TOPK_RADIX\");\n    return env && env[0] == '1' && tile_size == 8192 && k == 512 &&\n        dsv41_topk_radix_smem + sizeof(unsigned) <= ggml_cuda_info().devices[ggml_cuda_get_device()].smpbo;\n}\n#endif"
       }
     ]
   },
@@ -33490,14 +33490,14 @@
     ],
     "doc": "1 selects the CUB top-k path for single-row selection; built-in default retained.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:91"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:48"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:91",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:48",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env = std::getenv(\"LLAMA_DSV4_TOPK_CUB_1ROW\");",
-        "consumer": "    // LLAMA_DSV4_TOPK_CUB_1ROW=1, and for k > TOP_K_TILE_SIZE.\n    static const bool cub_single_row = []() {\n        const char * env = std::getenv(\"LLAMA_DSV4_TOPK_CUB_1ROW\");\n        return env != nullptr && env[0] == '1' && env[1] == '\\0';\n    }();\n    const bool deterministic_rows = nrows > 1 || force_bitonic_single_row || !cub_single_row;\n"
+        "consumer": "static bool top_k_cub_single_row() {\n    static const bool value = []() {\n        const char * env = std::getenv(\"LLAMA_DSV4_TOPK_CUB_1ROW\");\n        return env != nullptr && env[0] == '1' && env[1] == '\\0';\n    }();\n    return value;\n}"
       }
     ],
     "code_default": "NULL from getenv; the literal consumer below supplies any fallback"
@@ -33515,7 +33515,7 @@
     "doc": "LLAMA_DSV4_TOPK_FORCE_BITONIC: advanced engine setting; built-in default retained",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-prefill-stream.cpp:1317",
-      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:82"
+      "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:36"
     ],
     "code_defaults": [
       {
@@ -33525,10 +33525,10 @@
         "consumer": "            dsv4_lid_topk_trace_enabled ? (size_t) n_layer : 0);\n\n    const char * force_bitonic_env = std::getenv(\"LLAMA_DSV4_TOPK_FORCE_BITONIC\");\n    const bool force_bitonic = force_bitonic_env != nullptr &&\n            force_bitonic_env[0] != '\\0' && force_bitonic_env[0] != '0';\n\n    LLAMA_LOG_INFO(\"%s: [DIAG] model has %d layers\\n\", __func__, n_layer);"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:82",
+        "source": "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/top-k.cu:36",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char * env = std::getenv(\"LLAMA_DSV4_TOPK_FORCE_BITONIC\");",
-        "consumer": "#ifdef CUB_TOP_K_AVAILABLE\n    static const bool force_bitonic_single_row = []() {\n        const char * env = std::getenv(\"LLAMA_DSV4_TOPK_FORCE_BITONIC\");\n        return env != nullptr && env[0] != '\\0' && env[0] != '0';\n    }();\n    // LLAMADECODE: a single row takes the SAME deterministic bitonic / bitonic-tiles\n    // network as multi-row (prefill), so a 1-row decode step selects the same ids"
+        "consumer": "static bool top_k_force_bitonic_single_row() {\n    static const bool value = []() {\n        const char * env = std::getenv(\"LLAMA_DSV4_TOPK_FORCE_BITONIC\");\n        return env != nullptr && env[0] != '\\0' && env[0] != '0';\n    }();\n    return value;\n}"
       }
     ]
   },
@@ -51977,8 +51977,8 @@
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:1737",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:1824",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2184",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2298",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2196",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2310",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1051"
     ],
     "code_defaults": [
@@ -51995,13 +51995,13 @@
         "consumer": "            up_validate_started_ms=elapsed(upload_start);\n            pinned->validate(check,\"input\");\n            if(std::getenv(\"DS4PERF_NAN_TRACE\")!=nullptr){\n                // The same tensor the validator just certified, probed again after the layer graph\n                // has run. A buffer that was finite here and nonfinite later was overwritten.\n                llama_dsv41_layer_log(\"DS4PERF_RESIDUAL_STATE phase=input layer=%u ptr=%llu bytes=%llu type=%s flags=%u\\n\",\n                    in.layer,(unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2184",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2196",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if(const char*trace=std::getenv(\"DS4PERF_NAN_TRACE\");trace&&*trace){",
         "consumer": "            // propagated it. BF16 is validated as bit patterns, so a NaN stored before the widening\n            // is caught too.\n            if(const char*trace=std::getenv(\"DS4PERF_NAN_TRACE\");trace&&*trace){\n                std::vector<const ggml_tensor*> seen;\n                // Every tensor the graph touched, with its byte range. An input leaf whose range\n                // intersects a computed node's range is an allocation bug: the node overwrote the\n                // uploaded bytes, which is how a validated buffer arrives poisoned."
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2298",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2310",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if(std::getenv(\"DS4PERF_NAN_TRACE\")!=nullptr&&pinned){",
         "consumer": "                ggml_type_name(values.next_pre->type),(unsigned long long)ggml_nbytes(values.next_pre),\n                (unsigned long long)check.pre_n);\n            if(std::getenv(\"DS4PERF_NAN_TRACE\")!=nullptr&&pinned){\n                ggml_backend_synchronize(backend);\n                llama_dsv41_layer_log(\"DS4PERF_RESIDUAL_STATE phase=post_compute layer=%u input_ptr=%llu \"\n                    \"input_flags=%u output_ptr=%llu output_flags=%u\\n\",in.layer,\n                    (unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),pinned->residual_probe(input.residual),"

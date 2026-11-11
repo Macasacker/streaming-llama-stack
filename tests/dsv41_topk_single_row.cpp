@@ -6,6 +6,7 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cuda.h"
+#include "ggml-dsv41-topk.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -14,7 +15,10 @@
 #include <vector>
 
 static int failures = 0;
-static void expect(bool ok, const char *what) { std::printf("%s %s\n", ok ? "PASS" : "FAIL", what); if (!ok) ++failures; }
+static void expect(bool ok, const char *what, const char *detail = "") {
+    std::printf("%s %s%s%s\n", ok ? "PASS" : "FAIL", what, detail[0] ? " " : "", detail);
+    if (!ok) ++failures;
+}
 
 static std::vector<int32_t> run_topk(ggml_backend_t backend, const std::vector<float> &row, int64_t nrows, int k) {
     const int64_t ncols = int64_t(row.size());
@@ -37,6 +41,30 @@ static std::vector<int32_t> run_topk(ggml_backend_t backend, const std::vector<f
     return out;
 }
 
+static std::pair<uint64_t, uint64_t> run_topk_counted(ggml_backend_t backend, const std::vector<float> & row,
+                                                     int64_t nrows, int k) {
+    // (radix kernels actually dispatched, kernels the coverage rule says this tensor will dispatch).
+    // The executor refuses a layer when these two disagree, so the gate must see them agree here.
+    const int64_t ncols = int64_t(row.size());
+    ggml_init_params params{16 * 1024 * 1024, nullptr, true};
+    ggml_context * ctx = ggml_init(params);
+    ggml_tensor * x = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, ncols, nrows);
+    ggml_tensor * y = ggml_top_k(ctx, x, k);
+    ggml_cgraph * g = ggml_new_graph(ctx);
+    ggml_build_forward_expand(g, y);
+    ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend);
+    std::vector<float> all(size_t(ncols * nrows));
+    for (int64_t r = 0; r < nrows; ++r) std::copy(row.begin(), row.end(), all.begin() + r * ncols);
+    ggml_backend_tensor_set(x, all.data(), 0, all.size() * 4);
+    const auto before = ggml_backend_cuda_dsv41_topk_radix_queued();
+    ggml_backend_graph_compute(backend, g);
+    const auto delta = ggml_backend_cuda_dsv41_topk_radix_queued() - before;
+    const auto planned = ggml_backend_cuda_dsv41_topk_radix_dispatches(x, y);
+    ggml_backend_buffer_free(buf);
+    ggml_free(ctx);
+    return {delta, planned};
+}
+
 int main() {
     ggml_backend_t backend = ggml_backend_cuda_init(0);
     if (!backend) { std::printf("FAIL no CUDA backend\n"); return 2; }
@@ -45,7 +73,7 @@ int main() {
     std::mt19937 rng(1017);
     std::uniform_real_distribution<float> uni(-4.f, 4.f);
     struct cfg { int ncols, k; };
-    for (const cfg c : {cfg{272, 272}, cfg{384, 6}, cfg{8192, 512}, cfg{16384, 512}, cfg{65536, 512}, cfg{131072, 2048}}) {
+    for (const cfg c : {cfg{272, 272}, cfg{384, 6}, cfg{8192, 512}, cfg{16384, 512}, cfg{48645, 512}, cfg{65536, 512}, cfg{131072, 2048}}) {
         std::vector<float> row(size_t(c.ncols));
         for (auto &v : row) v = std::round(uni(rng) * 64.f) / 64.f;  // coarse values: many exact ties
         const auto one_a = run_topk(backend, row, 1, c.k);
@@ -64,6 +92,15 @@ int main() {
         expect(one_a == multi, what);
         std::snprintf(what, sizeof what, "ncols=%d k=%d: selected set == reference set", c.ncols, c.k);
         expect(same_set(one_a, ref), what);
+        for (const int64_t rows : {int64_t(1), int64_t(3)}) {
+            const auto counted = run_topk_counted(backend, row, rows, c.k);
+            char detail[120];
+            std::snprintf(detail, sizeof detail, "dispatched=%llu rule=%llu", (unsigned long long)counted.first,
+                          (unsigned long long)counted.second);
+            std::snprintf(what, sizeof what, "ncols=%d k=%d rows=%lld: coverage rule == dispatched kernels",
+                          c.ncols, c.k, (long long)rows);
+            expect(counted.first == counted.second, what, detail);
+        }
     }
     ggml_backend_free(backend);
     std::printf(failures ? "FAILED %d\n" : "ALL PASS\n", failures);

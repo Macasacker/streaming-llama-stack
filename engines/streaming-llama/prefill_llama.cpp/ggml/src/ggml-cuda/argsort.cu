@@ -528,7 +528,7 @@ static bool dsv41_topk_select_enabled() {
 static constexpr size_t dsv41_topk_radix_smem =
     sizeof(dsv41_TopKBlockSort::TempStorage) > 8192 * sizeof(int) ?
     sizeof(dsv41_TopKBlockSort::TempStorage) : 8192 * sizeof(int);
-static bool dsv41_topk_radix_enabled(const int tile_size, const int k) {
+bool dsv41_topk_radix_enabled(const int tile_size, const int k) {
     const char *env = std::getenv("LLAMA_DSV41_TOPK_RADIX");
     return env && env[0] == '1' && tile_size == 8192 && k == 512 &&
         dsv41_topk_radix_smem + sizeof(unsigned) <= ggml_cuda_info().devices[ggml_cuda_get_device()].smpbo;

@@ -2031,12 +2031,24 @@ bool llama_dsv41_tile_executor::run(const request&in,const llama_dsv41_layer_gra
         if(topk_radix){
             uint64_t expected=0;
             for(int i=0;i<ggml_graph_n_nodes(compute_graph);++i){const auto *node=ggml_graph_node(compute_graph,i);
-                if(ggml_dsv41_stream_topk_requested(node)){require(ggml_dsv41_stream_topk_shape(node),"Private selector lost bounded shape");expected+=node->ne[0]==512;continue;}
-                if(node->op!=GGML_OP_TOP_K||node->ne[0]!=512||!node->src[0]||node->src[0]->ne[0]<=8192||ggml_nrows(node->src[0])<=1)continue;
-                uint64_t width=(uint64_t(node->src[0]->ne[0])+8191)/8192*512;expected+=2;
-                while(width>8192){width=(width+8191)/8192*512;++expected;}
+                if(ggml_dsv41_stream_topk_requested(node))require(ggml_dsv41_stream_topk_shape(node),"Private selector lost bounded shape");
+                if(node->op!=GGML_OP_TOP_K||!node->src[0])continue;
+                expected+=ggml_backend_cuda_dsv41_topk_radix_dispatches(node->src[0],node);
             }
             const auto actual=ggml_backend_cuda_dsv41_topk_radix_queued()-topk_radix_before;
+            if(actual!=expected){
+                // A coverage refusal used to carry no numbers, so the only way to learn which
+                // node disagreed was to read the source. Name the shapes instead.
+                std::fprintf(stderr,"DS4PERF_TOPK_RADIX_MISMATCH layer=%u start=%u rows=%u expected=%llu actual=%llu\n",
+                    in.layer,in.start,in.count,(unsigned long long)expected,(unsigned long long)actual);
+                for(int i=0;i<ggml_graph_n_nodes(compute_graph);++i){const auto *node=ggml_graph_node(compute_graph,i);
+                    if(node->op!=GGML_OP_TOP_K||!node->src[0])continue;
+                    std::fprintf(stderr,"DS4PERF_TOPK_RADIX_NODE layer=%u node=%d name=%s k=%lld columns=%lld rows=%lld tagged=%d radix=%llu\n",
+                        in.layer,i,node->name,(long long)node->ne[0],(long long)node->src[0]->ne[0],
+                        (long long)ggml_nrows(node->src[0]),int(ggml_dsv41_stream_topk_requested(node)),
+                        (unsigned long long)ggml_backend_cuda_dsv41_topk_radix_dispatches(node->src[0],node));}
+                std::fflush(stderr);
+            }
             require(actual==expected,"Actual exact radix top-k first/merge dispatch coverage differs");
             llama_dsv41_layer_log("DS4PERF_TOPK_RADIX_COMPLETE layer=%u start=%u count=%u actual=%llu packed_score_index=1 original_NaN_subnormal_network=1 weight_formats_unchanged=1\n",in.layer,in.start,in.count,(unsigned long long)actual);
         }

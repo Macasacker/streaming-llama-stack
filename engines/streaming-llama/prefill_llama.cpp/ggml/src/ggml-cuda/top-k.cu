@@ -2,6 +2,8 @@
 #include "argsort.cuh"
 #include "top-k.cuh"
 #include "ggml-dsv41-stream-topk.h"
+#include "ggml-dsv41-topk.h"
+#include "ggml-dsv41-topk-plan.h"
 #include <atomic>
 static ggml_cuda_dispatch_counter dsv41_stream_topk_queued{0};
 extern "C" uint64_t ggml_backend_cuda_dsv41_stream_topk_queued(void){return dsv41_stream_topk_queued.load(std::memory_order_acquire);}
@@ -27,9 +29,39 @@ static int next_power_of_2(int x) {
 
 #endif  // GGML_CUDA_USE_CUB
 
+// The row rule and the shared-memory limit the dispatch below reads, as functions so the
+// exported dispatch count and the dispatch itself cannot disagree about the branch.
+static bool top_k_force_bitonic_single_row() {
+    static const bool value = []() {
+        const char * env = std::getenv("LLAMA_DSV4_TOPK_FORCE_BITONIC");
+        return env != nullptr && env[0] != '\0' && env[0] != '0';
+    }();
+    return value;
+}
+
+// LLAMADECODE: a single row takes the SAME deterministic bitonic / bitonic-tiles network as
+// multi-row (prefill), so a 1-row decode step selects the same ids in the same order on every
+// run. CUB DeviceTopK (determinism::not_guaranteed, unsorted output) remains only as the
+// explicit A/B control LLAMA_DSV4_TOPK_CUB_1ROW=1, and for k > the tile size.
+static bool top_k_cub_single_row() {
+    static const bool value = []() {
+        const char * env = std::getenv("LLAMA_DSV4_TOPK_CUB_1ROW");
+        return env != nullptr && env[0] == '1' && env[1] == '\0';
+    }();
+    return value;
+}
+
+static bool top_k_deterministic_rows(const int64_t nrows) {
+    return nrows > 1 || top_k_force_bitonic_single_row() || !top_k_cub_single_row();
+}
+
+static size_t top_k_bitonic_shared_limit() {
+    return std::min<size_t>(ggml_cuda_info().devices[ggml_cuda_get_device()].smpb, 48 * 1024);
+}
+
 #ifdef CUB_TOP_K_AVAILABLE
 
-static constexpr int TOP_K_TILE_SIZE = 8192;
+static constexpr int TOP_K_TILE_SIZE = DSV41_TOPK_TILE_SIZE;
 
 static void top_k_cub(ggml_cuda_pool & pool,
                       const float *    src,
@@ -78,28 +110,14 @@ void ggml_cuda_op_top_k(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
         CUDA_CHECK(cudaGetLastError());dsv41_stream_topk_queued.fetch_add(1,std::memory_order_release);return;
     }
 #ifdef CUB_TOP_K_AVAILABLE
-    static const bool force_bitonic_single_row = []() {
-        const char * env = std::getenv("LLAMA_DSV4_TOPK_FORCE_BITONIC");
-        return env != nullptr && env[0] != '\0' && env[0] != '0';
-    }();
-    // LLAMADECODE: a single row takes the SAME deterministic bitonic / bitonic-tiles
-    // network as multi-row (prefill), so a 1-row decode step selects the same ids
-    // in the same order on every run. CUB DeviceTopK (determinism::not_guaranteed,
-    // unsorted output) remains only as the explicit A/B control
-    // LLAMA_DSV4_TOPK_CUB_1ROW=1, and for k > TOP_K_TILE_SIZE.
-    static const bool cub_single_row = []() {
-        const char * env = std::getenv("LLAMA_DSV4_TOPK_CUB_1ROW");
-        return env != nullptr && env[0] == '1' && env[1] == '\0';
-    }();
-    const bool deterministic_rows = nrows > 1 || force_bitonic_single_row || !cub_single_row;
+    const bool deterministic_rows = top_k_deterministic_rows(nrows);
 
     // DeviceTopK has no segmented API yet. Use the one-kernel argsort path for multi-row calls when the
     // padded row fits in the default dynamic shared-memory limit. It writes only the first k descending
     // indices, so no full-size output allocation or follow-up copy is needed.
     const int    ncols_pad      = next_power_of_2(ncols);
     const size_t shared_mem     = ncols_pad * sizeof(int);
-    const size_t max_shared_mem = std::min<size_t>(
-        ggml_cuda_info().devices[ggml_cuda_get_device()].smpb, 48 * 1024);
+    const size_t max_shared_mem = top_k_bitonic_shared_limit();
 
     if (deterministic_rows && shared_mem <= max_shared_mem) {
         if (nrows == 1) {
@@ -176,4 +194,23 @@ void ggml_cuda_op_top_k(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
                                  cudaMemcpyDeviceToDevice, stream));
 #endif  // GGML_CUDA_USE_CUB
 #endif  // CUB_TOP_K_AVAILABLE
+}
+
+// What this tensor contributes to ggml_backend_cuda_dsv41_topk_radix_queued(). The V4.1
+// executor's coverage check sums this over its graph rather than re-deriving the branch above,
+// which is how a single-row decode came to dispatch kernels the check counted as zero.
+extern "C" uint64_t ggml_backend_cuda_dsv41_topk_radix_dispatches(const ggml_tensor * src0,
+                                                                 const ggml_tensor * dst) {
+    if (!src0 || !dst || dst->op != GGML_OP_TOP_K) return 0;
+    const int k = int(dst->ne[0]);
+#ifdef CUB_TOP_K_AVAILABLE
+    const size_t shared_mem = size_t(next_power_of_2(int(src0->ne[0]))) * sizeof(int);
+    return dsv41_topk_radix_dispatches(src0->ne[0], k, ggml_dsv41_stream_topk_requested(dst),
+                                       top_k_deterministic_rows(ggml_nrows(src0)),
+                                       shared_mem <= top_k_bitonic_shared_limit(),
+                                       dsv41_topk_radix_enabled(TOP_K_TILE_SIZE, k), true);
+#else
+    return dsv41_topk_radix_dispatches(src0->ne[0], k, ggml_dsv41_stream_topk_requested(dst),
+                                       true, false, false, false);
+#endif
 }
