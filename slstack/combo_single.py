@@ -858,6 +858,11 @@ def handler(proxy):
 def serve(cfg, run_id, window):
     os.environ['CUDA_VISIBLE_DEVICES'] = cfg['gpu_uuid'];os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
     proxy = SingleProxy(cfg, run_id, window)
+    from .port_wait import wait_for_ports
+    # A socket can stay occupied for seconds after a producer was force-killed, without ever
+    # reaching LISTEN; binding straight away answers the first request 503 `[Errno 98]`.
+    wait_for_ports(cfg, float(cfg.get('gpu_wait_seconds', 0)), stopping=proxy.engine.stopping,
+                   exclude_pid=os.getpid())
     class Server(ThreadingHTTPServer):daemon_threads = True
     server = Server((cfg['host'], cfg['port']), handler(proxy));proxy.server = server
     def idle():

@@ -273,6 +273,8 @@ def serve(cfg,run_id,window):
     if cfg.get('serving_mode') not in (None,'handoff'):raise ValueError('Unknown combo serving_mode')
     os.environ['CUDA_VISIBLE_DEVICES']=cfg['gpu_uuid'];os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
     proxy=Proxy(cfg,run_id,window)
+    from .port_wait import wait_for_ports
+    wait_for_ports(cfg,float(cfg.get('gpu_wait_seconds',0)),exclude_pid=os.getpid())
     class Server(ThreadingHTTPServer):daemon_threads=True
     server=Server((cfg['host'],cfg['port']),handler(proxy))
     print('DS4COMBO router ready; CPU idle, request-scoped GPU ownership',flush=True)

@@ -199,15 +199,24 @@ errno with no holder and no retry.
 
 Fix:
 
-1. Pre-flight the ports the stack binds before `serve()`, using the same any-state check
-   `gpu_handoff.ports_held` uses; poll until free within `gpu_wait_seconds`, then fail with a
-   message naming the port and the pid holding it (from `ss -tanp` / `/proc`).
-2. Move that check to the launcher (`scripts/dsv41_single.py`) as well, so a start fails loudly
-   before the lease is taken rather than mid-request.
+1. Pre-flight the ports the stack binds before `serve()` binds them, in any socket state, and
+   attribute the holder by mapping the `/proc/net/tcp{,6}` inode to `/proc/<pid>/fd` — no `ss`,
+   no process-name guess, and a socket that cannot be attributed is reported as such rather than
+   treated as free.
+2. Poll until the ports are clear within `gpu_wait_seconds`, then refuse with `PortHeld` naming
+   each port, its holder, how long it waited, and the handoff command. Nothing is killed: the
+   holder may be another agent's live engine.
 
-Tests: `tests/test_engine_port_wait.py` (new) — a socket bound on the configured port makes the
-engine wait then refuse with the port and pid named; releasing it lets `serve()` bind; nothing is
-attempted before the port is free.
+The check sits at the bind site (`combo_single.serve`, `combo_proxy.serve`) rather than in
+`scripts/dsv41_single.py`: that is where the errno came from, both serving modes go through it,
+and the engine takes no GPU hold until a request arrives, so a refusal still lands before the
+card is claimed.
+
+Tests: `tests/test_engine_port_wait.py` (new) — `stack_ports` from a real-shaped config; the
+`/proc/net/tcp` parser against a written table including a truncated row; and four cases against
+a **real child process** holding a port: the holder is attributed by pid, the wait returns once
+the holder is gone, a holder that stays is refused naming pid and `no process was killed`, and a
+stopped stack ends the wait without burning the full budget.
 
 ## Item 2: the top-k coverage self-check does not know about single-row decode
 
