@@ -1,5 +1,6 @@
 #include "llama-dsv41-layer-log.h"
 #include "llama-dsv41-weights.h"
+#include "llama-dsv41-routed-prefill.h"
 #include "llama-dsv41-prefill-routes.h"
 #include "llama-dsv41-tail-hint.h"
 #include "llama-dsv41-quant-types.h"
@@ -90,10 +91,12 @@ struct llama_dsv41_weight_provider::implementation {
     uint64_t resident_dense_bytes=0,decode_bank0_resident=0;
     uint64_t fetched_total=0;double fetch_ms_total=0;
     bool lazy_prefill=false,byte_ledger=false;
-    // Whether LLAMADECODE_PREFILL_ROUTED named a mode explicitly, as opposed to the sweep
-    // resolving one. DS4PERF_ROUTED_PREFILL reports it, so a log says whether the mode was
-    // chosen or pinned.
-    bool routed_env=false;
+    // The routed-prefill mode, and the shape its spans were registered for. `auto` answers per
+    // sweep; DS4PERF_ROUTED_PREFILL says which of the two decided this pass.
+    llama_dsv41_routed_prefill::mode routed_mode=llama_dsv41_routed_prefill::mode::sweep;
+    // What DS4PERF_ROUTED_PREFILL names as `source`: `env` for a pinned mode, `sweep` for the
+    // per-sweep answer, `profile` for a fetch profile that cannot demand-read and so forces off.
+    const char*routed_source="sweep";
     uint32_t lazy_from_layer=0;
     std::array<bool,384>prefill_loaded{};
     bool tail_prefetch=false;
@@ -672,6 +675,32 @@ struct llama_dsv41_weight_provider::implementation {
     std::shared_ptr<llama_dsv41_engram_row_cache>row_cache;
     bool device_suspended=false;
     void create_pipeline();
+    // Every stage's span table, as `lazy_tensor` currently names it. Registration is what
+    // decides whether a layer's routed experts are prefetched with the stage or demanded
+    // later, so a routed choice that changes has to be followed here.
+    void register_stages(){
+        for(uint32_t i=0;i<stage_count();++i){std::vector<wf_weight_span>spans;spans_for(stage_at(i),spans);
+            wf_register_layer(fetcher,int(i),spans.data(),int(spans.size()),stage_at(i).bytes);}
+    }
+    // Resolve this sweep's routed shape from its own new-row count and make the registered
+    // spans agree with it (docs/PREFILL_DECODE_PLAN_20261110.md Step 1). The producer is
+    // resident across turns, so the pipeline build cannot know whether the pass is a 16 666
+    // token prompt or a 45 token append; `auto` answers here, where the count is known.
+    // An explicit 0/1/tail never reaches the re-registration below: its answer already matches.
+    // Callers run this between passes, with the stream stopped and quiesced, which is the only
+    // moment wf_register_layer accepts a span table.
+    uint32_t resolve_routed(uint64_t rows,const char*&source){
+        source=routed_source;
+        if(decode_layout||!llama_dsv41_routed_prefill::routes(routed_mode))return lazy_from_layer;
+        const auto want=llama_dsv41_routed_prefill::from_layer(routed_mode,rows);
+        if(want==lazy_from_layer)return lazy_from_layer;
+        require(!leased&&next==0,"A routed prefill choice may only change between passes");
+        lazy_from_layer=want;
+        register_stages();
+        llama_dsv41_layer_log("DS4PERF_ROUTED_PREFILL_RESOLVED mode=%s from_layer=%u rows=%llu re_registered_stages=%u\n",
+            llama_dsv41_routed_prefill::resolved_name(want),want,(unsigned long long)rows,stage_count());
+        return want;
+    }
     std::thread early_thread;
     void join_early(){if(early)early->cancel=true;if(early_thread.joinable())early_thread.join();early.reset();}
     // LLAMADECODE_ENGRAM_EARLY: the early cache on the multi-ring loader.
@@ -1208,9 +1237,21 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     timer measured_build_total(build_total_ms);
     build_total_ms=0;build_fetcher_ms=0;build_banks_ms=0;build_register_ms=0;
     const char*lazy=std::getenv("LLAMADECODE_PREFILL_ROUTED");
-    require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
-    p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
-    p->routed_env=lazy&&*lazy;
+    require(!lazy||!*lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail")||!std::strcmp(lazy,"auto"),
+        "LLAMADECODE_PREFILL_ROUTED must be 0, 1, tail or auto");
+    p->routed_mode=llama_dsv41_routed_prefill::parse(lazy);
+    // `auto` routes only where the profile can demand-read. A fetch profile without direct
+    // compute banks has no extent relay into a stage the provider owns, so the default leaves
+    // such a provider on whole-stage prefetch - exactly what an unset variable meant before
+    // this change - rather than refusing it. An explicit 1 still refuses, because that answer
+    // was asked for.
+    if(p->routed_mode==llama_dsv41_routed_prefill::mode::sweep&&!p->options.compute_direct){
+        p->routed_mode=llama_dsv41_routed_prefill::mode::off;p->routed_source="profile";
+    }else p->routed_source=llama_dsv41_routed_prefill::pinned(p->routed_mode)?"env":"sweep";
+    // A pipeline build knows no sweep's row count, so `auto` starts at the shape every sweep
+    // can only narrow: `start_request` resolves it per sweep and re-registers if it differs.
+    p->lazy_prefill=llama_dsv41_routed_prefill::routes(p->routed_mode);
+    p->lazy_from_layer=llama_dsv41_routed_prefill::from_layer(p->routed_mode,0);
     require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),
         "Tail prefetch requires routed strict two-bank prefill");
     const char*ledger=std::getenv("LLAMADECODE_BYTE_LEDGER");p->byte_ledger=ledger&&!std::strcmp(ledger,"1");
@@ -1261,8 +1302,7 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
         require(bool(b),"Admitted weight buffer allocation/wrapping failed");ggml_backend_buffer_set_usage(b.get(),GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
         if(!p->options.compute_direct)wf_set_gpu_buf_ptr(p->fetcher,int(i),ggml_backend_buffer_get_base(b.get()));p->buffers.push_back(std::move(b));
     }}
-    {timer measured_layers(build_register_ms);
-    for(uint32_t i=0;i<p->stage_count();++i){std::vector<wf_weight_span>spans;p->spans_for(p->stage_at(i),spans);wf_register_layer(p->fetcher,int(i),spans.data(),int(spans.size()),p->stage_at(i).bytes);}}
+    {timer measured_layers(build_register_ms);p->register_stages();}
     if(p->options.yoco_encoder_only){
         require(!p->decode_layout,"YOCO encoder requires the prefill streaming layout");
         for(uint32_t i=22;i<42;++i)require(wf_set_layer_skipped(p->fetcher,int(i),true),"YOCO fetch omission refused");
@@ -1356,16 +1396,16 @@ bool llama_dsv41_weight_provider::finish_yoco_encoder(std::string&error){return 
 },error);}
 bool llama_dsv41_weight_provider::start_request(std::string&error,uint64_t rows){return p->guard([&]{
     require(p->allocated&&!p->device_suspended&&!p->leased&&p->next==0,"Request start requires an admitted resident unleased first stage");p->identity();
+    // Resolve and name this sweep's routed shape before its first acquire. A resident producer
+    // appends a few dozen tokens to a prompt it was launched with, so the count that decides
+    // the shape belongs to the sweep, not to the process (docs/PREFILL_DECODE_PLAN_20261110.md
+    // Step 1); DS4PERF_ROUTED_PREFILL is what a log reads the answer from.
+    const char*source="env";
+    const auto from=p->resolve_routed(rows,source);
+    llama_dsv41_layer_log("DS4PERF_ROUTED_PREFILL mode=%s from_layer=%u rows=%llu source=%s\n",
+        llama_dsv41_routed_prefill::resolved_name(from),from,(unsigned long long)rows,source);
     p->fetched_total=0;p->fetch_ms_total=0;if(!p->bound()){p->apply_pause("request_wf_start");wf_start(p->fetcher);p->mark_weight_stream(true);}
     require(!wf_has_failed(p->fetcher),"Persistent weight stream restart failed");
-    // Say which routed-prefill shape this sweep runs under, before its first acquire. The
-    // provider read LLAMADECODE_PREFILL_ROUTED once when its pipeline was built, so a resident
-    // producer's appends all inherit the launch turn's answer; this line is what makes that
-    // visible per sweep rather than once per process (docs/PREFILL_DECODE_PLAN_20261110.md
-    // Step 0, and the change Step 1 makes from it).
-    llama_dsv41_layer_log("DS4PERF_ROUTED_PREFILL mode=%s from_layer=%u rows=%llu source=%s\n",
-        p->lazy_prefill?(p->lazy_from_layer?"tail":"all"):"off",p->lazy_from_layer,
-        (unsigned long long)rows,p->routed_env?"env":"default");
 },error);}
 llama_dsv41_weight_provider::capacity llama_dsv41_weight_provider::budget()const{std::lock_guard<std::mutex>lock(p->mutex);return p->inspected&&!p->poisoned?p->planned:capacity{};}
 ggml_backend_t llama_dsv41_weight_provider::backend()const{std::lock_guard<std::mutex>lock(p->mutex);return p->allocated&&!p->poisoned?p->options.backend:nullptr;}

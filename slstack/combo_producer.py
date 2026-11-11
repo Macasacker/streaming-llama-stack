@@ -414,28 +414,33 @@ def resident_producer(cfg):
 
 
 def routed_prefill_choice(cfg, count):
-    """Which layers demand-read experts: `0` none, `1` every layer, `tail` from layer 21.
+    """Which layers demand-read experts: `0` none, `1` every layer, `tail` from layer 21, `auto` per sweep.
 
-    The producer reads this once, when the weight provider builds its pipeline
-    (src/llama-dsv41-weights.cpp:1193), so it is the producer's setting for its whole life, not
-    the request's. A resident producer is launched with the first turn's prompt, so a choice made
-    from that count is paid by every later turn: an agent session that opens with 16 666 tokens
-    picks `tail` and then reads whole stages for layers 0-20 on a 45-token append. All 38
-    recorded appends on this box ran under `tail` (runtime/single-engine/ultra-*/launch.json
-    `routed_prefill`), costing 3.5-43.7 s of `append_prefill_seconds`, median 24.5 s per turn
-    (docs/SESSION_FAILURE_PLAN.md).
+    The producer reads this once, when its weight provider builds a pipeline
+    (src/llama-dsv41-weights.cpp), so 0/1/tail are the producer's setting for its whole life,
+    not the request's. A resident producer is launched with the first turn's prompt and appends
+    every later turn to itself, so a choice made from that count is paid by every later turn:
+    an agent session that opened with 16 666 tokens picked `tail` and then read whole stages
+    for layers 0-20 on a 45-token append - 21 layers x ~630 ms of prefetch for 5 new experts,
+    13.2 s of an 18.6-22.5 s turn (docs/PREFILL_DECODE_PLAN_20261110.md). All 38 recorded
+    appends on this box ran that way (runtime/single-engine/ultra-*/launch.json
+    `routed_prefill`, 3.5-43.7 s of `append_prefill_seconds`, median 24.5 s per turn,
+    docs/SESSION_FAILURE_PLAN.md).
 
-    The steady state of a resident session is the append, so it routes every layer. The paired
-    route serves one request per producer, so its count still decides — matched ULTRA controls
-    favour demand reads through 2K there, not at 32K. An explicit override always wins, which is
-    how `tail` stays reachable for experiments.
+    `auto` is the resident producer's answer and the provider's default: each sweep chooses for
+    itself from its own new-row count, the same rule this function applies to a paired request -
+    demand-read every layer at <= 2 048 rows, keep the overlapped whole-stage prefetch below
+    that bound above it, where a full prompt measured 843 ms routed against 600 ms prefetched.
+    The paired route serves one request per producer, so its count still decides. An explicit
+    override always wins, which is how `tail` or `1` stays reachable for a matched A/B.
     """
     value=cfg.get('env_overrides',{}).get('LLAMADECODE_PREFILL_ROUTED')
     if value is not None:
-        if value not in ('0','1','tail'):raise ValueError('LLAMADECODE_PREFILL_ROUTED must be 0, 1 or tail')
+        if value not in ('0','1','tail','auto'):
+            raise ValueError('LLAMADECODE_PREFILL_ROUTED must be 0, 1, tail or auto')
         return value
     ultra=cfg.get('producer_profile','ultra')=='ultra'
-    if resident_producer(cfg):return '1' if ultra else '0'
+    if resident_producer(cfg):return 'auto' if ultra else '0'
     return '1' if count<=2048 and ultra else '0'
 
 

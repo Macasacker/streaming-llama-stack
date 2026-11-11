@@ -135,6 +135,41 @@ Accept: append prompt head <= 12 s at 69k context; full prompt unchanged; no num
 Risk: routed early layers on a full prompt cost more (843 ms against 600 ms), so the >2,048
 branch must stay whole-stage. Measure both branches in one window.
 
+### Done (2026-11-11) - implemented; the two branches still need one window
+
+- The provider resolves the shape per sweep. `LLAMADECODE_PREFILL_ROUTED` now answers `auto`
+  when it is unset, and `auto` chooses from that sweep's own new-row count: every layer at
+  <= 2 048 rows, layers 21-39 above it. The rule is `src/llama-dsv41-routed-prefill.h`, applied
+  in `start_request`, which is the first point that knows the count; `0`/`1`/`tail` still pin
+  the mode for the producer's life. A fetch profile without direct compute banks cannot
+  demand-read, so `auto` falls back to `off` there and says `source=profile` - the default
+  leaves such a profile on whole-stage prefetch, exactly as an unset variable did before, rather
+  than refusing it. An explicit `1` still refuses it, because that answer was asked for.
+- The fetcher's spans have to follow the answer. `spans_for` drops a routed tensor from a stage
+  exactly where the mode names its layer, and it runs at `wf_register_layer` during the
+  pipeline build - so a per-sweep answer that only moved `lazy_from_layer` would leave the
+  layers below the new bound reading bank bytes nobody ever fetched. `start_request`
+  re-registers the stage span tables when the answer differs from what is registered. That is
+  legal only between passes, which is where it runs: the stream is stopped and quiesced,
+  `next==0`, nothing leased. The host metadata budget is planned in `inspect`, before the mode
+  is read, with every span present, so a sweep that demand-reads asks for fewer requests than
+  were admitted and never more.
+- `combo_producer.routed_prefill_choice` answers `auto` for a resident producer, so a launch no
+  longer pins the mode for the session. The paired route keeps its measured count rule, and an
+  explicit override still wins; `dsv41_reuse_probe --expect-routed` takes `auto`, and
+  `ds4-first-run --routed` stays the pinned `1` control.
+- What a run says: `DS4PERF_ROUTED_PREFILL mode=… from_layer=… rows=… source=env|sweep|profile`
+  once per prompt head, and `DS4PERF_ROUTED_PREFILL_RESOLVED …` on the sweeps that changed the
+  registered stages. `scripts/ds4_run_metrics.py` prints the mode as a column, so a pair of
+  windows names what each side actually ran.
+- Proved without the card: `tests/dsv41_routed_prefill.cpp`, `tests/test_ds4_run_metrics.py`,
+  and the routing tests in `tests/test_prefill_breakdown.py` and
+  `tests/test_dsv41_single_launch.py`. The acceptance numbers (append prompt head <= 12 s at
+  69k context, full prompt unchanged, no admission refusal) still need
+  `~/bin/gpu-handoff --probe '' --probe 'LLAMADECODE_PREFILL_ROUTED=1'`, which takes the card
+  from Strata for the window.
+
+
 ## Step 2 - Prefill full prompt: overlap the routed fetch and raise its rate
 
 The late layers' 750-855 ms includes the routed fetch's 643 ms, serialised (fetch_ms is

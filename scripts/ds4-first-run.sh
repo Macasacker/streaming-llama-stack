@@ -19,14 +19,14 @@
 #             run. The value drives the bias (`combo_single` calls `generation.bias(quality_speed)`
 #             at slstack/combo_single.py:266); binding a calibration only makes a nonzero value
 #             possible - `Store.bias` raises when nothing is bound (slstack/generation.py:128).
-#   --routed  demand-read experts on every layer instead of only the tail: sets
+#   --routed  demand-read experts on every layer instead of letting each sweep choose: sets
 #             LLAMADECODE_PREFILL_ROUTED=1 in the derived config, which
-#             slstack/combo_producer.py:413 passes through untouched. The default for a prompt
-#             above 2 048 rows is `tail`, which reads layers 0-20 whole - all 384 experts per
-#             block, ~75 GiB a turn - and that is the larger half of a turn's prompt head
-#             (docs/DECODE_GAP_PLAN.md, Step 6). This is a measurement flag, not a recommendation:
-#             the routing change trades the overlapped full-stage prefetch that the matched ULTRA
-#             control was qualified with, so read it against a run without it.
+#             slstack/combo_producer.py passes through untouched as an override. The default is
+#             `auto`, which resolves per sweep from that sweep's new-row count - every layer at
+#             <= 2 048 rows, and the overlapped whole-stage prefetch for the early layers above
+#             it (docs/PREFILL_DECODE_PLAN_20261110.md Step 1). Before that change a resident
+#             producer chose once, from its launch turn, and every append paid for it. This is
+#             a measurement flag, not a recommendation: read it against a run without it.
 set -uo pipefail
 quick=0
 calibrate=

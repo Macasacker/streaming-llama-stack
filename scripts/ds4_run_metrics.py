@@ -43,6 +43,11 @@ def fields(line):
             for k, v in re.findall(r'(\w+)=([0-9]+(?:\.[0-9]+)?)', line)}
 
 
+def words(line):
+    """Every key=value on a line, as text: a mode or a source is a fact, not a number."""
+    return {k: v for k, v in re.findall(r'(\w+)=([^\s]+)', line)}
+
+
 def percentile(values, q):
     ordered = sorted(values)
     return ordered[min(len(ordered) - 1, int(q * len(ordered)))]
@@ -150,6 +155,17 @@ def metrics(path):
         'bytes': total_bytes, 'fetch_s': total_fetch / 1000.0,
         'layers': sum(b['layers'] for b in bursts),
         'gib_s': (total_bytes / GIB) / (total_fetch / 1000.0) if total_fetch else None,
+    }
+
+    # Step 1's acceptance is about which shape each sweep ran, not only how fast it was: a
+    # resident producer that resolved `tail` for a 45-token append did the change's work in the
+    # wrong direction, and only this line says so.
+    choices = [words(line) for line in lines if line.startswith('DS4PERF_ROUTED_PREFILL')]
+    out['routed_choice'] = {
+        'sweeps': len(choices),
+        'modes': sorted({row.get('mode', '?') for row in choices}),
+        'sources': sorted({row.get('source', '?') for row in choices}),
+        'rows': [int(row['rows']) for row in choices if row.get('rows', '').isdigit()],
     }
 
     tokens = [fields(l) for l in lines if 'LLAMADECODE_DS4X_TOKEN' in l]
@@ -281,15 +297,16 @@ def grouped(paths, stamps):
 
 
 def table(rows):
-    header = ('run', 'request', 'producer', 'window', 'routed GiB/s', 'routed GiB', 'fetch s',
-              'layers', 'step med/p90 ms', 'assign med/p90 ms', 'miss GiB/step', 'per-byte GiB/s',
-              'ram hits/miss', 'layout ms')
+    header = ('run', 'request', 'producer', 'routed mode', 'window', 'routed GiB/s', 'routed GiB',
+              'fetch s', 'layers', 'step med/p90 ms', 'assign med/p90 ms', 'miss GiB/step',
+              'per-byte GiB/s', 'ram hits/miss', 'layout ms')
     lines = ['| ' + ' | '.join(header) + ' |', '|' + '---|' * len(header)]
     for row in sorted(rows, key=lambda r: (r['label'], r['request'] or 0)):
         routed, decode = row['routed'], row['decode']
         slots = fields(row['window']).get('slots') if row['window'] else None
-        lines.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
+        lines.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
             row['label'], row['request'] if row['request'] is not None else '-', row['dir'],
+            '/'.join(row.get('routed_choice', {}).get('modes') or []) or '-',
             slots if slots is not None else '-',
             cell(routed['gib_s']), cell(routed['bytes'] / GIB), cell(routed['fetch_s'], '%.1f'),
             routed['layers'],

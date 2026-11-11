@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import inspect
+import re
 import unittest
 
 spec = importlib.util.spec_from_file_location('breakdown',Path(__file__).resolve().parents[1]/'scripts/analyze_dsv41_prefill.py')
@@ -38,30 +40,48 @@ class Breakdown(unittest.TestCase):
         self.assertIsNone(hinted['passes'][0]['tensor_ledger_reconciles'])
 
     def test_routed_fetch_split_and_per_sweep_choice_are_read(self):
-        # Step 0 of docs/PREFILL_DECODE_PLAN_20261110.md: `[dsv41-prefill-experts]` carries the
-        # fetch's read/upload split with LLAMADECODE_BYTE_LEDGER=1, and DS4PERF_ROUTED_PREFILL
-        # says which mode each sweep ran.
+        # Step 0 of docs/PREFILL_DECODE_PLAN_20261110.md: `[dsv41-prefill-experts]` and
+        # `[dsv41-fetch]` carry their read/upload splits, and DS4PERF_ROUTED_PREFILL says which
+        # shape each sweep ran and where the answer came from.
         log='''DS4PERF_ROUTED_PREFILL mode=tail from_layer=21 rows=16666 source=env
 [dsv41-fetch] stage=0 bytes=100 fetch_ms=10 read_ms=6.0 upload_issue_ms=3.0
 [dsv41-prefill-experts] stage=22 rows=6 active=30 new=6 resident=30 bytes=20 fetch_ms=2.0 read_ms=1.500 stage_ms=0.250 upload_issue_ms=0.200 upload_device_ms=1.100
-DS4PERF_ROUTED_PREFILL mode=all from_layer=0 rows=45 source=default
+DS4PERF_ROUTED_PREFILL mode=all from_layer=0 rows=45 source=sweep
 '''
         result=module.analyze(log)
         self.assertEqual(result['routed_prefill'][0],dict(mode='tail',from_layer='21',rows='16666',source='env'))
         self.assertEqual(result['routed_prefill'][1]['mode'],'all')
+        self.assertEqual(result['routed_prefill'][1]['source'],'sweep')
         split=result['passes'][0]['routed_fetch']
         self.assertEqual(split['layers'],1)
         self.assertEqual(split['read_ms'],1.5)
         self.assertEqual(split['upload_device_ms'],1.1)
         self.assertAlmostEqual(split['read_GB_s'],20*1000.0/1.5/1e9)
-        # The whole-stage relay reports its two halves on the same pass.
-        self.assertEqual(result['passes'][0]['fetches'][0]['read_ms'],6.0)
-        self.assertEqual(result['passes'][0]['fetches'][0]['upload_issue_ms'],3.0)
+        # The whole-stage relay reports its two halves on the same pass: that is the early
+        # layers' 600 ms, which Step 2 splits before it overlaps anything.
+        stage=result['passes'][0]['stage_fetch']
+        self.assertEqual(stage['read_ms'],6.0)
+        self.assertEqual(stage['upload_issue_ms'],3.0)
         # A run without the ledger has no split to report, and says so rather than guessing.
         plain=module.analyze('[dsv41-fetch] stage=0 bytes=100 fetch_ms=10\n'
                              '[dsv41-prefill-experts] stage=22 rows=6 bytes=20 fetch_ms=2\n')
         self.assertIsNone(plain['passes'][0]['routed_fetch'])
+        self.assertIsNone(plain['passes'][0]['stage_fetch'])
         self.assertIsNone(plain['routed_prefill'])
+
+    def test_the_sweep_rule_the_provider_applies_is_the_one_this_repo_documents(self):
+        # The C++ resolves a sweep's shape from the same boundary combo_producer applies to a
+        # paired request. If either side moves alone, the resident producer and the paired
+        # control stop being the same experiment.
+        from slstack.combo_producer import routed_prefill_choice
+        header=(Path(__file__).resolve().parents[1]/'engines/streaming-llama/prefill_llama.cpp/src'
+                /'llama-dsv41-routed-prefill.h').read_text(encoding='utf-8')
+        limit=int(re.search(r'sweep_rows_limit\s*=\s*(\d+)',header)[1])
+        tail=int(re.search(r'tail_from_layer\s*=\s*(\d+)',header)[1])
+        self.assertIn('count<=%d'%limit,inspect.getsource(routed_prefill_choice))
+        self.assertEqual(routed_prefill_choice({},limit),'1')
+        self.assertEqual(routed_prefill_choice({},limit+1),'0')
+        self.assertEqual(tail,21)   # the layer the tail branch has always started at
 
     def test_demand_read_default_follows_the_producers_lifetime(self):
         from slstack.combo_producer import routed_prefill_choice
@@ -72,20 +92,23 @@ DS4PERF_ROUTED_PREFILL mode=all from_layer=0 rows=45 source=default
         for profile in ('accurate','fast'):self.assertEqual(routed_prefill_choice(dict(producer_profile=profile),2048),'0')
         self.assertEqual(routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'0'}),2048),'0')
         self.assertEqual(routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'1'}),32768),'1')
-        with self.assertRaises(ValueError):routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'auto'}),2048)
-        # A resident producer reads this once, at pipeline build, so a choice made from the launch
-        # count is paid by every later append. pi's session opened at 16 666 tokens and appended
-        # 45 at a turn; `tail` cost whole-stage reads for layers 0-20 on each of them.
+        with self.assertRaises(ValueError):routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'maybe'}),2048)
+        # A resident producer resolves the shape per sweep (Step 1): its launch count cannot
+        # decide what a later 45-token append pays for.
         for n in (2049,45,16666,100000):
-            self.assertEqual(routed_prefill_choice(dict(yoco_keep=2541),n),'1',n)
-            self.assertEqual(routed_prefill_choice(dict(serving='single_engine'),n),'1',n)
+            self.assertEqual(routed_prefill_choice(dict(yoco_keep=2541),n),'auto',n)
+            self.assertEqual(routed_prefill_choice(dict(serving='single_engine'),n),'auto',n)
         self.assertEqual(routed_prefill_choice(dict(serving='single_engine',producer_profile='accurate'),100000),'0')
         self.assertEqual(routed_prefill_choice(dict(serving='single_engine',
                                                     env_overrides={'LLAMADECODE_PREFILL_ROUTED':'tail'}),45),'tail')
+        self.assertEqual(routed_prefill_choice(dict(serving='single_engine',
+                                                    env_overrides={'LLAMADECODE_PREFILL_ROUTED':'1'}),16666),'1')
+        self.assertEqual(routed_prefill_choice(dict(serving='native',
+                                                    env_overrides={'LLAMADECODE_PREFILL_ROUTED':'auto'}),16666),'auto')
         from scripts.dsv41_single import overlay
         cone=overlay('262k',profile='ultra-cone')
         self.assertEqual((cone['producer_profile'],cone['yoco_keep']),('ultra',2541))
-        self.assertEqual((routed_prefill_choice(cone,16666),routed_prefill_choice(cone,45)),('1','1'))
+        self.assertEqual((routed_prefill_choice(cone,16666),routed_prefill_choice(cone,45)),('auto','auto'))
 
     def test_inventory_and_legacy_pass_multiplicity(self):
         header=dict(metadata={},header_bytes=33,tensors=[

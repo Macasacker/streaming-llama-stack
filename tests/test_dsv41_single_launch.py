@@ -95,16 +95,16 @@ class LaunchConfigTests(unittest.TestCase):
                 self.assertGreater(row['sweep_plan']['max_host_bytes'], row['sweep_plan']['base_host_bytes'])
                 self.assertEqual(row['single_engine']['producer_host_reserve_gib'], .5)
 
-    def test_default_cone_reaches_native_args_and_routes_every_layer_for_the_resident_producer(self):
+    def test_default_cone_reaches_native_args_and_routes_the_resident_producer_per_sweep(self):
         from slstack.combo_producer import prefill_arguments, routed_prefill_choice
         for preset in ('262k','1m'):
             cfg=dsv41_single.overlay(preset, dict(producer_profile='accurate', yoco_keep=140))
             self.assertEqual((cfg['producer_profile'],cfg['yoco_keep']),('ultra',2541))
             self.assertEqual(cfg.get('producer_chunks_per_pass',1),1)
-            # The producer is resident across turns, so the launch count must not decide its
-            # routing: an append of a few dozen tokens would otherwise read whole stages for
-            # layers 0-20 on every later turn.
-            for count, routed in ((2048,'1'),(2049,'1'),(45,'1'),(49555,'1')):
+            # The producer is resident across turns, so neither the launch count nor a fixed
+            # mode may decide its routing: `auto` hands each sweep the choice, which is what
+            # stops a 45-token append reading whole stages for layers 0-20.
+            for count, routed in ((2048,'auto'),(2049,'auto'),(45,'auto'),(49555,'auto')):
                 self.assertEqual(routed_prefill_choice(cfg,count),routed)
                 args,plan=prefill_arguments(cfg,count,20*1024**3)
                 self.assertEqual(args['--yoco-keep'],'2541')

@@ -78,8 +78,9 @@ def report(label, data, wall):
 def recorded_routed(root=REPO):
     """The routing the newest resident producer recorded (launch.json), or None.
 
-    The producer reads LLAMADECODE_PREFILL_ROUTED once, when its pipeline is built, so an A/B of
-    append cost has to name the mode each side actually ran - not the mode the shell exported.
+    A pinned 0/1/tail is the provider's setting for its whole life; `auto` is the default and
+    answers per sweep, which DS4PERF_ROUTED_PREFILL reports. Either way an A/B of append cost
+    has to name what the producer was launched with - not the mode the shell exported.
     """
     files = sorted(root.glob('runtime/single-engine/ultra-*/launch.json'), key=lambda p: p.stat().st_mtime)
     if not files:return None
@@ -113,7 +114,7 @@ def main(argv=None):
     parser.add_argument('--turns', type=int, default=2,
                         help='turns to send; turns after the first append a short line, which is the '
                              'agentic cadence whose cost the resident producer\'s routing decides')
-    parser.add_argument('--expect-routed', choices=('0', '1', 'tail'),
+    parser.add_argument('--expect-routed', choices=('0', '1', 'tail', 'auto'),
                         help='fail if the resident producer recorded a different LLAMADECODE_PREFILL_ROUTED')
     parser.add_argument('--ignore-gpu', action='store_true',
                         help='run anyway (the lease gate will refuse admission if the card is busy)')
