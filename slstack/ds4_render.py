@@ -39,6 +39,9 @@ DS41_INVOKE_START = '<｜DSML｜ invoke'
 DS41_INVOKE_END = '</｜DSML｜ invoke>'
 DS41_PARAM_START = '<｜DSML｜ parameter'
 DS41_PARAM_END = '</｜DSML｜ parameter>'
+# The bare marker close a model writes in place of the element's own closing tag. It is a
+# terminator when the parser reads a block, so the writer must escape it inside a value.
+DSML_BARE_CLOSE = '</｜DSML｜>'
 THINK_NONE, THINK_HIGH, THINK_MAX, THINK_LOW, THINK_MEDIUM = 'none', 'high', 'max', 'low', 'medium'
 
 
@@ -414,18 +417,20 @@ def parse_request(body):
 
 
 # ---------------------------------------------------------------- DS4.1 render
-def tool_text_needs_escape(s, i, end):
+def tool_text_needs_escape(s, i, end, bare=None):
     if s.startswith(end, i):return True
+    if bare is not None and s.startswith(bare, i):return True
     if s[i] != '&':return False
     j = i + 1
     while s.startswith('amp;', j):j += 4
-    return s.startswith('lt;', j) and s.startswith(end[1:], j + 3)
+    if s.startswith('lt;', j) and s.startswith(end[1:], j + 3):return True
+    return bare is not None and s.startswith('lt;', j) and s.startswith(bare[1:], j + 3)
 
 
-def escape_tool_text(s, end):
+def escape_tool_text(s, end, bare=None):
     out = []
     for i, ch in enumerate(s):
-        if tool_text_needs_escape(s, i, end):out.append('&lt;' if ch == '<' else '&amp;')
+        if tool_text_needs_escape(s, i, end, bare):out.append('&lt;' if ch == '<' else '&amp;')
         else:out.append(ch)
     return ''.join(out)
 
@@ -437,7 +442,7 @@ def dsml_attr_escaped(s):
 def dsml_json_literal(s):
     out = [];i = 0
     while i < len(s):
-        if s.startswith(DS41_PARAM_END, i):out.append('\\u003c')
+        if s.startswith(DS41_PARAM_END, i) or s.startswith(DSML_BARE_CLOSE, i):out.append('\\u003c')
         else:out.append(s[i])
         i += 1
     return ''.join(out)
@@ -451,11 +456,11 @@ def dsml_tool_calls_text(calls, raw_tool_text=None):
         out.append(DS41_INVOKE_START + ' name="' + dsml_attr_escaped(call['name']) + '">\n')
         args = json_args_parse(call['arguments'])
         if args is None:
-            out.append(DS41_PARAM_START + ' name="arguments" string="true">' + escape_tool_text(call['arguments'], DS41_PARAM_END) + DS41_PARAM_END + '\n')
+            out.append(DS41_PARAM_START + ' name="arguments" string="true">' + escape_tool_text(call['arguments'], DS41_PARAM_END, DSML_BARE_CLOSE) + DS41_PARAM_END + '\n')
         else:
             for key, value, is_string in args:
                 out.append(DS41_PARAM_START + ' name="' + dsml_attr_escaped(key) + '" string="' + ('true' if is_string else 'false') + '">')
-                out.append(escape_tool_text(value, DS41_PARAM_END) if is_string else dsml_json_literal(value))
+                out.append(escape_tool_text(value, DS41_PARAM_END, DSML_BARE_CLOSE) if is_string else dsml_json_literal(value))
                 out.append(DS41_PARAM_END + '\n')
         out.append(DS41_INVOKE_END + '\n')
     out.append(DS41_TOOL_CALLS_END)

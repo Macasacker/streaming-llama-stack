@@ -89,6 +89,11 @@ the bare close (must round-trip, not truncate), and genuinely broken markup (mus
 `tool_error` and no calls). Plus `tests/test_ds4_render.py`: render → parse identity for a call
 whose arguments contain `</｜DSML｜>`.
 
+Done: 8 checks added, suite unchanged at the 2 pre-existing failures. The Python parser is now
+deliberately more tolerant than the C one it was ported from; that divergence is recorded in
+`parse_deepseek_generated`'s docstring, since the single-engine path is the one that reads these
+blocks.
+
 ## Item 1: the admission gate reports the wrong reason and never waits
 
 `lease.py:277` raises one message for three conditions:
@@ -288,8 +293,19 @@ retryable — and that the prefix-retention state is reported.
 6. Item 3 (retry classification) — Python, after 2 so the reason string it keys on exists.
 
 Baseline before any change: `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime
-python3 -B -m pytest tests/ -q`. The recorded baseline on this box is 31 failed / 696 passed
-(`HANDOFF.md`), the same 31 each run; each commit re-runs the suite and the count must not move.
+python3 -B -m pytest tests/ -q`. On this box today that is **2 failed / 726 passed**. The
+31 failed / 696 passed recorded in `HANDOFF.md` is an older tree; the two below are what this
+work sees, and both predate it:
+
+- `test_yoco.py::test_both_launch_modes_keep_the_flag_and_budgets` — `producer_prefill_sweep_tokens`
+  is `auto`, the test expects `49152`.
+- `test_combo_single_stop.py::CutTurnResumeTests::test_disconnect_inside_reasoning_then_next_turn_appends_only`
+  — a timing assertion (`assertLess(len(shown), evaluated)`) over a mocked producer that steps at
+  20 ms with a watcher polling at 50 ms. It passes when the box is quiet and fails while another
+  engine is loaded on it, so it is a test-isolation defect, not an engine one: it belongs in its
+  own fix, not in these commits.
+
+Each commit re-runs the suite and the count of failures must stay at 2.
 
 Two of the reported symptoms are not defects here:
 

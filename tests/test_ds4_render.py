@@ -45,6 +45,16 @@ class RenderTests(unittest.TestCase):
             r.USER + '<tool_result>T&lt;/tool_result><</tool_result>\n\nU2' + r.ASSISTANT + '<think>')
         self.assertEqual(text(body), expected)
 
+    def test_the_bare_marker_close_is_escaped_in_a_value(self):
+        # The parser reads `</｜DSML｜>` as a close, so a value carrying it must not be written raw
+        # or the next turn's replay of this call would truncate at that point.
+        block = r.dsml_tool_calls_text([dict(id='i', name='f', arguments='{"c": "x </｜DSML｜> y"}')])
+        self.assertIn('x &lt;/｜DSML｜> y', block)
+        self.assertNotIn('x </｜DSML｜> y', block)
+        self.assertTrue(block.endswith(r.DS41_PARAM_END + '\n' + r.DS41_INVOKE_END + '\n' + r.DS41_TOOL_CALLS_END))
+        json_block = r.dsml_tool_calls_text([dict(id='i', name='f', arguments='{"o": {"k": "</｜DSML｜>"}}')])
+        self.assertIn('\\u003c/｜DSML｜>', json_block)
+
     def test_parallel_tool_results_render_in_call_order(self):
         calls = [dict(id=i, type='function', function=dict(name='f', arguments='{}')) for i in ('a', 'b')]
         body = dict(messages=[dict(role='user', content='go'), dict(role='assistant', content='', tool_calls=calls),

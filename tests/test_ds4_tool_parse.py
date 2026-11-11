@@ -76,4 +76,71 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(p.json_object_or_empty('nope'), '{}')
 
 
+# What the model actually emitted in pi's session of 2026-11-11 (runtime/single-engine/
+# ultra-*/stderr.log turns, and the `Malformed tool call` activity the router reported).
+# The tags the stack renders are `<｜DSML｜ calls>` / `</｜DSML｜ parameter>`; the model put
+# whitespace inside the opening tag and closed the parameter with the bare marker.
+DRIFT = ('<｜DSML｜\n calls>\n' + r.DS41_INVOKE_START + ' name="bash">\n' +
+         r.DS41_PARAM_START + ' name="command" string="true">grep -n x a.py | head -30; echo\n---; sed -n 1,120p b.py' +
+         '</｜DSML｜>\n' + r.DS41_INVOKE_END + '\n' + r.DS41_TOOL_CALLS_END)
+
+
+class DriftedTagTests(unittest.TestCase):
+    def test_the_session_block_parses(self):
+        result = p.finish_message('Looking.  ' + DRIFT, has_tools=True, think=False, finish='stop')
+        self.assertTrue(result['ok'])
+        self.assertEqual(len(result['calls']), 1)
+        self.assertEqual(result['calls'][0]['name'], 'bash')
+        self.assertEqual(json.loads(result['calls'][0]['arguments']),
+                         {'command': 'grep -n x a.py | head -30; echo\n---; sed -n 1,120p b.py'})
+        self.assertEqual(result['content'], 'Looking.')
+        self.assertEqual(result['finish'], 'tool_calls')
+        self.assertNotIn('tool_error', result)
+
+    def test_whitespace_inside_a_tag_is_accepted(self):
+        for gap in ('\n', '\r\n', '\t', '  ', ' \n '):
+            text = DRIFT.replace('<｜DSML｜\n calls>', '<｜DSML｜' + gap + ' calls>', 1)
+            ok, content, _, calls, _ = p.parse_deepseek_generated(text, False)
+            self.assertTrue(ok, gap)
+            self.assertEqual([c['name'] for c in calls], ['bash'], gap)
+
+    def test_a_bare_marker_closes_any_open_element(self):
+        bare_calls = ('Thinking</think>x' + r.DS41_TOOL_CALLS_START + '\n' + r.DS41_INVOKE_START + ' name="f">\n' +
+                      r.DS41_PARAM_START + ' name="a" string="true">v' + '</｜DSML｜>\n' + '</｜DSML｜>\n' + '</｜DSML｜>')
+        ok, content, reasoning, calls, _ = p.parse_deepseek_generated(bare_calls, True)
+        self.assertTrue(ok)
+        self.assertEqual((content, reasoning, json.loads(calls[0]['arguments'])), ('x', 'Thinking', {'a': 'v'}))
+
+    def test_bare_close_inside_a_nested_object(self):
+        block = ('Thinking</think>x' + r.DS41_TOOL_CALLS_START + '\n' + r.DS41_INVOKE_START + ' name="f">\n' +
+                 r.DS41_PARAM_START + ' name="opts">\n' +
+                 r.DS41_PARAM_START + ' name="a" string="false">[1, 2]' + '</｜DSML｜>\n' +
+                 r.DS41_PARAM_START + ' name="b" string="true">y' + r.DS41_PARAM_END + '\n' +
+                 '</｜DSML｜>\n' + r.DS41_INVOKE_END + '\n' + r.DS41_TOOL_CALLS_END)
+        ok, _, _, calls, _ = p.parse_deepseek_generated(block, True)
+        self.assertTrue(ok)
+        self.assertEqual(json.loads(calls[0]['arguments']), {'opts': {'a': [1, 2], 'b': 'y'}})
+
+    def test_a_bare_close_written_as_a_value_is_not_a_close(self):
+        calls = [dict(id='i', name='f', arguments='{"command": "echo </｜DSML｜> done"}')]
+        block = r.dsml_tool_calls_text(calls)
+        self.assertNotIn('echo </｜DSML｜>', block)   # the render escapes it
+        ok, _, _, parsed, raw = p.parse_deepseek_generated('run' + block, False)
+        self.assertTrue(ok);self.assertEqual(raw, block)
+        self.assertEqual(json.loads(parsed[0]['arguments']), {'command': 'echo </｜DSML｜> done'})
+
+    def test_markup_no_grammar_can_read_is_still_refused(self):
+        for broken in (r.DS41_TOOL_CALLS_START + '\n' + r.DS41_INVOKE_START + '>\n' + r.DS41_TOOL_CALLS_END,
+                       r.DS41_TOOL_CALLS_START + '\n' + r.DS41_PARAM_START + ' name="a">v' + r.DS41_PARAM_END,
+                       '<｜DSML｜ nonsense>'):
+            result = p.finish_message(broken, has_tools=True, think=False, finish='stop')
+            self.assertEqual(result['calls'], [])
+            self.assertTrue(result.get('tool_error'))
+
+    def test_the_refusal_says_why(self):
+        result = p.finish_message(r.DS41_TOOL_CALLS_START + '\n' + r.DS41_INVOKE_START + '>\n' +
+                                  r.DS41_TOOL_CALLS_END, has_tools=True, think=False, finish='stop')
+        self.assertIn('invoke name=', result['tool_error']['reason'])
+
+
 if __name__ == '__main__':unittest.main()
