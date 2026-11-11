@@ -38,6 +38,7 @@ from . import request_error
 from .native_broker import vendor
 from . import ds4_render
 from .ds4_tool_parse import finish_message, find_any_tool_start, find_tool_markup_start, TOOL_MARKUP, tool_call_deltas
+from .turn_progress import ExpertCache, TurnProgress, phase_of
 
 EOS_ID = 1
 MAX_DECODE_CALL = 4096
@@ -460,12 +461,15 @@ class SingleEngine:
         if position is not None and position != len(self.live):
             raise RuntimeError('Producer frontier %d differs from the live token count %d' % (position, len(self.live)))
 
-    def decode(self, max_tokens, on_token):
+    def decode(self, max_tokens, on_token, cache=None):
         """Greedy decode until EOS or max_tokens; on_token(id) per evaluated step.
         A truthy on_token return (client stop sequence, client gone) cancels: the
         producer stops at its next token boundary, exactly as at max_tokens, and
-        no further decode call runs; live stays equal to the evaluated tokens."""
+        no further decode call runs; live stays equal to the evaluated tokens.
+        `cache` collects the producer's per-token expert-cache counters across the
+        calls of one turn (slstack/turn_progress.py)."""
         generated = [];stopped = False;steps = [];decode_ms = 0.0;cancel = [False]
+        cache = ExpertCache() if cache is None else cache
         def request_cancel():
             if not cancel[0]:
                 cancel[0] = True
@@ -488,6 +492,7 @@ class SingleEngine:
                     with process.state_lock:data = bytes(process.diagnostic[offset[0]:])
                     cut = data.rfind(b'\n') + 1;offset[0] += cut
                     for match in STEP.finditer(data[:cut]):feed(int(match[2]));seen[0] += 1
+                    cache.feed(data[:cut])
                     if finished:return
             watcher = threading.Thread(target=watch, daemon=True);watcher.start()
             try:reply = self.producer.decode(budget, stop_tokens=self.stop_tokens)
@@ -501,13 +506,15 @@ class SingleEngine:
         if stopped and generated and generated[-1] in self.stop_tokens:text_tokens = generated[:-1]
         else:text_tokens = generated
         if not stopped and generated:feed(generated[-1])
-        return dict(tokens=generated, text_tokens=text_tokens, stopped=stopped, cancelled=cancel[0], step_ms=steps, decode_ms=decode_ms)
+        return dict(tokens=generated, text_tokens=text_tokens, stopped=stopped, cancelled=cancel[0], step_ms=steps,
+                    decode_ms=decode_ms, expert_cache=cache)
 
-    def run(self, body, emit, metrics, ready=None, client_gone=None):
+    def run(self, body, emit, metrics, ready=None, client_gone=None, progress=None):
         """One chat request. emit(kind, value) receives ('delta', field, text) rows
         during decode and the final ('final', result) row; ready() runs once the
         producer holds the prompt (the request window then names its lease).
-        client_gone() true (stream write failed) ends the decode at the next token."""
+        client_gone() true (stream write failed) ends the decode at the next token.
+        progress (slstack/turn_progress.py) gets the per-second turn lines."""
         text, request = self.prepare(body, metrics)
         if ready:ready()
         think = request['think_mode'] != ds4_render.THINK_NONE
@@ -537,6 +544,7 @@ class SingleEngine:
         tokenizer = self.tokenize();started = time.monotonic();metrics['decode_started'] = started
         matcher = StopMatcher(request['stops']) if request.get('stops') else None
         shown = [];ended = [None]   # tokens fed to the text; why the text ended early
+        cache = ExpertCache()
         def on_token(token):
             if ended[0] is not None:return True
             if client_gone is not None and client_gone():ended[0] = 'client disconnected';return True
@@ -545,11 +553,14 @@ class SingleEngine:
             shown.append(token);metrics['live_completion_tokens'] = len(shown)
             piece = matcher.feed(tokenizer.token_bytes(token)) if matcher else decoder.decode(tokenizer.token_bytes(token))
             for field, delta in splitter.feed(piece):emit('delta', field, delta)
+            if progress is not None:
+                progress.token(len(shown), lambda: phase_of(splitter.text, think), max_tokens)
             if matcher and matcher.hit is not None:ended[0] = 'stop sequence'
             elif client_gone is not None and client_gone():ended[0] = 'client disconnected'
             return ended[0] is not None
         turn_start = len(self.live);self.cut_turn = None;self.decoding = True
-        try:result = self.decode(max_tokens, on_token) if max_tokens > 0 else dict(tokens=[], text_tokens=[], stopped=False, step_ms=[], decode_ms=0.0)
+        try:result = self.decode(max_tokens, on_token, cache) if max_tokens > 0 else \
+            dict(tokens=[], text_tokens=[], stopped=False, cancelled=False, step_ms=[], decode_ms=0.0, expert_cache=cache)
         finally:self.decoding = False
         if ended[0] is not None:result['text_tokens'] = list(shown)
         if matcher and matcher.hit is not None:generated_text = matcher.final_text()
@@ -569,7 +580,11 @@ class SingleEngine:
             for call in parsed['calls']:self.tool_memory[call['id']] = parsed['raw_tool_text']
         metrics.update(completion_tokens=len(result['text_tokens']), decode_ms=result['decode_ms'],
                        decode_tok_s=len(result['step_ms']) * 1000.0 / result['decode_ms'] if result['decode_ms'] else None,
-                       finish_reason=parsed['finish'], live_tokens=len(self.live), decode_ended=ended[0], decode_cancelled=result.get('cancelled', False))
+                       finish_reason=parsed['finish'], live_tokens=len(self.live), decode_ended=ended[0],
+                       decode_cancelled=result.get('cancelled', False), expert_cache=cache.counters())
+        if progress is not None:
+            progress.done(len(result['tokens']), parsed['finish'], result.get('cancelled', False), cache,
+                          result.get('decode_ms') or 0.0)
         emit('final', dict(parsed=parsed, splitter=splitter, request=request, usage=dict(
             prompt_tokens=metrics['prompt_tokens'], completion_tokens=len(result['text_tokens']),
             total_tokens=metrics['prompt_tokens'] + len(result['text_tokens']),
@@ -761,6 +776,7 @@ def handler(proxy):
                 return self.send(409, dict(error=dict(message=str(exc), type='engine_busy')))
             streaming = body.get('stream') is True;headers = False
             metrics = dict(started=time.time(), queue_wait_seconds=time.monotonic() - queued_at);alive = [True]
+            turn = TurnProgress(proxy.cfg)
             cid = 'chatcmpl-' + secrets.token_hex(12);created = int(time.time())
             model = body.get('model') if isinstance(body.get('model'), str) else proxy.model_id
             include_usage = isinstance(body.get('stream_options'), dict) and body['stream_options'].get('include_usage') is True
@@ -774,13 +790,18 @@ def handler(proxy):
             current = getattr(engine.producer, 'process', None)
             progress = dict(tracker=None, process=current, offset=len(getattr(current, 'diagnostic', b'')))
             def progress_beat():
-                # Owner: streaming clients get prefill percent. Parsed from the resident producer's
-                # per-layer sweep lines; a cold launch (producer still opening) gets a keepalive.
+                # Owner: streaming clients get prefill percent, and the turn's progress line comes
+                # from the same snapshot (slstack/turn_progress.py). Parsed from the resident
+                # producer's per-layer sweep lines; a cold launch (producer still opening) gets a
+                # keepalive and a line naming only what has to be read.
                 from .prefill_progress import chunk as progress_chunk
                 snapshot = prefill_snapshot(engine, metrics, progress, time.monotonic())
                 if snapshot is None:
-                    send_raw(b': progress\n\n');return
-                write(progress_chunk(cid, model, created, snapshot))
+                    if streaming:send_raw(b': progress\n\n')
+                    turn.reading(None, metrics.get('new_tokens') or metrics.get('prompt_tokens') or 0)
+                    return
+                if streaming:write(progress_chunk(cid, model, created, snapshot))
+                turn.reading(snapshot['tokens_done'], snapshot['tokens_total'])
             final = {}
             def emit(kind, *values):
                 if kind == 'delta' and streaming:
@@ -807,8 +828,8 @@ def handler(proxy):
                     write(_chunk(cid, model, created, dict(role='assistant')))
                 try:
                     proxy.request_active = True;proxy.window(True, engine.lease_id)
-                    with proxy.heartbeat(progress_beat if streaming else None):
-                        engine.run(body, emit, metrics, ready=prepared, client_gone=lambda: not alive[0])
+                    with proxy.heartbeat(progress_beat):
+                        engine.run(body, emit, metrics, ready=prepared, client_gone=lambda: not alive[0], progress=turn)
                 finally:proxy.request_active = False;proxy.window(False)
                 parsed, splitter = final['parsed'], final['splitter']
                 calls = tool_call_deltas(parsed['calls'])
@@ -833,7 +854,8 @@ def handler(proxy):
                                         choices=[dict(index=0, message=message, finish_reason=parsed['finish'])], usage=final['usage'],
                                         timings=final['timings']))
             except ds4_render.RenderRefused as exc:
-                metrics['failure'] = repr(exc);error = dict(error=dict(message=str(exc), type='invalid_request_error'))
+                metrics['failure'] = repr(exc);turn.failed(str(exc)[:200])
+                error = dict(error=dict(message=str(exc), type='invalid_request_error'))
                 if headers:
                     try:self.wfile.write(b'data: ' + json.dumps(error, separators=(',', ':')).encode() + b'\n\ndata: [DONE]\n\n');self.wfile.flush()
                     except OSError:pass
@@ -841,6 +863,7 @@ def handler(proxy):
             except Exception as exc:
                 metrics['failure'] = repr(exc)
                 metrics['retryable'] = request_error.is_retryable(str(exc))
+                turn.failed(type(exc).__name__ + ': ' + str(exc)[:200])
                 if engine.poison and engine.poison.startswith('Unconfirmed GPU release'):
                     print('OWNED CLEANUP UNCONFIRMED: '+engine.poison+'; retaining ownership',file=sys.stderr,flush=True)
                 else:

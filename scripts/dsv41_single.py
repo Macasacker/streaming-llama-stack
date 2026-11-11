@@ -7,6 +7,8 @@ rather than merging, so env_overrides is merged here.
 
     python -B scripts/dsv41_single.py --preset 262k [--config my.local.json] [--model M.gguf] --write runtime/x.local.json
     python -B scripts/dsv41_single.py --preset 1m --config my.local.json --dry-run      (prints the resolved settings)
+    python -B scripts/dsv41_single.py --preset 262k --no-progress --write runtime/x.local.json
+                                       (`turn_progress: false`: the engine writes no per-turn progress line)
 
 Both presets: serving single_engine (ULTRA exact-cone prefill + ds4-decode.dll decode in one
 producer), DirectStorage read parts 8, 512 MiB VRAM reserve beside the L2 expert tier, the default
@@ -64,7 +66,7 @@ def read(path):
     return json.loads(Path(path).read_text(encoding='utf-8-sig')) if path else {}
 
 
-def overlay(preset, local=None, model=None, yoco_keep=None, vision=None, profile=None):
+def overlay(preset, local=None, model=None, yoco_keep=None, vision=None, profile=None, turn_progress=None):
     """The config file for `slstack start --config`: the local keys, then the preset."""
     if preset not in PRESETS:
         raise ValueError('preset must be one of ' + ', '.join(PRESETS))
@@ -92,6 +94,7 @@ def overlay(preset, local=None, model=None, yoco_keep=None, vision=None, profile
         if type(yoco_keep) is not int or yoco_keep not in (0,140,2541):raise ValueError('yoco_keep must be 0, 140 or 2541')
         result['yoco_keep']=yoco_keep
     if vision:result['vision_bridge_version']=1
+    if turn_progress is not None:result['turn_progress']=turn_progress
     # Qualified Q4 exact-cone carry lifetime: use the unused growable-cache
     # reservation during initial prefill, then restore it before cache growth.
     # Keep N=1: the optimized two-sweep control is faster than grouped N=2.
@@ -156,13 +159,18 @@ def main(argv=None):
     parser.add_argument('--yoco-keep', type=int, choices=(0,140,2541), default=None, help='Bounded replay: 0 full, 140 approximate, 2541 exact dependency cone (local only)')
     parser.add_argument('--vision',action='store_true',default=None,help='Enable native image prefill and auto-detect the matching vision GGUF (requires the vision-capable producer)')
     parser.add_argument('--model', help='DSV4.1 GGUF path (overrides "model" in --config)')
+    states = parser.add_mutually_exclusive_group()
+    states.add_argument('--progress', dest='turn_progress', action='store_const', const=True,
+                        help='Print the per-second turn lines on the engine\'s output (the default)')
+    states.add_argument('--no-progress', dest='turn_progress', action='store_const', const=False,
+                        help='Turn the turn lines off (slstack/turn_progress.py)')
     parser.add_argument('--write', help='Write the start config here')
     parser.add_argument('--dry-run', action='store_true', help='Print the resolved settings')
     args = parser.parse_args(argv)
     local=read(args.config)
     if args.chunks_per_pass is not None:
         local['producer_chunks_per_pass'] = 'auto' if args.chunks_per_pass == 'auto' else int(args.chunks_per_pass)
-    cfg = overlay(args.preset, local, args.model, args.yoco_keep, args.vision,args.profile)
+    cfg = overlay(args.preset, local, args.model, args.yoco_keep, args.vision, args.profile, args.turn_progress)
     if args.write:
         target = Path(args.write)
         target.parent.mkdir(parents=True, exist_ok=True)

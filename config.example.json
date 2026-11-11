@@ -62,5 +62,6 @@
   "native_tier": "accurate",
   "serving": "single_engine",
   "single_engine_queue_depth": 4,
+  "turn_progress": true,
   "gpu_min_free_mib": 0
 }

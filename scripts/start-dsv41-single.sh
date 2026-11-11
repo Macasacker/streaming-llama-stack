@@ -12,6 +12,9 @@
 #                        (default: stay attached, Ctrl+C stops the stack and releases the GPU)
 #   --preset 262k|1m     required
 #   --keep 2541|140      dependency cone: 2541 exact cone (default), 140 approximate YOCO
+#   --progress           one turn progress line per second on the engine's output, followed in
+#                        this window while attached (slstack/turn_progress.py; default on)
+#   --no-progress        turn those lines off
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
@@ -24,6 +27,8 @@ vision=0
 dry_run=0
 stop=0
 detach=0
+progress=
+follow=
 while [ $# -gt 0 ]; do
     case "$1" in
         --preset) preset=$2; shift 2 ;;
@@ -32,6 +37,8 @@ while [ $# -gt 0 ]; do
         --keep) keep=$2; shift 2 ;;
         --webui) webui=1; shift ;;
         --vision) vision=1; shift ;;
+        --progress) progress=true; shift ;;
+        --no-progress) progress=false; shift ;;
         --dry-run) dry_run=1; shift ;;
         --stop) stop=1; shift ;;
         --detach) detach=1; shift ;;
@@ -53,6 +60,9 @@ start_config="$root/runtime/dsv41-single-$preset$suffix.local.json"
 
 gen_args="-B $root/scripts/dsv41_single.py --preset $preset --write $start_config --profile $profile"
 [ "$vision" = 1 ] && gen_args="$gen_args --vision"
+if [ -n "$progress" ]; then
+    if [ "$progress" = true ]; then gen_args="$gen_args --progress"; else gen_args="$gen_args --no-progress"; fi
+fi
 [ -n "$config" ] && gen_args="$gen_args --config $config"
 [ -n "$model" ] && gen_args="$gen_args --model $model"
 [ "$dry_run" = 1 ] && gen_args="$gen_args --dry-run"
@@ -182,6 +192,24 @@ fi
 logs="$runtime/logs"
 mkdir -p "$logs"
 log="$logs/dsv41-single-$preset-$(date +%Y%m%d-%H%M%S).log"
+
+# The engine's turn progress lines (slstack/turn_progress.py) go to the engine server's own log,
+# not to this launcher's: the router guards the engine worker, and that worker guards the server.
+# Following the newest one puts the turn lines in this window beside the launcher's output.
+follow_engine_log() {
+    newest=$(ls -t "$runtime/single-engine"/server-*.log 2>/dev/null | head -1)
+    if [ -z "$newest" ]; then
+        echo "No engine log under $runtime/single-engine yet; the turn lines will appear once the engine server writes one."
+        return 0
+    fi
+    echo "Turn progress: following $newest from now on (what it already holds stays in the file)."
+    tail -f -n 0 "$newest" &
+    follow=$!
+}
+stop_following() {
+    if [ -n "$follow" ] && kill -0 "$follow" 2>/dev/null; then kill "$follow" 2>/dev/null || true; fi
+    follow=
+}
 nohup env PYTHONDONTWRITEBYTECODE=1 sh -c "$command" >"$log" 2>&1 &
 pid=$!
 echo "Started DSV4.1 single engine ($preset) pid $pid; log: $log"
@@ -199,6 +227,7 @@ stop_owned() {
         kill "$pid" 2>/dev/null || true
     fi
     clear_leftovers
+    stop_following
     PYTHONDONTWRITEBYTECODE=1 "$python" -B -m slstack --config "${config:-$root/config.example.json}" release-holds 2>&1 | tail -2 \
         || echo 'release-holds refused; inspect runtime/state/gpu.holds'
     echo "GPU free: $(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1) MiB"
@@ -226,11 +255,15 @@ echo "Shutdown: $0 --preset $preset --stop   (or POST $url/v1/stack/shutdown wit
 
 if [ "$detach" = 1 ]; then
     echo "Detached as requested: this shell returns and the stack keeps running until --stop."
+    echo "Turn progress (if on): $(ls -t "$runtime/single-engine"/server-*.log 2>/dev/null | head -1 || echo "no engine log yet")"
     exit 0
 fi
+
+follow_engine_log
 
 # Stay attached so Ctrl+C is the shutdown. The server itself is still a detached child (nohup), so
 # closing the terminal without signalling does not take it down; interrupting this launcher does.
 echo "Attached: Ctrl+C stops the stack and releases the GPU. Ctrl+Z then 'bg' detaches instead."
 while kill -0 "$pid" 2>/dev/null; do sleep 1; done
+stop_following
 echo "The start process exited on its own; the stack is stopped."

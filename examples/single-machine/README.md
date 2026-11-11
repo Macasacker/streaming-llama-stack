@@ -19,11 +19,12 @@ Windows build; nothing has been re-measured here.
 | `ultra-cone` | Recommended: exact ULTRA dependency cone, keep 2541 |
 | `ultra-yoco` | Approximate keep-140 replay; the exact cone is `ultra-cone` |
 
-Copy `config.example.json` to `rtx.local.json` and replace the model placeholder with
-the original supported DSV4.1 1017 Q4 GGUF. Set paths for the built producer and the
-runtime root if they differ from the stack defaults. Install or build the stack first;
-these examples do not download model weights or select arbitrary replacement
-quantizations.
+`rtx.local.json` is tracked: it is the configuration the author's RTX 5090 box launches
+with, and its budgets are part of what a measurement reported here means. On another
+machine, edit it rather than copying `config.example.json` over it: point `model` at the
+original supported DSV4.1 1017 Q4 GGUF, and set the built-producer and runtime-root paths
+if they differ from the stack defaults. Install or build the stack first; these examples do
+not download model weights or select arbitrary replacement quantizations.
 
 From the stack root:
 
@@ -45,7 +46,9 @@ scripts/start-dsv41-single-262k.sh --config ./rtx.local.json --stop
 the growable bf16 context cache; that is capacity, not a measured one-million-token
 prefill result. `--dry-run` starts nothing and writes nothing. Stop a running stack with
 the same script and `--stop`, or Ctrl-C in a foreground run; its guardian owns the
-engine tree.
+engine tree. A foreground run also follows the engine server's log, so a running turn
+reports itself (`--no-progress` turns those lines off; see
+[docs/FIRST_RUN.md](../../docs/FIRST_RUN.md)).
 
 The exact cone is the default for `scripts/start-dsv41-single-262k.sh` and
 `scripts/start-dsv41-single-1m.sh`. `scripts/start-dsv41-single-262k-ultra-yoco.sh` and

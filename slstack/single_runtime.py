@@ -50,6 +50,7 @@ KEPT = ('generation_control_file', 'stack_preferences_file', 'vision_encoder', '
         'producer_provider_host_gib', 'producer_job_host_gib',
         'producer_desktop_reserve_gib',   # per-machine desktop RAM reserve kept free by admission (default 0.5 GiB)
         'runtime_min_free_gib',          # runtime available physical RAM floor (default 0.5 GiB; 0 disables it)
+        'turn_progress',                 # per-second turn lines on the engine's stdout (slstack/turn_progress.py)
         'comfyui_models', 'studio_python')  # envvars.json placeholders the proxy's studio/producer scopes expand
 
 
@@ -61,6 +62,8 @@ def serving_config(cfg, *, runtime_root, studio_root, llama_producer, library_di
                    spread_file=None, model_receipt=None, host_budget_gib=None):
     """The combo_proxy serving_mode=single_engine configuration (shared by Studio and the stack)."""
     host = cfg['host_budget_gib'] if host_budget_gib is None else host_budget_gib
+    if 'turn_progress' in cfg and type(cfg['turn_progress']) is not bool:
+        raise ValueError('turn_progress must be true or false')
     result = {k: deepcopy(cfg[k]) for k in KEPT if k in cfg}
     result.setdefault('yoco_keep',2541)
     result.update(serving_mode='single_engine', source_revision=revision,

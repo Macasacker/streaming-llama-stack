@@ -23,6 +23,12 @@ def check_decoder_queue_depth(value):
     return None
 
 
+def check_turn_progress(value):
+    """Validate turn_progress; None when it is a usable switch (slstack/turn_progress.py)."""
+    if type(value) is not bool:
+        raise ValueError('turn_progress must be true or false')
+    return None
+
 
 def load(path=None, overrides=None):
     cfg = json.loads((ROOT / 'config.example.json').read_text(encoding='utf-8'))
@@ -59,6 +65,7 @@ def load(path=None, overrides=None):
         raise ValueError('gpu_min_free_mib must be a nonnegative integer')
     check_gpu_utilization_ceiling(cfg.get('gpu_idle_max_util', 5))
     check_decoder_queue_depth(cfg.get('single_engine_queue_depth', 4))
+    check_turn_progress(cfg.get('turn_progress', True))
     wait = cfg.get('gpu_wait_seconds', 0)
     if type(wait) not in (int, float) or not math.isfinite(wait) or not 0 <= wait <= 7200:
         raise ValueError('gpu_wait_seconds must be finite and in [0,7200]')

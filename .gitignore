@@ -15,6 +15,11 @@ runtime/
 !engines/mference/Sources/MferenceApp/Core/State/
 !engines/mference/Sources/MferenceApp/Core/State/**
 *.local.*
+# The config this box launches with is tracked: scripts/start-dsv41-single.sh --config rtx.local.json
+# reads it, and its budgets (host_budget_gib, gpu_idle_max_mib, L2 slots) are part of what a
+# measurement here means. The exception is this one path: generated start configs and fixtures under
+# runtime/ (including release-secrets.local.json) stay ignored.
+!/rtx.local.json
 *.o
 *.so
 *.metallib

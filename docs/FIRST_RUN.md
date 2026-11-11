@@ -120,6 +120,16 @@ without signalling leaves it serving; interrupting the launcher does not.
 readiness wait, because a stack that never finished starting used to leave its worker and producer
 holding the card with nothing attached to stop them.
 
+While attached, the launcher also follows the engine server's own log, so the lines a running turn
+writes appear in the same window: `[ds4single] reading the prompt: 399,161 of 399,166 tokens, 1 s
+so far`, then one line per second naming the phase (`thinking`, `answering`, `writing a tool call:
+bash`), then `[ds4single] done: 1071 tokens in 10 s (115.1 tok/s) (stop, cancel=False), expert
+cache 97.0% hit (+3.0% of the routed experts over PCIe)`. The cache clause is what the producer's
+per-token routing counters say about that turn: the share of the routed expert slots the VRAM tiers
+served, and the share that came over PCIe from the RAM tier or the model file
+(`slstack/turn_progress.py`). `--no-progress` writes none of them; `--detach` returns without
+following the log and names the file instead.
+
 The launcher is the only route that serves this file on one 32 GB card. The native
 `ds4-server` backend refuses a V4.1 GGUF larger than VRAM both ways: without
 `--ssd-streaming` the admission check demands the mapped region resident
