@@ -23355,7 +23355,7 @@ Scope: rtx-llama. Class: advanced.
 
 ### LLAMADECODE_PREFILL_ROUTED
 
-Router-driven prefill expert reads: 0 off, 1 all layers, tail layers21-39. The single-engine launcher selects1 automatically for ULTRA prompts through2048 rows and tail with yoco_keep2541; larger full-layer passes retain overlapped eager reads. Explicit overrides win.
+Router-driven prefill expert reads: 0 off, 1 all layers, tail layers21-39. A resident single-engine producer reads this once at pipeline build, so the choice is the session's, not the request's: combo_producer.routed_prefill_choice answers 1 for ULTRA at any prompt size there, because later turns append a few dozen tokens and tail would make each of them read whole stages for layers0-20. The paired route still answers 1 through2048 rows and 0 beyond. Explicit overrides win.
 
 Scope: rtx-llama. Class: advanced.
 

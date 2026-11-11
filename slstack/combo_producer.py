@@ -404,18 +404,39 @@ def yoco_keep(cfg):
     return keep
 
 
-def routed_prefill_choice(cfg, count):
-    """Matched ULTRA controls favour demand reads through 2K, not at 32K.
+def resident_producer(cfg):
+    """True when the producer outlives the request that launched it.
 
-    Explicit native 0/1/tail overrides remain available for experiments. Larger
-    prompts retain overlapped full-stage prefetch until separately qualified.
+    That is what makes its routed choice a session policy rather than a per-request one: the
+    single engine launches one producer for turn 1 and appends every later turn to it.
+    """
+    return cfg.get('serving_mode', cfg.get('serving')) == 'single_engine' or cfg.get('yoco_keep') == 2541
+
+
+def routed_prefill_choice(cfg, count):
+    """Which layers demand-read experts: `0` none, `1` every layer, `tail` from layer 21.
+
+    The producer reads this once, when the weight provider builds its pipeline
+    (src/llama-dsv41-weights.cpp:1193), so it is the producer's setting for its whole life, not
+    the request's. A resident producer is launched with the first turn's prompt, so a choice made
+    from that count is paid by every later turn: an agent session that opens with 16 666 tokens
+    picks `tail` and then reads whole stages for layers 0-20 on a 45-token append. All 38
+    recorded appends on this box ran under `tail` (runtime/single-engine/ultra-*/launch.json
+    `routed_prefill`), costing 3.5-43.7 s of `append_prefill_seconds`, median 24.5 s per turn
+    (docs/SESSION_FAILURE_PLAN.md).
+
+    The steady state of a resident session is the append, so it routes every layer. The paired
+    route serves one request per producer, so its count still decides — matched ULTRA controls
+    favour demand reads through 2K there, not at 32K. An explicit override always wins, which is
+    how `tail` stays reachable for experiments.
     """
     value=cfg.get('env_overrides',{}).get('LLAMADECODE_PREFILL_ROUTED')
     if value is not None:
         if value not in ('0','1','tail'):raise ValueError('LLAMADECODE_PREFILL_ROUTED must be 0, 1 or tail')
         return value
-    if cfg.get('producer_profile','ultra')=='ultra' and cfg.get('yoco_keep')==2541:return '1' if count<=2048 else 'tail'
-    return '1' if count<=2048 and cfg.get('producer_profile','ultra')=='ultra' else '0'
+    ultra=cfg.get('producer_profile','ultra')=='ultra'
+    if resident_producer(cfg):return '1' if ultra else '0'
+    return '1' if count<=2048 and ultra else '0'
 
 
 def prefill_arguments(cfg, count, available, *, export_state=False, techniques=None):

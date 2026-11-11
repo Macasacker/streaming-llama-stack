@@ -236,8 +236,10 @@ for name in ('LLAMADECODE_EXTENT_SLOTS', 'LLAMADECODE_EXTENT_SLOT_MIB',
         env[name] = value
         print('%s=%s forwarded to the producer' % (name, value))
 if routed:
-    # '1' routes from layer 0; the unset default resolves through routed_prefill_choice, which
-    # answers 'tail' above 2 048 rows and leaves layers 0-20 reading every expert in the block.
+    # '1' routes from layer 0. The unset default now resolves through routed_prefill_choice to
+    # '1' for a resident single-engine producer at any prompt size; 'tail' (layers 21-39 only,
+    # layers 0-20 reading every expert in the block) is reachable only as an explicit override,
+    # which is what this flag used to be compared against on prompts above 2 048 rows.
     env['LLAMADECODE_PREFILL_ROUTED'] = '1'
     print('routed prefill on every layer: LLAMADECODE_PREFILL_ROUTED=1')
 if calibrate:

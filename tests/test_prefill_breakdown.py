@@ -37,18 +37,29 @@ class Breakdown(unittest.TestCase):
         self.assertEqual(hinted['passes'][0]['fetched_bytes'],130)
         self.assertIsNone(hinted['passes'][0]['tensor_ledger_reconciles'])
 
-    def test_demand_read_default_uses_measured_short_prompt_range(self):
+    def test_demand_read_default_follows_the_producers_lifetime(self):
         from slstack.combo_producer import routed_prefill_choice
+        # The paired route serves one request per producer, so the count decides.
         for n in (1,2048):self.assertEqual(routed_prefill_choice({},n),'1')
         for n in (2049,8192,32768,200000):self.assertEqual(routed_prefill_choice({},n),'0')
+        self.assertEqual(routed_prefill_choice(dict(serving='native'),100000),'0')
         for profile in ('accurate','fast'):self.assertEqual(routed_prefill_choice(dict(producer_profile=profile),2048),'0')
         self.assertEqual(routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'0'}),2048),'0')
         self.assertEqual(routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'1'}),32768),'1')
         with self.assertRaises(ValueError):routed_prefill_choice(dict(env_overrides={'LLAMADECODE_PREFILL_ROUTED':'auto'}),2048)
-        self.assertEqual(routed_prefill_choice(dict(yoco_keep=2541),100000),'tail')
+        # A resident producer reads this once, at pipeline build, so a choice made from the launch
+        # count is paid by every later append. pi's session opened at 16 666 tokens and appended
+        # 45 at a turn; `tail` cost whole-stage reads for layers 0-20 on each of them.
+        for n in (2049,45,16666,100000):
+            self.assertEqual(routed_prefill_choice(dict(yoco_keep=2541),n),'1',n)
+            self.assertEqual(routed_prefill_choice(dict(serving='single_engine'),n),'1',n)
+        self.assertEqual(routed_prefill_choice(dict(serving='single_engine',producer_profile='accurate'),100000),'0')
+        self.assertEqual(routed_prefill_choice(dict(serving='single_engine',
+                                                    env_overrides={'LLAMADECODE_PREFILL_ROUTED':'tail'}),45),'tail')
         from scripts.dsv41_single import overlay
         cone=overlay('262k',profile='ultra-cone')
         self.assertEqual((cone['producer_profile'],cone['yoco_keep']),('ultra',2541))
+        self.assertEqual((routed_prefill_choice(cone,16666),routed_prefill_choice(cone,45)),('1','1'))
 
     def test_inventory_and_legacy_pass_multiplicity(self):
         header=dict(metadata={},header_bytes=33,tensors=[

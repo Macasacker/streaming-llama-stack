@@ -369,6 +369,65 @@ Error with no status, and by then the 200 headers are gone — no header can ret
 what removes the abort itself; this item stops the buffered path from burning three cold launches
 and tells whoever is reading the stream why repeating it will not help.
 
+## Item 7: the resident producer's routing was decided by the first turn
+
+Found while reading pi's append cost, and confirmed from the box's own records rather than
+inferred.
+
+`LLAMADECODE_PREFILL_ROUTED` is read once, when the weight provider builds its pipeline
+(`src/llama-dsv41-weights.cpp:1193` sets `p->lazy_from_layer = tail ? 21 : 0`), and
+`combo_producer.py:582` supplies it at producer launch from `len(tokens)` — the launch prompt. A
+single-engine producer is resident: it is created for turn 1 and every later turn appends to that
+same process, so the first turn's size decides the routing for the rest of the session.
+
+`routed_prefill_choice` answered `1` through 2048 rows and `tail` beyond. An agent session that
+opens with 16 666 tokens therefore got `tail`, and each later append — a few dozen tokens —
+prefetched whole stages for layers 0-20 before demand-reading from layer 21.
+
+The recorded cost, from `runtime/single-engine/single-request-*.json` matched to each producer's
+`launch.json`:
+
+| appended tokens | `append_prefill_seconds` |
+|---|---|
+| 14 | 3.5, 3.8 |
+| 45 / 48 / 80 / 85 | 19.2, 17.7, 19.3, 19.9 |
+| 248 – 450 | 21.5 – 23.4 |
+| **all 38 appends** | **median 24.5 s, max 43.7 s** |
+
+All 38 ran under `routed_prefill=tail` — every recorded `launch.json` for a session with appends.
+An 85-token turn costing 19.9 s is not the tokens; it is 21 layers re-reading experts nobody asked
+for.
+
+Fix: `routed_prefill_choice` answers for the producer's lifetime, not the launch count. A resident
+producer (`serving=single_engine`, or `yoco_keep=2541`) gets `1` at any prompt size; the paired
+route, which serves one request per producer, keeps the count rule; an explicit
+`env_overrides.LLAMADECODE_PREFILL_ROUTED` still wins, which is how `tail` stays reachable.
+`resident_producer()` names the condition, and the reasoning is in the function's docstring.
+
+What this trades, stated honestly: `docs/MERGEPERF.md:39` measured whole-pass against routed on a
+single prefill — 2K rows 19.17 → 15.23 s, 8K rows 20.58 → 21.39 s — so routing every layer costs
+about 0.8 s on an 8K cold head and saves several on a 2K one. That is a comparison against `0`,
+not against `tail`, and it is a cold head, not an append. The head penalty is bounded and paid
+once per producer; the append saving is paid every turn.
+
+The A/B that remains, needing a free card (`scripts/dsv41_reuse_probe.py` gained `--turns` and
+`--expect-routed`, which reads the mode off `launch.json` so each side names what it ran):
+
+    scripts/start-dsv41-single-262k.sh --config rtx.tail.json ...   # env_overrides ROUTED=tail
+    python3 scripts/dsv41_reuse_probe.py --turns 5 --expect-routed tail
+    scripts/start-dsv41-single-262k.sh --config rtx.local.json ...  # default, now '1'
+    python3 scripts/dsv41_reuse_probe.py --turns 5 --expect-routed 1
+
+Record the two "append prefill over 5 turns" lines here when it runs. The prediction from the
+table above is roughly 15-20 s off each appended turn.
+
+Tests: `tests/test_prefill_breakdown.py` (renamed to `test_demand_read_default_follows_the_producers_lifetime`)
+asserts the count rule for the paired route, `1` at 45 / 2049 / 16666 / 100000 for a resident
+producer, `0` for a non-ULTRA resident one, and that `tail` is reachable only by override;
+`tests/test_dsv41_single_launch.py` now expects `1` for both presets at every count. The stale
+comment in `scripts/ds4-first-run.sh` and the `LLAMADECODE_PREFILL_ROUTED` row in
+`envvars.json` / `docs/VARIABLES.md` were corrected to match, since both described the old rule.
+
 ## Order, and what is not a stack bug
 
 All six are fixed, in this order, one commit each:
@@ -380,6 +439,9 @@ All six are fixed, in this order, one commit each:
 5. Item 2 (shared top-k predicate + readable abort) — needed `build.sh`, and the on-device gate
    was run while another engine held the card.
 6. Item 3 (retry classification) — Python, after 2 so the reason string it keys on exists.
+
+Item 7 came out of reading the append cost while checking item 1, and is not one of pi's reported
+errors: the session was slow on every turn after the first, not only failing.
 
 The suite went from 726 passed to **777 passed**, with the same 2 failures throughout. The
 31 failed / 696 passed recorded in `HANDOFF.md` is an older tree; the two below are what this box
