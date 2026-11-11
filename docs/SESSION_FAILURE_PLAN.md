@@ -161,15 +161,30 @@ the queue itself is full or its wait expires.
 
 Fix:
 
-1. Wait on the lock for the admission window (`cfg['request_timeout_s']`, already the bound the
-   control routes use) instead of refusing, and expose `single_engine_queue_depth` (default 4)
-   so a queue overflow is refused with the depth in the message.
-2. Say which it is in the 409 (`queue full`, not "another request owns the decoder"), so a
-   client can distinguish "wait and you'll be served" from "you are not going to be served".
+1. Wait on the lock for the admission window (the request's own `request_timeout_s`, already the
+   bound the control routes use) instead of refusing, and expose `single_engine_queue_depth`
+   (default 4) so a queue overflow is refused with the depth in the message.
+2. Distinguish the two refusals: 429 `engine_queue_full` when the queue is already full (the
+   client is not going to be served), 409 `engine_busy` when the window elapsed while waiting
+   (the decoder is still owned, and a retry may still land).
 
-Tests: `tests/test_single_engine_queue.py` (new) against a fake engine whose `run` blocks on an
-event: a second request waits and then completes; more than `queue_depth` queued requests get one
-409 naming the queue; a control-route wait still times out at its bound.
+Tests: `tests/test_decoder_queue.py` (new) — `DecoderQueue` unit behaviour (a waiter is served
+after the holder releases, overflow raises `QueueFull` naming the depth, an elapsed window raises
+`QueueTimeout`, depth 0 is rejected at construction), and three HTTP cases through the real
+handler: a second concurrent request waits and then answers 200 with the wait recorded in its
+metrics, a full queue answers 429 `engine_queue_full` while the two admitted requests are still
+served, and a configuration with no `request_timeout_s` still serves.
+
+Done. Two things this cost, both worth keeping:
+
+- The admission window was first read as `cfg['request_timeout_s']`, a key the smaller test
+  harnesses do not carry. The resulting `KeyError` escaped `do_POST` before any status line was
+  written, and `test_combo_single_stop`'s read loop kept calling `recv()` after the server closed
+  — a 14-minute hang instead of a failure. `admission_window()` defaults to 600 s, and that test
+  now breaks out when `recv()` returns nothing.
+- The queue lives in `slstack/decoder_queue.py` rather than inline in the engine, because
+  `combo_proxy` (native serving) had the identical non-blocking 409. Both now queue; the engine's
+  `self.lock` stays the engine's, since retirement, checkpoints and the idle sweep take it too.
 
 ## Item 5: a stale socket makes the next start answer 503 `[Errno 98]`
 

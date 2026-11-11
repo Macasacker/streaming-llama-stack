@@ -199,7 +199,10 @@ class HttpDisconnectTests(unittest.TestCase):
             client.sendall(b'POST /v1/chat/completions HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer ' + b't' * 40 +
                            b'\r\nContent-Type: application/json\r\nContent-Length: ' + str(len(body)).encode() + b'\r\n\r\n' + body)
             data = b''
-            while data.count(b'"content"') < 3:data += client.recv(4096)
+            while data.count(b'"content"') < 3:
+                chunk = client.recv(4096)
+                if not chunk:break   # the server went away; a stalled read would hang the suite
+                data += chunk
             client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, b'\x01\x00\x00\x00\x00\x00\x00\x00');client.close()   # RST
             deadline = time.monotonic() + 20
             while (not h.launched or not h.launched[0].decodes or h.engine.lock.locked()) and time.monotonic() < deadline:time.sleep(.05)

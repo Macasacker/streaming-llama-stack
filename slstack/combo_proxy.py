@@ -24,6 +24,7 @@ import psutil
 from .combo_measure import require_parity
 from .combo_session import ComboSession
 from .journal import atomic_json
+from .decoder_queue import DecoderQueue, QueueFull, QueueTimeout
 from .lease import gpu_lease
 from .native_broker import vendor
 
@@ -68,6 +69,7 @@ class Proxy:
         self.token=os.environ.get('DS4_SERVER_AUTH_TOKEN','')
         if len(self.token)<32:raise ValueError('Normal Studio native Bearer token is required')
         self.lock=threading.Lock();self.session=None;self.key=None;self.pending=0
+        self.queue=DecoderQueue(self.lock,int(cfg.get('single_engine_queue_depth',4)))
         capability=evidence['ultra'].get('provider_initial')
         if not capability:raise ValueError('Qualified native capability receipt is required')
         self.models=evidence['ultra'].get('native_models')
@@ -173,9 +175,13 @@ def handler(proxy):
                 try:return self.send(200,proxy.quality(body))
                 except (ValueError,RuntimeError,OSError) as exc:return self.send(409,dict(error=dict(message=str(exc))))
             if self.path!='/v1/chat/completions':return self.send(404,dict(error=dict(message='Unknown native endpoint')))
-            if not proxy.lock.acquire(blocking=False):return self.send(409,dict(error=dict(message='Another request owns this decoder')))
+            queued_at=time.monotonic()
+            try:proxy.queue.enter(float(proxy.cfg.get('request_timeout_s',600)))
+            except QueueFull as exc:return self.send(429,dict(error=dict(message=str(exc),type='engine_queue_full')))
+            except QueueTimeout as exc:return self.send(409,dict(error=dict(message=str(exc),type='engine_busy')))
             streaming=body.get('stream') is True;headers=False;done=threading.Event();session=None;timer=None
             metrics=None;request_started=time.monotonic()
+            waited=time.monotonic()-queued_at
             try:
                 key=conversation_key(body)
                 fresh=begins_conversation(body) and proxy.session is not None and not proxy.session.poison
@@ -212,6 +218,7 @@ def handler(proxy):
                     proxy.window(True,lease)
                     try:
                         with session.prepare(body) as (native,rendered,metrics):
+                            metrics['queue_wait_seconds']=waited
                             watched[0]=native
                             api_started=time.monotonic()
                             def observed(row):
@@ -255,7 +262,7 @@ def handler(proxy):
                 done.set()
                 done.set()   # ends progress_watch
                 if metrics is not None:atomic_json(Path(proxy.cfg['runtime_root'])/('request-'+secrets.token_hex(8)+'.json'),metrics)
-                proxy.lock.release()
+                proxy.queue.exit()
     return Handler
 
 

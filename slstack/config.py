@@ -16,6 +16,13 @@ def check_gpu_utilization_ceiling(value):
     return None
 
 
+def check_decoder_queue_depth(value):
+    """Validate single_engine_queue_depth; None when the queue admits it (slstack/decoder_queue.py)."""
+    if type(value) is not int or not 1 <= value <= 64:
+        raise ValueError('single_engine_queue_depth must be an integer in [1,64]')
+    return None
+
+
 
 def load(path=None, overrides=None):
     cfg = json.loads((ROOT / 'config.example.json').read_text(encoding='utf-8'))
@@ -51,6 +58,7 @@ def load(path=None, overrides=None):
     if type(cfg.get('gpu_min_free_mib', 0)) is not int or cfg.get('gpu_min_free_mib', 0) < 0:
         raise ValueError('gpu_min_free_mib must be a nonnegative integer')
     check_gpu_utilization_ceiling(cfg.get('gpu_idle_max_util', 5))
+    check_decoder_queue_depth(cfg.get('single_engine_queue_depth', 4))
     wait = cfg.get('gpu_wait_seconds', 0)
     if type(wait) not in (int, float) or not math.isfinite(wait) or not 0 <= wait <= 7200:
         raise ValueError('gpu_wait_seconds must be finite and in [0,7200]')

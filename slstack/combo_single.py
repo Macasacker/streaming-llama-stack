@@ -33,12 +33,14 @@ import threading
 import time
 import psutil
 from .journal import atomic_json
+from .decoder_queue import QueueFull, QueueTimeout
 from .native_broker import vendor
 from . import ds4_render
 from .ds4_tool_parse import finish_message, find_any_tool_start, find_tool_markup_start, TOOL_MARKUP, tool_call_deltas
 
 EOS_ID = 1
 MAX_DECODE_CALL = 4096
+
 STEP = re.compile(rb'LLAMADECODE_STEP index=(\d+) token=(\d+) ')
 TOOL_STARTS = ('\n\n' + ds4_render.DS41_TOOL_CALLS_START, ds4_render.DS41_TOOL_CALLS_START, '<｜DSML｜tool_calls>',
                '<DSML｜tool_calls>', '<tool_calls>', '<tool_call>') + TOOL_MARKUP
@@ -168,6 +170,8 @@ class SingleEngine:
         self.cfg = deepcopy(cfg);self.tokenizer = tokenizer
         self.producer = None;self.starting_producer = None;self.live = [];self.leases = None;self.lease_id = None
         self.tool_memory = {};self.lock = threading.Lock();self.stopping = threading.Event()
+        from .decoder_queue import DecoderQueue
+        self.queue = DecoderQueue(self.lock, int(cfg.get('single_engine_queue_depth', 4)))
         self.quality_value = None;self.applied_quality = None;self.last_used = time.monotonic()
         from .generation import Store
         self.generation = Store(cfg)
@@ -242,6 +246,19 @@ class SingleEngine:
     def tokenize(self):
         if self.tokenizer is None:self.tokenizer = ds4_render.Tokenizer.from_gguf(self.cfg['model'])
         return self.tokenizer
+
+    def enter_decoder(self, timeout):
+        """Take the decoder for one request, queued behind whoever holds it now.
+
+        One resident producer and one conversation mean two requests cannot run at once, but a
+        second one that is refused costs the client a retry against a cold engine — the whole
+        conversation re-prefills. Queueing costs it the wait instead
+        (slstack/decoder_queue.py, docs/SESSION_FAILURE_PLAN.md).
+        """
+        self.queue.enter(timeout)
+
+    def exit_decoder(self):
+        self.queue.exit()
 
     def retire(self, why):
         """Gracefully close the producer, then release the GPU hold."""
@@ -671,9 +688,14 @@ def handler(proxy):
             if len(data) != length:raise ValueError('Truncated request')
             vendor();from studio.dsv41_session_contract import control
             return control(data,max_bytes=limit)
+        def admission_window(self):
+            """Seconds a caller may wait for the decoder: the request's own timeout. Read with a
+            default because a harness may serve without a full configuration, and a missing key
+            must not kill the connection mid-stream."""
+            return float(proxy.cfg.get('request_timeout_s', 600))
         def control(self, route):
             engine = proxy.engine
-            if not engine.lock.acquire(timeout=float(proxy.cfg['request_timeout_s'])):
+            if not engine.lock.acquire(timeout=self.admission_window()):
                 return self.send(409, dict(error=dict(message='Another request owns this decoder')))
             try:
                 if engine.poison:raise RuntimeError('Single-engine owner is poisoned: ' + engine.poison)
@@ -695,7 +717,7 @@ def handler(proxy):
             # Cancel at the next token boundary before waiting for the session lock.
             producer=engine.producer
             if producer is not None and hasattr(producer,'cancel_decode'):producer.cancel_decode()
-            if not engine.lock.acquire(timeout=float(proxy.cfg.get('request_timeout_s', 600))):
+            if not engine.lock.acquire(timeout=self.admission_window()):
                 return self.send(409, dict(error=dict(message='Another request owns this decoder')))
             try:
                 if engine.poison:raise RuntimeError('Single-engine owner is poisoned: ' + engine.poison)
@@ -728,8 +750,14 @@ def handler(proxy):
             if self.path in ('/v1/stack/release', '/v1/stack/restore'):return self.control(self.path)
             if self.path != '/v1/chat/completions':return self.send(404, dict(error=dict(message='Unknown native endpoint')))
             engine = proxy.engine
-            if not engine.lock.acquire(blocking=False):return self.send(409, dict(error=dict(message='Another request owns this decoder')))
-            streaming = body.get('stream') is True;headers = False;metrics = dict(started=time.time());alive = [True]
+            queued_at = time.monotonic()
+            try:engine.enter_decoder(self.admission_window())
+            except QueueFull as exc:
+                return self.send(429, dict(error=dict(message=str(exc), type='engine_queue_full')))
+            except QueueTimeout as exc:
+                return self.send(409, dict(error=dict(message=str(exc), type='engine_busy')))
+            streaming = body.get('stream') is True;headers = False
+            metrics = dict(started=time.time(), queue_wait_seconds=time.monotonic() - queued_at);alive = [True]
             cid = 'chatcmpl-' + secrets.token_hex(12);created = int(time.time())
             model = body.get('model') if isinstance(body.get('model'), str) else proxy.model_id
             include_usage = isinstance(body.get('stream_options'), dict) and body['stream_options'].get('include_usage') is True
@@ -823,7 +851,7 @@ def handler(proxy):
             finally:
                 try:atomic_json(Path(proxy.cfg['runtime_root']) / ('single-request-' + secrets.token_hex(8) + '.json'), metrics)
                 except OSError:pass
-                engine.lock.release()
+                engine.exit_decoder()
     return Handler
 
 
