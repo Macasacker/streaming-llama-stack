@@ -11,6 +11,7 @@
   "lease_minutes": 19,
   "gpu_uuid": "",
   "gpu_idle_max_mib": 1024,
+  "gpu_idle_max_util": 5,
   "hold_file": "",
   "model_name": "DSV4.1-1017",
   "model": "",

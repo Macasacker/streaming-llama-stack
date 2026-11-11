@@ -186,6 +186,25 @@ class SingleEngine:
         from .lease import gpu_lease
         return gpu_lease(self.cfg)
 
+    def acquire_lease(self):
+        """Take the GPU hold, waiting out a busy card instead of failing the request.
+
+        guard.supervise retries admission at startup for gpu_wait_seconds; this engine takes its
+        hold per request, so without the same budget a browser's GPU process on the card turns a
+        turn into a 503 the client has to re-issue (docs/SESSION_FAILURE_PLAN.md).
+        """
+        from .lease import AdmissionRefused
+        wait = float(self.cfg.get('gpu_wait_seconds', 0))
+        deadline = time.monotonic() + wait
+        while True:
+            stack = ExitStack()
+            try:
+                return stack, stack.enter_context(self.lease_factory())
+            except AdmissionRefused:
+                stack.close()   # nothing was entered; the hold is not ours
+                if wait <= 0 or self.stopping.is_set() or time.monotonic() >= deadline:raise
+                time.sleep(min(.5, max(.05, deadline - time.monotonic())))
+
     def _launch_producer(self, tokens):
         from .combo_producer import ComboProducer
         session, epoch = secrets.token_hex(16), secrets.randbits(63) or 1
@@ -217,7 +236,7 @@ class SingleEngine:
             saved=self.save_snapshot('media');self.retire('encode chat image')
             if saved:self.pending_snapshot=saved
         if self.leases is None:
-            stack=ExitStack();self.lease_id=stack.enter_context(self.lease_factory());self.leases=stack
+            self.leases, self.lease_id = self.acquire_lease()
             self.lease_changed()
 
     def tokenize(self):
@@ -374,7 +393,7 @@ class SingleEngine:
     def launch(self, tokens, *, base=None):
         """Take the GPU hold and start a producer whose frontier is exactly tokens."""
         if self.leases is None:
-            stack = ExitStack();self.lease_id = stack.enter_context(self.lease_factory());self.leases = stack
+            self.leases, self.lease_id = self.acquire_lease()
             self.lease_changed()   # the guardian's window must name the new lease before it next samples the holds
         self.live = []
         self.restore_base = base

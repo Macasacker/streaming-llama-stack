@@ -16,6 +16,64 @@ class AdmissionRefused(RuntimeError):
     pass
 
 
+GPU_IDLE_MAX_UTIL_DEFAULT = 5
+GPU_UTIL_SAMPLE_SECONDS = .25        # the gap between the two utilization readings
+
+
+def gpu_sample(cfg):
+    """One reading of the selected card as (used MiB, free MiB, utilization %).
+
+    An unreadable reading is a RuntimeError, not a refusal: a broken query must never read as
+    somebody else owning the card.
+    """
+    result = subprocess.run(['nvidia-smi', '--id=' + cfg['gpu_uuid'],
+                             '--query-gpu=memory.used,memory.free,utilization.gpu', '--format=csv,noheader,nounits'],
+                            capture_output=True, text=True, timeout=10)
+    if result.returncode:
+        raise RuntimeError('Cannot certify GPU ownership: ' + result.stderr)
+    fields = result.stdout.strip().split(',')
+    if len(fields) != 3:
+        raise RuntimeError('Cannot certify GPU ownership: unreadable reading ' + result.stdout.strip())
+    return [int(x.strip()) for x in fields]
+
+
+def gpu_holder_line():
+    """Who holds device memory, as one line for a refusal message.
+
+    Admission never ejects a process, so a refusal has to name the holder rather than assert
+    there is none. A failed query must not turn a refusal into a crash, so the evidence
+    degrades to `unknown` here; the release path keeps the strict reading.
+    """
+    try:
+        rows = gpu_holders()
+    except (RuntimeError, OSError, ValueError):return 'unknown'
+    return ' '.join(f'{row["pid"]} ({row["used_memory_mib"]} MiB)' for row in rows) or 'none'
+
+
+def gpu_not_idle(cfg):
+    """Why the card is not idle enough for exclusive admission, or None when it is.
+
+    Each condition names the threshold it tripped: one message for three different causes is how
+    a 7 % reader on the card reads as a memory problem (docs/SESSION_FAILURE_PLAN.md). Memory is
+    read once — a holder of gigabytes is not transient. Utilization is the noisiest quantity on
+    the card, so it refuses only when a second sample a moment later still exceeds it.
+    """
+    used, free, busy = gpu_sample(cfg)
+    limit = cfg['gpu_idle_max_mib']
+    if used > limit:
+        return f'{used} MiB used exceeds gpu_idle_max_mib {limit}'
+    floor = int(cfg.get('gpu_min_free_mib', 0))
+    if free < floor:
+        return f'{free} MiB free is below gpu_min_free_mib {floor}'
+    ceiling = int(cfg.get('gpu_idle_max_util', GPU_IDLE_MAX_UTIL_DEFAULT))
+    if busy > ceiling:
+        time.sleep(GPU_UTIL_SAMPLE_SECONDS)
+        second = gpu_sample(cfg)[2]
+        if second > ceiling:
+            return f'{second}% utilization (first sample {busy}%) exceeds gpu_idle_max_util {ceiling}'
+    return None
+
+
 def read_hold_text(path):
     """Wait briefly for another admission's write to land; never use stale holds."""
     for attempt in range(51):
@@ -267,14 +325,10 @@ def gpu_lease(cfg):
                     raise AdmissionRefused('RTX admission refused: ACTIVE holds exist: ' + '\n'.join(active))
                 # Other processes hold device memory (a serve process, a browser GPU process),
                 # so the selected GPU's own baseline decides, not the absence of clients.
-                result = subprocess.run(['nvidia-smi', '--id=' + cfg['gpu_uuid'],
-                                         '--query-gpu=memory.used,memory.free,utilization.gpu', '--format=csv,noheader,nounits'],
-                                        capture_output=True, text=True, timeout=10)
-                if result.returncode:
-                    raise RuntimeError('Cannot certify GPU ownership: ' + result.stderr)
-                used, free, busy = [int(x.strip()) for x in result.stdout.strip().split(',')]
-                if used > cfg['gpu_idle_max_mib'] or free < int(cfg.get('gpu_min_free_mib', 0)) or busy > 5:
-                    raise AdmissionRefused('RTX is not idle enough for exclusive admission; no other process was ejected: ' + result.stdout)
+                reason = gpu_not_idle(cfg)
+                if reason:
+                    raise AdmissionRefused('RTX is not idle enough for exclusive admission; no other process was ejected: '
+                                           + reason + '; holding the card: ' + gpu_holder_line())
                 identity = uuid.uuid4().hex
                 expiry = datetime.now(timezone.utc) + timedelta(minutes=cfg['lease_minutes'])
                 lease_path = Path(cfg['runtime_root']) / 'state' / 'leases' / (identity + '.json')

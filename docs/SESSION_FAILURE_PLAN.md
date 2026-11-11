@@ -132,10 +132,20 @@ Fix:
 4. Honour `gpu_wait_seconds` at the engine's own admission point: wrap the lease acquisition in
    the same wait/retry the guardian uses, so a busy card costs a wait rather than a failed turn.
 
-Tests: `tests/test_gpu_admission.py` (new) with `subprocess.run` patched — asserts the message
+Tests: `tests/test_gpu_admission.py` (new) with `subprocess.run` scripted — asserts the message
 names the condition and the threshold, that two low samples admit and two high samples refuse,
-that `gpu_idle_max_util` is read, that a bad value is rejected by `config.validate`, and that
-the engine retries then admits when the first refusal clears.
+that `gpu_idle_max_util` is read, that a bad value is rejected by `config.load`, that a holder
+query which fails degrades to `unknown` rather than crashing the refusal, and that the refusal
+still says no process was ejected. `tests/test_single_engine_admission_wait.py` (new) drives
+`SingleEngine.acquire_lease` with a refusing lease factory: it waits and then serves, it refuses
+immediately with no wait budget, it gives up at its deadline, and a stopping engine stops.
+
+Done. The one point worth keeping: `gpu_holders()` already existed for the release path and is
+strict (a failed query is an error), so `gpu_holder_line()` reuses it and degrades to `unknown`
+for the message — one evidence function, two failure tolerances. The ceiling stays at its default
+of 5 on this box; what changed the session's behaviour is `gpu_wait_seconds: 120` in
+`rtx.local.json`, because the single engine is served straight from `__main__.serve` and never
+went through the guardian's admission retry.
 
 ## Item 4: a second concurrent request is refused, not queued
 

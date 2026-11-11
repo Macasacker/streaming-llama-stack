@@ -7,6 +7,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def check_gpu_utilization_ceiling(value):
+    """Validate gpu_idle_max_util; None when it is a usable percentage. An instantaneous
+    utilization reading is what refuses a session for a browser's GPU process, so the ceiling
+    is a setting rather than a constant (slstack/lease.py samples it twice)."""
+    if type(value) is not int or not 0 <= value <= 100:
+        raise ValueError('gpu_idle_max_util must be an integer percentage in [0,100]')
+    return None
+
+
+
 def load(path=None, overrides=None):
     cfg = json.loads((ROOT / 'config.example.json').read_text(encoding='utf-8'))
     if path:
@@ -40,6 +50,7 @@ def load(path=None, overrides=None):
             raise ValueError(f'{key} must be finite and positive')
     if type(cfg.get('gpu_min_free_mib', 0)) is not int or cfg.get('gpu_min_free_mib', 0) < 0:
         raise ValueError('gpu_min_free_mib must be a nonnegative integer')
+    check_gpu_utilization_ceiling(cfg.get('gpu_idle_max_util', 5))
     wait = cfg.get('gpu_wait_seconds', 0)
     if type(wait) not in (int, float) or not math.isfinite(wait) or not 0 <= wait <= 7200:
         raise ValueError('gpu_wait_seconds must be finite and in [0,7200]')

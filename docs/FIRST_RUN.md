@@ -70,13 +70,18 @@ validator:
    `LLAMADECODE_VRAM_MARGIN_MIB: "1024"` sized its L2 with the default 64, and
    `dsv41_single.overlay('262k', rtx.local.json)` prints the merged 64.
    Stopping Strata also stops the assistant, so GPU work is the user's to run by hand.
-   Admission itself gates on the device, not on which process holds it: `slstack/lease.py:210`
-   refuses when `memory.used > gpu_idle_max_mib` or `utilization.gpu > 5`. With the serve
-   process stopped this desktop still reports ~1,864 MiB used - the compositor and browser
-   GPU buffers, most of it not attributed to any compute client - so the example config's
-   `gpu_idle_max_mib: 1024` cannot admit here. `rtx.local.json` sets 2560, which still
+   Admission itself gates on the device, not on which process holds it: `slstack/lease.py`
+   refuses when `memory.used > gpu_idle_max_mib`, `memory.free < gpu_min_free_mib`, or
+   `utilization.gpu > gpu_idle_max_util` (default 5) — and the utilization gate asks twice,
+   0.25 s apart, because one 7% sample is a browser's GPU process rather than a competitor for
+   the card. A refusal now names the condition it tripped, its threshold, and the compute
+   clients holding memory. With the serve process stopped this desktop still reports ~1,864 MiB
+   used - the compositor and browser GPU buffers, most of it not attributed to any compute
+   client - so the example config's `gpu_idle_max_mib: 1024` cannot admit here. `rtx.local.json`
+   sets 2560, which still
    refuses a real model serve (29 GiB) and still fails while one is decoding (utilisation
-   was measured at 94%).
+   was measured at 94%). The single engine waits `gpu_wait_seconds` for the card to clear before
+   it answers, so a reader that goes away costs a wait rather than a failed turn.
    A second refusal is not about the card at all: a producer that is `kill -9`'d leaves an
    `ACTIVE` line in `runtime/state/gpu.holds` that never expires by inference, and the next
    admission fails with `RTX admission refused: ACTIVE holds exist: …` even on a quiet GPU
