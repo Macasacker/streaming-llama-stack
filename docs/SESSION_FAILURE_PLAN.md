@@ -1,4 +1,4 @@
-# The five ways pi's session on this box failed, and what each one costs
+# The six ways pi's session on this box failed, and what each one costs
 
 Goal: make a long pi session on the single engine finish without a tool call turning into
 `Malformed tool call`, without a transient reader on the card refusing admission, and without
