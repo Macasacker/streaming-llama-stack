@@ -726,7 +726,7 @@ bool llama_dsv41_sweep::run(const std::vector<int32_t>&tokens,const cancelled&st
         require(p->tokens.size()==p->position_offset&&tokens.size()<p->options.context-p->position_offset,"Stateful token prefix/extent changed");
         p->tokens.insert(p->tokens.end(),tokens.begin(),tokens.end());
         success(p->cache->ensure_tokens(uint32_t(p->tokens.size()),"prefill",nullptr,error),error);   // growable cache: map before the sweep writes
-        success(p->provider.start_request(error),error);
+        success(p->provider.start_request(error,uint64_t(tokens.size())),error);
         const auto &owned=tokens;
         const auto schedule=llama_dsv41_plan_append(p->options.pair_ffn,p->options.carry.max_tile_tokens,p->options.compute_step_tokens,p->position_offset,p->options.unaligned_append_step_tokens);
         const uint32_t compute_step=schedule.step;

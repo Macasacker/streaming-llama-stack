@@ -4,6 +4,7 @@
 #include "llama-dsv41-layer-log.h"
 #include "llama-dsv41-resident-append.h"
 #include "llama-dsv41-step-ledger.h"
+#include "llama-dsv41-assign-split.h"
 #include <thread>
 #include <filesystem>
 #include <optional>
@@ -381,12 +382,14 @@ struct ds4_external {
         ggml_backend_synchronize(backend);
         if(position%16==0)check_decode_vram_reserve();
         double f0[4]{};uint64_t r0=0,b0=0;wf_extent_fetch_stats(f0,&r0,&b0);
+        double e0[4]{};uint64_t eb0=0,ebatches0=0,eunread0=0;wf_extent_split_stats(e0,&eb0,&ebatches0,&eunread0);
         const auto before=provider->cache_stats();const auto started=std::chrono::steady_clock::now();
         double cpu0[4]{};uint64_t count0[2]{};if(x_host_timing)x_host_timing(cpu0,count0);
         require(x_decode(token,position,tail.data(),3,logits.data())==1,"ds4 decode step failed");
         const double decode_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
         success(sweep.commit_external_token(token,logits,error),error);
         const auto after=provider->cache_stats();double f1[4]{};uint64_t r1=0,b1=0;wf_extent_fetch_stats(f1,&r1,&b1);
+        double e1[4]{};uint64_t eb1=0,ebatches1=0,eunread1=0;wf_extent_split_stats(e1,&eb1,&ebatches1,&eunread1);
         double cpu1[4]{};uint64_t count1[2]{};if(x_host_timing)x_host_timing(cpu1,count1);
         std::fprintf(stderr,"LLAMADECODE_TIER_TIME position=%u hook_ms=%.4f store_ms=%.4f victim_sync_ms=%.4f upload_ms=%.4f overlap_ms=%.4f async_hits=%llu direct_hits=%llu dropped=%llu residency_ms=%.4f cpu_ms=%.4f cpu_wait_ms=%.4f cpu_transfer_ms=%.4f cpu_merge_ms=%.4f cpu_experts=%llu\n",position,
             after.hook_ms-before.hook_ms,after.host_store_ms-before.host_store_ms,after.host_sync_ms-before.host_sync_ms,
@@ -419,6 +422,26 @@ struct ds4_external {
             s.l1_hits=after.hits-before.hits;s.l2_hits=after.l2_hits-before.l2_hits;
             s.ram_hits=after.host_hits-before.host_hits;s.misses=after.misses-before.misses;
             std::fprintf(stderr,"%s\n",llama_dsv41_step_ledger::line(s).c_str());std::fflush(stderr);
+            // What the hook's own wall time was made of (docs/PREFILL_DECODE_PLAN_20261110.md
+            // Step 0): the extent fetch split into its storage read, its pinned-slot wait and
+            // its copies, the L2 copy sync, the RAM tier, and the bookkeeping that is left.
+            llama_dsv41_assign_split::parts split;
+            split.position=position;
+            split.assign_ms=after.assign_ms-before.assign_ms;
+            split.hook_ms=after.hook_ms-before.hook_ms;
+            split.fetch_ms=after.fetch_ms-before.fetch_ms;
+            split.read_ms=e1[0]-e0[0];split.stage_ms=e1[1]-e0[1];
+            split.upload_issue_ms=e1[2]-e0[2];split.upload_device_ms=e1[3]-e0[3];
+            split.fetch_bytes=after.fetched_bytes-before.fetched_bytes;
+            split.batches=ebatches1-ebatches0;
+            split.upload_windows_unread=eunread1-eunread0;
+            split.l2_copy_ms=after.copy_sync_ms-before.copy_sync_ms;
+            split.ram_ms=(after.host_upload_ms-before.host_upload_ms)+(after.host_store_ms-before.host_store_ms)+
+                (after.host_sync_ms-before.host_sync_ms);
+            split.ram_overlap_ms=after.host_overlap_ms-before.host_overlap_ms;
+            split.ram_overlap_in_fetch_ms=after.host_overlap_fetch_ms-before.host_overlap_fetch_ms;
+            split.misses=uint32_t(after.misses-before.misses);
+            std::fprintf(stderr,"%s\n",llama_dsv41_assign_split::line(split).c_str());std::fflush(stderr);
         }
     }
     // Multi-row append: `count` tokens at `position` in one ds4 prefill; the producer

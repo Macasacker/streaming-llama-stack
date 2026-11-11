@@ -67,6 +67,29 @@ def fields(line):
             for key, value in re.findall(r'(\w+)=([0-9]+(?:\.[0-9]+)?)', line)}
 
 
+def words(line):
+    """Every key=value on a line, strings kept: a mode or a source is a fact the plan reads."""
+    return {key: value for key, value in re.findall(r'(\w+)=([^\s]+)', line)}
+
+
+def fetch_split(rows):
+    """The fetch's read/upload split, when the run carried LLAMADECODE_BYTE_LEDGER=1.
+
+    `[dsv41-prefill-experts]` and `[dsv41-fetch]` both said only `fetch_ms`; Steps 2 and 3a of
+    docs/PREFILL_DECODE_PLAN_20261110.md need to know whether that is the storage read or the
+    upload, because the two have different fixes. A run without the switch reports no split
+    rather than a zero rate.
+    """
+    if not rows or not any('read_ms' in row for row in rows):
+        return None
+    out = dict(layers=len(rows))
+    for key in ('bytes', 'fetch_ms', 'read_ms', 'stage_ms', 'upload_issue_ms', 'upload_device_ms'):
+        out[key] = sum(row.get(key, 0) for row in rows)
+    for key, ms in (('read_GB_s', 'read_ms'), ('upload_GB_s', 'upload_device_ms')):
+        out[key] = out['bytes'] * 1000.0 / out[ms] / 1e9 if out[ms] else 0.0
+    return out
+
+
 def role(name):
     if 'engram_embd' in name: return 'engram_table'
     if '_exps.weight' in name: return 'routed_experts'
@@ -79,7 +102,10 @@ def analyze(text):
     passes = []
     nodes = []
     engram_reads = []
+    routed_prefill = []
     for line in text.splitlines():
+        if line.startswith('DS4PERF_ROUTED_PREFILL'):
+            routed_prefill.append(words(line))
         if '[dsv41-fetch] stage=0 ' in line:
             passes.append(dict(fetched_bytes=0, fetch_ms_overlapped=0, layers=[], wall_layers=[], fetches=[], tensors=[], expert_tiles=[], expert_hints=[]))
         if '[dsv41-fetch]' in line and passes:
@@ -129,6 +155,9 @@ def analyze(text):
         p['wall_totals'] = {key: sum(row[key] for row in p['wall_layers'])
                             for key in (p['wall_layers'][0] if p['wall_layers'] else []) if key != 'layer'}
         p['routed_fetch_wait_ms'] = sum(row['fetch_ms'] for row in p['expert_tiles'])
+        p['routed_fetch'] = fetch_split(p['expert_tiles'])
+        # The whole-stage relay's own split, which is the early layers' 600 ms Step 2 targets.
+        p['stage_fetch'] = fetch_split(p['fetches'])
         p['hint_fetched_bytes'] = sum(int(row['bytes']) for row in p['expert_hints'])
         p['hint_fetch_ms_overlapped'] = sum(row['fetch_ms'] for row in p['expert_hints'])
         p['exposed_hint_join_ms'] = sum(row['exposed_join_ms'] for row in p['expert_hints'])
@@ -139,7 +168,7 @@ def analyze(text):
     gpu = {stage: sum(n['gpu_ms'] for n in nodes if n['stage'] == stage)
            for stage in ('expert_gemm', 'attention_and_indexer', 'other_gpu')}
     return dict(passes=passes, engram_reads=engram_reads, gpu_node_ms=gpu if nodes else None,
-                gpu_node_count=len(nodes),
+                gpu_node_count=len(nodes), routed_prefill=routed_prefill or None,
                 interpretation='fetch_ms_overlapped is not exposed wait; acquire_ms includes wait and binding. '
                                'GPU node events exclude CPU prepare, transfer, waiting and head startup overhead. '
                                'Attention includes sparse attention, indexer and named attention projections. '

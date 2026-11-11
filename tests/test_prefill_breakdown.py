@@ -37,6 +37,32 @@ class Breakdown(unittest.TestCase):
         self.assertEqual(hinted['passes'][0]['fetched_bytes'],130)
         self.assertIsNone(hinted['passes'][0]['tensor_ledger_reconciles'])
 
+    def test_routed_fetch_split_and_per_sweep_choice_are_read(self):
+        # Step 0 of docs/PREFILL_DECODE_PLAN_20261110.md: `[dsv41-prefill-experts]` carries the
+        # fetch's read/upload split with LLAMADECODE_BYTE_LEDGER=1, and DS4PERF_ROUTED_PREFILL
+        # says which mode each sweep ran.
+        log='''DS4PERF_ROUTED_PREFILL mode=tail from_layer=21 rows=16666 source=env
+[dsv41-fetch] stage=0 bytes=100 fetch_ms=10 read_ms=6.0 upload_issue_ms=3.0
+[dsv41-prefill-experts] stage=22 rows=6 active=30 new=6 resident=30 bytes=20 fetch_ms=2.0 read_ms=1.500 stage_ms=0.250 upload_issue_ms=0.200 upload_device_ms=1.100
+DS4PERF_ROUTED_PREFILL mode=all from_layer=0 rows=45 source=default
+'''
+        result=module.analyze(log)
+        self.assertEqual(result['routed_prefill'][0],dict(mode='tail',from_layer='21',rows='16666',source='env'))
+        self.assertEqual(result['routed_prefill'][1]['mode'],'all')
+        split=result['passes'][0]['routed_fetch']
+        self.assertEqual(split['layers'],1)
+        self.assertEqual(split['read_ms'],1.5)
+        self.assertEqual(split['upload_device_ms'],1.1)
+        self.assertAlmostEqual(split['read_GB_s'],20*1000.0/1.5/1e9)
+        # The whole-stage relay reports its two halves on the same pass.
+        self.assertEqual(result['passes'][0]['fetches'][0]['read_ms'],6.0)
+        self.assertEqual(result['passes'][0]['fetches'][0]['upload_issue_ms'],3.0)
+        # A run without the ledger has no split to report, and says so rather than guessing.
+        plain=module.analyze('[dsv41-fetch] stage=0 bytes=100 fetch_ms=10\n'
+                             '[dsv41-prefill-experts] stage=22 rows=6 bytes=20 fetch_ms=2\n')
+        self.assertIsNone(plain['passes'][0]['routed_fetch'])
+        self.assertIsNone(plain['routed_prefill'])
+
     def test_demand_read_default_follows_the_producers_lifetime(self):
         from slstack.combo_producer import routed_prefill_choice
         # The paired route serves one request per producer, so the count decides.

@@ -72,6 +72,49 @@ levers are therefore: fewer bytes per step, a faster miss fetch, or fewer steps 
 Accept: one line per step and per layer with the split, and no behaviour change. This is the
 only step that can run while the card is busy.
 
+### Done (2026-11-11)
+
+The split exists and reads end to end; the measurement of it still needs a card window.
+
+- Decode hook. `assign_ms` (median 34.5 ms of a 58.7 ms step) is now one
+  `LLAMADECODE_ASSIGN_SPLIT` line per token with `LLAMADECODE_BYTE_LEDGER=1`: `read_ms` (the
+  io_uring or pread waits), `stage_ms` (a pinned slot an earlier upload still holds, which is
+  the upload gate as the host sees it), `upload_issue_ms` (`cudaMemcpyAsync` plus the event
+  record), `upload_device_ms` (the copies' own device timeline, timed by events bracketing the
+  batch and drained at the *next* batch so the split adds no synchronization), `l2_copy_ms`,
+  the RAM tier (`ram_ms`, with `ram_overlap_in_fetch_ms` so work that ran beside a read is not
+  counted twice), and `bookkeep_ms` for what is left. It reconciles:
+  `assign_ms = fetch_ms + l2_copy_ms + ram_exclusive_ms + overlap_after_ms + bookkeep_ms`, and
+  a step whose counters overshoot says so in `over_attributed_ms` instead of reading as
+  negative work. Off, no clock is read and every field stays 0. The formatter is
+  `src/llama-dsv41-assign-split.h`, emitted from `ds4_external::step()`
+  (`tools/dsv41-prefill/live-session.inc`); the fetch's four numbers come from
+  `wf_extent_split_stats()` (`src/llama-weight-fetcher.cpp`).
+- Prefill. `[dsv41-prefill-experts]` carries the same four fields for the routed fetch. The
+  whole-stage relay already timed its two halves per layer and never reported them separately:
+  `wf_get_required_layer_fetch_split` reads them, and `[dsv41-fetch]` now names
+  `read_ms` (the reader pool settling the stage's chunks) and `upload_issue_ms` (queueing the
+  copies; the device copy completes later, and `wf_wait_layer_gpu` is where that wait is paid).
+  That is the split Step 2 needs before it can say which of the early layers' 600 ms is the
+  storage read and which is the PCIe upload.
+  `DS4PERF_ROUTED_PREFILL mode=… from_layer=… rows=… source=env|default` is logged once per
+  sweep at `start_request`, which is what makes a resident producer answering 45 rows with the
+  mode its 16 666-token launch chose visible per sweep rather than once per process. Step 1
+  changes the answer; this line is how that change gets read.
+- The compute floor needed no new instrumentation. `DS4X_STAGE_PROFILE=1` already marks
+  attention (and its `attn_project`/`attn_rope_store`/`attn_select`/`attn_core` parts), the FFN
+  (`routed_experts`), the hyper-connection (`hc_pre`, `hc_mix`) and the expert hook on the
+  device stream, and `ds4x_decode` brackets the external step, so the 24.7 ms floor splits
+  without a new switch. `scripts/analyze_dsv41_decode.py` now reports both splits beside the
+  step rate and names the switch a log was missing;
+  `scripts/analyze_dsv41_prefill.py` carries the routed split and the per-sweep choice.
+- Proved without the card: `tests/dsv41_assign_split.cpp` (`c++ -std=c++17 -I
+  engines/streaming-llama/prefill_llama.cpp/src tests/dsv41_assign_split.cpp`),
+  `tests/test_decode_step_analysis.py` for the log read, and
+  `tests/test_prefill_breakdown.py::test_routed_fetch_split_and_per_sweep_choice_are_read`.
+  The producer builds clean; the only behaviour change is one log line per sweep and a `rows`
+  argument on `start_request`.
+
 ## Step 1 - Prefill append: choose routed per sweep (the cheap win)
 
 Root cause is above: `LLAMADECODE_PREFILL_ROUTED` is read once in `create_pipeline`

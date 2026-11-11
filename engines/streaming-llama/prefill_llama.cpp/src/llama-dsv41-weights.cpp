@@ -90,6 +90,10 @@ struct llama_dsv41_weight_provider::implementation {
     uint64_t resident_dense_bytes=0,decode_bank0_resident=0;
     uint64_t fetched_total=0;double fetch_ms_total=0;
     bool lazy_prefill=false,byte_ledger=false;
+    // Whether LLAMADECODE_PREFILL_ROUTED named a mode explicitly, as opposed to the sweep
+    // resolving one. DS4PERF_ROUTED_PREFILL reports it, so a log says whether the mode was
+    // chosen or pinned.
+    bool routed_env=false;
     uint32_t lazy_from_layer=0;
     std::array<bool,384>prefill_loaded{};
     bool tail_prefetch=false;
@@ -491,6 +495,9 @@ struct llama_dsv41_weight_provider::implementation {
             uint64_t bytes=0;double fetch_ms=0;
             // A failed or partial fetch poisons the provider (guard); the slot table is then discarded with it.
             const bool overlap=defer_copies&&host_async_level()>=2;
+            // Anything the overlap hook does inside this call is time the fetch already charges.
+            struct fetch_overlap_scope {implementation*me;bool prev;fetch_overlap_scope(implementation*self,bool v):me(self),prev(self->overlap_inside_fetch){me->overlap_inside_fetch=v;}
+                ~fetch_overlap_scope(){me->overlap_inside_fetch=prev;}} scoped{this,overlap};
             require((overlap?wf_fetch_extents_direct_overlap(fetcher,0,extents.data(),int(extents.size()),stream,&bytes,&fetch_ms,
                     [](void*self){auto*me=static_cast<implementation*>(self);me->overlap_host_work();},this):
                 wf_fetch_extents_direct(fetcher,0,extents.data(),int(extents.size()),stream,&bytes,&fetch_ms))&&!wf_has_failed(fetcher),
@@ -563,10 +570,17 @@ struct llama_dsv41_weight_provider::implementation {
 #endif
     }
     bool ram_uploaded=false;
+    // Where the RAM tier's overlapped work ran. Inside the extent fetch it is already counted in
+    // `cache_ms`, so an accounting of the hook that subtracted it again would double-count; the
+    // assign split (LLAMADECODE_ASSIGN_SPLIT) needs to know which side of the fetch each window
+    // fell on to reconcile `assign_ms` without a residual that swings negative.
+    bool overlap_inside_fetch=false;
+    double host_overlap_fetch_ms=0;
     void overlap_host_work(){
         const auto t0=std::chrono::steady_clock::now();
         ram_uploaded=!pending_ram.empty();upload_ram_hits(hook_stream,true);pending_ram.clear();commit_stores();
-        host_overlap_ms+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t0).count();
+        const double spent=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t0).count();
+        host_overlap_ms+=spent;if(overlap_inside_fetch)host_overlap_fetch_ms+=spent;
     }
     void*hook_stream=nullptr;
     void commit_stores(){
@@ -1043,8 +1057,13 @@ struct llama_dsv41_weight_provider::implementation {
         uint64_t fetched=0;double fetch_ms=0;
         require(wf_get_required_layer_fetch(fetcher,int(id),&fetched,&fetch_ms),"Completed strict layer timing unavailable");
         fetched_total+=fetched;fetch_ms_total+=fetch_ms;
-        llama_dsv41_layer_log("[dsv41-fetch] stage=%u bytes=%llu fetch_ms=%.6f decimal_GB_s=%.6f\n",
-            id,(unsigned long long)fetched,fetch_ms,double(fetched)/fetch_ms/1e6);
+        // The whole-stage relay's own two halves. A stage that took 600 ms to acquire is either
+        // the reader pool or the PCIe copy, and Step 2 of docs/PREFILL_DECODE_PLAN_20261110.md
+        // has a different fix for each; the fetcher already timed them, so this reads them.
+        uint64_t split_bytes=0;double read_ms=0,upload_issue_ms=0;
+        wf_get_required_layer_fetch_split(fetcher,int(id),&split_bytes,&read_ms,&upload_issue_ms);
+        llama_dsv41_layer_log("[dsv41-fetch] stage=%u bytes=%llu fetch_ms=%.6f read_ms=%.6f upload_issue_ms=%.6f decimal_GB_s=%.6f\n",
+            id,(unsigned long long)fetched,fetch_ms,read_ms,upload_issue_ms,double(fetched)/fetch_ms/1e6);
         // Compare what actually landed in the compute bank against the same extent in the file.
         // A difference here means the transfer delivered wrong bytes; no difference while a later
         // probe still sees NaN means something wrote into the bank after this stage was bound.
@@ -1191,6 +1210,7 @@ void llama_dsv41_weight_provider::implementation::create_pipeline(){
     const char*lazy=std::getenv("LLAMADECODE_PREFILL_ROUTED");
     require(!lazy||!std::strcmp(lazy,"0")||!std::strcmp(lazy,"1")||!std::strcmp(lazy,"tail"),"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail");
     p->lazy_prefill=lazy&&std::strcmp(lazy,"0");p->lazy_from_layer=lazy&&!std::strcmp(lazy,"tail")?21:0;
+    p->routed_env=lazy&&*lazy;
     require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),
         "Tail prefetch requires routed strict two-bank prefill");
     const char*ledger=std::getenv("LLAMADECODE_BYTE_LEDGER");p->byte_ledger=ledger&&!std::strcmp(ledger,"1");
@@ -1334,10 +1354,18 @@ bool llama_dsv41_weight_provider::finish_yoco_encoder(std::string&error){return 
     require(!wf_has_failed(p->fetcher),"YOCO encoder fetch quiescence failed");
     p->next=p->stage_count();p->mark_weight_stream(false);
 },error);}
-bool llama_dsv41_weight_provider::start_request(std::string&error){return p->guard([&]{
+bool llama_dsv41_weight_provider::start_request(std::string&error,uint64_t rows){return p->guard([&]{
     require(p->allocated&&!p->device_suspended&&!p->leased&&p->next==0,"Request start requires an admitted resident unleased first stage");p->identity();
     p->fetched_total=0;p->fetch_ms_total=0;if(!p->bound()){p->apply_pause("request_wf_start");wf_start(p->fetcher);p->mark_weight_stream(true);}
     require(!wf_has_failed(p->fetcher),"Persistent weight stream restart failed");
+    // Say which routed-prefill shape this sweep runs under, before its first acquire. The
+    // provider read LLAMADECODE_PREFILL_ROUTED once when its pipeline was built, so a resident
+    // producer's appends all inherit the launch turn's answer; this line is what makes that
+    // visible per sweep rather than once per process (docs/PREFILL_DECODE_PLAN_20261110.md
+    // Step 0, and the change Step 1 makes from it).
+    llama_dsv41_layer_log("DS4PERF_ROUTED_PREFILL mode=%s from_layer=%u rows=%llu source=%s\n",
+        p->lazy_prefill?(p->lazy_from_layer?"tail":"all"):"off",p->lazy_from_layer,
+        (unsigned long long)rows,p->routed_env?"env":"default");
 },error);}
 llama_dsv41_weight_provider::capacity llama_dsv41_weight_provider::budget()const{std::lock_guard<std::mutex>lock(p->mutex);return p->inspected&&!p->poisoned?p->planned:capacity{};}
 ggml_backend_t llama_dsv41_weight_provider::backend()const{std::lock_guard<std::mutex>lock(p->mutex);return p->allocated&&!p->poisoned?p->options.backend:nullptr;}
@@ -1581,6 +1609,8 @@ bool llama_dsv41_weight_provider::prefill_experts(uint32_t layer,const std::vect
     const auto reads=llama_dsv41_prefill_routes::plan(p->prefill_loaded,ids);
     const auto extents=p->tail_extents(layer,reads);
     uint64_t bytes=0;double ms=0;
+    double split0[4]{};uint64_t sbytes0=0,sbatches0=0,sunread0=0;
+    if(p->byte_ledger)wf_extent_split_stats(split0,&sbytes0,&sbatches0,&sunread0);
     const auto fetch_started=std::chrono::steady_clock::now();
 #ifdef GGML_USE_CUDA
     if(!extents.empty())require(wf_fetch_extents_direct(p->fetcher,int((layer+1)%p->options.buffers),extents.data(),int(extents.size()),
@@ -1591,12 +1621,18 @@ bool llama_dsv41_weight_provider::prefill_experts(uint32_t layer,const std::vect
     llama_dsv41_prefill_routes::commit(p->prefill_loaded,reads);
     p->queue_tail(layer,ids);
     p->fetched_total+=bytes;p->fetch_ms_total+=ms;
+    double split1[4]{};uint64_t sbytes1=0,sbatches1=0,sunread1=0;
+    if(p->byte_ledger)wf_extent_split_stats(split1,&sbytes1,&sbatches1,&sunread1);
     if(p->byte_ledger)for(const auto&e:p->stages[layer+1].entries)if(p->routed_tensor(e.t))for(const auto&range:reads.ranges)
         llama_dsv41_layer_log("[dsv41-byte-ledger] stage=%u tensor=%s file_offset=%llu bytes=%llu source=experts first=%u count=%u\n",
             layer+1,e.t->name,(unsigned long long)(e.file_offset+uint64_t(range.first)*e.t->nb[2]),
             (unsigned long long)(uint64_t(range.count)*e.t->nb[2]),range.first,range.count);
-    llama_dsv41_layer_log("[dsv41-prefill-experts] stage=%u rows=%zu active=%u new=%u resident=%u bytes=%llu fetch_ms=%.6f begin_epoch_ms=%.6f end_epoch_ms=%.6f\n",
+    llama_dsv41_layer_log("[dsv41-prefill-experts] stage=%u rows=%zu active=%u new=%u resident=%u bytes=%llu fetch_ms=%.6f read_ms=%.6f stage_ms=%.6f upload_issue_ms=%.6f upload_device_ms=%.6f read_GB_s=%.3f upload_GB_s=%.3f begin_epoch_ms=%.6f end_epoch_ms=%.6f\n",
         layer+1,ids.size()/6,reads.active,reads.additional,unsigned(std::count(p->prefill_loaded.begin(),p->prefill_loaded.end(),true)),(unsigned long long)bytes,ms,
+        p->byte_ledger?split1[0]-split0[0]:0.0,p->byte_ledger?split1[1]-split0[1]:0.0,
+        p->byte_ledger?split1[2]-split0[2]:0.0,p->byte_ledger?split1[3]-split0[3]:0.0,
+        p->byte_ledger&&split1[0]>split0[0]?double(bytes)/(split1[0]-split0[0])/1e6:0.0,
+        p->byte_ledger&&split1[3]>split0[3]?double(bytes)/(split1[3]-split0[3])/1e6:0.0,
         std::chrono::duration<double,std::milli>(fetch_started.time_since_epoch()).count(),
         std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count());
 },error);}
@@ -1685,7 +1721,7 @@ llama_dsv41_weight_provider::expert_cache_stats llama_dsv41_weight_provider::cac
     s.l2_slots=p->l2_slots;s.l2_hits=p->l2_hits;s.l2_stored=p->l2_stored;s.assign_ms=p->assign_ms;s.copy_sync_ms=p->copy_sync_ms;
     s.host_slots=p->host_slots;s.host_hits=p->host_hits;s.host_stored=p->host_stored;s.host_bytes=p->host_bytes;
     s.host_store_ms=p->host_store_ms;s.host_sync_ms=p->host_sync_ms;s.host_upload_ms=p->host_upload_ms;s.hook_ms=p->hook_ms;s.residency_ms=p->residency_ms;
-    s.host_overlap_ms=p->host_overlap_ms;s.host_async_hits=p->host_async_hits;s.host_dropped=p->host_dropped;s.host_direct_hits=p->host_direct_hits;
+    s.host_overlap_ms=p->host_overlap_ms;s.host_overlap_fetch_ms=p->host_overlap_fetch_ms;s.host_async_hits=p->host_async_hits;s.host_dropped=p->host_dropped;s.host_direct_hits=p->host_direct_hits;
     s.l1_bytes=p->l1_served;s.l2_bytes=p->l2_served;s.ram_bytes=p->ram_served;s.copied_bytes=p->device_copied;
     s.stored_bytes=p->ram_stored;s.expert_slots=p->expert_served;s.slot_bytes=p->triple_bytes();return s;}
 bool llama_dsv41_weight_provider::decode_residency(uint32_t layer,uint8_t*tier,uint32_t experts)const{

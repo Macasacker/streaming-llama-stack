@@ -1663,12 +1663,12 @@
     ],
     "doc": "DS4_CACHE_AFFINITY_RAMP_TOKENS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:371",
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:372",
       "engines/ds4/ds4.c:72634"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:371",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:372",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*w=std::getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\");const char*r=std::getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\");",
         "consumer": "        if(quality>=0.f||b){\n            const float mean=quality>=0.f?quality:std::strtof(b,nullptr);const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");\n            const char*w=std::getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\");const char*r=std::getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\");\n            require(x_affinity(mean,w?uint32_t(std::strtoul(w,nullptr,10)):100u,r?uint32_t(std::strtoul(r,nullptr,10)):8u,spread,&residency_hook,this)==1,\n                \"ds4x_set_affinity refused the bias configuration\");\n        }\n        handoff.bind_ms=ms(t0);"
@@ -1745,12 +1745,12 @@
     ],
     "doc": "DS4_CACHE_AFFINITY_WARMUP_TOKENS: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:371",
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:372",
       "engines/ds4/ds4.c:72634"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:371",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:372",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*w=std::getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\");const char*r=std::getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\");",
         "consumer": "        if(quality>=0.f||b){\n            const float mean=quality>=0.f?quality:std::strtof(b,nullptr);const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");\n            const char*w=std::getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\");const char*r=std::getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\");\n            require(x_affinity(mean,w?uint32_t(std::strtoul(w,nullptr,10)):100u,r?uint32_t(std::strtoul(r,nullptr,10)):8u,spread,&residency_hook,this)==1,\n                \"ds4x_set_affinity refused the bias configuration\");\n        }\n        handoff.bind_ms=ms(t0);"
@@ -9777,7 +9777,7 @@
     ],
     "doc": "Expert-count upper bound for the host cache. On the single engine it optionally caps LLAMADECODE_HOST_CACHE_MB; unset leaves byte/physical admission authoritative.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1735",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1771",
       "engines/ds4/ds4_cuda.cu:4938"
     ],
     "defaults_by_scope": {
@@ -9785,7 +9785,7 @@
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1735",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1771",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*n=std::getenv(\"DS4_CUDA_STREAMING_HOST_CACHE_N\");",
         "consumer": "    require(p->pool_max_stride[0]==p->pool_max_stride[1],\"RAM expert gate/up geometry mismatch\");\n    const auto width=p->pool_max_stride[0]+p->pool_max_stride[1]+p->pool_max_stride[2];\n    const char*n=std::getenv(\"DS4_CUDA_STREAMING_HOST_CACHE_N\");\n    p->ring_width=width;p->ring_offset={0,p->pool_max_stride[0],p->pool_max_stride[0]+p->pool_max_stride[1]};\n    const bool rings=p->host_v2&&p->host_async_level()>=1;\n    // The pinned staging rings come out of the same admitted RAM as the tier.\n    uint64_t capped=rings?(offer>p->host_ring_bytes()?offer-p->host_ring_bytes():0):offer;"
@@ -23059,13 +23059,13 @@
     ],
     "doc": "GGML_CUDA_ENABLE_UNIFIED_MEMORY: advanced engine setting; built-in default retained",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1133",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1152",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:850",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:7204"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1133",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1152",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "require(!std::getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\"),\"Unified CUDA memory is outside strict physical weight admission (including env value zero)\");",
         "consumer": "    require(!options.compute_direct||(options.buffers==2&&options.async_staging_drain&&options.auto_request_size),\n        \"Direct compute requires two typed async banks\");\n    require(!std::getenv(\"GGML_CUDA_ENABLE_UNIFIED_MEMORY\"),\"Unified CUDA memory is outside strict physical weight admission (including env value zero)\");\n    require(ggml_backend_is_cuda(options.backend),\"V4.1 physical provider requires an actual CUDA backend\");\n    const char*device=ggml_backend_dev_description(ggml_backend_get_device(options.backend));\n    require(device&&*device,\"V4.1 streaming producer requires the explicitly admitted CUDA backend\");\n    const char*tail=std::getenv(\"LLAMADECODE_CONE_TAIL_PREFETCH\");"
@@ -24585,14 +24585,14 @@
     ],
     "doc": "Producer resident append toggle: 0 (default) keeps full sweeps. Opt in with 96 for the measured faster but numerically different single-token decode path. E2c observed follow-up KL up to0.01087 at bias0; accuracy attribution is in progress. Appends above the threshold keep the sweep.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:177"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:178"
     ],
     "defaults_by_scope": {
       "rtx-llama": "0"
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:177",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:178",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "uint64_t append_decode_max(){static const uint64_t n=[]{const char*e=std::getenv(\"LLAMADECODE_APPEND_DECODE_MAX\");",
         "consumer": "// most LLAMADECODE_APPEND_DECODE_MAX tokens (default 0 = off; opt-in 96) is appended\n// one token at a time through the ds4 decode step instead of a full weight sweep.\nuint64_t append_decode_max(){static const uint64_t n=[]{const char*e=std::getenv(\"LLAMADECODE_APPEND_DECODE_MAX\");\n    return e&&*e?uint64_t(std::max<long long>(0,std::min<long long>(std::strtoll(e,nullptr,10),4096))):uint64_t(0);}();return n;} /* E2c measured faster but non-exact; owner requires opt-in until attribution/fix. */\n// LLAMADECODE decode cancel: the client creates LLAMADECODE_DECODE_CANCEL_FILE\n// while a decode op runs; the loop stops at the next token boundary exactly as at\n// max_tokens (the last sampled token is returned, not evaluated). Cleared at"
@@ -24609,11 +24609,11 @@
     ],
     "doc": "Producer small appends: 1 runs a 2..LLAMADECODE_APPEND_DECODE_MAX-row append as one ds4-win layer-major prefill in ds4-decode.dll instead of one decode step per token (opt-in; refused with bf16 context caches). Unset or any other value keeps per-token steps.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:187"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:188"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:187",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:188",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool append_multirow_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_APPEND_MULTIROW\");return e&&e[0]=='1'&&!e[1];}();return on;}",
         "consumer": "// (ds4x_prefill, native ds41_graph_prefill on a small workspace) instead of one ds4\n// decode step per token; the routed experts of the rows are fetched as one union per layer.\nbool append_multirow_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_APPEND_MULTIROW\");return e&&e[0]=='1'&&!e[1];}();return on;}\n// LLAMADECODE keep-open: after a prefill weight sweep rebuilt the banks, the ds4\n// decoder stays open and only the moved resident weights are re-registered\n// (default ON). LLAMADECODE_DS4X_KEEP_OPEN=0 restores x_close + x_open.\nbool ds4x_keep_open(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DS4X_KEEP_OPEN\");const bool v=llama_dsv41_ds4x_keep::keep_open_from_env(e);"
@@ -24660,11 +24660,11 @@
     ],
     "doc": "Producer decode: bind the resident decode weights once at the switch to decode (default on); 0 re-binds per step, for comparison only.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:185"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:189"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:185",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:189",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static bool bind_once_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_BIND_ONCE\");return !(e&&e[0]=='0'&&!e[1]);}();return on;}",
         "consumer": "    // LLAMADECODE bind-once: set after a complete decode-layout pass; cleared on any layout rebuild.\n    bool resident_bound=false;\n    static bool bind_once_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_BIND_ONCE\");return !(e&&e[0]=='0'&&!e[1]);}();return on;}\n    // LLAMADECODE_EXTENT_SLOTS / LLAMADECODE_EXTENT_SLOT_MIB: the named-extent\n    // relay's host window (docs/TURN_COST_PLAN.md Step 2). The window is what is\n    // in flight on a cold span - 32 MiB reads 3.6 GiB/s, 64 MiB 5.19 - and it is\n    // pinned host RAM, so the slots are read once, planned into the provider's"
@@ -24681,20 +24681,27 @@
     "scopes": [
       "rtx-llama"
     ],
-    "doc": "Diagnostic per-tensor file extents and byte counts for every acquired weight stage and router-driven expert read, plus one LLAMADECODE_STEP_BYTES line per decoded token: that step's footprint and which tier served each byte (file, RAM, VRAM L2, VRAM L1). Set 1 to enable; default 0.",
+    "doc": "Diagnostic per-tensor file extents and byte counts for every acquired weight stage and router-driven expert read, plus one LLAMADECODE_STEP_BYTES line per decoded token: that step's footprint and which tier served each byte (file, RAM, VRAM L2, VRAM L1). It also splits the expert hook: one LLAMADECODE_ASSIGN_SPLIT line per token (assign_ms into read, pinned-slot wait, upload issue, the copies' device time, L2 copy sync, RAM tier and bookkeeping), and read_ms/stage_ms/upload_issue_ms/upload_device_ms fields on [dsv41-prefill-experts]. Set 1 to enable; default 0.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1196",
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:200"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1216",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3693",
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:201"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1196",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1216",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*ledger=std::getenv(\"LLAMADECODE_BYTE_LEDGER\");p->byte_ledger=ledger&&!std::strcmp(ledger,\"1\");",
         "consumer": "    require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),\n        \"Tail prefetch requires routed strict two-bank prefill\");\n    const char*ledger=std::getenv(\"LLAMADECODE_BYTE_LEDGER\");p->byte_ledger=ledger&&!std::strcmp(ledger,\"1\");\n    require(!p->lazy_prefill||p->options.compute_direct,\"Routed prefill requires direct compute banks\");\n    wf_params params=wf_params_default();params.model_path=p->options.model_path.c_str();params.gpu_backend=p->options.backend;\n    // The provider's Windows transport was DirectStorage. Its Linux route is the\n    // bounded relay named explicitly: the io_uring reader (or the pread baseline)"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:200",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-weight-fetcher.cpp:3693",
+        "unset": "NULL from getenv; the literal consumer below supplies any fallback",
+        "read": "const char * e = getenv(\"LLAMADECODE_BYTE_LEDGER\");",
+        "consumer": "    int cached = g_wf_extent_split_on.load(std::memory_order_relaxed);\n    if (cached < 0) {\n        const char * e = getenv(\"LLAMADECODE_BYTE_LEDGER\");\n        cached = (e && e[0] == '1' && !e[1]) ? 1 : 0;\n        g_wf_extent_split_on.store(cached, std::memory_order_relaxed);\n    }\n    return cached == 1;"
+      },
+      {
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:201",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool byte_ledger_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_BYTE_LEDGER\");return e&&!std::strcmp(e,\"1\");}();return on;}",
         "consumer": "// step's expert bytes. Both answer the same question, so they share one switch; the\n// counters the step line reads are kept anyway because they are increments.\nbool byte_ledger_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_BYTE_LEDGER\");return e&&!std::strcmp(e,\"1\");}();return on;}\nvoid clear_decode_cancel(){const auto&p=decode_cancel_file();if(!p.empty())(void)remove_file(p);}\nstruct ds4_external {\n    library module=nullptr;bool open=false;\n    int(*x_open)(const char*,uint32_t,char*,size_t)=nullptr;const void*(*x_map)()=nullptr;"
@@ -24762,11 +24769,11 @@
     ],
     "doc": "Opt-in exact next-layer routed-tail hint. Default0. When1, one worker predicts at most24 experts from the first four current routing rows, only into the next layer>=21 already-ready other compute bank. Uses the existing two weight banks and adds8MiB host admission for its stack and bounded metadata. A matching stage/bank/pass generation and completed CPU storage/error checks plus a consumer CUDA fence are required before adoption; actual routing still fetches every missing expert. No arithmetic, token, raw-history or checkpoint changes. Failed hints fail the request; release/restart/destruction join the worker.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1137"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1156"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1137",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1156",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*tail=std::getenv(\"LLAMADECODE_CONE_TAIL_PREFETCH\");",
         "consumer": "    const char*device=ggml_backend_dev_description(ggml_backend_get_device(options.backend));\n    require(device&&*device,\"V4.1 streaming producer requires the explicitly admitted CUDA backend\");\n    const char*tail=std::getenv(\"LLAMADECODE_CONE_TAIL_PREFETCH\");\n    require(!tail||!std::strcmp(tail,\"0\")||!std::strcmp(tail,\"1\"),\"LLAMADECODE_CONE_TAIL_PREFETCH must be0 or1\");\n    p->tail_prefetch=tail&&!std::strcmp(tail,\"1\");\n    ggml_context*raw=nullptr;p->gguf.reset(gguf_init_from_file(options.model_path.c_str(),{true,&raw}));p->tensors.reset(raw);\n    require(p->gguf&&p->tensors&&gguf_get_data_offset(p->gguf.get())<=8*mib&&gguf_get_n_tensors(p->gguf.get())<=2048,\"Native GGUF metadata exceeds inspected original limits\");"
@@ -24835,12 +24842,12 @@
     ],
     "doc": "Set by ComboProducer to <producer dir>/decode.cancel. The single-engine server creates that file to stop a running producer decode at its next token boundary (client stop sequence or client disconnect); the producer clears it at every decode start.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:193"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:194"
     ],
     "defaults_by_scope": {},
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:193",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:194",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const std::filesystem::path&decode_cancel_file(){static const std::filesystem::path p=[]{const char*e=std::getenv(\"LLAMADECODE_DECODE_CANCEL_FILE\");",
         "consumer": "bool ds4x_keep_open(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DS4X_KEEP_OPEN\");const bool v=llama_dsv41_ds4x_keep::keep_open_from_env(e);\n    std::fprintf(stderr,\"LLAMADECODE_DS4X_KEEP_OPEN enabled=%d default=on (=0 disables)\\n\",int(v));std::fflush(stderr);return v;}();return on;}\nconst std::filesystem::path&decode_cancel_file(){static const std::filesystem::path p=[]{const char*e=std::getenv(\"LLAMADECODE_DECODE_CANCEL_FILE\");\n    return e&&*e?native_path(e):std::filesystem::path();}();return p;}\nbool decode_cancel_requested(){const auto&p=decode_cancel_file();return !p.empty()&&file_present(p);}\n// LLAMADECODE_BYTE_LEDGER=1 turns on the provider's per-tensor extents ledger and, with\n// it, one LLAMADECODE_STEP_BYTES line per decoded token saying which tier paid for the"
@@ -24886,11 +24893,11 @@
     ],
     "doc": "Producer decode: routed decode-sized weight layout (default on); 0 is a diagnostic that keeps the whole-layer prefill layout.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:447"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:470"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:447",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:470",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool routed_decode_layout(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DECODE_LAYOUT\");",
         "consumer": "// LLAMADECODE: decode steps use the routed-expert layout (B1). The explicit\n// diagnostic LLAMADECODE_DECODE_LAYOUT=0 runs them on the whole-layer B0 layout.\nbool routed_decode_layout(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DECODE_LAYOUT\");\n    if(e&&e[0]=='0'&&!e[1]){std::fprintf(stderr,\"LLAMADECODE_DECODE_LAYOUT=0 whole-layer B0 decode (diagnostic)\\n\");return false;}return true;}();return on;}\nvoid run_live_session(std::unique_ptr<llama_dsv41_sweep>&sweep,\n        const llama_dsv41_weight_provider::config&weights,const llama_dsv41_sweep::config&options,\n        const std::string&session,uint64_t timeout_ms,uint32_t capacity,producer_wire::handle output,uint64_t owner_epoch=0){"
@@ -24909,11 +24916,11 @@
     ],
     "doc": "Packed FP4 decode: the decoder reads second-tier (L2) expert-cache hits in place instead of copying them into the first tier (default on; 0 keeps the copy path)",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:363"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:364"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:363",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:364",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if(x_hook_l2){static const bool direct=[]{const char*e=std::getenv(\"LLAMADECODE_DIRECT_L2\");return !(e&&e[0]=='0'&&!e[1]);}();",
         "consumer": "        // Packed FP4 experts: the decoder reads second-tier (L2) hits in place.\n        // LLAMADECODE_DIRECT_L2=0 keeps the copy-into-L1 path.\n        if(x_hook_l2){static const bool direct=[]{const char*e=std::getenv(\"LLAMADECODE_DIRECT_L2\");return !(e&&e[0]=='0'&&!e[1]);}();\n            x_hook_l2(direct?&expert_hook_l2:nullptr,this);}\n        // B5: LLAMADECODE_DS4_BIAS=<quality-speed mean> enables ds4's own\n        // cache-affinity bias on this cache (selection only). Spread file and\n        // warmup/ramp follow the native engine (DS4_CACHE_AFFINITY_*)."
@@ -24954,11 +24961,11 @@
     ],
     "doc": "Keep the decoder open across appended turns; 0 restores close/reopen.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:191"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:192"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:191",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:192",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool ds4x_keep_open(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DS4X_KEEP_OPEN\");const bool v=llama_dsv41_ds4x_keep::keep_open_from_env(e);",
         "consumer": "// decoder stays open and only the moved resident weights are re-registered\n// (default ON). LLAMADECODE_DS4X_KEEP_OPEN=0 restores x_close + x_open.\nbool ds4x_keep_open(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DS4X_KEEP_OPEN\");const bool v=llama_dsv41_ds4x_keep::keep_open_from_env(e);\n    std::fprintf(stderr,\"LLAMADECODE_DS4X_KEEP_OPEN enabled=%d default=on (=0 disables)\\n\",int(v));std::fflush(stderr);return v;}();return on;}\nconst std::filesystem::path&decode_cancel_file(){static const std::filesystem::path p=[]{const char*e=std::getenv(\"LLAMADECODE_DECODE_CANCEL_FILE\");\n    return e&&*e?native_path(e):std::filesystem::path();}();return p;}\nbool decode_cancel_requested(){const auto&p=decode_cancel_file();return !p.empty()&&file_present(p);}"
@@ -24997,11 +25004,11 @@
     ],
     "doc": "Producer decode: initial quality/speed router bias (0..1.36125) for the ds4 decode path; the live quality/speed tool overrides it per request.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:368"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:369"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:368",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:369",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*b=std::getenv(\"LLAMADECODE_DS4_BIAS\");",
         "consumer": "        // cache-affinity bias on this cache (selection only). Spread file and\n        // warmup/ramp follow the native engine (DS4_CACHE_AFFINITY_*).\n        const char*b=std::getenv(\"LLAMADECODE_DS4_BIAS\");\n        if(quality>=0.f||b){\n            const float mean=quality>=0.f?quality:std::strtof(b,nullptr);const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");\n            const char*w=std::getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\");const char*r=std::getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\");\n            require(x_affinity(mean,w?uint32_t(std::strtoul(w,nullptr,10)):100u,r?uint32_t(std::strtoul(r,nullptr,10)):8u,spread,&residency_hook,this)==1,"
@@ -25020,14 +25027,14 @@
     ],
     "doc": "Producer decode engine: 1 (default) decodes with ds4-win's kernels in ds4-decode.dll inside the ULTRA producer; 0 keeps the earlier B2 llama-path decode for comparison.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:173"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:174"
     ],
     "defaults_by_scope": {
       "rtx-llama": "1"
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:173",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:174",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "bool ds4_decode_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DS4_DECODE\");return e&&e[0]=='1'&&!e[1];}();return on;}",
         "consumer": "        provider->cache_stats().l2_slots,(unsigned long long)sweep.context_next_step_bytes());std::fflush(stderr);\n}\nbool ds4_decode_enabled(){static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_DS4_DECODE\");return e&&e[0]=='1'&&!e[1];}();return on;}\n// LLAMADECODE append-via-decode: with the ds4 decode on, a live prefill of at\n// most LLAMADECODE_APPEND_DECODE_MAX tokens (default 0 = off; opt-in 96) is appended\n// one token at a time through the ds4 decode step instead of a full weight sweep.\nuint64_t append_decode_max(){static const uint64_t n=[]{const char*e=std::getenv(\"LLAMADECODE_APPEND_DECODE_MAX\");"
@@ -25044,18 +25051,18 @@
     ],
     "doc": "Producer decode: path of the per-model routing calibration (affinity spreads) used with LLAMADECODE_DS4_BIAS; the controller supplies cache_affinity_spread_file.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:370",
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:473"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:371",
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:496"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:370",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:371",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const float mean=quality>=0.f?quality:std::strtof(b,nullptr);const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");",
         "consumer": "        const char*b=std::getenv(\"LLAMADECODE_DS4_BIAS\");\n        if(quality>=0.f||b){\n            const float mean=quality>=0.f?quality:std::strtof(b,nullptr);const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");\n            const char*w=std::getenv(\"DS4_CACHE_AFFINITY_WARMUP_TOKENS\");const char*r=std::getenv(\"DS4_CACHE_AFFINITY_RAMP_TOKENS\");\n            require(x_affinity(mean,w?uint32_t(std::strtoul(w,nullptr,10)):100u,r?uint32_t(std::strtoul(r,nullptr,10)):8u,spread,&residency_hook,this)==1,\n                \"ds4x_set_affinity refused the bias configuration\");\n        }"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:473",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:496",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");",
         "consumer": "            // token. No restarted warmup/ramp may defer a live slider update.\n            if(index==0||bias!=ds4x.quality){\n                const char*spread=std::getenv(\"LLAMADECODE_DS4_SPREAD\");\n                // The refusal is the one failure in this loop that says nothing about what\n                // was refused: name the bias, the spread file and the way to get one.\n                require(ds4x.x_affinity(bias,0,0,spread,&ds4_external::residency_hook,&ds4x)==1,\n                    (std::string(\"Live bias refused: value=\")+std::to_string(bias)+\" spread=\"+"
@@ -25439,11 +25446,11 @@
     ],
     "doc": "Named-extent relay's host window slot count (the pinned staging tier `wf_fetch_extents_direct` reads cold expert spans through). Unset is 4; 1..64, whole integers only, and anything else refuses the provider plan. Slots x slot bytes is what the relay has in flight on a cold read (32 MiB measured 3.6 GiB/s, 64 MiB 5.19) and is charged in LLAMADECODE_HOST_PLAN's provider component, so widening it is an admitted host cost, not a silent one. DS4X_EXTENT_WINDOW reports the window the fetcher actually pinned.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:197"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:201"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:197",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:201",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*slots=std::getenv(\"LLAMADECODE_EXTENT_SLOTS\");",
         "consumer": "        static const extent_window_geometry geometry=[]{\n            extent_window_geometry g{4,8ull<<20,32ull<<20};\n            const char*slots=std::getenv(\"LLAMADECODE_EXTENT_SLOTS\");\n            const char*mib=std::getenv(\"LLAMADECODE_EXTENT_SLOT_MIB\");\n            if(slots&&*slots){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(slots,&end,10);\n                require(slots[0]!='-'&&!errno&&end!=slots&&!*end&&v>=1&&v<=64,\"LLAMADECODE_EXTENT_SLOTS must be a whole number in 1..64 (unset is 4)\");\n                g.slots=int(v);}"
@@ -25461,11 +25468,11 @@
     ],
     "doc": "Named-extent relay's slot size in MiB. Unset is 8; 1..1024, whole MiB only, and anything else refuses the provider plan. Read once per process with LLAMADECODE_EXTENT_SLOTS and planned into the provider's host admission before the fetcher allocates, so the bytes charged are the bytes pinned.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:198"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:202"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:198",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:202",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*mib=std::getenv(\"LLAMADECODE_EXTENT_SLOT_MIB\");",
         "consumer": "            extent_window_geometry g{4,8ull<<20,32ull<<20};\n            const char*slots=std::getenv(\"LLAMADECODE_EXTENT_SLOTS\");\n            const char*mib=std::getenv(\"LLAMADECODE_EXTENT_SLOT_MIB\");\n            if(slots&&*slots){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(slots,&end,10);\n                require(slots[0]!='-'&&!errno&&end!=slots&&!*end&&v>=1&&v<=64,\"LLAMADECODE_EXTENT_SLOTS must be a whole number in 1..64 (unset is 4)\");\n                g.slots=int(v);}\n            if(mib&&*mib){char*end=nullptr;errno=0;const unsigned long long v=std::strtoull(mib,&end,10);"
@@ -25540,11 +25547,11 @@
     ],
     "doc": "Single-engine RAM expert tier data movement. 0 = original synchronous copies (stream drain per expert, uploads finish before the DirectStorage batch); 1 = VRAM-to-RAM copy-in on its own non-blocking stream with batched D2H and one event; 2 = also submit the DirectStorage batch first and upload RAM hits on a separate H2D stream while it is in flight (per-expert wait); 3 = as 2 with one event per stream. Byte-identical expert data in every level.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:326"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:330"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:326",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:330",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static int host_async_level(){static const int level=[]{const char*v=std::getenv(\"LLAMADECODE_HOST_ASYNC\");",
         "consumer": "    // batch first and upload RAM hits on a separate H2D stream while it is in flight, waiting\n    // per expert; 3 (default) = as 2 with one event per stream instead of per-expert waits.\n    static int host_async_level(){static const int level=[]{const char*v=std::getenv(\"LLAMADECODE_HOST_ASYNC\");\n        const int n=!v||!*v?3:(v[0]>='0'&&v[0]<='3'&&!v[1])?v[0]-'0':-1;\n        if(n<0)throw std::invalid_argument(\"LLAMADECODE_HOST_ASYNC must be 0, 1, 2 or 3\");\n        std::fprintf(stderr,\"LLAMADECODE_HOST_ASYNC level=%d\\n\",n);return n;}();return level;}\n    ds4_external_host_cache_v2 host2{};bool host_v2=false;"
@@ -25562,14 +25569,14 @@
     ],
     "doc": "Single-engine bounded RAM admission. Observe 32 scalar layer passes, select frequently evicted experts, then fill at most one payload per selected key until the next prefill. 0 retains an empty admitted tier for zero-hit overhead qualification; it never changes router scores at quality bias 0.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:276"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:280"
     ],
     "defaults_by_scope": {
       "rtx-llama": "1"
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:276",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:280",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*admit=std::getenv(\"LLAMADECODE_HOST_CACHE_ADMIT\");",
         "consumer": "        if(!host_slots||host_selected||layer!=0)return;\n        if(host_admit_touch())return;   // continuous admission takes no snapshot\n        const char*admit=std::getenv(\"LLAMADECODE_HOST_CACHE_ADMIT\");\n        if(admit&&!std::strcmp(admit,\"0\"))return;\n        if(++host_observations<=32)return;\n        std::vector<int32_t>keys;\n        for(int32_t k=0;k<int32_t(host_frequency.size());++k)if(host_frequency[k])keys.push_back(k);"
@@ -25587,14 +25594,14 @@
     ],
     "doc": "RAM expert tier admission policy. Unset or 0 keeps the bounded 32-pass snapshot; 1..255 admits a victim on its Nth eviction instead, so a key that turns hot late in a session reaches the tier without waiting for the snapshot. 1 stores every victim. Measured 2026-11-10 funded at 12.9 GiB (1 288 slots against 15 360 expert keys): the snapshot absorbed 6.3 percent of misses and second-touch 1.7 percent, both under the turn-cost plan's 50 percent clause and paid for with 10-12 ms of decode step median, so this is an instrument rather than a recommendation.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:259"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:263"
     ],
     "defaults_by_scope": {
       "rtx-llama": "0"
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:259",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:263",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static uint32_t host_admit_touch(){static const uint32_t n=[]{const char*v=std::getenv(\"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH\");",
         "consumer": "    // slots. Threshold 1 stores every victim, which is the writeback the comment above warns\n    // about; read that as an experiment, not a setting.\n    static uint32_t host_admit_touch(){static const uint32_t n=[]{const char*v=std::getenv(\"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH\");\n        if(!v||!v[0]||!std::strcmp(v,\"0\"))return 0u;\n        char*end=nullptr;errno=0;const unsigned long long t=std::strtoull(v,&end,10);\n        require(v[0]!='-'&&!errno&&end!=v&&!*end&&t>=1&&t<=255,\"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH must be 0 or 1..255\");\n        std::fprintf(stderr,\"LLAMADECODE_HOST_CACHE_ADMIT_TOUCH threshold=%u policy=continuous\\n\",uint32_t(t));"
@@ -25612,21 +25619,21 @@
     ],
     "doc": "Single-engine locked RAM expert tier after VRAM L1/L2. 0 disables; auto uses admitted physical/process headroom; integer MiB is an upper bound. Bounded hot-set admission avoids continuous GPU victim writeback. Keeps the runtime floor plus 512 MiB desktop reserve and 256 MiB margin; drops before append prefill. See LLAMADECODE_HOST_MODE for upload/CPU service.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1714",
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:270"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1750",
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:271"
     ],
     "defaults_by_scope": {
       "rtx-llama": "0"
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1714",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1750",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*e=std::getenv(\"LLAMADECODE_HOST_CACHE_MB\");",
         "consumer": "    (void)limit;(void)floor;throw std::runtime_error(\"RAM expert cache requires a CUDA backend\");\n#else\n    const char*e=std::getenv(\"LLAMADECODE_HOST_CACHE_MB\");\n    // Qualification decides the shipping default. An explicit auto uses all\n    // admitted headroom, an integer is an exact upper bound, and 0 is off.\n    if(!e||!e[0]||!std::strcmp(e,\"0\"))return;\n    uint64_t requested=UINT64_MAX;"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:270",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:271",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*ram=std::getenv(\"LLAMADECODE_HOST_CACHE_MB\");",
         "consumer": "        bind(x_hook,\"ds4x_set_expert_hook\");bind(x_decode,\"ds4x_decode\");bind(x_close,\"ds4x_close\");bind(x_affinity,\"ds4x_set_affinity\");\n        x_host_timing=reinterpret_cast<decltype(x_host_timing)>(library_symbol(module,\"ds4x_host_timing_v1\"));\n        const char*ram=std::getenv(\"LLAMADECODE_HOST_CACHE_MB\");\n        if(ram&&*ram&&std::strcmp(ram,\"0\")){\n            int(*api)(ds4_external_host_cache_v1*)=nullptr;bind(api,\"ds4x_host_cache_v1\");\n            require(api(&host_cache)==1,\"ds4-decode RAM cache ABI refused\");\n            int(*api2)(ds4_external_host_cache_v2*)=reinterpret_cast<int(*)(ds4_external_host_cache_v2*)>(library_symbol(module,\"ds4x_host_cache_v2\"));"
@@ -25713,7 +25720,7 @@
     ],
     "doc": "Single-engine RAM expert service: upload (pinned staging), cpu, or mix (per layer, the cheaper of CPU and upload by measured cost). Packed FP4 experts: cpu computes RAM-tier experts in place on a persistent AVX-512 pool (exact replica of the GPU packed kernels: Q8_1 activations, per-lane FMA order, slot-order merge) concurrently with the expert hook and GPU experts, joined once per layer before the down projection; verified bit-identical per layer. Q4_K: cpu uses the ds4 worker pool with llama CPU dot kernels (experimental, not exact). Other formats and multi-row calls use upload. Requires a matching producer and decode library.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:276",
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:277",
       "engines/ds4/ds4_external_host_compute.inc:40"
     ],
     "defaults_by_scope": {
@@ -25721,7 +25728,7 @@
     },
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:276",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:277",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*mode=std::getenv(\"LLAMADECODE_HOST_MODE\");",
         "consumer": "            int(*api2)(ds4_external_host_cache_v2*)=reinterpret_cast<int(*)(ds4_external_host_cache_v2*)>(library_symbol(module,\"ds4x_host_cache_v2\"));\n            have_host2=api2&&api2(&host_cache2)==1;\n            const char*mode=std::getenv(\"LLAMADECODE_HOST_MODE\");\n            require(!mode||!std::strcmp(mode,\"upload\")||!std::strcmp(mode,\"cpu\")||!std::strcmp(mode,\"mix\"),\"LLAMADECODE_HOST_MODE must be upload, cpu or mix\");\n            if(mode&&std::strcmp(mode,\"upload\")){\n                int(*cpu)(ds4_external_dot)=nullptr;bind(cpu,\"ds4x_host_cpu_v1\");\n                // The GPU producer does not otherwise initialize the CPU"
@@ -25767,11 +25774,11 @@
     ],
     "doc": "Producer decode: use free VRAM, less the reserve, as a second expert-cache tier (default on); 0 disables.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:132"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:133"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:132",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:133",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_L2\");return !(e&&e[0]=='0'&&!e[1]);}();",
         "consumer": "}\nvoid grow_decode_l2(llama_dsv41_sweep&sweep,const llama_dsv41_fixed_storage*fixed,ggml_backend_t backend){\n    static const bool on=[]{const char*e=std::getenv(\"LLAMADECODE_L2\");return !(e&&e[0]=='0'&&!e[1]);}();\n    if(!on||!fixed||!fixed->decode_compact)return;\n    auto*provider=sweep.provider_for_external_decode();\n    if(!provider->decode_layout()||provider->cache_stats().l2_slots)return;\n    // Owner rule: keep a 2 GiB physical reserve (NVML free already excludes"
@@ -25789,12 +25796,12 @@
     ],
     "doc": "Optional single-engine VRAM L2 slot upper bound. Useful for reproducible tier comparisons; physical VRAM admission remains authoritative. Unset uses all admitted slots.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1755"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1791"
     ],
     "defaults_by_scope": {},
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1755",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1791",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if(const char*e=std::getenv(\"LLAMADECODE_L2_MAX_SLOTS\")){",
         "consumer": "    const uint64_t slot_bytes=p->pool_max_stride[0]+p->pool_max_stride[1]+p->pool_max_stride[2];\n    uint32_t n=uint32_t(std::min<uint64_t>(bytes/slot_bytes,40ull*384-p->pool_slots));*slots=0;\n    if(const char*e=std::getenv(\"LLAMADECODE_L2_MAX_SLOTS\")){\n        char*end=nullptr;errno=0;const auto cap=std::strtoul(e,&end,10);\n        require(*e&&*e!='-'&&!errno&&end!=e&&!*end&&cap<=40u*384u,\"Invalid LLAMADECODE_L2_MAX_SLOTS\");\n        n=std::min(n,uint32_t(cap));\n    }"
@@ -25834,11 +25841,11 @@
     ],
     "doc": "E8 experiment: LFU score half life in tokens, 1 (default) or 16. Only used when the opt-in recency-LFU policy is enabled; expert routes and arithmetic are unchanged.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:228"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:232"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:228",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:232",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*value=std::getenv(\"LLAMADECODE_LFU_HALF_LIFE\");",
         "consumer": "    }();return enabled;}\n    static uint32_t recency_lfu_half_life(){static const uint32_t period=[]{\n        const char*value=std::getenv(\"LLAMADECODE_LFU_HALF_LIFE\");\n        const uint32_t n=!value||!std::strcmp(value,\"1\")?1u:!std::strcmp(value,\"16\")?16u:0u;\n        if(!n)throw std::invalid_argument(\"LLAMADECODE_LFU_HALF_LIFE must be 1 or 16\");\n        std::fprintf(stderr,\"PERFEXP_E8 lfu_half_life_tokens=%u\\n\",n);return n;\n    }();return period;}"
@@ -25861,12 +25868,12 @@
     ],
     "doc": "Optional local binary correctness trace: position, input token and vocabulary size as three uint32 fields followed by float32 logits, once every 32 positions. Compare only identical token prefixes and quality bias 0. The operator supplies a scratch file; disabled when unset.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:399"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:402"
     ],
     "defaults_by_scope": {},
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:399",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:402",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*trace=std::getenv(\"LLAMADECODE_LOGITS_TRACE\");",
         "consumer": "        // 32 positions; the caller supplies a scratch path and compares only\n        // identical token prefixes. No extra model evaluation or routing.\n        const char*trace=std::getenv(\"LLAMADECODE_LOGITS_TRACE\");\n        if(trace&&*trace&&position%32==0){\n            auto*f=std::fopen(trace,\"ab\");require(f,\"Cannot open decode logits trace\");\n            const uint32_t header[3]={position,uint32_t(token),uint32_t(logits.size())};\n            const bool ok=std::fwrite(header,sizeof(header),1,f)==1&&std::fwrite(logits.data(),sizeof(float),logits.size(),f)==logits.size();"
@@ -25907,11 +25914,11 @@
     ],
     "doc": "E17 experiment diagnostic only: 1 allows bounded KV sampling over the private producer pipe; default off. It does not change cache storage or any preset.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:748"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:771"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:748",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:771",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*gate=std::getenv(\"LLAMADECODE_PERFEXP_KV_SAMPLES\");",
         "consumer": "        }else if(operation==\"perfexp_kv_samples\"){\n            dsv41_live::keys(command,{\"session\",\"model_sha256\",\"sequence\",\"operation\",\"base\",\"path\"});same_base();\n            const char*gate=std::getenv(\"LLAMADECODE_PERFEXP_KV_SAMPLES\");\n            require(gate&&!std::strcmp(gate,\"1\"),\"Experimental KV sampling is disabled\");\n            const auto path=native_path(command.at(\"path\").get<std::string>());\n            require(path.is_absolute()&&!std::filesystem::exists(path),\"KV sample path must be absolute and new\");\n            exclusive_writer sample;sample.create(path);"
@@ -25948,14 +25955,14 @@
     ],
     "doc": "Router-driven prefill expert reads: 0 off, 1 all layers, tail layers21-39. A resident single-engine producer reads this once at pipeline build, so the choice is the session's, not the request's: combo_producer.routed_prefill_choice answers 1 for ULTRA at any prompt size there, because later turns append a few dozen tokens and tail would make each of them read whole stages for layers0-20. The paired route still answers 1 through2048 rows and 0 beyond. Explicit overrides win.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1191"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1210"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1191",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1210",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*lazy=std::getenv(\"LLAMADECODE_PREFILL_ROUTED\");",
-        "consumer": "    timer measured_build_total(build_total_ms);\n    build_total_ms=0;build_fetcher_ms=0;build_banks_ms=0;build_register_ms=0;\n    const char*lazy=std::getenv(\"LLAMADECODE_PREFILL_ROUTED\");\n    require(!lazy||!std::strcmp(lazy,\"0\")||!std::strcmp(lazy,\"1\")||!std::strcmp(lazy,\"tail\"),\"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail\");\n    p->lazy_prefill=lazy&&std::strcmp(lazy,\"0\");p->lazy_from_layer=lazy&&!std::strcmp(lazy,\"tail\")?21:0;\n    require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),\n        \"Tail prefetch requires routed strict two-bank prefill\");"
+        "consumer": "    timer measured_build_total(build_total_ms);\n    build_total_ms=0;build_fetcher_ms=0;build_banks_ms=0;build_register_ms=0;\n    const char*lazy=std::getenv(\"LLAMADECODE_PREFILL_ROUTED\");\n    require(!lazy||!std::strcmp(lazy,\"0\")||!std::strcmp(lazy,\"1\")||!std::strcmp(lazy,\"tail\"),\"LLAMADECODE_PREFILL_ROUTED must be0,1 or tail\");\n    p->lazy_prefill=lazy&&std::strcmp(lazy,\"0\");p->lazy_from_layer=lazy&&!std::strcmp(lazy,\"tail\")?21:0;\n    p->routed_env=lazy&&*lazy;\n    require(!p->tail_prefetch||(p->lazy_prefill&&p->options.compute_direct&&p->options.buffers==2),"
       }
     ]
   },
@@ -25991,11 +25998,11 @@
     ],
     "doc": "E8 experiment: recency-weighted LFU admission for the L2 expert victim cache; 0 (default) preserves LRU, 1 decays scores per token and requires a 25% admission margin.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:220"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:224"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:220",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:224",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*value=std::getenv(\"LLAMADECODE_RECENCY_LFU\");",
         "consumer": "    llama_dsv41_recency_lfu::scores lfu_scores;\n    static bool recency_lfu_enabled(){static const bool enabled=[]{\n        const char*value=std::getenv(\"LLAMADECODE_RECENCY_LFU\");\n        if(value&&*value&&std::strcmp(value,\"0\")&&std::strcmp(value,\"1\"))\n            throw std::invalid_argument(\"LLAMADECODE_RECENCY_LFU must be 0 or 1\");\n        const bool on=value&&!std::strcmp(value,\"1\");\n        std::fprintf(stderr,\"PERFEXP_E8 recency_lfu=%d admission_margin_percent=25 tier=l2\\n\",int(on));"
@@ -26136,11 +26143,11 @@
     ],
     "doc": "Single-engine decode: VRAM growth margin kept free beside LLAMADECODE_VRAM_RESERVE_MIB when the L2 expert tier is sized (default 64, 0-8192 MiB; 128 MiB reserve with 0 margin breached the reserve in every measured run). The reserve's runtime guard still refuses loudly if physical free VRAM falls below the reserve.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:102"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:103"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:102",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:103",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "uint64_t decode_vram_margin(){static const uint64_t r=[]{const char*e=std::getenv(\"LLAMADECODE_VRAM_MARGIN_MIB\");",
         "consumer": "// measured post-L2 transient is ~25-30 MiB, and 128+0 breached the reserve in every run).\n// Owner 2026-10-29: the safety margin may be cut but not zeroed; reserve+margin >= 128 MiB.\nuint64_t decode_vram_margin(){static const uint64_t r=[]{const char*e=std::getenv(\"LLAMADECODE_VRAM_MARGIN_MIB\");\n    const long v=e&&*e?std::strtol(e,nullptr,10):64;return uint64_t(std::max<long>(0,std::min<long>(v,8192)))<<20;}();return r;}\n// Headroom measurement: a 5 ms NVML sampler records the minimum free VRAM\n// (transient cuBLAS/graph/WDDM/other-process use) once the L2 is filled.\nstruct vram_sampler{"
@@ -26158,11 +26165,11 @@
     ],
     "doc": "Producer decode: physical VRAM kept free beside the L2 expert tier, in MiB (default 128, clamp 128-8192). The runtime guard refuses loudly if free VRAM falls below it.",
     "reads": [
-      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:97"
+      "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:98"
     ],
     "code_defaults": [
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:97",
+        "source": "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/live-session.inc:98",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "uint64_t decode_vram_reserve(){static const uint64_t r=[]{const char*e=std::getenv(\"LLAMADECODE_VRAM_RESERVE_MIB\");",
         "consumer": "// Physical VRAM reserve kept free beside the L2 (LLAMADECODE_VRAM_RESERVE_MIB, default 128 MiB;\n// owner 2026-10-30: 128 MiB reserve + 64 MiB growth margin, 8/8 runs at 50K-200K without a breach).\nuint64_t decode_vram_reserve(){static const uint64_t r=[]{const char*e=std::getenv(\"LLAMADECODE_VRAM_RESERVE_MIB\");\n    const long v=e&&*e?std::strtol(e,nullptr,10):128; /* measured: no transient dip below the post-L2 steady free (5 ms NVML, 43K run) */return uint64_t(std::max<long>(128,std::min<long>(v,8192)))<<20;}();return r;}\n// Decode-graph growth margin beside the reserve (LLAMADECODE_VRAM_MARGIN_MIB, default 64 MiB; the\n// measured post-L2 transient is ~25-30 MiB, and 128+0 breached the reserve in every run).\n// Owner 2026-10-29: the safety margin may be cut but not zeroed; reserve+margin >= 128 MiB."
@@ -31390,9 +31397,9 @@
     "doc": "LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP: qualified preset/runtime setting; override for a different memory or arithmetic plan",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-sweep.cpp:733",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1412",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1441",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1462",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1440",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1469",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1490",
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:782",
       "engines/streaming-llama/prefill_llama.cpp/tools/dsv41-prefill/main.cpp:822"
     ],
@@ -31407,19 +31414,19 @@
         "consumer": "        const auto schedule=llama_dsv41_plan_append(p->options.pair_ffn,p->options.carry.max_tile_tokens,p->options.compute_step_tokens,p->position_offset,p->options.unaligned_append_step_tokens);\n        const uint32_t compute_step=schedule.step;\n        const char*engram_overlap_env=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");\n        const bool engram_overlap=(!p->options.images||p->options.engram_tile_lookahead)&&engram_overlap_env&&std::strcmp(engram_overlap_env,\"1\")==0;\n        require(!engram_overlap||p->options.engram_tile_lookahead,\"Engram prompt overlap requires the existing lookahead worker\");\n        std::vector<uint8_t>text_mask;\n        if(p->options.images){"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1412",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1440",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*overlap=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");",
         "consumer": "    if(!llama_dsv41_engram_early_enabled()||p->options.engram_early_tokens.empty())return;\n    require(p->options.engram_prefetch_host_bytes&&p->inspected&&!p->allocated&&!p->early,\"Cold early Engram start requires an inspected, admitted, unallocated provider\");\n    const char*overlap=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");\n    if(llama_dsv41_engram_early_auto()&&!(overlap&&std::strcmp(overlap,\"1\")==0)){\n        llama_dsv41_layer_log(\"LLAMADECODE_ENGRAM_EARLY_DECISION at=cold_before_wf_start tokens=%zu early=0 reason=prompt_overlap_off\\n\",p->options.engram_early_tokens.size());return;}\n    require(overlap&&std::strcmp(overlap,\"1\")==0,\"LLAMADECODE_ENGRAM_EARLY requires LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP=1 (per-table adoption)\");\n    const auto&tokens=p->options.engram_early_tokens;const auto&tail=p->options.engram_early_tail;"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1441",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1469",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*overlap=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");",
         "consumer": "bool llama_dsv41_weight_provider::start_engram_append(const std::vector<int32_t>&tokens,llama_dsv41::engram_history initial,double gap_s,std::string&error){return p->guard([&]{\n    require(llama_dsv41_engram_early_enabled(),\"Append early Engram start requires LLAMADECODE_ENGRAM_EARLY=1 or auto\");\n    const char*overlap=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");\n    if(llama_dsv41_engram_early_auto()&&(!(overlap&&std::strcmp(overlap,\"1\")==0)||!p->options.engram_prefetch_host_bytes)){\n        llama_dsv41_layer_log(\"LLAMADECODE_ENGRAM_EARLY_DECISION at=append_tokens_arrived tokens=%zu early=0 reason=%s\\n\",tokens.size(),\n            p->options.engram_prefetch_host_bytes?\"prompt_overlap_off\":\"no_engram_prefetch\");return;}\n    require(overlap&&std::strcmp(overlap,\"1\")==0,\"LLAMADECODE_ENGRAM_EARLY requires LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP=1 (per-table adoption)\");"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1462",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1490",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char*overlap=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");",
         "consumer": "bool llama_dsv41_weight_provider::prepare_engram_prompt(const std::vector<int32_t>&tokens,const std::function<bool()>&stop,std::string&error,llama_dsv41::engram_history initial,const uint8_t* text_mask){return p->guard([&]{\n    if(!p->options.engram_prefetch_host_bytes)return;\n    const char*overlap=std::getenv(\"LLAMA_DSV41_ENGRAM_PROMPT_OVERLAP\");\n    const bool during_layer_zero=overlap&&std::strcmp(overlap,\"1\")==0&&p->leased&&p->next==1;\n    require(p->allocated&&((!p->leased&&p->next==0)||during_layer_zero)&&!p->engram_prompt&&tokens.size()==p->options.engram_prefetch_tokens,\n        \"Engram whole-prompt cache requires its initial or explicitly overlapped layer-zero lease\");p->identity();\n    if(p->whole_covers(tokens)&&!text_mask){"
@@ -31578,7 +31585,7 @@
     "doc": "Explicit absolute Windows SM120 packed-FP4 fused FFN bridge; prefill-only experiment, rejects canonical/decode mismatch.",
     "reads": [
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-flashinfer-budget.h:8",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:832",
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:846",
       "engines/streaming-llama/prefill_llama.cpp/ggml/src/ggml-cuda/dsv41-native-ffn.cuh:20"
     ],
     "code_defaults": [
@@ -31589,7 +31596,7 @@
         "consumer": "namespace llama_dsv41_flashinfer {\ninline uint64_t reserve_bytes(){\n    const char *native=std::getenv(\"LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL\");\n    if(native&&*native){const auto rows=ggml_dsv41_flashinfer::batch_tokens();return (rows==16384?3072ull:rows==8192?1792ull:1280ull)<<20;}\n    return ggml_dsv41_flashinfer::selected_reserve_bytes();\n}\ninline bool requested(){const char *v=std::getenv(\"LLAMA_DSV41_FLASHINFER_MXFP4\");return v&&!std::strcmp(v,\"1\");}"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:832",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:846",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "const char *bridge=std::getenv(\"LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL\");",
         "consumer": "                \"Unknown or mismatched native FP4 expert layout\");\n            require(gguf_get_alignment(gguf.get())>=128,\"Native FP4 requires128-byte file/tensor alignment\");\n            const char *bridge=std::getenv(\"LLAMA_DSV41_FLASHINFER_NATIVE_FFN_DLL\");\n            require(bridge&&*bridge,\"Kernel-native FP4 requires its explicit native FFN bridge\");\n            for(auto&w:layers)w.ffn.native_fp4_layout=true;\n        }\n        const auto arch=gguf_find_key(gguf.get(),\"general.architecture\");"
@@ -51979,7 +51986,7 @@
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:1824",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2196",
       "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-executor.cpp:2310",
-      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1051"
+      "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1070"
     ],
     "code_defaults": [
       {
@@ -52007,7 +52014,7 @@
         "consumer": "                ggml_type_name(values.next_pre->type),(unsigned long long)ggml_nbytes(values.next_pre),\n                (unsigned long long)check.pre_n);\n            if(std::getenv(\"DS4PERF_NAN_TRACE\")!=nullptr&&pinned){\n                ggml_backend_synchronize(backend);\n                llama_dsv41_layer_log(\"DS4PERF_RESIDUAL_STATE phase=post_compute layer=%u input_ptr=%llu \"\n                    \"input_flags=%u output_ptr=%llu output_flags=%u\\n\",in.layer,\n                    (unsigned long long)reinterpret_cast<uintptr_t>(input.residual->data),pinned->residual_probe(input.residual),"
       },
       {
-        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1051",
+        "source": "engines/streaming-llama/prefill_llama.cpp/src/llama-dsv41-weights.cpp:1070",
         "unset": "NULL from getenv; the literal consumer below supplies any fallback",
         "read": "if(std::getenv(\"DS4PERF_NAN_TRACE\")!=nullptr){",
         "consumer": "        // A difference here means the transfer delivered wrong bytes; no difference while a later\n        // probe still sees NaN means something wrote into the bank after this stage was bound.\n        if(std::getenv(\"DS4PERF_NAN_TRACE\")!=nullptr){\n            std::ifstream in(path.c_str(),std::ios::binary);\n            uint32_t compared=0,mismatching=0;\n            for(const auto&e:stage_at(id).entries){\n                const uint64_t bytes=ggml_nbytes(e.t);"

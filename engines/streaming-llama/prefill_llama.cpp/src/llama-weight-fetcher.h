@@ -344,6 +344,14 @@ WF_API // LLAMADECODE: cumulative extent-fetch counters. out4[3] is the extent
 // verify split and stay 0 here, so the diagnostic line keeps its shape and shows
 // nothing was split.
 void wf_extent_fetch_stats(double * out4, uint64_t * requests, uint64_t * batches);
+// LLAMADECODE: the same batches split by what the wall clock waited on, off unless
+// LLAMADECODE_BYTE_LEDGER=1 (then every field is 0). out4 = {read_ms, stage_ms, issue_ms,
+// upload_ms}: read/stage/issue are host-side waits inside the batch total, upload_ms is the
+// device timeline the copies occupied and overlaps them. `bytes` is the extent bytes and
+// `batches` the batches since the last reset of the fetcher's counters (they never reset).
+// `unread` counts device windows whose copies had not completed when the next batch drained
+// them, i.e. how much of `upload_ms` this run never got to charge.
+WF_API void wf_extent_split_stats(double * out4, uint64_t * bytes, uint64_t * batches, uint64_t * unread);
 bool wf_fetch_extents_direct(wf_context * wf, int bank, const wf_extent * extents, int n,
                                     void * cuda_stream, uint64_t * bytes, double * milliseconds);
 // Same, but overlap(overlap_user) runs on this thread after the first reads are
@@ -453,6 +461,13 @@ WF_API void wf_get_stats(wf_context * wf, wf_stats * stats);
 // False for a layer the fetcher did not transfer (skipped, empty, or not strict).
 WF_API bool wf_get_required_layer_fetch(wf_context * wf, int layer,
                                       uint64_t * bytes, double * milliseconds);
+// LLAMADECODE: the same completed stage's transfer split into the reader pool settling its
+// chunks (`read_ms`) and queueing the H2D copies (`upload_issue_ms`); the copy itself completes
+// later, and wf_wait_layer_gpu is where that wait is paid. False for a layer the fetcher did not
+// transfer. Nothing is timed here - both halves already exist per layer.
+WF_API bool wf_get_required_layer_fetch_split(wf_context * wf, int layer,
+                                              uint64_t * bytes, double * read_ms,
+                                              double * upload_issue_ms);
 
 // Reset all counters.
 WF_API void wf_reset_stats(wf_context * wf);

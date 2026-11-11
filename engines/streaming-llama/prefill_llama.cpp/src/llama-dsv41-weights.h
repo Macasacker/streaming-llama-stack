@@ -82,7 +82,7 @@ public:
     // banks, registered spans and imported pointers. Start is deferred to the
     // timed run.
     bool restart_prompt(const config &options,std::string &error);
-    bool start_request(std::string &error);
+    bool start_request(std::string &error,uint64_t rows=0);
     bool finish_yoco_encoder(std::string &error);
     // DS4COMBO fast switch: release / rebuild the fetcher's banks and imported
     // compute buffers between passes; model lease, plan and Engram state are kept.
@@ -169,6 +169,9 @@ public:
         uint32_t host_slots=0;uint64_t host_hits=0,host_stored=0,host_bytes=0;
         double host_store_ms=0,host_sync_ms=0,host_upload_ms=0,hook_ms=0,residency_ms=0;
         double host_overlap_ms=0;uint64_t host_async_hits=0,host_dropped=0,host_direct_hits=0;
+        // The part of host_overlap_ms that ran inside the extent fetch, i.e. already charged to
+        // fetch_ms. The assign split subtracts it so `assign_ms` reconciles without double count.
+        double host_overlap_fetch_ms=0;
         // Byte ledger (LLAMADECODE_BYTE_LEDGER=1 emits LLAMADECODE_STEP_BYTES from these):
         // bytes each tier served, device-to-device copies, RAM-tier writes, and the expert
         // count with one triple's bytes, so a step's footprint is checkable against what

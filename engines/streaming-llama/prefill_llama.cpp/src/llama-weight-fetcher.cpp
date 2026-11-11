@@ -3421,6 +3421,26 @@ bool wf_get_required_layer_fetch(wf_context * wf, int layer, uint64_t * bytes, d
     return true;
 }
 
+// The whole-stage relay's own split of the same transfer: `read_ms` is the reader pool
+// settling the stage's chunks (submit to last completion), `upload_issue_ms` is queueing the
+// H2D copies that land them in the compute bank - the device copy itself completes later, and
+// `wf_wait_layer_gpu` is where that wait is paid. These are the two numbers
+// docs/PREFILL_DECODE_PLAN_20261110.md Step 2 needs for the early layers' 600 ms of prefetch,
+// and they already exist per layer, so this reads them rather than timing anything.
+bool wf_get_required_layer_fetch_split(wf_context * wf, int layer, uint64_t * bytes,
+                                       double * read_ms, double * upload_issue_ms) {
+    if (bytes) *bytes = 0;
+    if (read_ms) *read_ms = 0;
+    if (upload_issue_ms) *upload_issue_ms = 0;
+    if (!wf || !wf->strict_streaming || layer < 0 || layer >= (int)wf->layers.size()) return false;
+    const auto & l = wf->layers[layer];
+    if (l.skipped || l.stage.load(std::memory_order_acquire) < WF_STAGE_GPU_READY) return false;
+    if (bytes) *bytes = uint64_t(l.total_bytes);
+    if (read_ms) *read_ms = double(l.nvme_read_ms);
+    if (upload_issue_ms) *upload_issue_ms = double(l.h2d_ms);
+    return true;
+}
+
 void wf_get_stats(wf_context * wf, wf_stats * stats) {
     if (!wf || !stats) return;
 
@@ -3647,6 +3667,89 @@ void wf_extent_fetch_stats(double * out4, uint64_t * requests, uint64_t * batche
     if (requests) *requests = g_wf_extent_stats.requests;
     if (batches) *batches = g_wf_extent_stats.batches;
 }
+
+// LLAMADECODE_BYTE_LEDGER=1: what a named-extent batch spent its wall clock on. The batch total
+// already exists (`cuda_ms` above) and says only "the fetch took N ms", which cannot tell a
+// storage read from a PCIe copy - and docs/PREFILL_DECODE_PLAN_20261110.md Steps 2 and 3a hinge
+// on which of the two to raise.
+//   read_ms    blocked on storage: io_uring submissions and completion waits, or pread
+//   stage_ms   blocked on a pinned slot an earlier upload still holds - the upload gate, as the
+//              host sees it, since a full window cannot be refilled until its copy has drained
+//   issue_ms   cudaMemcpyAsync plus the per-slot event record: queueing the copies, host side
+//   upload_ms  the device timeline the copies occupied, timed by events bracketing the batch's
+//              uploads on the upload stream and drained at the *next* batch, so the split adds
+//              no synchronization to this one
+// read_ms + stage_ms + issue_ms is the host wall (the batch total minus a small remainder);
+// upload_ms overlaps them. Off, nothing is timed and every field stays 0.
+static struct {
+    double read_ms = 0, stage_ms = 0, issue_ms = 0, upload_ms = 0;
+    uint64_t bytes = 0, batches = 0, upload_windows_unread = 0;
+} g_wf_extent_split = {};
+static std::atomic<int> g_wf_extent_split_on{-1};
+
+static bool wf_extent_split_enabled() {
+    int cached = g_wf_extent_split_on.load(std::memory_order_relaxed);
+    if (cached < 0) {
+        const char * e = getenv("LLAMADECODE_BYTE_LEDGER");
+        cached = (e && e[0] == '1' && !e[1]) ? 1 : 0;
+        g_wf_extent_split_on.store(cached, std::memory_order_relaxed);
+    }
+    return cached == 1;
+}
+
+void wf_extent_split_stats(double * out4, uint64_t * bytes, uint64_t * batches, uint64_t * unread) {
+    std::lock_guard<std::mutex> lock(g_wf_extent_stats_mutex);
+    if (out4) { out4[0] = g_wf_extent_split.read_ms; out4[1] = g_wf_extent_split.stage_ms;
+                out4[2] = g_wf_extent_split.issue_ms; out4[3] = g_wf_extent_split.upload_ms; }
+    if (bytes) *bytes = g_wf_extent_split.bytes;
+    if (batches) *batches = g_wf_extent_split.batches;
+    if (unread) *unread = g_wf_extent_split.upload_windows_unread;
+}
+
+// The device-side window is one pair of timing events, reused. A batch that starts while the
+// previous window has not completed is counted in `upload_windows_unread` rather than waited on:
+// synchronizing here would serialize the fetch against the compute it is meant to overlap with,
+// which is exactly what the split exists to measure.
+#ifdef WF_HAS_CUDA
+static cudaEvent_t g_wf_upload_start = nullptr, g_wf_upload_end = nullptr;
+#endif
+static bool g_wf_upload_open = false;
+
+static void wf_extent_upload_drain() {
+    if (!wf_extent_split_enabled() || !g_wf_upload_open) return;
+#ifdef WF_HAS_CUDA
+    float ms = 0.0f;
+    // cudaEventQuery on the end event answers "both recorded and elapsed"; the start precedes
+    // the end on the same stream, so a completed end means a completed start.
+    const bool done = cudaEventQuery(g_wf_upload_end) == cudaSuccess &&
+                      cudaEventElapsedTime(&ms, g_wf_upload_start, g_wf_upload_end) == cudaSuccess;
+    std::lock_guard<std::mutex> lock(g_wf_extent_stats_mutex);
+    if (done) { g_wf_extent_split.upload_ms += ms; g_wf_upload_open = false; }
+    else ++g_wf_extent_split.upload_windows_unread;
+#endif
+}
+
+// `stream` is the upload stream (a cudaStream_t), void* so the build without CUDA needs no
+// second signature. Without CUDA the copies are synchronous memcpys, charged where they run.
+static void wf_extent_upload_begin(void * stream) {
+#ifdef WF_HAS_CUDA
+    if (!wf_extent_split_enabled() || g_wf_upload_open) return;
+    if (!g_wf_upload_start && cudaEventCreate(&g_wf_upload_start) != cudaSuccess) { g_wf_upload_start = nullptr; return; }
+    if (!g_wf_upload_end && cudaEventCreate(&g_wf_upload_end) != cudaSuccess) { g_wf_upload_end = nullptr; return; }
+    g_wf_upload_open = cudaEventRecord(g_wf_upload_start, static_cast<cudaStream_t>(stream)) == cudaSuccess;
+#else
+    (void) stream;
+#endif
+}
+
+static void wf_extent_upload_end(void * stream) {
+#ifdef WF_HAS_CUDA
+    if (!wf_extent_split_enabled() || !g_wf_upload_open) return;
+    if (cudaEventRecord(g_wf_upload_end, static_cast<cudaStream_t>(stream)) != cudaSuccess) g_wf_upload_open = false;
+#else
+    (void) stream;
+#endif
+}
 bool wf_ready_direct_bank(wf_context * wf, int stage, int bank, uint64_t * generation) {
     if (generation) *generation=0;
     if (!wf || !generation || !wf->strict_streaming || !wf->params.ds_compute_direct ||
@@ -3674,6 +3777,9 @@ static bool wf_ready_generation(wf_context*wf,int stage,int bank,uint64_t genera
 // checks and the accounting are the same code either way.
 static void wf_extent_fail(wf_context * wf, const char * why) {
     WF_ERR("Required streaming: extent transfer failed (%s); no fallback", why);
+    // A batch that ended early never records its upload window's end event, so its timing is
+    // abandoned instead of read as a zero-length copy on a later drain.
+    g_wf_upload_open = false;
     wf->ds_failed.store(true, std::memory_order_release);
 }
 
@@ -3811,11 +3917,27 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
 
 #ifdef WF_HAS_CUDA
     const cudaStream_t upload = cuda_stream ? static_cast<cudaStream_t>(cuda_stream) : wf->copy_stream;
+    void * const upload_stream = (void *) upload;
+#else
+    void * const upload_stream = nullptr;
 #endif
+    // The batch's own split (LLAMADECODE_BYTE_LEDGER=1). A null target makes the timer read no
+    // clock, so the default path pays nothing for it.
+    const bool split = wf_extent_split_enabled();
+    double read_ms = 0, stage_ms = 0, issue_ms = 0, copy_ms = 0;
+    struct split_timer {
+        double * to;
+        std::chrono::high_resolution_clock::time_point t0;
+        explicit split_timer(double * target) : to(target) { if (to) t0 = std::chrono::high_resolution_clock::now(); }
+        ~split_timer() { if (to) *to += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count(); }
+    };
+    wf_extent_upload_drain();                    // the previous batch's device window, never waited on
+    wf_extent_upload_begin(upload_stream);
     const auto started = std::chrono::high_resolution_clock::now();
     size_t next = 0, done = 0;
     std::vector<bool> busy(size_t(wf->extent_slots), false);
     auto slot_ready = [&](int s) {
+        const split_timer waited(split ? &stage_ms : nullptr);
 #ifdef WF_HAS_CUDA
         return !wf->extent_slot_done[size_t(s)] || cudaEventSynchronize(wf->extent_slot_done[size_t(s)]) == cudaSuccess;
 #else
@@ -3825,10 +3947,12 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
     };
     auto upload_part = [&](const wf_extent_part & p, int s) {
 #ifdef WF_HAS_CUDA
+        const split_timer queued(split ? &issue_ms : nullptr);
         if (cudaMemcpyAsync(dst + p.bank_offset, wf->extent_window[size_t(s)], p.nbytes,
                             cudaMemcpyHostToDevice, upload) != cudaSuccess) return false;
         return cudaEventRecord(wf->extent_slot_done[size_t(s)], upload) == cudaSuccess;
 #else
+        const split_timer copied(split ? &copy_ms : nullptr);   // synchronous: the copy is the upload
         std::memcpy(dst + p.bank_offset, wf->extent_window[size_t(s)], p.nbytes);
         return true;
 #endif
@@ -3849,6 +3973,9 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
                 const int s = int(next % wf->extent_slots);
                 if (busy[size_t(s)]) break;                    // slot still holding an upload
                 if (!slot_ready(s)) { wf_extent_fail(wf, "extent staging wait failed"); return false; }
+                // Arming a read is timed apart from the slot wait above, so a wait on an
+                // upload that has not drained lands in stage_ms and not in read_ms.
+                const split_timer armed(split ? &read_ms : nullptr);
                 struct io_uring_sqe * sqe = io_uring_get_sqe(ring);
                 if (!sqe) break;                               // SQ full: a completion frees one
                 io_uring_prep_read(sqe, wf->files[size_t(parts[next].file_idx)].fd,
@@ -3858,6 +3985,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
                 busy[size_t(s)] = true;
                 ++next;
             }
+            const split_timer submitted(split ? &read_ms : nullptr);
             if (next > 0 && io_uring_submit(ring) < 0) { wf_extent_fail(wf, "io_uring_submit failed"); return false; }
             return true;
         };
@@ -3865,6 +3993,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
         if (overlap) overlap(overlap_user);                     // host work while reads are in flight
         while (done < parts.size()) {
             struct io_uring_cqe * cqe = nullptr;
+            const split_timer waited(split ? &read_ms : nullptr);
             // Submit and wait in one enter: io_uring_wait_cqe() does not flush the
             // submission queue on this liburing, and io_uring_submit() can return
             // 0 without an error, which would leave queued reads unseen.
@@ -3895,6 +4024,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
             const auto & p = parts[i];
             const int fd = wf->files[size_t(p.file_idx)].fd;
             size_t got = 0;
+            const split_timer reads(split ? &read_ms : nullptr);
             while (got < p.nbytes) {
                 const ssize_t read = ::pread(fd, wf->extent_window[size_t(s)] + got, p.nbytes - got, off_t(p.file_offset + got));
                 if (read <= 0) { wf_extent_fail(wf, "an extent read failed or was short"); return false; }
@@ -3936,6 +4066,7 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
         wf->extent_ready.push_back(batch);
     }
     const auto finished = std::chrono::high_resolution_clock::now();
+    wf_extent_upload_end(upload_stream);
     if (bytes) *bytes = total;
     if (milliseconds) *milliseconds = std::chrono::duration<double, std::milli>(finished - started).count();
     {
@@ -3943,6 +4074,14 @@ static bool wf_fetch_extents_impl(wf_context * wf, int bank, const wf_extent * e
         g_wf_extent_stats.batches += 1;
         g_wf_extent_stats.requests += uint64_t(n);
         g_wf_extent_stats.cuda_ms += std::chrono::duration<double, std::milli>(finished - started).count();
+        if (split) {
+            g_wf_extent_split.read_ms += read_ms;
+            g_wf_extent_split.stage_ms += stage_ms;
+            g_wf_extent_split.issue_ms += issue_ms;
+            g_wf_extent_split.upload_ms += copy_ms;      // the memcpy build uploads as it copies
+            g_wf_extent_split.bytes += total;
+            g_wf_extent_split.batches += 1;
+        }
     }
     return true;
 }
