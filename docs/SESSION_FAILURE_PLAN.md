@@ -326,32 +326,44 @@ amplifier is roughly a minute of wall clock per failure, on top of the abort its
 
 Fix:
 
-1. Distinguish an engine *self-check* abort from a transient failure. The producer reports
-   `LLAMADECODE_PRODUCER_ABORT kind=… reason=…`; a `kind=exception` abort whose reason is a
-   coverage require is deterministic, and retrying it unchanged cannot help. Keep the retirement
-   (the producer is gone) but mark the error non-retryable so the client sees one failure with
-   the reason rather than three.
-2. Say what was lost in the message: whether the conversation prefix survived. `retire` keeps
-   the snapshot (`save_snapshot('conversation')`) and `restore` reloads it, so the prefix is not
-   necessarily gone — the error should not imply it is.
+1. Classify the failure. The producer reports `LLAMADECODE_PRODUCER_ABORT kind=… reason=…`; an
+   engine self-check (two computed quantities differ) is a property of the shapes, so repeating
+   the request reproduces it, while a cancelled decode, an allocation failure, a closed pipe or a
+   busy card are conditions of the moment. Transient wording wins when both appear.
+2. Say it where a client can read it: `x-should-retry: false` on the buffered error — pi's own
+   classifier honours that header (`isRetryableProviderError`) — and `retryable: false` inside the
+   error object, which is the only channel left once an SSE stream has already sent its 200.
+   The stack does not, and cannot, set the client's retry policy.
+3. Say what is lost: retirement drops the live tokens and the producer frontier, so the next
+   request re-prefills the conversation. The message now states that, instead of reading as a
+   generic engine fault.
 
-Tests: `tests/test_producer_abort.py` gains the classification case — a coverage-abort line maps
-to a non-retryable error whose message carries the reason, while a `bad_alloc` line stays
-retryable — and that the prefix-retention state is reported.
+Tests: `tests/test_request_retry_hint.py` (new) — the classification table over the reason strings
+this box has actually produced, the transient-beats-deterministic rule, the wording, the error
+object, and three replies through the real handler: a self-check answers 503 with
+`x-should-retry: false` and `retryable: false`, a transient failure leaves both unset and the
+message untouched, and the per-request record carries the classification.
+
+Done, with one honest limit: pi retries a *streamed* error because the stream parser raises a plain
+Error with no status, and by then the 200 headers are gone — no header can retract that. Item 2 is
+what removes the abort itself; this item stops the buffered path from burning three cold launches
+and tells whoever is reading the stream why repeating it will not help.
 
 ## Order, and what is not a stack bug
+
+All six are fixed, in this order, one commit each:
 
 1. Item 6 (DSML tolerance) — offline, reproducible, no rebuild.
 2. Item 1 (admission reason, threshold, wait) — Python only.
 3. Item 4 (queue instead of 409) — Python only.
 4. Item 5 (port pre-flight) — Python only.
-5. Item 2 (shared top-k predicate + readable abort) — needs `build.sh` and a free card.
+5. Item 2 (shared top-k predicate + readable abort) — needed `build.sh`, and the on-device gate
+   was run while another engine held the card.
 6. Item 3 (retry classification) — Python, after 2 so the reason string it keys on exists.
 
-Baseline before any change: `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime
-python3 -B -m pytest tests/ -q`. On this box today that is **2 failed / 726 passed**. The
-31 failed / 696 passed recorded in `HANDOFF.md` is an older tree; the two below are what this
-work sees, and both predate it:
+The suite went from 726 passed to **777 passed**, with the same 2 failures throughout. The
+31 failed / 696 passed recorded in `HANDOFF.md` is an older tree; the two below are what this box
+reports, and both predate the work:
 
 - `test_yoco.py::test_both_launch_modes_keep_the_flag_and_budgets` — `producer_prefill_sweep_tokens`
   is `auto`, the test expects `49152`.
@@ -359,9 +371,11 @@ work sees, and both predate it:
   — a timing assertion (`assertLess(len(shown), evaluated)`) over a mocked producer that steps at
   20 ms with a watcher polling at 50 ms. It passes when the box is quiet and fails while another
   engine is loaded on it, so it is a test-isolation defect, not an engine one: it belongs in its
-  own fix, not in these commits.
+  own fix, not in these commits. Its read loop was fixed in the queue commit, because a server
+  error there used to hang the suite instead of failing it.
 
-Each commit re-runs the suite and the count of failures must stay at 2.
+Each commit re-ran `env PYTHONPATH=.:tests STUDIO_RUNTIME_ROOT=$PWD/runtime python3 -B -m pytest
+tests/ -q` and the failure count stayed at 2.
 
 Two of the reported symptoms are not defects here:
 

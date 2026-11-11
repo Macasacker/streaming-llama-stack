@@ -34,6 +34,7 @@ import time
 import psutil
 from .journal import atomic_json
 from .decoder_queue import QueueFull, QueueTimeout
+from . import request_error
 from .native_broker import vendor
 from . import ds4_render
 from .ds4_tool_parse import finish_message, find_any_tool_start, find_tool_markup_start, TOOL_MARKUP, tool_call_deltas
@@ -675,9 +676,11 @@ def handler(proxy):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.1'
         def log_message(self, *args):pass
-        def send(self, status, body):
+        def send(self, status, body, extra=None):
             data = json.dumps(body, separators=(',', ':'), allow_nan=False).encode()
-            self.send_response(status);self.send_header('Content-Type', 'application/json');self.send_header('Content-Length', str(len(data)));self.end_headers();self.wfile.write(data)
+            self.send_response(status);self.send_header('Content-Type', 'application/json')
+            for name, value in (extra or {}).items():self.send_header(name, value)
+            self.send_header('Content-Length', str(len(data)));self.end_headers();self.wfile.write(data)
         def authorized(self):return hmac.compare_digest(self.headers.get('Authorization', ''), 'Bearer ' + proxy.token)
         def read_body(self):
             length = int(self.headers.get('Content-Length', '0'))
@@ -708,7 +711,7 @@ def handler(proxy):
                     return self.send(200, reply)
                 return self.send(404, dict(error=dict(message='Unknown stack control route')))
             except Exception as exc:
-                self.send(503, dict(error=dict(message=str(exc), type='single_engine_refused')))
+                self.send(503, request_error.error(str(exc)))
             finally:engine.lock.release()
         def shutdown(self):
             """Graceful stop (Studio eject / switch-away): retire the producer so its VRAM and GPU hold
@@ -837,17 +840,19 @@ def handler(proxy):
                 else:self.send(400, error)
             except Exception as exc:
                 metrics['failure'] = repr(exc)
+                metrics['retryable'] = request_error.is_retryable(str(exc))
                 if engine.poison and engine.poison.startswith('Unconfirmed GPU release'):
                     print('OWNED CLEANUP UNCONFIRMED: '+engine.poison+'; retaining ownership',file=sys.stderr,flush=True)
                 else:
                     try:engine.retire('request failed: ' + repr(exc)[:200])
                     except BaseException as cleanup:
                         print('OWNED CLEANUP UNCONFIRMED: '+repr(cleanup)+'; retaining ownership',file=sys.stderr,flush=True)
-                error = dict(error=dict(message=str(exc), type='single_engine_refused'))
+                error = request_error.error(str(exc))
+                retry = request_error.retry_header(str(exc))
                 if headers:
                     try:self.wfile.write(b'data: ' + json.dumps(error, separators=(',', ':')).encode() + b'\n\ndata: [DONE]\n\n');self.wfile.flush()
                     except OSError:pass
-                else:self.send(503, error)
+                else:self.send(503, error, {'x-should-retry': retry} if retry else None)
             finally:
                 try:atomic_json(Path(proxy.cfg['runtime_root']) / ('single-request-' + secrets.token_hex(8) + '.json'), metrics)
                 except OSError:pass
